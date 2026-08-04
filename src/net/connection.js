@@ -73,22 +73,33 @@ export async function connectAndWait({ onStage } = {}){
     transport.onStatus = st => {
       if (st === 'closed' && !settled){ settled = true; reject(new Error('연결이 끊겼다')); }
     };
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      transport.auto = true;                // 이제부터 끊기면 자동으로 다시 붙는다
+      conn = { transport, slot, room };
+      onStage?.('matched');
+      resolve(conn);
+    };
     transport.toClient = m => {
       if (m.t === 'hello'){
         slot = m.pid; room = m.room;
         SELF.slot = slot;                   // 내 슬롯은 서버가 정한다
         onStage?.('waiting');
-      } else if ((m.t === 'go' || (m.t === 'hello' && m.back)) && !settled){
-        settled = true;
-        transport.auto = true;              // 이제부터 끊기면 자동으로 다시 붙는다
-        conn = { transport, slot, room };
-        onStage?.('matched');
-        resolve(conn);
+        if (m.back) done();                 // 재접속이면 서버가 go를 다시 보내지 않는다
+      } else if (m.t === 'queued'){
+        onStage?.('waiting', m.ahead);
+      } else if (m.t === 'go'){
+        done();
       }
     };
   });
 }
 
+// 사용자가 직접 나갈 때. 서버에 알려서 자리를 즉시 비운다
 export function disconnect(){
-  if (conn){ conn.transport.close(); conn = null; }
+  if (!conn) return;
+  try { conn.transport.clientSend({ t: 'bye' }); } catch { /* 이미 끊겼으면 무시 */ }
+  conn.transport.close();
+  conn = null;
 }

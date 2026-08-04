@@ -63,15 +63,25 @@ class Room {
     this.snapshotTo(slot);
     this.send({ t: 'peer', slot: 1 - slot, state: this.seats[1 - slot].ws ? 'here' : 'gone' }, slot);
     if (reconnected) this.send({ t: 'peer', slot, state: 'back' }, 1 - slot);
-    else if (this.full) this.send({ t: 'go' });
+    else if (this.seats[0].ws && this.seats[1].ws) this.send({ t: 'go' });
     return slot;
   }
 
+  // 연결이 끊긴 경우: 자리는 그대로 두고 시간만 기록 (재접속 대기)
   leave(slot){
     const seat = this.seats[slot];
     seat.ws = null;
-    seat.goneAt = Date.now();                        // 자리는 그대로 두고 시간만 기록
+    seat.goneAt = Date.now();
     this.send({ t: 'peer', slot, state: 'gone', grace: GRACE_MS }, 1 - slot);
+    if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
+  }
+
+  // 사용자가 직접 나간 경우: 자리를 바로 비운다.
+  // 이걸 구분 안 하면 다시 매칭을 눌러도 옛 방의 예약석으로 돌아가 상대를 못 만난다
+  quit(slot){
+    const seat = this.seats[slot];
+    seat.sid = null; seat.ws = null; seat.goneAt = 0;
+    this.send({ t: 'peer', slot, state: 'left' }, 1 - slot);
     if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
   }
 
@@ -96,6 +106,7 @@ const http = createServer((req, res) => {
     res.end(JSON.stringify({
       ok: true,
       rooms: rooms.size,
+      waiting: waiting.length,
       players: wss ? wss.clients.size : 0,
       uptime: Math.round(process.uptime())
     }));
@@ -107,30 +118,69 @@ const http = createServer((req, res) => {
 const wss = new WebSocketServer({ server: http });
 http.listen(PORT, () => console.log(`듀얼 서버 대기중 :${PORT}`));
 
+// 대기열: 새로 들어온 사람은 방에 바로 앉히지 않는다.
+// 방에 빈 자리가 있다고 바로 넣으면, 상대가 재접속 대기 중인(예약석) 방에 앉아
+// 오지 않을 사람을 기다리게 된다. 둘이 모였을 때만 방을 만든다.
+function pairUp(){
+  while (waiting.length >= 2){
+    const a = waiting.shift(), b = waiting.shift();
+    if (a.readyState !== 1){ if (b.readyState === 1) waiting.unshift(b); continue; }
+    if (b.readyState !== 1){ waiting.unshift(a); continue; }
+    const room = new Room(nextRoomId++);
+    rooms.set(room.id, room);
+    room.join(a, a.sid);
+    room.join(b, b.sid);
+    a.room = b.room = room;
+    console.log(`매칭: room ${room.id} (대기 ${waiting.length}명, 방 ${rooms.size}개)`);
+  }
+}
+
 wss.on('connection', (ws, req) => {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
 
   const sid = new URL(req.url, 'http://x').searchParams.get('sid') || String(Math.random());
+  ws.sid = sid;
 
-  // 재접속이면 원래 방으로, 아니면 빈 자리가 있는 방으로, 그것도 없으면 새 방
-  let room = [...rooms.values()].find(r => r.seatOf(sid) >= 0)
-          || [...rooms.values()].find(r => !r.full);
-  if (!room){ room = new Room(nextRoomId++); rooms.set(room.id, room); }
-  const slot = room.join(ws, sid);
-  if (slot < 0){ ws.close(); return; }
-  console.log(`접속: room ${room.id} slot ${slot} sid ${sid.slice(0, 8)} (방 ${rooms.size}개)`);
+  // 재접속이면 예약해 둔 자리로 바로 복귀
+  const back = [...rooms.values()].find(r => r.seatOf(sid) >= 0);
+  if (back){
+    ws.room = back;
+    back.join(ws, sid);
+    console.log(`복귀: room ${back.id} slot ${ws.slot} sid ${sid.slice(0, 8)}`);
+  } else {
+    // 같은 sid가 이미 대기 중이면 옛 소켓을 정리
+    for (let i = waiting.length - 1; i >= 0; i--){
+      if (waiting[i].sid === sid){ waiting[i].close(); waiting.splice(i, 1); }
+    }
+    ws.room = null;
+    waiting.push(ws);
+    ws.send(JSON.stringify({ t: 'queued', ahead: waiting.length - 1 }));
+    pairUp();
+  }
 
   ws.on('message', raw => {
     let m; try { m = JSON.parse(raw); } catch { return; }
+    if (m.t === 'bye'){
+      if (ws.room) ws.room.quit(ws.slot);
+      else { const i = waiting.indexOf(ws); if (i >= 0) waiting.splice(i, 1); }
+      ws.close();
+      return;
+    }
+    if (!ws.room) return;                       // 아직 대기열이면 입력은 버린다
     // pid는 절대 클라이언트 말을 믿지 않는다 (남의 캐릭터를 조작할 수 있으므로)
     m.pid = ws.slot;
-    room.server.onMsg(m);
+    ws.room.server.onMsg(m);
   });
 
   ws.on('close', () => {
-    if (room.seats[ws.slot].ws === ws) room.leave(ws.slot);   // 이미 새 소켓이 앉았으면 건드리지 않음
-    console.log(`끊김: room ${room.id} slot ${ws.slot} (${GRACE_MS / 1000}초 대기)`);
+    const i = waiting.indexOf(ws);
+    if (i >= 0){ waiting.splice(i, 1); return; }
+    const room = ws.room;
+    if (room && room.seats[ws.slot].ws === ws){
+      room.leave(ws.slot);
+      console.log(`끊김: room ${room.id} slot ${ws.slot} (${GRACE_MS / 1000}초 대기)`);
+    }
   });
   ws.on('error', () => ws.close());
 });

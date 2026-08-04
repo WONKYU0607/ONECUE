@@ -94,11 +94,11 @@ const tickBefore = ca.s.tick;
 await sleep(400);
 assert(ca.s.tick > tickBefore, '상대가 나가도 서버는 계속 돌아감');
 
-// 남의 자리를 채가면 안 된다 — 다른 sid로 들어오면 새 방이 열려야 함
+// 남의 자리를 채가면 안 된다 — 제3자는 대기열에서 기다려야 함
 const C = makeTransport('stranger');
 await C.ready; await sleep(300);
-const helloC = C.msgs.find(m => m.t === 'hello');
-assert(helloC && helloC.room !== helloA.room, `제3자는 예약된 자리를 못 가져감 (방 ${helloC.room} vs ${helloA.room})`);
+assert(C.msgs.some(m => m.t === 'queued'), '제3자는 대기열로');
+assert(!C.msgs.some(m => m.t === 'hello'), '제3자는 예약석에 앉지 못함');
 C.ws.close();
 await sleep(200);
 
@@ -127,6 +127,26 @@ assert(Math.abs(cb2.s.tick - ca.s.tick) < 20,
        `복귀 후 양쪽 틱이 비슷 (A ${ca.s.tick} / B ${cb2.s.tick})`);
 B2.ws.close();
 await sleep(200);
+
+// 한 판 끝내고 나갔다가 다시 매칭할 때: 옛 방의 예약석으로 돌아가면 안 된다
+{
+  // 한 판 끝내고 나간 뒤 둘이 다시 매칭을 누르는 상황
+  A.ws.send(JSON.stringify({ t: 'bye' }));
+  await sleep(300);
+
+  const A2 = makeTransport(sidA), D2 = makeTransport('sid-D');
+  await Promise.all([A2.ready, D2.ready]);
+  await sleep(400);
+  const hA2 = A2.msgs.find(m => m.t === 'hello');
+  const hD2 = D2.msgs.find(m => m.t === 'hello');
+  assert(hA2 && hD2, '재입장 시 hello 수신');
+  assert(!hA2.back && !hD2.back, '나간 뒤 재입장은 재접속이 아님');
+  assert(hA2.room === hD2.room, `다시 매칭될 때 같은 방 (A ${hA2.room} / D ${hD2.room})`);
+  assert(A2.msgs.some(m => m.t === 'go') && D2.msgs.some(m => m.t === 'go'),
+         '다시 매칭되면 go 수신 (매칭 화면이 안 멈춤)');
+  A2.ws.close(); D2.ws.close();
+  await sleep(200);
+}
 
 raf = false;
 A.ws.close();
