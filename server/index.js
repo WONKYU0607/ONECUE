@@ -1,5 +1,6 @@
 // 실시간 대전 서버. 클라이언트와 완전히 같은 시뮬레이션 코드를 쓴다.
 // (src/game/sim.js, config.js를 그대로 import — 규칙이 갈라지면 즉시 데싱크가 나므로)
+import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { Server } from '../src/game/net.js';
 
@@ -50,8 +51,25 @@ class Room {
   get full(){ return !!(this.sockets[0] && this.sockets[1]); }
 }
 
-const wss = new WebSocketServer({ port: PORT });
-console.log(`듀얼 서버 대기중 :${PORT}`);
+// 웹소켓만 열면 Render 헬스체크가 실패하고, 잠든 서비스를 깨울 방법도 없다.
+// 평범한 HTTP 응답을 하나 두고 그 위에 웹소켓을 얹는다.
+const http = createServer((req, res) => {
+  // 브라우저에서 fetch로 깨울 수 있어야 하므로 CORS 허용
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.url === '/' || req.url === '/health'){
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({
+      ok: true,
+      rooms: rooms.size,
+      players: wss ? wss.clients.size : 0,
+      uptime: Math.round(process.uptime())
+    }));
+    return;
+  }
+  res.writeHead(404); res.end();
+});
+const wss = new WebSocketServer({ server: http });
+http.listen(PORT, () => console.log(`듀얼 서버 대기중 :${PORT}`));
 
 wss.on('connection', ws => {
   ws.isAlive = true;

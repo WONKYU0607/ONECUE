@@ -116,7 +116,7 @@ export class WsTransport {
         let m; try { m = JSON.parse(e.data); } catch { return; }
         if (this.toClient) this.toClient(m);
       };
-      ws.onclose = () => { this.onStatus('closed'); };
+      ws.onclose = () => { this.onStatus('closed'); reject(new Error('연결 종료')); };
       ws.onerror = () => { this.onStatus('error'); reject(new Error('연결 실패')); };
     });
   }
