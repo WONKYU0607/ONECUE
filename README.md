@@ -78,8 +78,17 @@ test/               노드에서 도는 테스트
 | `layout.test.js` | 기기별 레이아웃·여백, 스틱 8방향·데드존 |
 | `lifecycle.test.js` | 마운트/언마운트 정리 (StrictMode 이중 실행 대비) |
 | `settings.test.js` | 설정 저장·복구, 항목 추가 시 병합, 저장소 막힌 환경 |
+| `online.test.js` | **실제 ws 서버를 띄워** 클라 2개 접속 — 슬롯 배정, 같은 틱 상태 일치, 핑 응답 격리, 상대 이탈 |
 
 `net.test.js`는 `setClock()`으로 가상 시계를 주입해 실제 시간 없이 결정론적으로 돈다.
+
+## 온라인 대전
+
+- 서버: `server/` (Node + ws). 클라이언트와 같은 시뮬 코드를 import한다
+- 클라: `src/net/connection.js`가 소켓을 들고 있다. 매칭 화면에서 연결하고 게임 화면까지 유지된다
+- 슬롯은 서버가 배정(`SELF.slot`). **슬롯 1인 플레이어는 화면을 뒤집어** 자기가 항상 아래에 보이게 한다
+  (아레나가 상하 대칭이라 배경은 그대로 두고 캐릭터·총알 y좌표만 뒤집음). 세로 입력도 같이 반전
+- 로컬 서버 주소 기본값 `ws://localhost:8080`. 바꾸려면 `.env`에 `VITE_SERVER_URL`
 
 ## 넷코드
 
@@ -113,8 +122,8 @@ npx cap open android      # Android Studio
 
 ## 남은 작업 (순서)
 
-1. **WebSocket 서버 + 2인 접속** — 가장 위험한 부분. 지금 넷코드는 Loopback 위에서만 검증됨
-2. 매칭 (대기열 → 방 배정) → `Matching.jsx` 교체
+1. ~~WebSocket 서버 + 2인 접속~~ 완료
+2. 재접속 처리 (지금은 끊기면 그 판은 끝)
 3. 아이템 배치 단계 (1~3칸 벽·바리케이트·드럼통, 스프라이트는 `public/assets/items.webp`)
 4. AI 모드 (스테이지별 난이도, 상대 슬롯을 AI가 조작)
 5. 결과 배선 (게임 → `onFinish` → Result)

@@ -79,7 +79,8 @@ export const TEAMS = [
   { m:'#f0a81e', d:'#a86e10' }    // 3 노랑
 ];
 export const TEAM_OF = [0, 1, 2, 3];     // 플레이어 슬롯 -> 팀 컬러
-export const MY_SLOT = 0;                // 내 캐릭터 = 뒷모습, 나머지 = 앞모습
+// 내 슬롯은 서버가 배정한다. 화면에선 항상 내가 아래쪽에 보이도록 렌더에서 뒤집는다
+export const SELF = { slot: 0 };
 export const GUN_C = '#23232b', LENS_C = '#101014', GLINT_C = '#dfe8f0';
 
 export const COL = {

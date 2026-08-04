@@ -1,5 +1,5 @@
 import {
-  FP, MY_SLOT, NET, TUNE, DEBUG_LOCAL_BOTH,
+  FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH,
   stepCap, bulletFP, coolTicks, clampi
 } from './config.js';
 import { Loopback, Server, Client } from './net.js';
@@ -13,9 +13,11 @@ export function createGame(canvas, opts = {}){
   const onPhase = opts.onPhase || (() => {});
   const session = opts.session || { mode: 'pvp' };   // TODO: ai 모드면 상대를 AI가 조작
 
-  const net = new Loopback();
-  const server = new Server(net);
-  const client = new Client(net, DEBUG_LOCAL_BOTH ? [0, 1] : [0]);
+  // 온라인이면 서버가 원격이라 여기서 Server를 만들지 않는다
+  const online = opts.transport || null;
+  const net = online || new Loopback();
+  const server = online ? null : new Server(net);
+  const client = new Client(net, DEBUG_LOCAL_BOTH && !online ? [0, 1] : [SELF.slot]);
   const view = createRenderer(canvas);
   const input = attachInput(canvas, view);
 
@@ -44,17 +46,18 @@ export function createGame(canvas, opts = {}){
     if (keys['arrowright']) vx =  1;
     if (keys['arrowup'])    vy = -1;
     if (keys['arrowdown'])  vy =  1;
-    if (vx || vy) client.input(MY_SLOT, vx * sp * dt, vy * sp * dt, 0);
+    const fvy = SELF.slot === 1 ? -vy : vy;   // 화면이 뒤집힌 쪽은 세로 입력도 반전
+    if (vx || vy) client.input(SELF.slot, vx * sp * dt, fvy * sp * dt, 0);
 
     client.ping(now);
     client.sendInputs(now);
-    server.update(now);
+    if (server) server.update(now);
     client.applyFrames();
     client.predict();
 
-    const dbg = 'SV' + server.s.tick + ' CL' + client.s.tick +
+    const dbg = 'SV' + (server ? server.s.tick : '-') + ' CL' + client.s.tick +
                 ' LAT' + NET.oneway + ' AHEAD' + (client.nextInputTick - 1 - client.s.tick) +
-                ' DRP' + server.lateDrops + ' DSY' + client.desync;
+                ' DRP' + (server ? server.lateDrops : '-') + ' DSY' + client.desync;
     const a = client.alpha(now);
     client.updateRender(a);
     view.draw(client.pred, dbg, a, client, stick);

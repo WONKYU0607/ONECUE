@@ -1,5 +1,5 @@
 import {
-  W, H, FP, COL, TEAMS, TEAM_OF, MY_SLOT, MAXHP, FLASH_T, VIEW, SHOW_HUD,
+  W, H, FP, COL, TEAMS, TEAM_OF, SELF, MAXHP, FLASH_T, VIEW, SHOW_HUD,
   GRID_COLS, GRID_ROWS, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO
 } from './config.js';
@@ -9,6 +9,10 @@ import { getImage, isReady } from './assets.js';
 const FW = 14 * RS, FH = 16 * RS;
 
 // 캔버스 하나에 붙는 렌더러. React는 이 객체만 만들고 정리하면 된다
+// 슬롯 1인 플레이어는 화면을 뒤집어 자기가 항상 아래쪽에 보이게 한다.
+// 아레나 배경·격자·중앙선은 상하 대칭이라 그대로 둬도 된다.
+const fy = (y, h) => SELF.slot === 1 ? H - y - h : y;
+
 export function createRenderer(canvas){
   const ctx = canvas.getContext('2d');
   const bg = getImage('arena'), sheet = getImage('characters');   // 진입창에서 미리 받아둔 것
@@ -49,11 +53,11 @@ export function createRenderer(canvas){
   function drawPlayer(p, i, xOverride, yOverride){
     if (p.invul > 0 && (p.invul >> 2) % 2 === 0) return;
     const xw = (xOverride === undefined ? p.x : xOverride) / FP;
-    const yw = (yOverride === undefined ? p.y : yOverride) / FP;
+    const yw = fy((yOverride === undefined ? p.y : yOverride) / FP, 16);
     const hit = p.flash > 0;
     if (isReady(sheet)){
       // 프레임 순서: [팀0앞, 팀0뒤, 팀1앞, 팀1뒤, ...] + 8부터 피격(흰색) 버전
-      const idx = (hit ? 8 : 0) + TEAM_OF[i] * 2 + (i === MY_SLOT ? 1 : 0);
+      const idx = (hit ? 8 : 0) + TEAM_OF[i] * 2 + (i === SELF.slot ? 1 : 0);
       // 월드 정수px가 아니라 디바이스 픽셀 단위로 반올림해야 계단이 안 생긴다
       ctx.drawImage(sheet, idx*FW, 0, FW, FH, Math.round(xw*RS), Math.round(yw*RS), FW, FH);
     }
@@ -64,7 +68,7 @@ export function createRenderer(canvas){
     px(0, H, W, 0.6, 'rgba(78,201,240,0.55)');
 
     // 상단 바: 내 HP(왼쪽) / 상대 HP(오른쪽) / 가운데 상태
-    const my = MY_SLOT, op = 1 - MY_SLOT;
+    const my = SELF.slot, op = 1 - SELF.slot;
     for (let i = 0; i < MAXHP; i++){
       px(4 + i*7,     H + 4, 5, 5, i < s.p[my].hp ? TEAMS[TEAM_OF[my]].m : 'rgba(255,255,255,0.13)');
       px(W - 9 - i*7, H + 4, 5, 5, i < s.p[op].hp ? TEAMS[TEAM_OF[op]].m : 'rgba(255,255,255,0.13)');
@@ -100,10 +104,11 @@ export function createRenderer(canvas){
     px(8, H/2 - 1, W - 16, 2, '#ffffff');            // 진영 경계 (정확히 절반)
     for (const c of s.covers){
       if (c.hp <= 0) continue;
-      px(c.x/FP, c.y/FP, c.w/FP, c.h/FP, c.hp > 2 ? COL.cover : COL.cover2);
-      px(c.x/FP, c.y/FP, c.w/FP, 2, '#7676a0');
+      const cy2 = fy(c.y/FP, c.h/FP);
+      px(c.x/FP, cy2, c.w/FP, c.h/FP, c.hp > 2 ? COL.cover : COL.cover2);
+      px(c.x/FP, cy2, c.w/FP, 2, '#7676a0');
     }
-    for (const b of s.bullets) px(b.x/FP, (b.y + b.vy * a)/FP, 2, 5, TEAMS[TEAM_OF[b.o]].m);
+    for (const b of s.bullets) px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5, TEAMS[TEAM_OF[b.o]].m);
     for (let i = 0; i < 2; i++) drawPlayer(s.p[i], i, cl.rx[i], cl.ry[i]);
     if (SHOW_HUD){
       ctx.font = (8*RS) + 'px monospace'; ctx.textAlign = 'left';

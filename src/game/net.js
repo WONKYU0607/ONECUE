@@ -30,7 +30,6 @@ import {
   MAXHP,
   MAX_DELAY,
   MIN_DELAY,
-  MY_SLOT,
   NET,
   PH_COUNT,
   PH_OVER,
@@ -42,6 +41,7 @@ import {
   RENDER_MAXJUMP,
   ROW_MAX,
   ROW_MIN,
+  SELF,
   SHOW_HUD,
   SNAP_EVERY,
   TEAMS,
@@ -90,6 +90,43 @@ export class Loopback {
   constructor(){ this.toServer = null; this.toClient = null; }
   clientSend(msg){ const d = NET.oneway; CLOCK.delay(() => this.toServer && this.toServer(msg), d); }
   serverSend(msg){ const d = NET.oneway; CLOCK.delay(() => this.toClient && this.toClient(msg), d); }
+  close(){ this.toServer = this.toClient = null; }
+}
+
+// 실제 온라인용. Loopback과 같은 인터페이스라 Server/Client 코드는 그대로 쓴다.
+export class WsTransport {
+  constructor(url){
+    this.url = url;
+    this.toClient = null;
+    this.ws = null;
+    this.queue = [];          // 연결되기 전에 보낸 메시지
+    this.onStatus = () => {};
+  }
+  connect(){
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(this.url);
+      this.ws = ws;
+      ws.onopen = () => {
+        this.onStatus('open');
+        for (const m of this.queue) ws.send(m);
+        this.queue.length = 0;
+        resolve();
+      };
+      ws.onmessage = e => {
+        let m; try { m = JSON.parse(e.data); } catch { return; }
+        if (this.toClient) this.toClient(m);
+      };
+      ws.onclose = () => { this.onStatus('closed'); };
+      ws.onerror = () => { this.onStatus('error'); reject(new Error('연결 실패')); };
+    });
+  }
+  clientSend(msg){
+    const raw = JSON.stringify(msg);
+    if (this.ws && this.ws.readyState === 1) this.ws.send(raw);
+    else this.queue.push(raw);
+  }
+  serverSend(){ /* 클라에는 서버가 없다 */ }
+  close(){ this.toClient = null; if (this.ws) this.ws.close(); }
 }
 
 // ================= SERVER (authoritative) =================
@@ -108,7 +145,7 @@ export class Server {
     net.toServer = m => this.onMsg(m);
   }
   onMsg(m){
-    if (m.t === 'p'){ this.net.serverSend({ t:'q', id:m.id, pid:m.pid }); return; }
+    if (m.t === 'p'){ this.net.serverSend({ t:'q', id:m.id, pid:m.pid }, m.pid); return; }   // 핑 응답은 보낸 클라에게만
     if (m.t === 'rtt'){ this.rtt[m.pid] = m.rtt; this.recalcDelay(); return; }
     if (m.t === 'cfg'){ this.pendingCfg = Object.assign(this.pendingCfg || {}, m.cfg); return; }
     if (m.t !== 'in') return;
@@ -188,7 +225,15 @@ export class Client {
         this.net.clientSend({ t:'rtt', pid:m.pid, rtt:this.rtt });
       }
     } else if (m.t === 's'){
-      this.pendingSnap = m;
+      // 접속 시점엔 서버가 이미 여러 틱 진행돼 있어 프레임 1번부터 받을 수 없다.
+      // 첫 스냅샷을 그대로 채택해서 그 지점부터 따라간다.
+      if (this.s.tick === 0 && m.tick > 0){
+        this.s = cloneState(m.st);
+        for (const k of [...this.frames.keys()]) if (k <= m.tick) this.frames.delete(k);
+        this.rx = null; this.ry = null;
+      } else {
+        this.pendingSnap = m;
+      }
     }
   }
   estServerTick(now){
@@ -244,7 +289,7 @@ export class Client {
   predict(){
     const target = this.nextInputTick - 1;
     const p = cloneState(this.s);
-    let prevMy = p.p[MY_SLOT].x, prevMyY = p.p[MY_SLOT].y;
+    let prevMy = p.p[SELF.slot].x, prevMyY = p.p[SELF.slot].y;
     let guard = 0;
     while (p.tick < target && guard++ < 40){
       const t = p.tick + 1;
@@ -253,7 +298,7 @@ export class Client {
         for (let k = 0; k < 2; k++){ inp[k].dx = this.lastInp[k].dx; inp[k].dy = this.lastInp[k].dy; }
       }
       for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire };
-      prevMy = p.p[MY_SLOT].x; prevMyY = p.p[MY_SLOT].y;
+      prevMy = p.p[SELF.slot].x; prevMyY = p.p[SELF.slot].y;
       step(p, inp);
     }
     this.prevMy = prevMy; this.prevMyY = prevMyY;
@@ -264,7 +309,7 @@ export class Client {
   updateRender(a){
     for (let i = 0; i < 2; i++){
       const tx = this.pred.p[i].x, ty = this.pred.p[i].y;
-      if (i === MY_SLOT){
+      if (i === SELF.slot){
         this.rx[i] = lerp(this.prevMy, tx, a);
         this.ry[i] = lerp(this.prevMyY, ty, a);
       } else {
