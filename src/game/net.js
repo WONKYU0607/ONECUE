@@ -95,18 +95,23 @@ export class Loopback {
 
 // 실제 온라인용. Loopback과 같은 인터페이스라 Server/Client 코드는 그대로 쓴다.
 export class WsTransport {
-  constructor(url){
+  constructor(url, opts = {}){
     this.url = url;
     this.toClient = null;
     this.ws = null;
-    this.queue = [];          // 연결되기 전에 보낸 메시지
+    this.queue = [];              // 연결되기 전에 보낸 메시지
     this.onStatus = () => {};
+    this.auto = false;            // 자동 재접속 (게임에 들어간 뒤부터 켠다)
+    this.closed = false;
+    this.tries = 0;
+    this.maxDelay = opts.maxDelay || 8000;
   }
   connect(){
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(this.url);
       this.ws = ws;
       ws.onopen = () => {
+        this.tries = 0;
         this.onStatus('open');
         for (const m of this.queue) ws.send(m);
         this.queue.length = 0;
@@ -116,17 +121,35 @@ export class WsTransport {
         let m; try { m = JSON.parse(e.data); } catch { return; }
         if (this.toClient) this.toClient(m);
       };
-      ws.onclose = () => { this.onStatus('closed'); reject(new Error('연결 종료')); };
+      ws.onclose = () => {
+        this.onStatus('closed');
+        reject(new Error('연결 종료'));
+        this.retry();
+      };
       ws.onerror = () => { this.onStatus('error'); reject(new Error('연결 실패')); };
     });
+  }
+  // 끊기면 점점 간격을 늘리며 다시 붙는다. 폰은 화면만 꺼도 끊기므로 필수
+  retry(){
+    if (!this.auto || this.closed) return;
+    const wait = Math.min(this.maxDelay, 500 * Math.pow(2, this.tries++));
+    this.onStatus('retrying');
+    setTimeout(() => {
+      if (!this.auto || this.closed) return;
+      this.connect().catch(() => {});
+    }, wait);
   }
   clientSend(msg){
     const raw = JSON.stringify(msg);
     if (this.ws && this.ws.readyState === 1) this.ws.send(raw);
-    else this.queue.push(raw);
+    else if (this.queue.length < 200) this.queue.push(raw);   // 끊긴 동안 무한정 쌓지 않는다
   }
   serverSend(){ /* 클라에는 서버가 없다 */ }
-  close(){ this.toClient = null; if (this.ws) this.ws.close(); }
+  close(){
+    this.closed = true; this.auto = false;
+    this.toClient = null;
+    if (this.ws) this.ws.close();
+  }
 }
 
 // ================= SERVER (authoritative) =================
@@ -208,6 +231,7 @@ export class Client {
     this.lastInp = null;
     this.tickAt = CLOCK.now();
     this.desync = 0; this.pendingSnap = null;
+    this.awaitSnap = true;             // 스냅샷을 받아야 시작(또는 재개)할 수 있는 상태
     this.ckHist = new Map();
     net.toClient = m => this.onMsg(m);
   }
@@ -230,14 +254,24 @@ export class Client {
     } else if (m.t === 's'){
       // 접속 시점엔 서버가 이미 여러 틱 진행돼 있어 프레임 1번부터 받을 수 없다.
       // 첫 스냅샷을 그대로 채택해서 그 지점부터 따라간다.
-      if (this.s.tick === 0 && m.tick > 0){
+      if (this.awaitSnap && m.tick > 0){
         this.s = cloneState(m.st);
         for (const k of [...this.frames.keys()]) if (k <= m.tick) this.frames.delete(k);
         this.rx = null; this.ry = null;
+        this.awaitSnap = false;
       } else {
         this.pendingSnap = m;
       }
     }
+  }
+  // 재접속 직후 호출. 옛 프레임·입력을 버리고 서버 스냅샷을 다시 기다린다
+  resync(){
+    this.awaitSnap = true;
+    this.frames.clear();
+    this.sent.length = 0;
+    this.nextInputTick = -1;
+    this.rtt = -1; this.pings.clear(); this.lastPing = -1e9;
+    this.pendingSnap = null;
   }
   estServerTick(now){
     const ow = Math.ceil((this.rtt < 0 ? 0 : this.rtt / 2) / TICK_MS);

@@ -11,6 +11,7 @@ import { attachInput } from './input.js';
 // 게임 상태는 절대 React state로 올리지 않는다 — 60Hz로 리렌더가 돌면 프레임이 죽는다.
 export function createGame(canvas, opts = {}){
   const onPhase = opts.onPhase || (() => {});
+  const onLink = opts.onLink || (() => {});   // 연결·상대 상태 알림
   const session = opts.session || { mode: 'pvp' };   // TODO: ai 모드면 상대를 AI가 조작
 
   // 온라인이면 서버가 원격이라 여기서 Server를 만들지 않는다
@@ -18,6 +19,25 @@ export function createGame(canvas, opts = {}){
   const net = online || new Loopback();
   const server = online ? null : new Server(net);
   const client = new Client(net, DEBUG_LOCAL_BOTH && !online ? [0, 1] : [SELF.slot]);
+  // 재접속하면 옛 프레임을 버리고 서버 스냅샷으로 다시 맞춘다
+  if (online){
+    let first = true;
+    online.onStatus = st => {
+      if (st === 'open'){
+        if (!first) client.resync();
+        first = false;
+        onLink({ self: 'ok' });
+      } else if (st === 'closed' || st === 'retrying'){
+        onLink({ self: 'reconnecting' });
+      }
+    };
+    const inner = client.onMsg.bind(client);
+    online.toClient = m => {
+      if (m.t === 'peer') onLink({ peer: m.state, grace: m.grace });
+      inner(m);
+    };
+  }
+
   const view = createRenderer(canvas);
   const input = attachInput(canvas, view);
 

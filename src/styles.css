@@ -83,3 +83,6 @@ border-radius:50%;transition:transform .15s,background .15s}
 .switch.on{background:rgba(78,201,240,.35)}
 .switch.on i{transform:translateX(18px);background:#4ec9f0}
 .hint.note{max-width:min(320px,80vw);text-align:center;line-height:1.6;color:#5f5f7a}
+.link-note{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:25;
+padding:8px 14px;background:rgba(18,18,28,.94);border:1px solid #f0a81e;
+color:#f0c86e;font:12px/1.4 monospace;white-space:nowrap}

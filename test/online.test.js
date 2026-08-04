@@ -19,9 +19,9 @@ proc.stderr.on('data', d => logs.push('ERR ' + d));
 await sleep(600);
 
 // 브라우저 WebSocket 대신 ws 모듈을 쓰는 전송 계층 (WsTransport와 같은 인터페이스)
-function makeTransport(){
-  const t = { toClient: null, ws: null, msgs: [] };
-  t.ws = new WebSocket(`ws://127.0.0.1:${PORT}`);
+function makeTransport(sid){
+  const t = { toClient: null, ws: null, msgs: [], sid };
+  t.ws = new WebSocket(`ws://127.0.0.1:${PORT}?sid=${encodeURIComponent(sid)}`);
   t.clientSend = msg => { if (t.ws.readyState === 1) t.ws.send(JSON.stringify(msg)); };
   t.serverSend = () => {};
   t.ws.on('message', raw => {
@@ -33,7 +33,8 @@ function makeTransport(){
   return t;
 }
 
-const A = makeTransport(), B = makeTransport();
+const sidA = 'sid-A', sidB = 'sid-B';
+const A = makeTransport(sidA), B = makeTransport(sidB);
 await Promise.all([A.ready, B.ready]);
 await sleep(300);
 
@@ -84,13 +85,48 @@ for (const [tick, a] of mapA){
 }
 assert(matched > 20 && mismatched === 0, `같은 틱에서 양쪽 상태 일치 (일치 ${matched} / 불일치 ${mismatched})`);
 
-// 한쪽이 끊기면 남은 쪽에 알림이 가고 서버는 안 죽는지
+// 한쪽이 끊기면 알림이 가고, 자리는 유예 시간 동안 예약된다
 B.ws.close();
 await sleep(400);
-assert(A.msgs.some(m => m.t === 'peer' && m.gone === 1), '상대 이탈 알림 수신');
+assert(A.msgs.some(m => m.t === 'peer' && m.slot === 1 && m.state === 'gone'),
+       '상대 이탈 알림 수신');
 const tickBefore = ca.s.tick;
 await sleep(400);
 assert(ca.s.tick > tickBefore, '상대가 나가도 서버는 계속 돌아감');
+
+// 남의 자리를 채가면 안 된다 — 다른 sid로 들어오면 새 방이 열려야 함
+const C = makeTransport('stranger');
+await C.ready; await sleep(300);
+const helloC = C.msgs.find(m => m.t === 'hello');
+assert(helloC && helloC.room !== helloA.room, `제3자는 예약된 자리를 못 가져감 (방 ${helloC.room} vs ${helloA.room})`);
+C.ws.close();
+await sleep(200);
+
+// 같은 sid로 다시 붙으면 원래 방·슬롯으로 복귀
+const B2 = makeTransport(sidB);
+await B2.ready; await sleep(400);
+const helloB2 = B2.msgs.find(m => m.t === 'hello');
+assert(helloB2 && helloB2.pid === 1 && helloB2.room === helloA.room,
+       `재접속 시 원래 방·슬롯 복귀 (room ${helloB2.room} slot ${helloB2.pid})`);
+assert(helloB2.back === true, '서버가 재접속임을 알려줌');
+assert(B2.msgs.some(m => m.t === 's'), '재접속에도 스냅샷을 다시 받음');
+assert(A.msgs.some(m => m.t === 'peer' && m.slot === 1 && m.state === 'back'),
+       '남은 쪽에 상대 복귀 알림');
+
+// 복귀한 클라가 다시 따라잡는지
+const cb2 = new Client(B2, [1]);
+cb2.resync();
+for (let i = 0; i < 60; i++){
+  const now = performance.now();
+  cb2.ping(now); cb2.sendInputs(now); cb2.applyFrames(); cb2.predict();
+  ca.ping(now); ca.sendInputs(now); ca.applyFrames(); ca.predict();
+  await sleep(16);
+}
+assert(cb2.s.tick > 30, `복귀한 클라가 다시 진행 (tick ${cb2.s.tick})`);
+assert(Math.abs(cb2.s.tick - ca.s.tick) < 20,
+       `복귀 후 양쪽 틱이 비슷 (A ${ca.s.tick} / B ${cb2.s.tick})`);
+B2.ws.close();
+await sleep(200);
 
 raf = false;
 A.ws.close();
