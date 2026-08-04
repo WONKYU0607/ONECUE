@@ -5,6 +5,7 @@ import {
 import { Loopback, Server, Client } from './net.js';
 import { createRenderer } from './render.js';
 import { attachInput } from './input.js';
+import { createAI } from './ai.js';
 
 // 게임 한 판을 만들고 rAF 루프를 돌린다.
 // React는 이 함수 하나만 호출하고, 언마운트 때 stop()만 부르면 된다.
@@ -18,7 +19,10 @@ export function createGame(canvas, opts = {}){
   const online = opts.transport || null;
   const net = online || new Loopback();
   const server = online ? null : new Server(net);
-  const client = new Client(net, DEBUG_LOCAL_BOTH && !online ? [0, 1] : [SELF.slot]);
+  // 온라인이면 내 슬롯만, 로컬(AI·디버그)이면 둘 다 이 클라가 입력을 넣는다
+  const client = new Client(net, online ? [SELF.slot] : [0, 1]);
+  const ai = (!online && session.mode === 'ai') ? createAI(session.stage || 1) : null;
+  const aiSlot = 1 - SELF.slot;
   // 재접속하면 옛 프레임을 버리고 서버 스냅샷으로 다시 맞춘다
   if (online){
     let first = true;
@@ -74,6 +78,12 @@ export function createGame(canvas, opts = {}){
     const fvy = SELF.slot === 1 ? -vy : vy;   // 화면이 뒤집힌 쪽은 세로 입력도 반전
     if (vx || vy) client.input(SELF.slot, vx * sp * dt, fvy * sp * dt, 0);
 
+    // AI는 사람과 완전히 같은 입력 경로를 탄다 (서버가 판정하는 건 동일)
+    if (ai){
+      const a = ai.think(client.pred, aiSlot, dt, now);
+      if (a.vx || a.vy) client.input(aiSlot, a.vx * sp * dt, a.vy * sp * dt, 0);
+    }
+
     client.ping(now);
     client.sendInputs(now);
     if (server) server.update(now);
@@ -97,7 +107,7 @@ export function createGame(canvas, opts = {}){
   raf = requestAnimationFrame(loop);
 
   return {
-    server, client, session,
+    server, client, session, ai,
     applyCfg,
     // 튜닝값 한 칸 조절 (UI 버튼용)
     bump(k, dir){
