@@ -11,6 +11,17 @@ export default function GameCanvas({ session, onExit, onFinish }){
   const gameRef = useRef(null);
   const [phase, setPhase] = useState(PH_READY);
   const [link, setLink] = useState({ self: 'ok', peer: 'here' });
+  const [ready, setReady] = useState({ me: false, peer: false });
+
+  // 배치 단계에선 준비 상태를 자주 확인해야 버튼이 제때 바뀐다
+  useEffect(() => {
+    if (phase !== PH_READY){ setReady({ me: false, peer: false }); return; }
+    const iv = setInterval(() => {
+      const g = gameRef.current; if (!g) return;
+      setReady({ me: g.isReady(), peer: g.peerReady() });
+    }, 200);
+    return () => clearInterval(iv);
+  }, [phase]);
 
   useEffect(() => {
     // StrictMode가 개발 중 effect를 두 번 실행하므로, cleanup에서 반드시 정리해야
@@ -27,7 +38,8 @@ export default function GameCanvas({ session, onExit, onFinish }){
     return () => { game.stop(); gameRef.current = null; };
   }, [session, onFinish]);
 
-  const showStart = phase === PH_READY || phase === PH_OVER;
+  const placing = phase === PH_READY;
+  const showStart = (placing && ready.me && ready.peer) || phase === PH_OVER;
 
   return (
     <div className="game-root">
@@ -44,6 +56,14 @@ export default function GameCanvas({ session, onExit, onFinish }){
         <div className="link-note ui-overlay">상대가 나갔다</div>
       )}
 
+      {placing && !ready.me && (
+        <button className="placebtn ui-overlay" onClick={() => gameRef.current?.ready()}>
+          설치 완료
+        </button>
+      )}
+      {placing && ready.me && !ready.peer && (
+        <div className="link-note ui-overlay">상대가 설치하는 중…</div>
+      )}
       {showStart && (
         <button className="startbtn ui-overlay" onClick={() => gameRef.current?.start()}>
           START

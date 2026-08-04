@@ -9,7 +9,7 @@ const IN = (a, b) => [a, b];
 const mk = (vx, vy, sp) => ({
   dx: Math.round(vx * sp * (1 / 60) * FP),
   dy: Math.round(vy * sp * (1 / 60) * FP),
-  fire: 0
+  fire: 0, ready: 0, place: null
 });
 
 // AI(슬롯1)와 상대(슬롯0)를 SECONDS초 굴리며 AI가 몇 번 맞는지 센다

@@ -5,9 +5,11 @@ import {
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 
-const IN = (f0 = 0, f1 = 0) => [{ dx:0, dy:0, fire:f0 }, { dx:0, dy:0, fire:f1 }];
-const P  = (dx, dy) => [{ dx:Math.round(dx*FP), dy:Math.round(dy*FP), fire:0 },
-                        { dx:Math.round(dx*FP), dy:Math.round(dy*FP), fire:0 }];
+// 배치 단계가 생겨서 시작하려면 양쪽 다 '설치 완료'가 필요하다
+const IN = (f0 = 0, f1 = 0) => [{ dx:0, dy:0, fire:f0, ready:1, place:null },
+                                { dx:0, dy:0, fire:f1, ready:1, place:null }];
+const P  = (dx, dy) => [{ dx:Math.round(dx*FP), dy:Math.round(dy*FP), fire:0, ready:1, place:null },
+                        { dx:Math.round(dx*FP), dy:Math.round(dy*FP), fire:0, ready:1, place:null }];
 const keep = t => { t.p[0].hp = t.p[1].hp = 9; t.bullets.length = 0; t.phase = PH_PLAY; t.over = false; };
 
 console.log('페이즈 전이');

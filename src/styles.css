@@ -86,3 +86,7 @@ border-radius:50%;transition:transform .15s,background .15s}
 .link-note{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:25;
 padding:8px 14px;background:rgba(18,18,28,.94);border:1px solid #f0a81e;
 color:#f0c86e;font:12px/1.4 monospace;white-space:nowrap}
+.placebtn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;
+padding:14px 28px;background:rgba(18,18,28,.92);color:#f0c86e;border:2px solid #f0a81e;
+font:bold 16px/1 monospace;letter-spacing:2px;cursor:pointer}
+.placebtn:active{background:#f0a81e;color:#12121c}

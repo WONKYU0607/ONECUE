@@ -65,6 +65,8 @@ assert(ca.rtt >= 0 && cb.rtt >= 0, `RTT 측정됨 (${ca.rtt.toFixed(1)}ms / ${cb
 assert(!A.msgs.some(m => m.t === 'q' && m.pid === 1), 'A는 B의 핑 응답을 받지 않음');
 
 // 한쪽이 START를 누르면 양쪽 다 시작
+ca.setReady(0); cb.setReady(1);
+await sleep(300);
 ca.input(0, 0, 0, 1);
 await sleep(500);
 assert(ca.s.phase === PH_COUNT && cb.s.phase === PH_COUNT,

@@ -24,7 +24,7 @@ export function makeNetGame(oneway = 60){
   NET.oneway = oneway;
   const net = new Loopback();
   const server = new Server(net);
-  const client = new Client(net, DEBUG_LOCAL_BOTH ? [0, 1] : [0]);
+  const client = new Client(net, [0, 1]);   // 테스트는 양쪽 다 조작
   const TICK = 1000 / 60;
   function frame(){
     const now = clock.now();

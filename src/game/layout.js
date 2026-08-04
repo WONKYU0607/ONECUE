@@ -23,6 +23,17 @@ export function computeLayout(innerW, innerH){
 export const padRect = uiH => ({ x: 3, y: H + UI_TOP, w: W - 6, h: uiH - UI_TOP - UI_ROW });
 
 // 원형 스틱: 패드 오른쪽 끝
+// 배치 팔레트: 스틱 왼쪽에 아이콘 3개
+export function paletteSlots(uiH){
+  const pd = padRect(uiH);
+  const n = 3, size = Math.min(pd.h - 6, 26);
+  const gap = 5;
+  const total = n * size + (n - 1) * gap;
+  const x0 = Math.max(4, (pd.x + (W - 6 - 2 * 36) / 2) - total / 2);   // 스틱 왼쪽 영역 가운데
+  const y = pd.y + (pd.h - size) / 2;
+  return Array.from({ length: n }, (_, i) => ({ k: i, x: x0 + i * (size + gap), y, w: size, h: size }));
+}
+
 export function stickGeom(uiH){
   const pd = padRect(uiH);
   const r = Math.min(pd.h / 2 - 2, STICK_R_MAX);
