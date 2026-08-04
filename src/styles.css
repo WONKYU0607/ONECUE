@@ -1,0 +1,21 @@
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:#07070d;overflow:hidden;touch-action:none;
+-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.wrap{height:100%;display:flex;align-items:center;justify-content:center}
+canvas{display:block;background:#12121c}
+.tune{position:fixed;right:6px;top:6px;display:flex;flex-direction:column;gap:5px;
+z-index:10;font:11px/1 monospace;color:#7a7a95}
+.tune .row{display:flex;align-items:center;gap:5px;justify-content:flex-end}
+.tune .lbl{min-width:30px;text-align:right}
+.tune button{width:28px;height:28px;background:#1b1b2a;color:#4ec9f0;
+border:1px solid #4ec9f0;font:15px/1 monospace;cursor:pointer;padding:0}
+.tune button:active{background:#4ec9f0;color:#12121c}
+.tune .val{min-width:46px;text-align:center;color:#e8e8f0}
+.startbtn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;
+padding:14px 34px;background:rgba(18,18,28,0.92);color:#8fd8ff;border:2px solid #4ec9f0;
+font:bold 20px/1 monospace;letter-spacing:2px;cursor:pointer}
+.startbtn:active{background:#4ec9f0;color:#12121c}
+
+.tune button.wide{width:auto;padding:0 10px}
+.game-root{height:100%}
+#root{height:100%}
