@@ -186,6 +186,9 @@ export class Server {
   }
 }
 
+// 상대 위치 추종 속도(1/초). 60Hz에서 프레임당 0.35와 같은 수렴 속도
+const FOLLOW_RATE = 26;
+
 // ================= CLIENT =================
 export class Client {
   constructor(net, controlled){
@@ -305,16 +308,20 @@ export class Client {
     this.pred = p;
     if (!this.rx){ this.rx = [p.p[0].x, p.p[1].x]; this.ry = [p.p[0].y, p.p[1].y]; }
   }
-  // 내 캐릭터는 틱 보간(지연 0), 상대는 따라가기 필터로 부드럽게
-  updateRender(a){
+  // 내 캐릭터는 틱 보간(지연 0), 상대는 따라가기 필터로 부드럽게.
+  // 필터 계수를 프레임당 고정값으로 두면 주사율에 따라 수렴 속도가 달라진다
+  // (120Hz 폰에서는 60Hz PC의 두 배로 빨리 따라붙어 상대가 확확 튀어 보임).
+  // dt 기준 지수 감쇠로 바꿔야 주사율과 무관하게 같은 시간에 같은 만큼 수렴한다.
+  updateRender(a, dt = 1 / 60){
+    const k = 1 - Math.exp(-FOLLOW_RATE * Math.min(dt, 0.1));
     for (let i = 0; i < 2; i++){
       const tx = this.pred.p[i].x, ty = this.pred.p[i].y;
       if (i === SELF.slot){
         this.rx[i] = lerp(this.prevMy, tx, a);
         this.ry[i] = lerp(this.prevMyY, ty, a);
       } else {
-        this.rx[i] += (tx - this.rx[i]) * 0.35;
-        this.ry[i] += (ty - this.ry[i]) * 0.35;
+        this.rx[i] += (tx - this.rx[i]) * k;
+        this.ry[i] += (ty - this.ry[i]) * k;
       }
     }
   }

@@ -64,7 +64,7 @@ export function createGame(canvas, opts = {}){
                 ' LAT' + NET.oneway + ' AHEAD' + (client.nextInputTick - 1 - client.s.tick) +
                 ' DRP' + (server ? server.lateDrops : '-') + ' DSY' + client.desync;
     const a = client.alpha(now);
-    client.updateRender(a);
+    client.updateRender(a, dt);
     view.draw(client.pred, dbg, a, client, stick);
 
     // 페이즈가 바뀔 때만 React에 알린다 (매 프레임 setState 하면 안 됨)

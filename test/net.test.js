@@ -65,3 +65,23 @@ console.log('넷 경로에서도 벽을 안 넘는지');
   assert(bad === 0, '서버 상태가 벽 밖으로 안 나감');
 }
 console.log('net.test.js 통과');
+
+console.log('상대 추종 필터가 주사율에 무관한지');
+{
+  // 같은 목표를 향해 1초 동안 따라갈 때, 60Hz와 120Hz의 결과가 같아야 한다
+  const run = fps => {
+    const g = makeNetGame(0);
+    g.run(200); g.client.input(SELF.slot, 0, 0, 1); g.run(320);
+    const opp = 1 - SELF.slot;
+    g.client.rx[opp] = 0;
+    const target = g.client.pred.p[opp].x;
+    const dt = 1 / fps, SPAN = 0.1;                               // 100ms 동안 얼마나 따라오는지 (30·60·120Hz 모두 정수 프레임)
+    for (let i = 0; i < Math.round(SPAN * fps); i++) g.client.updateRender(0, dt);
+    return g.client.rx[opp] / target;                              // 목표까지 진행률
+  };
+  const a = run(60), b = run(120), c = run(30);
+  assert(Math.abs(a - b) < 0.02 && Math.abs(a - c) < 0.02,
+         `100ms 수렴률이 주사율과 무관 (30Hz ${c.toFixed(3)} / 60Hz ${a.toFixed(3)} / 120Hz ${b.toFixed(3)})`);
+  assert(a > 0.5 && a < 0.95, `100ms면 대부분 따라옴 (${a.toFixed(3)})`);
+}
+console.log('net.test.js 통과');

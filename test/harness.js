@@ -33,7 +33,7 @@ export function makeNetGame(oneway = 60){
     server.update(now);
     client.applyFrames();
     client.predict();
-    client.updateRender(client.alpha(now));
+    client.updateRender(client.alpha(now), 1/60);
     clock.advance(TICK);
   }
   function run(n, each){
