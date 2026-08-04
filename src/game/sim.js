@@ -39,6 +39,7 @@ import {
   PING_MS,
   PWf,
   RENDER_MAXJUMP,
+  ROUND_TICKS,
   ROW_MAX,
   ROW_MIN,
   SELF,
@@ -80,7 +81,7 @@ export function newCovers(){
 export function newState(){
   return {
     tick: 0,
-    phase: PH_READY, timer: 0,
+    phase: PH_READY, timer: 0, clock: 0,   // clock = 남은 라운드 틱
     p: [
       { x:homeXFP(HOME_COL), y:homeYFP(GRID_ROWS-1), hp:MAXHP, cool:0, invul:0, flash:0 },
       { x:homeXFP(HOME_COL), y:homeYFP(0),            hp:MAXHP, cool:0, invul:0, flash:0 }   // 완전 대칭
@@ -135,7 +136,7 @@ export function step(s, inp){
   }
 
   if (s.phase === PH_COUNT){
-    if (--s.timer <= 0){ s.phase = PH_PLAY; s.timer = 0; }
+    if (--s.timer <= 0){ s.phase = PH_PLAY; s.timer = 0; s.clock = ROUND_TICKS; }
     return;
   }
 
@@ -176,10 +177,16 @@ export function step(s, inp){
   }
   if (s.over && s.p[0].hp <= 0 && s.p[1].hp <= 0) s.winner = 0;   // 동시 사망 = 무승부
 
+  // 제한 시간. 다 되면 체력이 많은 쪽 승, 같으면 무승부
+  if (!s.over && s.phase === PH_PLAY && s.clock > 0 && --s.clock === 0){
+    s.over = true; s.phase = PH_OVER;
+    s.winner = s.p[0].hp === s.p[1].hp ? 0 : (s.p[0].hp > s.p[1].hp ? 1 : 2);
+  }
+
 }
 
 export function checksum(s){
-  let h = s.tick + s.maxStep + s.bulletV + s.coolT + s.phase * 7 + s.timer;
+  let h = s.tick + s.maxStep + s.bulletV + s.coolT + s.phase * 7 + s.timer + s.clock;
   for (const p of s.p) h = (h*31 + p.x + p.y*3 + p.hp*7 + p.cool*3 + p.invul) | 0;
   for (const b of s.bullets) h = (h*31 + b.x + b.y + b.o) | 0;
   for (const c of s.covers) h = (h*31 + c.hp) | 0;

@@ -6,7 +6,7 @@ import { getConnection, disconnect } from '../net/connection.js';
 
 // 캔버스를 마운트하고 게임을 붙였다 떼는 얇은 껍데기.
 // 게임 루프 상태는 ref에만 두고, React state는 "페이즈"처럼 드물게 바뀌는 것만 쓴다.
-export default function GameCanvas({ session, onExit }){
+export default function GameCanvas({ session, onExit, onFinish }){
   const canvasRef = useRef(null);
   const gameRef = useRef(null);
   const [phase, setPhase] = useState(PH_READY);
@@ -16,11 +16,16 @@ export default function GameCanvas({ session, onExit }){
     // StrictMode가 개발 중 effect를 두 번 실행하므로, cleanup에서 반드시 정리해야
     // 서버·루프가 두 개 생겨 총알이 두 배로 나오는 일이 없다
     const conn = session?.mode === 'pvp' ? getConnection() : null;
-    const game = createGame(canvasRef.current, { onPhase: setPhase, session, transport: conn?.transport,
-        onLink: u => setLink(prev => ({ ...prev, ...u })) });
+    const game = createGame(canvasRef.current, {
+      onPhase: setPhase,
+      session,
+      transport: conn?.transport,
+      onLink: u => setLink(prev => ({ ...prev, ...u })),
+      onFinish: r => setTimeout(() => onFinish?.(r), 1400)   // 결과 연출을 잠깐 보여준 뒤 넘어감
+    });
     gameRef.current = game;
     return () => { game.stop(); gameRef.current = null; };
-  }, [session]);
+  }, [session, onFinish]);
 
   const showStart = phase === PH_READY || phase === PH_OVER;
 

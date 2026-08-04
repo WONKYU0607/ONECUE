@@ -67,18 +67,30 @@ export function createRenderer(canvas){
     px(0, H, W, uiH, '#0d0d16');
     px(0, H, W, 0.6, 'rgba(78,201,240,0.55)');
 
-    // 상단 바: 내 HP(왼쪽) / 상대 HP(오른쪽) / 가운데 상태
+    // 상단 바: 내 HP(왼쪽) / 상대 HP(오른쪽) / 가운데 남은 시간
     const my = SELF.slot, op = 1 - SELF.slot;
-    for (let i = 0; i < MAXHP; i++){
-      px(4 + i*7,     H + 4, 5, 5, i < s.p[my].hp ? TEAMS[TEAM_OF[my]].m : 'rgba(255,255,255,0.13)');
-      px(W - 9 - i*7, H + 4, 5, 5, i < s.p[op].hp ? TEAMS[TEAM_OF[op]].m : 'rgba(255,255,255,0.13)');
+    const BW = 62, BH = 5, BY = H + 4.5;
+    const bar = (x, hp, team, rightAlign) => {
+      px(x, BY, BW, BH, 'rgba(255,255,255,0.10)');
+      const w = BW * Math.max(0, hp) / MAXHP;
+      px(rightAlign ? x + BW - w : x, BY, w, BH, TEAMS[team].m);
+      for (let i = 1; i < MAXHP; i++) px(x + BW * i / MAXHP, BY, 0.4, BH, 'rgba(13,13,22,0.85)');
+    };
+    bar(4, s.p[my].hp, TEAM_OF[my], false);
+    bar(W - 4 - BW, s.p[op].hp, TEAM_OF[op], true);
+
+    ctx.font = 'bold ' + (8 * RS) + 'px monospace'; ctx.textAlign = 'center';
+    if (s.phase === PH_PLAY){
+      const left = Math.ceil(s.clock / 60);
+      ctx.fillStyle = left <= 10 ? '#f0645a' : '#e8e8f0';   // 10초 남으면 빨갛게
+      ctx.fillText(String(left).padStart(2, '0'), W / 2 * RS, (H + 9.5) * RS);
+    } else {
+      ctx.font = (7 * RS) + 'px monospace';
+      ctx.fillStyle = COL.dim;
+      const label = s.phase === PH_READY ? 'PLACE YOUR ITEMS'
+                  : s.phase === PH_COUNT ? 'GET READY' : 'ROUND OVER';
+      ctx.fillText(label, W / 2 * RS, (H + 9.5) * RS);
     }
-    ctx.font = (7*RS) + 'px monospace'; ctx.textAlign = 'center';
-    ctx.fillStyle = COL.dim;
-    const label = s.phase === PH_READY ? 'PLACE YOUR ITEMS'
-                : s.phase === PH_COUNT ? 'GET READY'
-                : s.phase === PH_PLAY  ? 'FIGHT' : 'ROUND OVER';
-    ctx.fillText(label, W/2*RS, (H + 9.5)*RS);
     ctx.textAlign = 'left';
 
     const g = stickGeom(uiH);
@@ -130,8 +142,9 @@ export function createRenderer(canvas){
     if (s.phase === PH_OVER){
       px(0, H/2-26, W, 26, 'rgba(0,0,0,0.75)');
       ctx.font = 'bold ' + (12*RS) + 'px monospace';
-      ctx.fillStyle = s.winner === 0 ? COL.txt : TEAMS[TEAM_OF[s.winner-1]].m;
-      ctx.fillText(s.winner === 0 ? 'DRAW' : 'PLAYER ' + s.winner + ' WINS', W/2*RS, (H/2 - 8)*RS);
+      const meWin = s.winner === SELF.slot + 1;
+      ctx.fillStyle = s.winner === 0 ? COL.txt : (meWin ? '#4ec9f0' : '#f0645a');
+      ctx.fillText(s.winner === 0 ? 'DRAW' : (meWin ? 'YOU WIN' : 'YOU LOSE'), W/2*RS, (H/2 - 8)*RS);
       ctx.font = (8*RS) + 'px monospace';
     }
     ctx.textAlign = 'left';

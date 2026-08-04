@@ -39,6 +39,7 @@ import {
   PING_MS,
   PWf,
   RENDER_MAXJUMP,
+  ROUND_TICKS,
   ROW_MAX,
   ROW_MIN,
   SELF,

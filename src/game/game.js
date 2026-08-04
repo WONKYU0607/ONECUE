@@ -1,5 +1,5 @@
 import {
-  FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH,
+  FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH, PH_OVER,
   stepCap, bulletFP, coolTicks, clampi
 } from './config.js';
 import { Loopback, Server, Client } from './net.js';
@@ -13,6 +13,7 @@ import { createAI } from './ai.js';
 export function createGame(canvas, opts = {}){
   const onPhase = opts.onPhase || (() => {});
   const onLink = opts.onLink || (() => {});   // 연결·상대 상태 알림
+  const onFinish = opts.onFinish || (() => {});
   const session = opts.session || { mode: 'pvp' };   // TODO: ai 모드면 상대를 AI가 조작
 
   // 온라인이면 서버가 원격이라 여기서 Server를 만들지 않는다
@@ -101,6 +102,10 @@ export function createGame(canvas, opts = {}){
     if (client.pred.phase !== lastPhase){
       lastPhase = client.pred.phase;
       onPhase(lastPhase);
+      if (lastPhase === PH_OVER){
+        const w = client.pred.winner;
+        onFinish(w === 0 ? 'draw' : (w === SELF.slot + 1 ? 'win' : 'lose'));
+      }
     }
     raf = requestAnimationFrame(loop);
   }

@@ -1,7 +1,7 @@
 import { newState, step, checksum } from '../src/game/sim.js';
 import {
   FP, PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_TICKS, coolTicks,
-  WALL_L, WALL_R, wallIdx, YMIN_S, YMAX_S, DEBUG_INF_HP, H
+  WALL_L, WALL_R, wallIdx, YMIN_S, YMAX_S, DEBUG_INF_HP, H, MAXHP, ROUND_TICKS
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 
@@ -90,5 +90,43 @@ console.log('무한 체력 플래그');
   let n = 0; while (s.phase !== PH_OVER && n < 3000){ step(s, IN()); n++; }
   assert(DEBUG_INF_HP ? s.phase !== PH_OVER : s.phase === PH_OVER,
          DEBUG_INF_HP ? '무한 체력이라 라운드가 안 끝남' : '체력 소진 시 라운드 종료');
+}
+console.log('sim.test.js 통과');
+
+console.log('제한 시간 / 승패 판정');
+{
+  // 60초가 지나면 체력 많은 쪽 승
+  const s = newState(); step(s, IN(1));
+  for (let i = 0; i < CD_TICKS; i++) step(s, IN());
+  assert(s.clock === ROUND_TICKS, `PLAY 진입 시 제한 시간 ${ROUND_TICKS}틱(60초) 설정`);
+
+  s.p[0].hp = 7; s.p[1].hp = 4;
+  let n = 0;
+  while (s.phase !== PH_OVER && n < ROUND_TICKS + 200){
+    s.p[0].hp = 7; s.p[1].hp = 4;                 // 체력을 고정해 시간승만 확인
+    step(s, IN()); n++;
+  }
+  assert(n <= ROUND_TICKS, `제한 시간 안에 종료 (${(n/60).toFixed(1)}초)`);
+  assert(s.winner === 1, `시간 만료 시 체력 많은 쪽 승 (winner ${s.winner})`);
+}
+{
+  // 체력이 같으면 무승부
+  const s = newState(); step(s, IN(1));
+  for (let i = 0; i < CD_TICKS; i++) step(s, IN());
+  let n = 0;
+  while (s.phase !== PH_OVER && n < ROUND_TICKS + 200){
+    s.p[0].hp = 5; s.p[1].hp = 5;
+    step(s, IN()); n++;
+  }
+  assert(s.winner === 0, '시간 만료 + 동점 = 무승부');
+}
+{
+  // 10대 맞으면 그 전에 끝난다
+  const s = newState(); step(s, IN(1));
+  let n = 0;
+  while (s.phase !== PH_OVER && n < ROUND_TICKS + 400){ step(s, IN()); n++; }
+  assert(n < ROUND_TICKS, `체력 소진으로 시간 전에 종료 (${(n/60).toFixed(1)}초)`);
+  assert(s.p[0].hp <= 0 || s.p[1].hp <= 0, '누군가 체력 0');
+  assert(MAXHP === 10, `최대 체력 ${MAXHP}`);
 }
 console.log('sim.test.js 통과');

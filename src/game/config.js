@@ -32,7 +32,7 @@ export const YMIN_S = [ Math.round(H / 2 * FP), 0 ];
 export const YMAX_S = [ Math.round((H - 16) * FP), Math.round((H / 2 - 16) * FP) ];
 // 실시간 조절 대상 (UI 버튼). 전부 서버 권위 상태로 전파됨
 export const TUNE = {
-  spd:  { v:0.35, min:0.1, max:2.0,  inc:0.05, fmt:v => Math.round(v*600) + '/s' },
+  spd:  { v:0.25, min:0.1, max:2.0,  inc:0.05, fmt:v => Math.round(v*600) + '/s' },
   bul:  { v:204, min:60,  max:600,  inc:12,   fmt:v => v + '/s' },
   rate: { v:0.5, min:0.1, max:2.0,  inc:0.05, fmt:v => v.toFixed(2) + 's' }
 };
@@ -66,8 +66,9 @@ export const VIEW = { grid: true };          // 디버그 표시
 export const SHOW_HUD = false;   // SV/CL/LAT 디버그 수치 표시
 export const INV_SLOTS = 5;     // 아이템 인벤토리 칸 수 (임시)
 export const EXTRAP_MAX = 15;   // 상대 입력을 모를 때 마지막 입력을 이어붙이는 최대 틱
-export const MAXHP = 3;
-export const DEBUG_INF_HP = true;   // 디버그: 체력 무한 (라운드가 안 끝남)
+export const MAXHP = 10;              // 10대 맞으면 끝
+export const DEBUG_INF_HP = false;  // 디버그: 체력 무한 (라운드가 안 끝남)
+export const ROUND_TICKS = 60 * 60;   // 한 판 60초. 시간 내 승부가 안 나면 체력 많은 쪽 승
 export const SNAP_EVERY = 30;          // 스냅샷 주기(틱)
 export const clampi = (v,a,b) => v < a ? a : (v > b ? b : v);
 

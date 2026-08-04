@@ -7,6 +7,7 @@ import Result from './ui/screens/Result.jsx';
 import SettingsModal from './ui/SettingsModal.jsx';
 import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings } from './state/settings.js';
+import { disconnect } from './net/connection.js';
 import { VIEW, SELF } from './game/config.js';
 
 // 화면 전환은 여기 한 곳에서만 한다.
@@ -19,8 +20,8 @@ export default function App(){
 
   useEffect(() => { VIEW.grid = getSettings().showGrid; }, []);
 
-  const goHome    = useCallback(() => { setSession(null); setResult(null); setScreen('home'); }, []);
-  const startPvp  = useCallback(() => { setSession({ mode: 'pvp' }); setScreen('matching'); }, []);
+  const goHome    = useCallback(() => { disconnect(); setSession(null); setResult(null); setScreen('home'); }, []);
+  const startPvp  = useCallback(() => { disconnect(); setSession({ mode: 'pvp' }); setScreen('matching'); }, []);
   const startAi   = useCallback(stage => {
     SELF.slot = 0;                       // AI전은 항상 내가 아래쪽
     setSession({ mode: 'ai', stage });
@@ -29,7 +30,8 @@ export default function App(){
   const toGame    = useCallback(() => setScreen('game'), []);
   const onFinish  = useCallback(r => { setResult(r); setScreen('result'); }, []);
   const again     = useCallback(() => {
-    if (session?.mode === 'pvp') setScreen('matching');
+    setResult(null);
+    if (session?.mode === 'pvp'){ disconnect(); setScreen('matching'); }
     else setScreen('game');
   }, [session]);
 
@@ -40,7 +42,7 @@ export default function App(){
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} />}
       {screen === 'matching' && <Matching onCancel={goHome} onMatched={toGame} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome} onFinish={onFinish} />}
-      {screen === 'result'   && <Result result={result} onAgain={again} onHome={goHome} />}
+      {screen === 'result'   && <Result result={result} session={session} onAgain={again} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </>
   );
