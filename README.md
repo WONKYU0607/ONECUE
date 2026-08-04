@@ -11,6 +11,28 @@ npm test         # 브라우저 없이 시뮬·넷코드 검증
 npm run build    # dist/ 생성
 ```
 
+## 화면 흐름
+
+```
+splash ──> home ──┬─> matching ──> game ──> result ──┬─> matching (PVP 다시)
+                  │                                   ├─> game (AI 다시)
+                  └─> ai(스테이지) ──> game            └─> home
+        home 위에 settings 모달
+```
+
+화면 전환은 `App.jsx` 한 곳에서만 한다. `GameCanvas`는 `screen === 'game'`일 때만 마운트되므로
+화면을 벗어나면 게임 루프·리스너가 자동으로 정리된다. 소켓이 붙으면 같은 자리에서 연결·해제하면 된다.
+
+| 화면 | 파일 | 상태 |
+|---|---|---|
+| 진입창 | `ui/screens/Splash.jsx` | 자산 프리로드 + 진행률. 최소 표시 0.9초 |
+| 첫 화면 | `ui/screens/Home.jsx` | PVP / AI 모드 버튼, 설정 |
+| 설정 | `ui/SettingsModal.jsx` | 효과음·배경음·진동·격자 토글 (localStorage 저장) |
+| AI 스테이지 | `ui/screens/AiStages.jsx` | 껍데기. 잠금 표시만 있고 진행도 저장 없음 |
+| 매칭 | `ui/screens/Matching.jsx` | **껍데기.** 1.5초 후 게임으로 넘어감 — 서버 붙이면 교체 |
+| 게임 | `ui/GameCanvas.jsx` | 동작함 |
+| 결과 | `ui/screens/Result.jsx` | 껍데기. 게임이 결과를 넘겨주는 배선은 아직 없음 |
+
 ## 구조
 
 ```
@@ -27,7 +49,10 @@ src/
     layout.js       화면 비율에 따른 레이아웃·스틱 기하 (순수 함수)
     render.js       캔버스 그리기
     input.js        포인터·키보드
+    assets.js       이미지 프리로드·캐시 (진입창이 여기서 받아둠)
     game.js         createGame(canvas) — 전부 묶어서 rAF 루프를 돌림
+  state/
+    settings.js     설정 저장 (localStorage, 막힌 환경에서도 안전)
 public/assets/      아레나 배경, 캐릭터 시트, 아이템 시트
 test/               노드에서 도는 테스트
 ```
@@ -52,6 +77,7 @@ test/               노드에서 도는 테스트
 | `net.test.js` | 편도 0~300ms에서 예측 오차·데싱크·입력 유실, 페이즈 전파, 튜닝값 동기화 |
 | `layout.test.js` | 기기별 레이아웃·여백, 스틱 8방향·데드존 |
 | `lifecycle.test.js` | 마운트/언마운트 정리 (StrictMode 이중 실행 대비) |
+| `settings.test.js` | 설정 저장·복구, 항목 추가 시 병합, 저장소 막힌 환경 |
 
 `net.test.js`는 `setClock()`으로 가상 시계를 주입해 실제 시간 없이 결정론적으로 돈다.
 
@@ -85,10 +111,12 @@ npx cap sync android
 npx cap open android      # Android Studio
 ```
 
-## 남은 작업
+## 남은 작업 (순서)
 
-- 로그인 / 매칭 화면 (`App.jsx`의 screen 분기)
-- 아이템 배치 단계 (1~3칸 벽·바리케이트·드럼통, 스프라이트는 `public/assets/items.webp`)
-- 아이템 충돌·파괴 처리
-- WebSocket 서버
-- 2대2 확장 (캐릭터 컬러 4종 준비됨)
+1. **WebSocket 서버 + 2인 접속** — 가장 위험한 부분. 지금 넷코드는 Loopback 위에서만 검증됨
+2. 매칭 (대기열 → 방 배정) → `Matching.jsx` 교체
+3. 아이템 배치 단계 (1~3칸 벽·바리케이트·드럼통, 스프라이트는 `public/assets/items.webp`)
+4. AI 모드 (스테이지별 난이도, 상대 슬롯을 AI가 조작)
+5. 결과 배선 (게임 → `onFinish` → Result)
+6. 로그인·프로필 — 매칭에는 게스트 ID면 충분하므로 뒤로
+7. 2대2 확장 (캐릭터 컬러 4종 준비됨)

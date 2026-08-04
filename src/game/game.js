@@ -11,6 +11,7 @@ import { attachInput } from './input.js';
 // 게임 상태는 절대 React state로 올리지 않는다 — 60Hz로 리렌더가 돌면 프레임이 죽는다.
 export function createGame(canvas, opts = {}){
   const onPhase = opts.onPhase || (() => {});
+  const session = opts.session || { mode: 'pvp' };   // TODO: ai 모드면 상대를 AI가 조작
 
   const net = new Loopback();
   const server = new Server(net);
@@ -68,7 +69,7 @@ export function createGame(canvas, opts = {}){
   raf = requestAnimationFrame(loop);
 
   return {
-    server, client,
+    server, client, session,
     applyCfg,
     // 튜닝값 한 칸 조절 (UI 버튼용)
     bump(k, dir){

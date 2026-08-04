@@ -4,22 +4,14 @@ import {
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO
 } from './config.js';
 import { RS, computeLayout, stickGeom } from './layout.js';
+import { getImage, isReady } from './assets.js';
 
-const ASSETS = {
-  bg:    'assets/arena.webp',
-  sheet: 'assets/characters.png'
-};
 const FW = 14 * RS, FH = 16 * RS;
 
 // 캔버스 하나에 붙는 렌더러. React는 이 객체만 만들고 정리하면 된다
 export function createRenderer(canvas){
   const ctx = canvas.getContext('2d');
-  const bg = new Image(), sheet = new Image();
-  let bgReady = false, sheetReady = false;
-  bg.onload = () => { bgReady = true; };
-  sheet.onload = () => { sheetReady = true; };
-  bg.src = ASSETS.bg;
-  sheet.src = ASSETS.sheet;
+  const bg = getImage('arena'), sheet = getImage('characters');   // 진입창에서 미리 받아둔 것
 
   let uiH = 86, totalH = H + uiH, scale = 1;
 
@@ -59,7 +51,7 @@ export function createRenderer(canvas){
     const xw = (xOverride === undefined ? p.x : xOverride) / FP;
     const yw = (yOverride === undefined ? p.y : yOverride) / FP;
     const hit = p.flash > 0;
-    if (sheetReady){
+    if (isReady(sheet)){
       // 프레임 순서: [팀0앞, 팀0뒤, 팀1앞, 팀1뒤, ...] + 8부터 피격(흰색) 버전
       const idx = (hit ? 8 : 0) + TEAM_OF[i] * 2 + (i === MY_SLOT ? 1 : 0);
       // 월드 정수px가 아니라 디바이스 픽셀 단위로 반올림해야 계단이 안 생긴다
@@ -98,7 +90,7 @@ export function createRenderer(canvas){
   }
 
   function draw(s, dbg, a, cl, stick){
-    if (bgReady) ctx.drawImage(bg, 0, 0, W * RS, H * RS);
+    if (isReady(bg)) ctx.drawImage(bg, 0, 0, W * RS, H * RS);
     else px(0, 0, W, H, COL.bg);
     drawPanel(s, stick);
     if (VIEW.grid){

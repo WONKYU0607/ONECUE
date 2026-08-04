@@ -1,10 +1,43 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import Splash from './ui/screens/Splash.jsx';
+import Home from './ui/screens/Home.jsx';
+import AiStages from './ui/screens/AiStages.jsx';
+import Matching from './ui/screens/Matching.jsx';
+import Result from './ui/screens/Result.jsx';
+import SettingsModal from './ui/SettingsModal.jsx';
 import GameCanvas from './ui/GameCanvas.jsx';
+import { getSettings } from './state/settings.js';
+import { VIEW } from './game/config.js';
 
-// 화면 전환 자리. 로그인·매칭이 붙으면 여기서 갈라진다
+// 화면 전환은 여기 한 곳에서만 한다.
+// GameCanvas는 'game'일 때만 마운트되므로, 화면을 벗어나면 게임 루프·소켓이 자동으로 정리된다.
 export default function App(){
-  const [screen] = useState('game');   // 'login' | 'match' | 'game'
+  const [screen, setScreen] = useState('splash');   // splash|home|ai|matching|game|result
+  const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
+  const [result, setResult] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
 
-  if (screen === 'game') return <GameCanvas />;
-  return null;
+  useEffect(() => { VIEW.grid = getSettings().showGrid; }, []);
+
+  const goHome    = useCallback(() => { setSession(null); setResult(null); setScreen('home'); }, []);
+  const startPvp  = useCallback(() => { setSession({ mode: 'pvp' }); setScreen('matching'); }, []);
+  const startAi   = useCallback(stage => { setSession({ mode: 'ai', stage }); setScreen('game'); }, []);
+  const toGame    = useCallback(() => setScreen('game'), []);
+  const onFinish  = useCallback(r => { setResult(r); setScreen('result'); }, []);
+  const again     = useCallback(() => {
+    if (session?.mode === 'pvp') setScreen('matching');
+    else setScreen('game');
+  }, [session]);
+
+  return (
+    <>
+      {screen === 'splash'   && <Splash onDone={goHome} />}
+      {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onSettings={() => setShowSettings(true)} />}
+      {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} />}
+      {screen === 'matching' && <Matching onCancel={goHome} onMatched={toGame} />}
+      {screen === 'game'     && <GameCanvas session={session} onExit={goHome} onFinish={onFinish} />}
+      {screen === 'result'   && <Result result={result} onAgain={again} onHome={goHome} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+    </>
+  );
 }

@@ -19,3 +19,66 @@ font:bold 20px/1 monospace;letter-spacing:2px;cursor:pointer}
 .tune button.wide{width:auto;padding:0 10px}
 .game-root{height:100%}
 #root{height:100%}
+
+/* ---------- 화면 공통 ---------- */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+justify-content:center;gap:18px;color:#e8e8f0;font-family:monospace;padding:24px}
+.screen.center{justify-content:center}
+.screen.list{justify-content:flex-start;padding:0}
+.logo{font-size:44px;letter-spacing:8px;color:#8fd8ff;text-shadow:0 0 18px rgba(78,201,240,.45)}
+.logo.win{color:#4ec9f0}.logo.lose{color:#f0645a}.logo.draw{color:#e8e8f0}
+.hint{font-size:12px;color:#7a7a95;letter-spacing:2px}
+.big{font-size:16px;letter-spacing:2px}
+.ver{position:fixed;bottom:12px;font-size:11px;color:#4a4a63}
+
+.menu{display:flex;flex-direction:column;gap:12px;width:min(320px,80vw)}
+.menu-btn{display:flex;flex-direction:column;gap:4px;padding:16px;cursor:pointer;
+background:rgba(18,18,28,.92);border:2px solid #2a2a40;color:#e8e8f0;font-family:monospace}
+.menu-btn .t{font-size:18px;letter-spacing:3px}
+.menu-btn .d{font-size:11px;color:#7a7a95}
+.menu-btn.primary{border-color:#4ec9f0;color:#8fd8ff}
+.menu-btn.ghost{border-color:#2a2a40;color:#7a7a95;text-align:center}
+.menu-btn:active{background:#1b2430}
+
+.icon-btn{width:40px;height:40px;background:rgba(18,18,28,.9);border:1px solid #2a2a40;
+color:#8fd8ff;font:20px/1 monospace;cursor:pointer}
+.icon-btn:active{background:#4ec9f0;color:#12121c}
+.top-right{position:fixed;right:12px;top:12px;z-index:30}
+.top-left{position:fixed;left:12px;top:12px;z-index:30}
+
+/* ---------- 진입창 ---------- */
+.bar{width:min(260px,70vw);height:4px;background:#1b1b2a;overflow:hidden}
+.bar .fill{height:100%;background:#4ec9f0;transition:width .18s linear}
+
+/* ---------- 매칭 ---------- */
+.spinner{width:34px;height:34px;border:3px solid #2a2a40;border-top-color:#4ec9f0;
+border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- 목록 화면 ---------- */
+.bar-top{display:flex;align-items:center;justify-content:space-between;width:100%;
+padding:10px 12px;border-bottom:1px solid #1e1e2e}
+.bar-top .title{font-size:14px;letter-spacing:3px}
+.bar-top .spacer{width:40px}
+.stages{width:100%;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:12px}
+.stage{display:flex;align-items:center;gap:14px;padding:14px;cursor:pointer;
+background:rgba(18,18,28,.92);border:1px solid #2a2a40;color:#e8e8f0;font-family:monospace}
+.stage .no{width:28px;color:#4ec9f0;font-size:16px}
+.stage .nm{flex:1;text-align:left;font-size:13px;letter-spacing:2px}
+.stage .st{font-size:11px;color:#7a7a95}
+.stage.locked{opacity:.4;cursor:default}
+
+/* ---------- 설정 ---------- */
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:40;
+display:flex;align-items:center;justify-content:center}
+.modal{width:min(340px,86vw);background:#12121c;border:2px solid #2a2a40;
+color:#e8e8f0;font-family:monospace}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;width:100%;
+padding:14px 16px;background:none;border:0;border-top:1px solid #1e1e2e;
+color:#e8e8f0;font:13px monospace;cursor:pointer}
+.switch{width:40px;height:22px;background:#2a2a40;border-radius:11px;position:relative;
+transition:background .15s}
+.switch i{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#7a7a95;
+border-radius:50%;transition:transform .15s,background .15s}
+.switch.on{background:rgba(78,201,240,.35)}
+.switch.on i{transform:translateX(18px);background:#4ec9f0}
