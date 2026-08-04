@@ -6,6 +6,11 @@ import { Loopback, Server, Client } from './net.js';
 import { createRenderer } from './render.js';
 import { attachInput } from './input.js';
 import { createAI } from './ai.js';
+import { canPlace } from './sim.js';
+import {
+  ITEM, ITEM_DEF, PH_READY, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
+  GRID_X0, GRID_Y0, H, cellOwner
+} from './config.js';
 
 // 게임 한 판을 만들고 rAF 루프를 돌린다.
 // React는 이 함수 하나만 호출하고, 언마운트 때 stop()만 부르면 된다.
@@ -24,6 +29,7 @@ export function createGame(canvas, opts = {}){
   const client = new Client(net, online ? [SELF.slot] : [0, 1]);
   const ai = (!online && session.mode === 'ai') ? createAI(session.stage || 1) : null;
   const aiSlot = 1 - SELF.slot;
+  let aiPlaced = false;
   // 재접속하면 옛 프레임을 버리고 서버 스냅샷으로 다시 맞춘다
   if (online){
     let first = true;
@@ -44,7 +50,30 @@ export function createGame(canvas, opts = {}){
   }
 
   const view = createRenderer(canvas);
-  const input = attachInput(canvas, view);
+
+  // 배치 단계 도우미 ---------------------------------------------------
+  const leftCount = k => {
+    const st = client.pred;
+    const used = st.items.filter(it => it.by === SELF.slot && it.k === k).length;
+    return Math.max(0, ITEM_DEF[k].quota - used);
+  };
+  // 화면 좌표 -> 놓을 수 있는 칸 (슬롯1이면 세로가 뒤집혀 있으므로 되돌린다)
+  const okCell = (k, c, r) => canPlace(client.pred, SELF.slot, k, c, r);
+  const cellAt = (wp, k) => {
+    const c = Math.floor((wp.x - GRID_X0) / GRID_CW);
+    let yTop = wp.y;
+    if (SELF.slot === 1) yTop = H - wp.y;
+    const r = Math.floor((yTop - GRID_Y0) / GRID_CH);
+    if (c < 0 || c >= GRID_COLS || r < 0 || r >= GRID_ROWS) return null;
+    return okCell(k, c, r) ? { c, r } : null;
+  };
+
+  const input = attachInput(canvas, view, {
+    canPlaceNow: () => client.pred.phase === PH_READY,
+    leftCount,
+    cellAt,
+    onPlace: (k, c, r) => client.place(SELF.slot, k, c, r)
+  });
 
   const doResize = () => view.resize(innerWidth, innerHeight);
   addEventListener('resize', doResize);
@@ -79,6 +108,20 @@ export function createGame(canvas, opts = {}){
     const fvy = SELF.slot === 1 ? -vy : vy;   // 화면이 뒤집힌 쪽은 세로 입력도 반전
     if (vx || vy) client.input(SELF.slot, vx * sp * dt, fvy * sp * dt, 0);
 
+    // AI도 배치 단계를 거친다
+    if (ai && client.pred.phase === PH_READY && !aiPlaced){
+      aiPlaced = true;
+      const myRows = [], foeRows = [];
+      for (let r = 0; r < GRID_ROWS; r++) (cellOwner(r) === aiSlot ? myRows : foeRows).push(r);
+      const pick = rows => rows[Math.floor(Math.random() * rows.length)];
+      const col = () => Math.floor(Math.random() * GRID_COLS);
+      client.place(aiSlot, ITEM.WALL, col(), pick(myRows));
+      client.place(aiSlot, ITEM.BARR, col(), pick(myRows));
+      client.place(aiSlot, ITEM.DRUM, col(), pick(foeRows));
+      setTimeout(() => client.setReady(aiSlot), 350);   // 배치가 확정된 뒤 준비
+    }
+    if (ai && client.pred.phase !== PH_READY) aiPlaced = false;
+
     // AI는 사람과 완전히 같은 입력 경로를 탄다 (서버가 판정하는 건 동일)
     if (ai){
       const a = ai.think(client.pred, aiSlot, dt, now);
@@ -96,7 +139,7 @@ export function createGame(canvas, opts = {}){
                 ' DRP' + (server ? server.lateDrops : '-') + ' DSY' + client.desync;
     const a = client.alpha(now);
     client.updateRender(a, dt);
-    view.draw(client.pred, dbg, a, client, stick);
+    view.draw(client.pred, dbg, a, client, stick, input.drag, leftCount, okCell);
 
     // 페이즈가 바뀔 때만 React에 알린다 (매 프레임 setState 하면 안 됨)
     if (client.pred.phase !== lastPhase){
@@ -113,6 +156,10 @@ export function createGame(canvas, opts = {}){
 
   return {
     server, client, session, ai,
+    leftCount,
+    ready(){ client.setReady(SELF.slot); },
+    isReady(){ return client.pred.ready[SELF.slot]; },
+    peerReady(){ return client.pred.ready[1 - SELF.slot]; },
     applyCfg,
     // 튜닝값 한 칸 조절 (UI 버튼용)
     bump(k, dir){

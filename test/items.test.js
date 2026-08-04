@@ -1,0 +1,131 @@
+import { newState, step, canPlace, itemRect } from '../src/game/sim.js';
+import {
+  FP, ITEM, ITEM_DEF, PH_READY, PH_PLAY, PH_OVER, CD_TICKS, GRID_ROWS, GRID_COLS,
+  cellOwner, MAXHP, DRUM_DAMAGE, DRUM_RADIUS, GRID_MIDROW
+} from '../src/game/config.js';
+import { assert } from './harness.js';
+
+const mk = (o = {}) => ({ dx:0, dy:0, fire:0, ready:0, place:null, ...o });
+const IN = (a, b) => [mk(a), mk(b)];
+const myRow = slot => { for (let r = 0; r < GRID_ROWS; r++) if (cellOwner(r) === slot) return r; };
+const foeRow = slot => { for (let r = 0; r < GRID_ROWS; r++) if (cellOwner(r) !== slot) return r; };
+
+console.log('배치 규칙');
+{
+  const s = newState();
+  assert(canPlace(s, 0, ITEM.WALL, 2, myRow(0)), '벽은 내 영역에 놓을 수 있다');
+  assert(!canPlace(s, 0, ITEM.WALL, 2, foeRow(0)), '벽을 상대 영역에는 못 놓는다');
+  assert(canPlace(s, 0, ITEM.DRUM, 2, foeRow(0)), '드럼통은 상대 영역에 놓는다');
+  assert(!canPlace(s, 0, ITEM.DRUM, 2, myRow(0)), '드럼통을 내 영역에는 못 놓는다');
+  assert(!canPlace(s, 0, ITEM.DRUM, 2, GRID_MIDROW - 1), '중앙선에 붙은 칸에는 드럼통 금지');
+  assert(!canPlace(s, 1, ITEM.DRUM, 2, GRID_MIDROW), '반대편도 마찬가지');
+  assert(canPlace(s, 0, ITEM.DRUM, 2, GRID_MIDROW - 2), '한 칸 뒤부터는 가능');
+  assert(!canPlace(s, 0, ITEM.WALL, GRID_COLS, myRow(0)), '격자 밖은 안 된다');
+
+  step(s, IN({ place: { k: ITEM.WALL, c: 2, r: myRow(0) } }, {}));
+  assert(s.items.length === 1, '배치 반영');
+  assert(!canPlace(s, 0, ITEM.WALL, 3, myRow(0)), `벽은 ${ITEM_DEF[ITEM.WALL].quota}개까지만`);
+  assert(!canPlace(s, 0, ITEM.BARR, 2, myRow(0)), '같은 칸에 겹쳐 놓을 수 없다');
+  assert(canPlace(s, 0, ITEM.BARR, 3, myRow(0)), '다른 칸에는 바리케이트 가능');
+}
+
+console.log('설치 완료 전에는 시작 못 함');
+{
+  const s = newState();
+  step(s, IN({ fire: 1 }, { fire: 1 }));
+  assert(s.phase === PH_READY, '둘 다 준비 전이면 START 무시');
+  step(s, IN({ ready: 1 }, {}));
+  step(s, IN({ fire: 1 }, {}));
+  assert(s.phase === PH_READY, '한쪽만 준비돼도 시작 안 됨');
+  step(s, IN({}, { ready: 1 }));
+  step(s, IN({ fire: 1 }, {}));
+  assert(s.phase !== PH_READY, '양쪽 준비 후 START로 진행');
+}
+
+console.log('벽이 총알을 막는가');
+{
+  const build = withWall => {
+    const s = newState();
+    if (withWall){
+      // 슬롯0(아래) 앞을 막도록 시작 열에 벽을 세운다
+      const col = Math.floor((s.p[0].x / FP - 24.9) / 21.638);
+      const r = GRID_ROWS - 3;
+      if (cellOwner(r) === 0) step(s, IN({ place: { k: ITEM.WALL, c: col, r } }, {}));
+    }
+    step(s, IN({ ready:1 }, { ready:1 }));
+    step(s, IN({ fire: 1 }, {}));
+    for (let i = 0; i < CD_TICKS; i++) step(s, IN({}, {}));
+    let hits = 0;
+    for (let i = 0; i < 600; i++){
+      s.p[0].hp = s.p[1].hp = MAXHP;
+      step(s, IN({}, {}));
+      if (s.p[0].flash === 15) hits++;
+    }
+    return hits;
+  };
+  const bare = build(false), walled = build(true);
+  console.log(`  벽 없음 ${bare}회 피격 / 벽 있음 ${walled}회 피격 (벽 내구도 ${ITEM_DEF[ITEM.WALL].hp}발)`);
+  assert(walled < bare, `벽이 총알을 막는다 (${walled} < ${bare})`);
+
+  // 벽이 총알을 흡수하며 닳는지
+  const s2 = newState();
+  const col = Math.floor((s2.p[0].x / FP - 24.9) / 21.638);
+  step(s2, IN({ place: { k: ITEM.WALL, c: col, r: GRID_ROWS - 3 } }, {}));
+  step(s2, IN({ ready:1 }, { ready:1 })); step(s2, IN({ fire:1 }, {}));
+  for (let i = 0; i < CD_TICKS + 400; i++){ s2.p[0].hp = s2.p[1].hp = MAXHP; step(s2, IN({}, {})); }
+  assert(s2.items[0].hp < ITEM_DEF[ITEM.WALL].hp, `벽이 총알을 맞아 닳음 (${s2.items[0].hp}/${ITEM_DEF[ITEM.WALL].hp})`);
+}
+
+console.log('드럼통');
+{
+  const s = newState();
+  const r = foeRow(0);
+  step(s, IN({ place: { k: ITEM.DRUM, c: 3, r } }, {}));
+  step(s, IN({ place: { k: ITEM.DRUM, c: 1, r } }, {}));
+  assert(s.items.length === 2, `드럼통 ${ITEM_DEF[ITEM.DRUM].quota}개까지 배치`);
+  assert(!canPlace(s, 0, ITEM.DRUM, 5, r), '3개째는 안 됨');
+
+  const drum = s.items[0];
+  step(s, IN({ ready:1 }, { ready:1 }));
+  step(s, IN({ fire: 1 }, {}));
+  for (let i = 0; i < CD_TICKS; i++) step(s, IN({}, {}));
+
+  // 밟아도 안 터진다 (총알에만 반응)
+  const rect = itemRect(drum);
+  s.p[1].x = rect.x; s.p[1].y = rect.y;
+  const hpA = s.p[1].hp;
+  const savedCool = s.coolT;
+  s.coolT = 1e6; s.p[0].cool = s.p[1].cool = 1e6;   // 자동 발사를 멈추고 밟기만 확인
+  s.bullets.length = 0;
+  for (let i = 0; i < 30; i++) step(s, IN({}, {}));
+  assert(s.items[0].hp > 0 && s.p[1].hp === hpA, '밟아도 안 터짐 (총알로만 발동)');
+
+  // 총알을 직접 맞히면 터지고, 반경 안의 플레이어가 피해를 입는다
+  s.bullets.length = 0;
+  s.bullets.push({ x: rect.x + 3*FP, y: rect.y - 2*FP, vy: Math.round(3*FP), o: 0 });
+  void savedCool;
+  const hpB = s.p[1].hp;
+  s.p[1].invul = 0;
+  for (let i = 0; i < 20; i++) step(s, IN({}, {}));
+  assert(s.items[0].hp <= 0, '총알에 맞으면 터짐');
+  assert(s.p[1].hp === hpB - DRUM_DAMAGE, `반경 안이면 체력 ${DRUM_DAMAGE} 감소 (${hpB} -> ${s.p[1].hp})`);
+
+  // 반경 밖은 무사
+  const s2 = newState();
+  const r2 = foeRow(0);
+  step(s2, IN({ place: { k: ITEM.DRUM, c: 0, r: r2 } }, {}));
+  step(s2, IN({ ready:1 }, { ready:1 })); step(s2, IN({ fire:1 }, {}));
+  for (let i = 0; i < CD_TICKS; i++) step(s2, IN({}, {}));
+  const d2 = itemRect(s2.items[0]);
+  s2.coolT = 1e6; s2.p[0].cool = s2.p[1].cool = 1e6;                        // 자동 발사 배제
+  s2.p[1].x = Math.round((24.9 + 21.638 * (0 + DRUM_RADIUS + 1.2)) * FP);   // 반경 밖 칸
+  s2.p[1].y = d2.y;
+  const hpC = s2.p[1].hp;
+  s2.bullets.length = 0;
+  s2.bullets.push({ x: d2.x + 3*FP, y: d2.y - 2*FP, vy: Math.round(3*FP), o: 0 });
+  s2.p[1].invul = 0;
+  for (let i = 0; i < 20; i++){ step(s2, IN({}, {})); s2.bullets = s2.bullets.filter(b => b.o === 0); }
+  assert(s2.items[0].hp <= 0, '멀리 있어도 총알 맞으면 터짐');
+  assert(s2.p[1].hp === hpC, '폭발 반경 밖은 피해 없음');
+}
+console.log('items.test.js 통과');

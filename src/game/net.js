@@ -9,6 +9,8 @@ import {
   COL,
   DEBUG_INF_HP,
   DEBUG_LOCAL_BOTH,
+  DRUM_DAMAGE,
+  DRUM_RADIUS,
   EXTRAP_MAX,
   FLASH_T,
   FP,
@@ -25,6 +27,8 @@ import {
   HOME_COL,
   INVUL_T,
   INV_SLOTS,
+  ITEM,
+  ITEM_DEF,
   JITTER_MS,
   LENS_C,
   MAXHP,
@@ -73,9 +77,12 @@ import {
 } from './config.js';
 import {
   NOIN,
+  canPlace,
   checksum,
   cloneState,
+  itemRect,
   newCovers,
+  newItems,
   newState,
   overlap,
   step
@@ -182,7 +189,7 @@ export class Server {
     }
     let f = this.inbox.get(m.tick);
     if (!f){ f = [null, null]; this.inbox.set(m.tick, f); }
-    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0 };
+    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, ready: m.ready ? 1 : 0, place: m.place || null };
   }
   recalcDelay(){
     const worst = Math.max(this.rtt[0], this.rtt[1]);         // 느린 쪽 기준 = 양쪽 동일 지연
@@ -224,7 +231,7 @@ export class Client {
     this.delay = MIN_DELAY;
     this.rtt = -1; this.pings = new Map(); this.pingId = 1; this.lastPing = -1e9;
     this.svTick = 0; this.svAt = CLOCK.now();
-    this.pend = [ {dx:0, dy:0, fire:0}, {dx:0, dy:0, fire:0} ];
+    this.pend = [ {dx:0, dy:0, fire:0, ready:0, place:null}, {dx:0, dy:0, fire:0, ready:0, place:null} ];
     this.sent = [];                    // 아직 서버가 확정하지 않은 내 입력
     this.pred = newState();            // 예측 상태 (화면에 그리는 것)
     this.rx = null; this.ry = null;    // 렌더 위치 (상대는 따라가기 필터)
@@ -294,9 +301,9 @@ export class Client {
       this.tickAt = now;
       for (const pid of this.controlled){
         const q = this.pend[pid];
-        this.net.clientSend({ t:'in', pid, tick:t, dx:q.dx, dy:q.dy, fire:q.fire });
-        this.sent.push({ tick:t, pid, dx:q.dx, dy:q.dy, fire:q.fire });
-        q.dx = 0; q.dy = 0; q.fire = 0;
+        this.net.clientSend({ t:'in', pid, tick:t, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place });
+        this.sent.push({ tick:t, pid, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place });
+        q.dx = 0; q.dy = 0; q.fire = 0; q.ready = 0; q.place = null;
       }
     }
   }
@@ -335,7 +342,7 @@ export class Client {
       if (this.lastInp && t - this.s.tick <= EXTRAP_MAX){   // 상대는 마지막 입력으로 외삽
         for (let k = 0; k < 2; k++){ inp[k].dx = this.lastInp[k].dx; inp[k].dy = this.lastInp[k].dy; }
       }
-      for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire };
+      for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, ready:e.ready, place:e.place };
       prevMy = p.p[SELF.slot].x; prevMyY = p.p[SELF.slot].y;
       step(p, inp);
     }
@@ -366,5 +373,14 @@ export class Client {
     if (dx) this.pend[pid].dx += Math.round(dx * FP);
     if (dy) this.pend[pid].dy += Math.round(dy * FP);
     if (fire) this.pend[pid].fire = 1;
+  }
+  // 아이템 배치·설치 완료도 같은 입력 경로로 보낸다 (서버가 검증)
+  place(pid, k, c, r){
+    if (!this.controlled.includes(pid)) return;
+    this.pend[pid].place = { k, c, r };
+  }
+  setReady(pid){
+    if (!this.controlled.includes(pid)) return;
+    this.pend[pid].ready = 1;
   }
 }

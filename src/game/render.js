@@ -1,12 +1,21 @@
 import {
   W, H, FP, COL, TEAMS, TEAM_OF, SELF, MAXHP, FLASH_T, VIEW, SHOW_HUD,
   GRID_COLS, GRID_ROWS, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
-  PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO
+  PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO,
+  ITEM, ITEM_DEF, cellOwner
 } from './config.js';
 import { RS, computeLayout, stickGeom } from './layout.js';
 import { getImage, isReady } from './assets.js';
+import { paletteSlots } from './layout.js';
 
 const FW = 14 * RS, FH = 16 * RS;
+
+// items.webp 안의 프레임 위치 (824x66)
+const ITEM_FRAME = {
+  wall1: { x: 0,   y: 3, w: 65, h: 63 },
+  barr1: { x: 390, y: 0, w: 65, h: 66 },
+  drum:  { x: 780, y: 3, w: 44, h: 63 }
+};
 
 // 캔버스 하나에 붙는 렌더러. React는 이 객체만 만들고 정리하면 된다
 // 슬롯 1인 플레이어는 화면을 뒤집어 자기가 항상 아래쪽에 보이게 한다.
@@ -15,7 +24,7 @@ const fy = (y, h) => SELF.slot === 1 ? H - y - h : y;
 
 export function createRenderer(canvas){
   const ctx = canvas.getContext('2d');
-  const bg = getImage('arena'), sheet = getImage('characters');   // 진입창에서 미리 받아둔 것
+  const bg = getImage('arena'), sheet = getImage('characters'), items = getImage('items');
 
   let uiH = 86, totalH = H + uiH, scale = 1;
 
@@ -105,15 +114,99 @@ export function createRenderer(canvas){
                          live ? '#4ec9f0' : 'rgba(255,255,255,0.35)', 0.8);
   }
 
-  function draw(s, dbg, a, cl, stick){
+  // 칸 좌표 -> 화면 사각형 (슬롯1이면 세로 반전)
+  function cellBox(c, r, cells = 1){
+    const x = cellX(c), yTop = cellY(r);
+    const y = SELF.slot === 1 ? H - yTop - GRID_CH : yTop;
+    return { x, y, w: GRID_CW * cells, h: GRID_CH };
+  }
+  function drawItems(s){
+    if (!isReady(items)) return;
+    for (const it of s.items){
+      if (it.hp <= 0) continue;
+      // 상대가 내 영역에 심은 드럼통은 시작 전엔 안 보인다
+      if (it.k === ITEM.DRUM && it.by !== SELF.slot && s.phase !== PH_PLAY) continue;
+      const def = ITEM_DEF[it.k];
+      const f = ITEM_FRAME[def.key];
+      const box = cellBox(it.c, it.r, def.cells);
+      const dw = f.w / RS, dh = f.h / RS;
+      const dx = box.x + (box.w - dw) / 2;          // 칸 가로 중앙
+      const dy = box.y + box.h - dh;               // 칸 아래 정렬
+      ctx.drawImage(items, f.x, f.y, f.w, f.h,
+                    Math.round(dx * RS), Math.round(dy * RS), f.w, f.h);
+      // 남은 내구도
+      if (def.hp > 1){
+        const ratio = it.hp / def.hp;
+        px(box.x + 2, box.y + box.h - 1.6, (box.w - 4) * ratio, 1.2,
+           ratio > 0.5 ? 'rgba(120,220,255,0.75)' : 'rgba(240,140,90,0.85)');
+      }
+    }
+  }
+  // 배치 단계 안내: 놓을 수 있는 칸을 밝히고, 끌고 있는 아이콘을 따라 그린다
+  function drawPlacing(s, cl, drag, ok){
+    if (s.phase !== PH_READY) return;
+    const k = drag && drag.on ? drag.k : -1;
+    for (let r = 0; r < GRID_ROWS; r++){
+      for (let c = 0; c < GRID_COLS; c++){
+        // 끌고 있을 땐 실제 배치 규칙으로 판정한다 (드럼통 중앙선 금지 등)
+        const usable = k < 0 ? cellOwner(r) === SELF.slot : (ok ? ok(k, c, r) : false);
+        if (!usable) continue;
+        const box = cellBox(c, r);
+        px(box.x + 0.6, box.y + 0.6, box.w - 1.2, box.h - 1.2,
+           k >= 0 ? 'rgba(78,201,240,0.10)' : 'rgba(255,255,255,0.045)');
+      }
+    }
+    if (k >= 0 && drag.cell){
+      const box = cellBox(drag.cell.c, drag.cell.r, ITEM_DEF[k].cells);
+      px(box.x, box.y, box.w, 1, '#4ec9f0'); px(box.x, box.y + box.h - 1, box.w, 1, '#4ec9f0');
+      px(box.x, box.y, 1, box.h, '#4ec9f0'); px(box.x + box.w - 1, box.y, 1, box.h, '#4ec9f0');
+    }
+  }
+  // 팔레트: 스틱 왼쪽 아이콘 3개 + 남은 개수
+  function drawPalette(s, uiH2, left, drag){
+    if (s.phase !== PH_READY || !isReady(items)) return;
+    for (const sl of paletteSlots(uiH2)){
+      const def = ITEM_DEF[sl.k], f = ITEM_FRAME[def.key];
+      const n = left(sl.k);
+      px(sl.x, sl.y, sl.w, sl.h, n > 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)');
+      const c = n > 0 ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.10)';
+      px(sl.x, sl.y, sl.w, 0.7, c); px(sl.x, sl.y + sl.h - 0.7, sl.w, 0.7, c);
+      px(sl.x, sl.y, 0.7, sl.h, c); px(sl.x + sl.w - 0.7, sl.y, 0.7, sl.h, c);
+      const sc = Math.min((sl.w - 6) / (f.w / RS), (sl.h - 6) / (f.h / RS));
+      const dw = f.w / RS * sc, dh = f.h / RS * sc;
+      ctx.globalAlpha = n > 0 ? 1 : 0.25;
+      ctx.drawImage(items, f.x, f.y, f.w, f.h,
+        Math.round((sl.x + (sl.w - dw) / 2) * RS), Math.round((sl.y + (sl.h - dh) / 2) * RS),
+        Math.round(dw * RS), Math.round(dh * RS));
+      ctx.globalAlpha = 1;
+      ctx.font = 'bold ' + (7 * RS) + 'px monospace'; ctx.textAlign = 'right';
+      ctx.fillStyle = n > 0 ? '#8fd8ff' : '#4a4a63';
+      ctx.fillText('x' + n, (sl.x + sl.w - 1.5) * RS, (sl.y + sl.h - 1.5) * RS);
+      ctx.textAlign = 'left';
+    }
+    // 끌고 있는 아이콘
+    if (drag && drag.on && drag.k >= 0){
+      const f = ITEM_FRAME[ITEM_DEF[drag.k].key];
+      const dw = f.w / RS, dh = f.h / RS;
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(items, f.x, f.y, f.w, f.h,
+        Math.round((drag.x - dw / 2) * RS), Math.round((drag.y - dh / 2) * RS), f.w, f.h);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function draw(s, dbg, a, cl, stick, drag, left, ok){
     if (isReady(bg)) ctx.drawImage(bg, 0, 0, W * RS, H * RS);
     else px(0, 0, W, H, COL.bg);
     drawPanel(s, stick);
+    if (left) drawPalette(s, uiH, left, drag);
     if (VIEW.grid){
       for (let c = 0; c <= GRID_COLS; c++) px(cellX(c), GRID_Y0, 0.4, GRID_CH*GRID_ROWS, 'rgba(255,255,255,0.14)');
       for (let r = 0; r <= GRID_ROWS; r++) px(GRID_X0, cellY(r), GRID_CW*GRID_COLS, 0.4, 'rgba(255,255,255,0.14)');
     }
     px(8, H/2 - 1, W - 16, 2, '#ffffff');            // 진영 경계 (정확히 절반)
+    drawPlacing(s, cl, drag, ok);
+    drawItems(s);
     for (const c of s.covers){
       if (c.hp <= 0) continue;
       const cy2 = fy(c.y/FP, c.h/FP);

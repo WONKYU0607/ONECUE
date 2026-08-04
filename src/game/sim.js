@@ -9,6 +9,8 @@ import {
   COL,
   DEBUG_INF_HP,
   DEBUG_LOCAL_BOTH,
+  DRUM_DAMAGE,
+  DRUM_RADIUS,
   EXTRAP_MAX,
   FLASH_T,
   FP,
@@ -25,6 +27,8 @@ import {
   HOME_COL,
   INVUL_T,
   INV_SLOTS,
+  ITEM,
+  ITEM_DEF,
   JITTER_MS,
   LENS_C,
   MAXHP,
@@ -73,6 +77,8 @@ import {
 } from './config.js';
 
 // ================= SIM (pure, deterministic) =================
+export function newItems(){ return []; }
+
 export function newCovers(){
   // 기본 엄폐물 없음. 아이템/맵 오브젝트로 채울 때 여기서 push
   // 예) c.push({x:19*FP, y:147*FP, w:32*FP, h:10*FP, hp:4});
@@ -88,30 +94,101 @@ export function newState(){
     ],
     bullets: [],
     covers: newCovers(),
+    items: newItems(),          // 배치된 엄폐물·폭탄
+    ready: [false, false],      // 설치 완료 여부
     maxStep: stepCap(),   // 아래 3개는 서버가 정하고 프레임으로 전파 → 결정론 유지
     bulletV: bulletFP(),
     coolT:   coolTicks(),
     over: false, winner: 0
   };
 }
-export const NOIN = { dx:0, dy:0, fire:0 };
+export const NOIN = { dx:0, dy:0, fire:0, ready:0, place:null };
 export function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
 
 export function overlap(ax,ay,aw,ah,bx,by,bw,bh){
   return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
 }
 
+// 칸 -> 아이템 사각형 (월드 고정소수점)
+export function itemRect(it){
+  const def = ITEM_DEF[it.k];
+  const w = GRID_CW * def.cells;
+  return {
+    x: Math.round(cellX(it.c) * FP),
+    y: Math.round(cellY(it.r) * FP),
+    w: Math.round(w * FP),
+    h: Math.round(GRID_CH * FP)
+  };
+}
+// 해당 슬롯이 이 칸에 이 아이템을 놓을 수 있는가
+export function canPlace(s, slot, k, c, r){
+  const def = ITEM_DEF[k];
+  if (!def) return false;
+  if (s.phase !== PH_READY) return false;
+  if (c < 0 || c + def.cells > GRID_COLS || r < 0 || r >= GRID_ROWS) return false;
+  // 내 영역/상대 영역 판정 (cellOwner: 위 절반=1, 아래 절반=0)
+  const owner = cellOwner(r);
+  if (def.mine ? owner !== slot : owner === slot) return false;
+  // 드럼통은 중앙선에 붙은 한 칸에 못 심는다 (폭발 반경이 내 영역까지 닿아 자폭)
+  if (k === ITEM.DRUM && (r === GRID_MIDROW - 1 || r === GRID_MIDROW)) return false;
+  // 개수 제한
+  const used = s.items.filter(it => it.by === slot && it.k === k).length;
+  if (used >= def.quota) return false;
+  // 겹침
+  for (const it of s.items){
+    const w = ITEM_DEF[it.k].cells;
+    if (it.r === r && c < it.c + w && c + def.cells > it.c) return false;
+  }
+  return true;
+}
+
+// 드럼통이 터지면 근처 플레이어가 피해를 입는다
+function explode(s, it){
+  // 폭발 범위 = 드럼통이 놓인 칸 + 주변 DRUM_RADIUS칸
+  const x0 = Math.round(cellX(it.c - DRUM_RADIUS) * FP);
+  const x1 = Math.round(cellX(it.c + DRUM_RADIUS + 1) * FP);
+  const y0 = Math.round(cellY(it.r - DRUM_RADIUS) * FP);
+  const y1 = Math.round(cellY(it.r + DRUM_RADIUS + 1) * FP);
+  for (let i = 0; i < 2; i++){
+    const p = s.p[i];
+    if (!overlap(p.x, p.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
+    if (p.invul > 0) continue;
+    p.invul = INVUL_T; p.flash = FLASH_T;
+    if (!DEBUG_INF_HP){
+      p.hp -= DRUM_DAMAGE;
+      if (p.hp <= 0){ s.over = true; s.phase = PH_OVER; s.winner = i === 0 ? 2 : 1; }
+    }
+  }
+  it.hp = 0;
+}
+
 export function step(s, inp){
   s.tick++;
 
   // 대기/종료 화면: START 입력(fire)으로만 카운트다운 시작
-  if (s.phase === PH_READY || s.phase === PH_OVER){
+  if (s.phase === PH_READY){
+    for (let i = 0; i < 2; i++){
+      const q = inp[i] || NOIN;
+      if (q.place && canPlace(s, i, q.place.k, q.place.c, q.place.r)){
+        s.items.push({ k: q.place.k, c: q.place.c, r: q.place.r, by: i, hp: ITEM_DEF[q.place.k].hp });
+      }
+      if (q.ready) s.ready[i] = true;
+    }
+    // 둘 다 설치를 끝냈을 때만 시작할 수 있다
+    if ((inp[0].fire || inp[1].fire) && s.ready[0] && s.ready[1]){
+      s.phase = PH_COUNT; s.timer = CD_TICKS;
+    }
+    return;
+  }
+
+  if (s.phase === PH_OVER){
     if (inp[0].fire || inp[1].fire){
       const t = s.tick, ms = s.maxStep, bv = s.bulletV, ct = s.coolT, n = newState();
-      n.tick = t; n.phase = PH_COUNT; n.timer = CD_TICKS;
+      n.tick = t; n.phase = PH_READY; n.timer = 0;
       s.p = n.p; s.bullets = n.bullets; s.covers = n.covers;
+      s.items = n.items; s.ready = n.ready;      // 다시 배치 단계부터
       s.maxStep = ms; s.bulletV = bv; s.coolT = ct;
-      s.phase = n.phase; s.timer = n.timer; s.over = false; s.winner = 0;
+      s.phase = n.phase; s.timer = n.timer; s.over = false; s.winner = 0; s.clock = 0;
     }
     return;
   }
@@ -157,6 +234,15 @@ export function step(s, inp){
     b.y += b.vy;
     if (b.y < -8*FP || b.y > (H+8)*FP){ s.bullets.splice(k,1); continue; }
     let gone = false;
+    for (const it of s.items){
+      if (it.hp <= 0) continue;
+      const r = itemRect(it);
+      if (!overlap(b.x, b.y, BWf, BHf, r.x, r.y, r.w, r.h)) continue;
+      it.hp--;
+      if (it.k === ITEM.DRUM && it.hp <= 0) explode(s, it);
+      gone = true; break;
+    }
+    if (gone){ s.bullets.splice(k, 1); continue; }
     for (const c of s.covers){
       if (c.hp > 0 && overlap(b.x,b.y,BWf,BHf, c.x,c.y,c.w,c.h)){ c.hp--; gone = true; break; }
     }
@@ -190,5 +276,7 @@ export function checksum(s){
   for (const p of s.p) h = (h*31 + p.x + p.y*3 + p.hp*7 + p.cool*3 + p.invul) | 0;
   for (const b of s.bullets) h = (h*31 + b.x + b.y + b.o) | 0;
   for (const c of s.covers) h = (h*31 + c.hp) | 0;
+  for (const it of s.items) h = (h*31 + it.k*7 + it.c*13 + it.r*29 + it.hp*3 + it.by) | 0;
+  h = (h*31 + (s.ready[0] ? 1 : 0) + (s.ready[1] ? 2 : 0)) | 0;
   return h | 0;
 }

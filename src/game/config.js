@@ -68,6 +68,17 @@ export const INV_SLOTS = 5;     // 아이템 인벤토리 칸 수 (임시)
 export const EXTRAP_MAX = 15;   // 상대 입력을 모를 때 마지막 입력을 이어붙이는 최대 틱
 export const MAXHP = 10;              // 10대 맞으면 끝
 export const DEBUG_INF_HP = false;  // 디버그: 체력 무한 (라운드가 안 끝남)
+// 아이템: 0=벽(1칸) 1=바리케이트(1칸) 2=드럼통 폭탄(1칸)
+// 벽·바리케이트는 자기 영역에, 드럼통은 상대 영역에 심는다
+export const ITEM = { WALL: 0, BARR: 1, DRUM: 2 };
+export const ITEM_DEF = [
+  { key: 'wall1', name: '벽',       hp: 5, cells: 1, mine: true,  quota: 1 },
+  { key: 'barr1', name: '바리케이트', hp: 3, cells: 1, mine: true,  quota: 1 },
+  { key: 'drum',  name: '드럼통',    hp: 1, cells: 1, mine: false, quota: 2 }
+];
+export const DRUM_DAMAGE = 1;         // 폭발에 휘말리면 이만큼 깎임
+export const DRUM_RADIUS = 1;         // 폭발 범위: 주변 한 칸
+
 export const ROUND_TICKS = 60 * 60;   // 한 판 60초. 시간 내 승부가 안 나면 체력 많은 쪽 승
 export const SNAP_EVERY = 30;          // 스냅샷 주기(틱)
 export const clampi = (v,a,b) => v < a ? a : (v > b ? b : v);
