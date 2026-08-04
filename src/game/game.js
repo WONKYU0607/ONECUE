@@ -42,10 +42,15 @@ export function createGame(canvas, opts = {}){
     const sp = stepCap() / FP * 60;                 // 최대 속도(px/초)
     const { stick, keys } = input;
     let vx = stick.nx, vy = stick.ny;
-    if (keys['arrowleft'])  vx = -1;
-    if (keys['arrowright']) vx =  1;
-    if (keys['arrowup'])    vy = -1;
-    if (keys['arrowdown'])  vy =  1;
+    let kx = 0, ky = 0;
+    if (keys['arrowleft'])  kx = -1;
+    if (keys['arrowright']) kx =  1;
+    if (keys['arrowup'])    ky = -1;
+    if (keys['arrowdown'])  ky =  1;
+    if (kx || ky){                      // 키보드 대각선도 크기 1로 (스틱과 같은 최대 속도)
+      const km = Math.hypot(kx, ky);
+      vx = kx / km; vy = ky / km;
+    }
     const fvy = SELF.slot === 1 ? -vy : vy;   // 화면이 뒤집힌 쪽은 세로 입력도 반전
     if (vx || vy) client.input(SELF.slot, vx * sp * dt, fvy * sp * dt, 0);
 

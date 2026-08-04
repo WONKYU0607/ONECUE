@@ -1,6 +1,7 @@
 import { W, H } from './config.js';
 
 export const STICK_DEAD = 0.14;   // 중심 근처는 무시
+export const STICK_SAT  = 0.82;   // 이 지점부터 최대 속도 (끝까지 안 밀어도 됨)
 
 // 렌더 배율. 시뮬 좌표는 그대로 두고 캔버스만 3배로 그린다
 export const RS = 3;
@@ -28,14 +29,18 @@ export function stickGeom(uiH){
   return { cx: W - 6 - r, cy: pd.y + pd.h / 2, r, kr: r * 0.40 };
 }
 
-// 터치 지점 -> 스틱 기울기 (-1..1). 데드존 안이면 0
+// 터치 지점 -> 스틱 기울기 (-1..1).
+// 데드존~포화반경 구간을 0~1로 다시 편다. 이걸 안 하면
+// (1) 데드존 직후에 갑자기 0.14 속도로 튀고
+// (2) 원 가장자리까지 밀어야 최대 속도가 나와 키보드보다 항상 느리다
 export function stickVector(pt, uiH){
   const g = stickGeom(uiH);
-  let nx = (pt.x - g.cx) / g.r, ny = (pt.y - g.cy) / g.r;
+  const nx = (pt.x - g.cx) / g.r, ny = (pt.y - g.cy) / g.r;
   const m = Math.hypot(nx, ny);
-  if (m > 1){ nx /= m; ny /= m; }
   if (m < STICK_DEAD) return { nx: 0, ny: 0 };
-  return { nx, ny };
+  const mag = Math.min(1, (m - STICK_DEAD) / (STICK_SAT - STICK_DEAD));
+  const k = mag / m;
+  return { nx: nx * k, ny: ny * k };
 }
 
 // 스틱을 잡을 수 있는 범위인지 (원 주변까지 살짝 여유)

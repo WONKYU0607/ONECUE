@@ -36,3 +36,29 @@ console.log('스틱 8방향 판정');
   assert(ok, '8방향 부호 전부 일치');
 }
 console.log('layout.test.js 통과');
+
+console.log('스틱 세기 곡선');
+{
+  const { uiH } = computeLayout(1080, 2340);
+  const g = stickGeom(uiH);
+  const at = frac => {                       // 반지름의 frac 지점을 오른쪽으로 민 경우
+    const v = stickVector({ x: g.cx + g.r * frac, y: g.cy }, uiH);
+    return Math.hypot(v.nx, v.ny);
+  };
+  assert(at(0.10) === 0, '데드존 안은 0');
+  assert(at(0.14) === 0, '데드존 경계도 0');
+  assert(Math.abs(at(0.82) - 1) < 0.001, `포화반경(82%)에서 최대치 (${at(0.82).toFixed(3)})`);
+  assert(Math.abs(at(1.0) - 1) < 0.001, '가장자리도 최대치 (더 커지지 않음)');
+  assert(Math.abs(at(1.4) - 1) < 0.001, '원 밖으로 나가도 최대치 유지');
+  const mid = at(0.48);
+  assert(mid > 0.4 && mid < 0.6, `중간쯤은 중간 세기 (${mid.toFixed(3)})`);
+  // 단조 증가인지
+  let prev = -1, mono = true;
+  for (let f = 0.14; f <= 1.0; f += 0.02){ const v = at(f); if (v < prev - 1e-9) mono = false; prev = v; }
+  assert(mono, '세기가 중간에 꺾이지 않고 증가');
+
+  // 대각선도 최대치가 1 (더 빨라지지 않음)
+  const d = stickVector({ x: g.cx + g.r * 0.9, y: g.cy - g.r * 0.9 }, uiH);
+  assert(Math.abs(Math.hypot(d.nx, d.ny) - 1) < 0.001, '대각선 끝도 크기 1');
+}
+console.log('layout.test.js 통과');
