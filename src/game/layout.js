@@ -34,6 +34,16 @@ export function paletteSlots(uiH){
   return Array.from({ length: n }, (_, i) => ({ k: i, x: x0 + i * (size + gap), y, w: size, h: size }));
 }
 
+// 전투 중 투척 버튼. 배치 팔레트와 같은 줄, 2칸
+export function throwSlots(uiH){
+  const pd = padRect(uiH);
+  const size = Math.min(pd.h - 6, 30), gap = 6;
+  const total = 2 * size + gap;
+  const x0 = Math.max(4, (pd.x + (W - 6 - 2 * 36) / 2) - total / 2);
+  const y = pd.y + (pd.h - size) / 2;
+  return [0, 1].map(i => ({ k: i, x: x0 + i * (size + gap), y, w: size, h: size }));
+}
+
 export function stickGeom(uiH){
   const pd = padRect(uiH);
   const r = Math.min(pd.h / 2 - 2, STICK_R_MAX);

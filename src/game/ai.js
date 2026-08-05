@@ -1,4 +1,4 @@
-import { FP, WALL_L, WALL_R, wallIdx, YMIN_S, YMAX_S, PH_PLAY } from './config.js';
+import { FP, WALL_L, WALL_R, wallIdx, YMIN_S, YMAX_S, PH_PLAY, THROW } from './config.js';
 
 // 단계별 AI. 값이 클수록 잘한다.
 //  react   : 위협을 알아채고 움직이기까지 걸리는 시간(ms). 낮을수록 잘 피함
@@ -29,6 +29,7 @@ export function createAI(stage = 1){
   const p = AI_STAGES[Math.max(0, Math.min(AI_STAGES.length - 1, stage - 1))];
   let targetX = null, nextPlan = 0;
   let wander = 0, wanderT = 0;
+  let nextThrow = 3000 + Math.random() * 4000;   // 처음 던지기까지
 
   // 어느 x에 서 있으면 안전한지 훑어서 가장 좋은 자리를 고른다.
   // 상대 x를 그냥 따라가면 상대가 쏜 총알 정면으로 걸어들어가게 된다.
@@ -94,7 +95,15 @@ export function createAI(stage = 1){
       const want = me === 0 ? hi - (hi - lo) * p.push : lo + (hi - lo) * p.push;
       let vy = Math.max(-1, Math.min(1, (want - my.y) / (24 * FP) + wander * 0.25));
 
-      return { vx: vx * p.speed, vy: vy * p.speed };
+      // 가끔 투척 (단계가 높을수록 자주)
+      let thr = null;
+      nextThrow -= dt * 1000;
+      if (nextThrow <= 0){
+        nextThrow = (7000 - p.aim * 4000) + Math.random() * 3000;
+        thr = { k: Math.random() < 0.65 ? THROW.NADE : THROW.FLASH,
+                ch: Math.round(Math.random() * 100) };
+      }
+      return { vx: vx * p.speed, vy: vy * p.speed, thr };
     }
   };
 }

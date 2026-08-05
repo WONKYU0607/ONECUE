@@ -6,12 +6,13 @@ import { Loopback, Server, Client } from './net.js';
 import { createRenderer } from './render.js';
 import { attachInput } from './input.js';
 import { createAI } from './ai.js';
-import { canPlace } from './sim.js';
+import { canPlace, canThrow } from './sim.js';
 import {
   ITEM, ITEM_DEF, PH_READY, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
   GRID_X0, GRID_Y0, H, cellOwner
 } from './config.js';
 import { padRect, paletteSlots } from './layout.js';
+import { CHARGE_MAX_MS, PH_PLAY, THROW } from './config.js';
 
 // 게임 한 판을 만들고 rAF 루프를 돌린다.
 // React는 이 함수 하나만 호출하고, 언마운트 때 stop()만 부르면 된다.
@@ -69,11 +70,16 @@ export function createGame(canvas, opts = {}){
     return okCell(k, c, r) ? { c, r } : null;
   };
 
+  const ammoLeft = k => (client.pred.ammo?.[SELF.slot]?.[k] ?? 0);
+
   const input = attachInput(canvas, view, {
     canPlaceNow: () => client.pred.phase === PH_READY,
     leftCount,
     cellAt,
-    onPlace: (k, c, r) => client.place(SELF.slot, k, c, r)
+    onPlace: (k, c, r) => client.place(SELF.slot, k, c, r),
+    canThrowNow: () => client.pred.phase === PH_PLAY,
+    ammo: ammoLeft,
+    onThrow: (k, ch) => { if (canThrow(client.pred, SELF.slot, k)) client.throwItem(SELF.slot, k, ch); }
   });
 
   const doResize = () => view.resize(innerWidth, innerHeight);
@@ -127,6 +133,7 @@ export function createGame(canvas, opts = {}){
     if (ai){
       const a = ai.think(client.pred, aiSlot, dt, now);
       if (a.vx || a.vy) client.input(aiSlot, a.vx * sp * dt, a.vy * sp * dt, 0);
+      if (a.thr && canThrow(client.pred, aiSlot, a.thr.k)) client.throwItem(aiSlot, a.thr.k, a.thr.ch);
     }
 
     client.ping(now);
@@ -139,8 +146,11 @@ export function createGame(canvas, opts = {}){
                 ' LAT' + NET.oneway + ' AHEAD' + (client.nextInputTick - 1 - client.s.tick) +
                 ' DRP' + (server ? server.lateDrops : '-') + ' DSY' + client.desync;
     const a = client.alpha(now);
+    input.tick(now, CHARGE_MAX_MS);
     client.updateRender(a, dt);
-    view.draw(client.pred, dbg, a, client, stick, input.drag, leftCount, okCell);
+    view.draw(client.pred, dbg, a, client, stick, input.drag, leftCount, okCell, {
+      ammo: ammoLeft, charge: input.charge, softFlash: opts.softFlash?.() || false
+    });
 
     // 페이즈가 바뀔 때만 React에 알린다 (매 프레임 setState 하면 안 됨)
     if (client.pred.phase !== lastPhase){
@@ -157,7 +167,7 @@ export function createGame(canvas, opts = {}){
 
   return {
     server, client, session, ai,
-    leftCount,
+    leftCount, ammoLeft,
     // 아이템 칸 바로 위 여백의 화면 좌표. 버튼을 여기에 얹는다
     // (화면 절대 위치로 두면 기기마다 패널 높이가 달라 어긋난다)
     uiBox(){

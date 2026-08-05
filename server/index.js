@@ -12,11 +12,22 @@ const GRACE_MS = 30_000;         // 끊긴 사람의 자리를 잡아두는 시�
 
 let nextRoomId = 1;
 const rooms = new Map();         // id -> Room
+const codes = new Map();         // 코드 -> Room (친구방)
 const waiting = [];              // 매칭 대기열 (소켓)
 
+// 헷갈리는 글자 없이 숫자 4자리
+function newCode(){
+  for (let i = 0; i < 200; i++){
+    const c = String(Math.floor(1000 + Math.random() * 9000));
+    if (!codes.has(c)) return c;
+  }
+  return String(Date.now() % 10000);
+}
+
 class Room {
-  constructor(id){
+  constructor(id, code = null){
     this.id = id;
+    this.code = code;
     // 자리마다 세션 id를 기억한다. 소켓이 끊겨도 sid가 남아 있으면 그 자리는 예약 상태
     this.seats = [
       { sid: null, ws: null, goneAt: 0 },
@@ -45,6 +56,7 @@ class Room {
   // 새 사람이 앉을 수 있는 자리 (예약된 자리는 제외)
   freeSeat(){ return this.seats.findIndex(x => !x.sid); }
   get full(){ return this.seats.every(x => !!x.sid); }
+  dispose(){ if (this.code) codes.delete(this.code); }
 
   join(ws, sid){
     const back = this.seatOf(sid);
@@ -109,6 +121,7 @@ const http = createServer((req, res) => {
       ver: PROTO_VER,
       rooms: rooms.size,
       waiting: waiting.length,
+      codeRooms: codes.size,
       players: wss ? wss.clients.size : 0,
       uptime: Math.round(process.uptime())
     }));
@@ -141,7 +154,10 @@ wss.on('connection', (ws, req) => {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
 
-  const sid = new URL(req.url, 'http://x').searchParams.get('sid') || String(Math.random());
+  const q = new URL(req.url, 'http://x').searchParams;
+  const sid = q.get('sid') || String(Math.random());
+  const mode = q.get('mode') || 'queue';      // queue | create | join
+  const code = (q.get('code') || '').trim();
   ws.sid = sid;
 
   // 재접속이면 예약해 둔 자리로 바로 복귀
@@ -150,6 +166,22 @@ wss.on('connection', (ws, req) => {
     ws.room = back;
     back.join(ws, sid);
     console.log(`복귀: room ${back.id} slot ${ws.slot} sid ${sid.slice(0, 8)}`);
+  } else if (mode === 'create'){
+    // 친구방 만들기: 코드를 발급하고 상대가 들어올 때까지 혼자 기다린다
+    const room = new Room(nextRoomId++, newCode());
+    rooms.set(room.id, room);
+    codes.set(room.code, room);
+    ws.room = room;
+    room.join(ws, sid);
+    ws.send(JSON.stringify({ t: 'room', code: room.code }));
+    console.log(`방 개설: ${room.code} (room ${room.id})`);
+  } else if (mode === 'join'){
+    const room = codes.get(code);
+    if (!room){ ws.send(JSON.stringify({ t: 'joinfail', reason: 'notfound' })); ws.close(); return; }
+    if (room.full){ ws.send(JSON.stringify({ t: 'joinfail', reason: 'full' })); ws.close(); return; }
+    ws.room = room;
+    room.join(ws, sid);
+    console.log(`방 입장: ${code} (room ${room.id})`);
   } else {
     // 같은 sid가 이미 대기 중이면 옛 소켓을 정리
     for (let i = waiting.length - 1; i >= 0; i--){
@@ -193,6 +225,7 @@ setInterval(() => {
   for (const [id, room] of rooms){
     room.sweep(wall);
     if (room.emptyAt && wall - room.emptyAt > EMPTY_ROOM_TTL){
+      room.dispose();
       rooms.delete(id);
       console.log(`방 정리: ${id}`);
       continue;

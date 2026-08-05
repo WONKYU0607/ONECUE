@@ -4,7 +4,9 @@ export const ASSET_SRC = {
   arena:      'assets/arena.webp',
   characters: 'assets/characters.png',
   items:      'assets/items.webp',
-  explosion:  'assets/explosion.webp'
+  explosion:  'assets/explosion.webp',
+  grenade:    'assets/grenade.webp',
+  flash:      'assets/flash.webp'
 };
 
 const cache = {};

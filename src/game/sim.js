@@ -1,11 +1,14 @@
 import {
   BASE_MAX_STEP,
   BHf,
+  BLIND_FULL,
+  BLIND_TICKS,
   BOFF,
   BWf,
   CD_GO,
   CD_STEP,
   CD_TICKS,
+  CHARGE_MAX_MS,
   COL,
   DEBUG_INF_HP,
   DEBUG_LOCAL_BOTH,
@@ -14,7 +17,9 @@ import {
   EXPLO_TICKS,
   EXTRAP_MAX,
   FLASH_T,
+  FLY_TICKS,
   FP,
+  FUSE_TICKS,
   GLINT_C,
   GRID_CH,
   GRID_COLS,
@@ -35,6 +40,8 @@ import {
   MAXHP,
   MAX_DELAY,
   MIN_DELAY,
+  NADE_DAMAGE,
+  NADE_RADIUS,
   NET,
   PH_COUNT,
   PH_OVER,
@@ -42,6 +49,7 @@ import {
   PH_READY,
   PHf,
   PING_MS,
+  PROTO_VER,
   PWf,
   RENDER_MAXJUMP,
   ROUND_TICKS,
@@ -52,6 +60,8 @@ import {
   SNAP_EVERY,
   TEAMS,
   TEAM_OF,
+  THROW,
+  THROW_DEF,
   TICK_HZ,
   TICK_MS,
   TUNE,
@@ -88,6 +98,9 @@ export function normalizeState(st){
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
   if (!Array.isArray(st.ready)) st.ready = [false, false];
+  if (!Array.isArray(st.proj)) st.proj = [];
+  if (!Array.isArray(st.blind)) st.blind = [0, 0];
+  if (!Array.isArray(st.ammo)) st.ammo = [[3, 3], [3, 3]];
   if (typeof st.clock !== 'number') st.clock = 0;
   return st;
 }
@@ -109,6 +122,10 @@ export function newState(){
     covers: newCovers(),
     items: newItems(),          // 배치된 엄폐물·폭탄
     fx: [],                     // 폭발 연출 (칸 좌표 + 남은 틱). 상태에 넣어야 양쪽 화면에 같이 뜬다
+    proj: [],                   // 날아가는 투척물 {k, by, c, r0, r1, t, fuse}
+    blind: [0, 0],              // 슬롯별 섬광 남은 틱
+    ammo: [[THROW_DEF[0].count, THROW_DEF[1].count],
+           [THROW_DEF[0].count, THROW_DEF[1].count]],
     ready: [false, false],      // 설치 완료 여부
     maxStep: stepCap(),   // 아래 3개는 서버가 정하고 프레임으로 전파 → 결정론 유지
     bulletV: bulletFP(),
@@ -116,7 +133,7 @@ export function newState(){
     over: false, winner: 0
   };
 }
-export const NOIN = { dx:0, dy:0, fire:0, ready:0, place:null };
+export const NOIN = { dx:0, dy:0, fire:0, ready:0, place:null, thr:null };
 export function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
 
 export function overlap(ax,ay,aw,ah,bx,by,bw,bh){
@@ -157,24 +174,46 @@ export function canPlace(s, slot, k, c, r){
 }
 
 // 드럼통이 터지면 근처 플레이어가 피해를 입는다
-function explode(s, it){
-  // 폭발 범위 = 드럼통이 놓인 칸 + 주변 DRUM_RADIUS칸
-  const x0 = Math.round(cellX(it.c - DRUM_RADIUS) * FP);
-  const x1 = Math.round(cellX(it.c + DRUM_RADIUS + 1) * FP);
-  const y0 = Math.round(cellY(it.r - DRUM_RADIUS) * FP);
-  const y1 = Math.round(cellY(it.r + DRUM_RADIUS + 1) * FP);
+// 칸 (c,r)을 중심으로 rad칸 범위를 터뜨린다. 드럼통·수류탄이 함께 쓴다
+export function blast(s, c, r, rad, dmg){
+  const x0 = Math.round(cellX(c - rad) * FP);
+  const x1 = Math.round(cellX(c + rad + 1) * FP);
+  const y0 = Math.round(cellY(r - rad) * FP);
+  const y1 = Math.round(cellY(r + rad + 1) * FP);
   for (let i = 0; i < 2; i++){
     const p = s.p[i];
     if (!overlap(p.x, p.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
     if (p.invul > 0) continue;
     p.invul = INVUL_T; p.flash = FLASH_T;
     if (!DEBUG_INF_HP){
-      p.hp -= DRUM_DAMAGE;
+      p.hp -= dmg;
       if (p.hp <= 0){ s.over = true; s.phase = PH_OVER; s.winner = i === 0 ? 2 : 1; }
     }
   }
+  s.fx.push({ c, r, t: EXPLO_TICKS });
+}
+
+function explode(s, it){
+  blast(s, it.c, it.r, DRUM_RADIUS, DRUM_DAMAGE);
   it.hp = 0;
-  s.fx.push({ c: it.c, r: it.r, t: EXPLO_TICKS });
+}
+
+// 던지는 사람의 세로줄 = 캐릭터 중심이 속한 열
+export function throwCol(p){
+  const c = Math.floor(((p.x + 7 * FP) / FP - GRID_X0) / GRID_CW);
+  return Math.max(0, Math.min(GRID_COLS - 1, c));
+}
+// 차징(0~1) -> 착탄 행. 0이면 중앙선 건너 첫 칸, 1이면 상대 맨 뒷줄
+export function throwRow(slot, charge){
+  const ch = Math.max(0, Math.min(1, charge));
+  const near = slot === 0 ? GRID_MIDROW - 1 : GRID_MIDROW;      // 중앙선 건너 첫 칸
+  const far  = slot === 0 ? 0 : GRID_ROWS - 1;                   // 상대 맨 뒷줄
+  return Math.round(near + (far - near) * ch);
+}
+export function canThrow(s, slot, k){
+  if (s.phase !== PH_PLAY) return false;
+  if (!THROW_DEF[k]) return false;
+  return (s.ammo?.[slot]?.[k] || 0) > 0;
 }
 
 export function step(s, inp){
@@ -201,7 +240,8 @@ export function step(s, inp){
       const t = s.tick, ms = s.maxStep, bv = s.bulletV, ct = s.coolT, n = newState();
       n.tick = t; n.phase = PH_READY; n.timer = 0;
       s.p = n.p; s.bullets = n.bullets; s.covers = n.covers;
-      s.items = n.items; s.ready = n.ready; s.fx = n.fx;   // 다시 배치 단계부터
+      s.items = n.items; s.ready = n.ready; s.fx = n.fx;
+      s.proj = n.proj; s.blind = n.blind; s.ammo = n.ammo;   // 다시 배치 단계부터
       s.maxStep = ms; s.bulletV = bv; s.coolT = ct;
       s.phase = n.phase; s.timer = n.timer; s.over = false; s.winner = 0; s.clock = 0;
     }
@@ -232,6 +272,40 @@ export function step(s, inp){
     return;
   }
 
+  // 던지기 요청 (누르는 시간이 사거리)
+  for (let i = 0; i < 2; i++){
+    const q = inp[i] || NOIN;
+    if (!q.thr) continue;
+    const k = q.thr.k | 0;
+    if (!canThrow(s, i, k)) continue;
+    s.ammo[i][k]--;
+    s.proj.push({
+      k, by: i,
+      c: throwCol(s.p[i]),
+      r0: i === 0 ? GRID_ROWS - 1 : 0,          // 출발은 내 진영 끝쪽(연출용)
+      r1: throwRow(i, q.thr.ch / 100),          // 차징은 0~100 정수로 온다
+      t: FLY_TICKS, fuse: 0
+    });
+  }
+
+  // 투척물: 날아가는 동안 t 감소 -> 착탄 -> 수류탄은 신관 대기 후 폭발
+  for (let i = s.proj.length - 1; i >= 0; i--){
+    const pr = s.proj[i];
+    if (pr.t > 0){
+      if (--pr.t === 0 && pr.k === THROW.NADE) pr.fuse = FUSE_TICKS;
+      if (pr.t === 0 && pr.k === THROW.FLASH){
+        s.blind[1 - pr.by] = BLIND_TICKS;       // 맞은 쪽이 상대 진영을 못 봄
+        s.proj.splice(i, 1);
+      }
+      continue;
+    }
+    if (pr.fuse > 0 && --pr.fuse === 0){
+      blast(s, pr.c, pr.r1, NADE_RADIUS, NADE_DAMAGE);
+      s.proj.splice(i, 1);
+    }
+  }
+  for (let i = 0; i < 2; i++) if (s.blind[i] > 0) s.blind[i]--;
+
   // 폭발 연출 수명
   for (let i = s.fx.length - 1; i >= 0; i--) if (--s.fx[i].t <= 0) s.fx.splice(i, 1);
 
@@ -252,16 +326,22 @@ export function step(s, inp){
     b.y += b.vy;
     if (b.y < -8*FP || b.y > (H+8)*FP){ s.bullets.splice(k,1); continue; }
     let gone = false;
-    for (const it of s.items){
+    for (const it of (s.items || [])){
       if (it.hp <= 0) continue;
       const r = itemRect(it);
       if (!overlap(b.x, b.y, BWf, BHf, r.x, r.y, r.w, r.h)) continue;
-      it.hp--;
-      if (it.k === ITEM.DRUM && it.hp <= 0) explode(s, it);
+      // 총알은 누구 것이든 막히고 사라진다. 다만 그 칸이 속한 영역의 주인이
+      // 쏜 총알은 내구도를 깎지도, 드럼통을 터뜨리지도 않는다.
+      //  - 내 영역의 벽·바리케이트: 상대 총알만 부순다
+      //  - 상대 영역의 드럼통: 내 총알만 터뜨린다 (당한 쪽은 미리 못 없앤다)
+      if (b.o !== cellOwner(it.r)){
+        it.hp--;
+        if (it.k === ITEM.DRUM && it.hp <= 0) explode(s, it);
+      }
       gone = true; break;
     }
     if (gone){ s.bullets.splice(k, 1); continue; }
-    for (const c of s.covers){
+    for (const c of (s.covers || [])){
       if (c.hp > 0 && overlap(b.x,b.y,BWf,BHf, c.x,c.y,c.w,c.h)){ c.hp--; gone = true; break; }
     }
     if (!gone){
@@ -297,5 +377,7 @@ export function checksum(s){
   for (const it of s.items) h = (h*31 + it.k*7 + it.c*13 + it.r*29 + it.hp*3 + it.by) | 0;
   h = (h*31 + (s.ready[0] ? 1 : 0) + (s.ready[1] ? 2 : 0)) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t) | 0;
+  for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;
+  h = (h*31 + s.blind[0] + s.blind[1]*3 + s.ammo[0][0]*7 + s.ammo[0][1]*11 + s.ammo[1][0]*13 + s.ammo[1][1]*17) | 0;
   return h | 0;
 }

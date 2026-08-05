@@ -3,6 +3,7 @@ import { createGame } from '../game/game.js';
 import { PH_READY, PH_OVER } from '../game/config.js';
 import TunePanel from './TunePanel.jsx';
 import { getConnection, disconnect } from '../net/connection.js';
+import { getSettings } from '../state/settings.js';
 
 // 캔버스를 마운트하고 게임을 붙였다 떼는 얇은 껍데기.
 // 게임 루프 상태는 ref에만 두고, React state는 "페이즈"처럼 드물게 바뀌는 것만 쓴다.
@@ -48,7 +49,8 @@ export default function GameCanvas({ session, onExit, onFinish }){
       session,
       transport: conn?.transport,
       onLink: u => setLink(prev => ({ ...prev, ...u })),
-      onFinish: r => setTimeout(() => onFinish?.(r), 1400)   // 결과 연출을 잠깐 보여준 뒤 넘어감
+      onFinish: r => setTimeout(() => onFinish?.(r), 1400),  // 결과 연출을 잠깐 보여준 뒤 넘어감
+      softFlash: () => getSettings().softFlash   // 번쩍임이 부담되면 옅은 안개로
     });
     gameRef.current = game;
     return () => { game.stop(); gameRef.current = null; };

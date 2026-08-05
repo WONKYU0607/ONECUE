@@ -30,7 +30,9 @@ export function getSid(){
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const wsUrl = () => BASE + '?sid=' + encodeURIComponent(getSid());
+const wsUrl = (mode = 'queue', code = '') =>
+  BASE + '?sid=' + encodeURIComponent(getSid()) +
+  '&mode=' + mode + (code ? '&code=' + encodeURIComponent(code) : '');
 
 // 잠든 서버는 HTTP 요청으로도 깨어난다. 소켓보다 먼저 두드려 둔다.
 export async function wakeServer(){
@@ -55,14 +57,15 @@ function openOnce(transport){
 }
 
 // 접속해서 상대가 들어올 때까지 기다린다. onStage로 진행 상황을 알린다.
-export async function connectAndWait({ onStage } = {}){
+// mode: 'queue'(랜덤) | 'create'(방 만들기) | 'join'(코드 입장)
+export async function connectAndWait({ onStage, onCode, mode = 'queue', code = '' } = {}){
   onStage?.('waking');
   await wakeServer();                       // 실패해도 그냥 진행 (소켓이 깨울 수도 있으므로)
 
   let transport = null;
   for (let i = 0; i < TRIES; i++){
     onStage?.(i === 0 ? 'connecting' : 'retrying', i + 1, TRIES);
-    transport = new WsTransport(wsUrl());
+    transport = new WsTransport(wsUrl(mode, code));
     try { await openOnce(transport); break; }
     catch { transport.close(); transport = null; await sleep(GAP_MS); }
   }
@@ -95,6 +98,13 @@ export async function connectAndWait({ onStage } = {}){
         SELF.slot = slot;                   // 내 슬롯은 서버가 정한다
         onStage?.('waiting');
         if (m.back) done();                 // 재접속이면 서버가 go를 다시 보내지 않는다
+      } else if (m.t === 'room'){
+        onCode?.(m.code);
+        onStage?.('hosting');
+      } else if (m.t === 'joinfail'){
+        settled = true;
+        transport.close();
+        reject(new Error(m.reason === 'full' ? '이미 꽉 찬 방이다' : '없는 방 코드다'));
       } else if (m.t === 'queued'){
         onStage?.('waiting', m.ahead);
       } else if (m.t === 'go'){

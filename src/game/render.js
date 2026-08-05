@@ -2,11 +2,12 @@ import {
   W, H, FP, COL, TEAMS, TEAM_OF, SELF, MAXHP, FLASH_T, VIEW, SHOW_HUD,
   GRID_COLS, GRID_ROWS, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO,
-  ITEM, ITEM_DEF, cellOwner, DRUM_RADIUS, EXPLO_TICKS
+  ITEM, ITEM_DEF, cellOwner, DRUM_RADIUS, EXPLO_TICKS,
+  THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
 } from './config.js';
 import { RS, computeLayout, stickGeom } from './layout.js';
 import { getImage, isReady } from './assets.js';
-import { paletteSlots } from './layout.js';
+import { paletteSlots, throwSlots } from './layout.js';
 
 const FW = 14 * RS, FH = 16 * RS;
 
@@ -26,6 +27,7 @@ export function createRenderer(canvas){
   const ctx = canvas.getContext('2d');
   const bg = getImage('arena'), sheet = getImage('characters'), items = getImage('items');
   const boom = getImage('explosion');
+  const throwImg = [getImage('grenade'), getImage('flash')];
 
   let uiH = 86, totalH = H + uiH, scale = 1;
 
@@ -126,8 +128,8 @@ export function createRenderer(canvas){
     if (!isReady(items)) return;
     for (const it of (s.items || [])){
       if (it.hp <= 0) continue;
-      // 상대가 내 영역에 심은 드럼통은 시작 전엔 안 보인다
-      if (it.k === ITEM.DRUM && it.by !== SELF.slot && s.phase !== PH_PLAY) continue;
+      // 상대가 뭘 어디에 깔았는지는 시작 전엔 안 보인다 (벽·바리케이트·드럼통 모두)
+      if (it.by !== SELF.slot && s.phase !== PH_PLAY) continue;
       const def = ITEM_DEF[it.k];
       const f = ITEM_FRAME[def.key];
       const box = cellBox(it.c, it.r, def.cells);
@@ -177,6 +179,83 @@ export function createRenderer(canvas){
       }
     }
   }
+  // 날아가는 투척물 + 착탄 지점 (착탄점은 양쪽 다 보인다)
+  function drawProjectiles(s, a){
+    for (const pr of s.proj || []){
+      const box = cellBox(pr.c, pr.r1);
+      const mx = box.x + box.w / 2, my = box.y + box.h / 2;
+
+      if (pr.t > 0){
+        // 출발점에서 착탄점까지, 위로 볼록한 포물선
+        const k = 1 - (pr.t - a) / FLY_TICKS;
+        const from = cellBox(pr.c, pr.r0);
+        const sx = from.x + from.w / 2, sy = from.y + from.h / 2;
+        const x = sx + (mx - sx) * k;
+        const y = sy + (my - sy) * k - Math.sin(Math.PI * k) * 34;
+        const img = throwImg[pr.k];
+        if (isReady(img)){
+          const w = img.naturalWidth / RS * 0.7, h = img.naturalHeight / RS * 0.7;
+          ctx.drawImage(img, Math.round((x - w/2)*RS), Math.round((y - h/2)*RS),
+                        Math.round(w*RS), Math.round(h*RS));
+        } else px(x - 2, y - 2, 4, 4, '#e8e8f0');
+      }
+
+      // 착탄 표시
+      const blink = pr.fuse > 0 ? (Math.floor(pr.fuse / 4) % 2 === 0) : true;
+      const c = pr.k === THROW.NADE ? (blink ? 'rgba(240,120,60,0.85)' : 'rgba(240,120,60,0.3)')
+                                    : 'rgba(200,220,255,0.7)';
+      const R = pr.k === THROW.NADE ? NADE_RADIUS : 0;
+      const w = GRID_CW * (R * 2 + 1), h = GRID_CH * (R * 2 + 1);
+      const x0 = mx - w / 2, y0 = my - h / 2;
+      px(x0, y0, w, 0.8, c); px(x0, y0 + h - 0.8, w, 0.8, c);
+      px(x0, y0, 0.8, h, c); px(x0 + w - 0.8, y0, 0.8, h, c);
+    }
+  }
+
+  // 섬광: 당한 쪽 화면에서 상대 진영만 가린다
+  function drawBlind(s, softMode){
+    const t = (s.blind || [0,0])[SELF.slot];
+    if (!t) return;
+    const k = t > BLIND_TICKS - BLIND_FULL ? 1 : t / (BLIND_TICKS - BLIND_FULL);
+    // 각자 자기가 아래쪽에 보이므로 상대 진영은 항상 화면 위 절반
+    if (softMode){
+      px(0, 0, W, H / 2, `rgba(200,210,230,${(0.55 * k).toFixed(3)})`);
+    } else {
+      px(0, 0, W, H / 2, `rgba(255,255,255,${(0.95 * k).toFixed(3)})`);
+    }
+  }
+
+  // 전투 중 투척 버튼 (배치 팔레트와 같은 자리)
+  function drawThrowPad(s, uiH2, ammo, charge){
+    if (s.phase !== PH_PLAY) return;
+    for (const sl of throwSlots(uiH2)){
+      const n = ammo(sl.k);
+      const active = charge && charge.on && charge.k === sl.k;
+      px(sl.x, sl.y, sl.w, sl.h, active ? 'rgba(240,168,30,0.25)'
+                                        : n > 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)');
+      const c = active ? '#f0a81e' : n > 0 ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.10)';
+      px(sl.x, sl.y, sl.w, 0.7, c); px(sl.x, sl.y + sl.h - 0.7, sl.w, 0.7, c);
+      px(sl.x, sl.y, 0.7, sl.h, c); px(sl.x + sl.w - 0.7, sl.y, 0.7, sl.h, c);
+      const img = throwImg[sl.k];
+      if (isReady(img)){
+        const sc = Math.min((sl.w - 7) / (img.naturalWidth / RS), (sl.h - 7) / (img.naturalHeight / RS));
+        const dw = img.naturalWidth / RS * sc, dh = img.naturalHeight / RS * sc;
+        ctx.globalAlpha = n > 0 ? 1 : 0.25;
+        ctx.drawImage(img, Math.round((sl.x + (sl.w - dw)/2)*RS), Math.round((sl.y + (sl.h - dh)/2)*RS),
+                      Math.round(dw*RS), Math.round(dh*RS));
+        ctx.globalAlpha = 1;
+      }
+      ctx.font = 'bold ' + (7*RS) + 'px monospace'; ctx.textAlign = 'right';
+      ctx.fillStyle = n > 0 ? '#8fd8ff' : '#4a4a63';
+      ctx.fillText('x' + n, (sl.x + sl.w - 1.5)*RS, (sl.y + sl.h - 1.5)*RS);
+      ctx.textAlign = 'left';
+      // 차징 게이지
+      if (active){
+        px(sl.x + 1, sl.y + sl.h - 3, (sl.w - 2) * charge.ch / 100, 1.6, '#f0a81e');
+      }
+    }
+  }
+
   // 배치 단계 안내: 놓을 수 있는 칸을 밝히고, 끌고 있는 아이콘을 따라 그린다
   function drawPlacing(s, cl, drag, ok){
     if (s.phase !== PH_READY) return;
@@ -237,11 +316,12 @@ export function createRenderer(canvas){
     }
   }
 
-  function draw(s, dbg, a, cl, stick, drag, left, ok){
+  function draw(s, dbg, a, cl, stick, drag, left, ok, extra = {}){
     if (isReady(bg)) ctx.drawImage(bg, 0, 0, W * RS, H * RS);
     else px(0, 0, W, H, COL.bg);
     drawPanel(s, stick);
     if (left) drawPalette(s, uiH, left, drag);
+    if (extra.ammo) drawThrowPad(s, uiH, extra.ammo, extra.charge);
     if (VIEW.grid){
       for (let c = 0; c <= GRID_COLS; c++) px(cellX(c), GRID_Y0, 0.4, GRID_CH*GRID_ROWS, 'rgba(255,255,255,0.14)');
       for (let r = 0; r <= GRID_ROWS; r++) px(GRID_X0, cellY(r), GRID_CW*GRID_COLS, 0.4, 'rgba(255,255,255,0.14)');
@@ -257,7 +337,9 @@ export function createRenderer(canvas){
     }
     for (const b of s.bullets) px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5, TEAMS[TEAM_OF[b.o]].m);
     for (let i = 0; i < 2; i++) drawPlayer(s.p[i], i, cl.rx[i], cl.ry[i]);
+    drawProjectiles(s, a);
     drawFx(s);
+    drawBlind(s, extra.softFlash);
     if (SHOW_HUD){
       ctx.font = (8*RS) + 'px monospace'; ctx.textAlign = 'left';
       ctx.fillStyle = COL.dim;

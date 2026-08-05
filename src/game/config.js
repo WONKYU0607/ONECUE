@@ -81,6 +81,20 @@ export const DRUM_DAMAGE = 1;         // 폭발에 휘말리면 이만큼 깎임
 export const DRUM_RADIUS = 1;         // 폭발 범위: 주변 한 칸
 export const EXPLO_TICKS = 34;        // 폭발 이펙트 지속 (틱)
 
+// 던지는 아이템: 0=수류탄 1=섬광탄. 누르는 시간이 곧 사거리
+export const THROW = { NADE: 0, FLASH: 1 };
+export const THROW_DEF = [
+  { key: 'grenade', name: '수류탄', count: 3 },
+  { key: 'flash',   name: '섬광탄', count: 3 }
+];
+export const CHARGE_MAX_MS = 1000;    // 최대로 눌렀을 때 상대 맨 뒷줄
+export const FLY_TICKS  = 36;         // 날아가는 시간 (0.6초)
+export const FUSE_TICKS = 30;         // 착탄 후 폭발까지 (0.5초)
+export const NADE_RADIUS = 1;         // 폭발 범위: 주변 한 칸
+export const NADE_DAMAGE = 2;
+export const BLIND_TICKS = 108;       // 섬광 지속 (1.8초)
+export const BLIND_FULL  = 18;        // 이 구간은 완전히 하얗게
+
 export const ROUND_TICKS = 60 * 60;   // 한 판 60초. 시간 내 승부가 안 나면 체력 많은 쪽 승
 export const SNAP_EVERY = 30;          // 스냅샷 주기(틱)
 export const clampi = (v,a,b) => v < a ? a : (v > b ? b : v);

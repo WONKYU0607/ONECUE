@@ -1,11 +1,14 @@
 import {
   BASE_MAX_STEP,
   BHf,
+  BLIND_FULL,
+  BLIND_TICKS,
   BOFF,
   BWf,
   CD_GO,
   CD_STEP,
   CD_TICKS,
+  CHARGE_MAX_MS,
   COL,
   DEBUG_INF_HP,
   DEBUG_LOCAL_BOTH,
@@ -14,7 +17,9 @@ import {
   EXPLO_TICKS,
   EXTRAP_MAX,
   FLASH_T,
+  FLY_TICKS,
   FP,
+  FUSE_TICKS,
   GLINT_C,
   GRID_CH,
   GRID_COLS,
@@ -35,6 +40,8 @@ import {
   MAXHP,
   MAX_DELAY,
   MIN_DELAY,
+  NADE_DAMAGE,
+  NADE_RADIUS,
   NET,
   PH_COUNT,
   PH_OVER,
@@ -42,6 +49,7 @@ import {
   PH_READY,
   PHf,
   PING_MS,
+  PROTO_VER,
   PWf,
   RENDER_MAXJUMP,
   ROUND_TICKS,
@@ -52,6 +60,8 @@ import {
   SNAP_EVERY,
   TEAMS,
   TEAM_OF,
+  THROW,
+  THROW_DEF,
   TICK_HZ,
   TICK_MS,
   TUNE,
@@ -191,7 +201,7 @@ export class Server {
     }
     let f = this.inbox.get(m.tick);
     if (!f){ f = [null, null]; this.inbox.set(m.tick, f); }
-    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, ready: m.ready ? 1 : 0, place: m.place || null };
+    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, ready: m.ready ? 1 : 0, place: m.place || null, thr: m.thr || null };
   }
   recalcDelay(){
     const worst = Math.max(this.rtt[0], this.rtt[1]);         // 느린 쪽 기준 = 양쪽 동일 지연
@@ -233,7 +243,8 @@ export class Client {
     this.delay = MIN_DELAY;
     this.rtt = -1; this.pings = new Map(); this.pingId = 1; this.lastPing = -1e9;
     this.svTick = 0; this.svAt = CLOCK.now();
-    this.pend = [ {dx:0, dy:0, fire:0, ready:0, place:null}, {dx:0, dy:0, fire:0, ready:0, place:null} ];
+    const blank = () => ({ dx:0, dy:0, fire:0, ready:0, place:null, thr:null });
+    this.pend = [ blank(), blank() ];
     this.sent = [];                    // 아직 서버가 확정하지 않은 내 입력
     this.pred = newState();            // 예측 상태 (화면에 그리는 것)
     this.rx = null; this.ry = null;    // 렌더 위치 (상대는 따라가기 필터)
@@ -303,9 +314,9 @@ export class Client {
       this.tickAt = now;
       for (const pid of this.controlled){
         const q = this.pend[pid];
-        this.net.clientSend({ t:'in', pid, tick:t, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place });
-        this.sent.push({ tick:t, pid, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place });
-        q.dx = 0; q.dy = 0; q.fire = 0; q.ready = 0; q.place = null;
+        this.net.clientSend({ t:'in', pid, tick:t, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place, thr:q.thr });
+        this.sent.push({ tick:t, pid, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place, thr:q.thr });
+        q.dx = 0; q.dy = 0; q.fire = 0; q.ready = 0; q.place = null; q.thr = null;
       }
     }
   }
@@ -340,11 +351,12 @@ export class Client {
     let guard = 0;
     while (p.tick < target && guard++ < 40){
       const t = p.tick + 1;
-      const inp = [ { dx:0, dy:0, fire:0 }, { dx:0, dy:0, fire:0 } ];
+      const inp = [ { dx:0, dy:0, fire:0, ready:0, place:null, thr:null },
+                    { dx:0, dy:0, fire:0, ready:0, place:null, thr:null } ];
       if (this.lastInp && t - this.s.tick <= EXTRAP_MAX){   // 상대는 마지막 입력으로 외삽
         for (let k = 0; k < 2; k++){ inp[k].dx = this.lastInp[k].dx; inp[k].dy = this.lastInp[k].dy; }
       }
-      for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, ready:e.ready, place:e.place };
+      for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, ready:e.ready, place:e.place, thr:e.thr };
       prevMy = p.p[SELF.slot].x; prevMyY = p.p[SELF.slot].y;
       step(p, inp);
     }
@@ -384,5 +396,10 @@ export class Client {
   setReady(pid){
     if (!this.controlled.includes(pid)) return;
     this.pend[pid].ready = 1;
+  }
+  // 던지기: ch는 0~100 정수 (누른 시간 비율)
+  throwItem(pid, k, ch){
+    if (!this.controlled.includes(pid)) return;
+    this.pend[pid].thr = { k, ch: Math.max(0, Math.min(100, Math.round(ch))) };
   }
 }

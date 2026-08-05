@@ -1,5 +1,5 @@
 import { NET } from './config.js';
-import { stickVector, inStickZone, clampBase, stickGeom, paletteSlots } from './layout.js';
+import { stickVector, inStickZone, clampBase, stickGeom, paletteSlots, throwSlots } from './layout.js';
 
 // 스틱 상태와 눌린 키를 들고 있다가 루프가 매 프레임 읽어간다.
 // React 언마운트 시 detach()로 리스너를 전부 떼야 StrictMode 이중 마운트에서 입력이 겹치지 않는다.
@@ -12,6 +12,8 @@ export function attachInput(canvas, view, opts = {}){
   const stick = { on: false, id: null, nx: 0, ny: 0, base: null };
   const keys = {};
   const drag = { on: false, id: null, k: -1, x: 0, y: 0, cell: null };
+  // 투척: 누르고 있는 동안 차징, 떼면 던진다
+  const charge = { on: false, id: null, k: -1, t0: 0, ch: 0 };
 
   // 화면 좌표 -> 월드 좌표
   function worldPt(e){
@@ -30,6 +32,18 @@ export function attachInput(canvas, view, opts = {}){
           if ((opts.leftCount?.(sl.k) ?? 0) <= 0) return;
           drag.on = true; drag.id = e.pointerId; drag.k = sl.k;
           drag.x = wp.x; drag.y = wp.y; drag.cell = null;
+          return;
+        }
+      }
+    }
+
+    // 전투 중: 투척 버튼을 누르면 차징 시작
+    if (opts.canThrowNow?.()){
+      for (const sl of throwSlots(view.uiH)){
+        if (wp.x >= sl.x && wp.x <= sl.x + sl.w && wp.y >= sl.y && wp.y <= sl.y + sl.h){
+          if ((opts.ammo?.(sl.k) ?? 0) <= 0) return;
+          charge.on = true; charge.id = e.pointerId; charge.k = sl.k;
+          charge.t0 = performance.now(); charge.ch = 0;
           return;
         }
       }
@@ -60,6 +74,11 @@ export function attachInput(canvas, view, opts = {}){
     Object.assign(stick, stickVector(wp, view.uiH, stick.base));
   };
   const onUp = e => {
+    if (charge.on && e.pointerId === charge.id){
+      opts.onThrow?.(charge.k, charge.ch);
+      charge.on = false; charge.id = null; charge.k = -1; charge.ch = 0;
+      return;
+    }
     if (drag.on && e.pointerId === drag.id){
       if (drag.cell) opts.onPlace?.(drag.k, drag.cell.c, drag.cell.r);
       drag.on = false; drag.id = null; drag.k = -1; drag.cell = null;
@@ -85,8 +104,13 @@ export function attachInput(canvas, view, opts = {}){
   addEventListener('keydown', onKeyDown);
   addEventListener('keyup', onKeyUp);
 
+  // 루프가 매 프레임 불러 차징 진행도를 갱신한다
+  function tick(now, maxMs){
+    if (charge.on) charge.ch = Math.max(0, Math.min(100, (now - charge.t0) / maxMs * 100));
+  }
+
   return {
-    stick, keys, drag,
+    stick, keys, drag, charge, tick,
     detach(){
       removeEventListener('pointerdown', onDown);
       removeEventListener('pointermove', onMove);

@@ -99,3 +99,13 @@ letter-spacing:2px;cursor:pointer;line-height:1}
 .panelbtn.place:active{background:#f0a81e;color:#12121c}
 .panelbtn.start{color:#8fd8ff;border:2px solid #4ec9f0}
 .panelbtn.start:active{background:#4ec9f0;color:#12121c}
+.wide-menu{width:min(340px,86vw)}
+.code-row{display:flex;gap:8px;align-items:stretch}
+.code-input{flex:0 0 110px;background:#12121c;border:2px solid #2a2a40;color:#e8e8f0;
+font:20px/1 monospace;letter-spacing:6px;text-align:center;padding:0 8px}
+.code-input:focus{outline:none;border-color:#4ec9f0}
+.menu-btn.join{flex:1;align-items:center;justify-content:center;border-color:#4ec9f0;color:#8fd8ff}
+.menu-btn.join:disabled{border-color:#2a2a40;color:#4a4a63;cursor:default}
+.roomcode{display:flex;flex-direction:column;align-items:center;gap:6px;margin:6px 0}
+.roomcode .lbl{font-size:11px;color:#7a7a95;letter-spacing:2px}
+.roomcode strong{font:bold 40px monospace;letter-spacing:10px;color:#8fd8ff}

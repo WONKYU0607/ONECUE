@@ -5,7 +5,8 @@ export const DEFAULTS = {
   sound: true,       // 효과음
   music: true,       // 배경음
   vibrate: true,     // 진동 (피격 등)
-  showGrid: false    // 바닥 격자 (디버그)
+  showGrid: false,   // 바닥 격자 (디버그)
+  softFlash: false   // 화면 효과 줄이기 (섬광탄 번쩍임을 옅은 안개로)
 };
 
 function read(){

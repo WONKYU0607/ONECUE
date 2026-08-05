@@ -152,3 +152,54 @@ console.log('폭발 연출');
   assert(n > 10 && n < EXPLO_TICKS + 10, `연출이 ${EXPLO_TICKS}틱쯤 뒤 사라짐 (${n}틱)`);
 }
 console.log('items.test.js 통과');
+
+console.log('드럼통은 심은 사람만 터뜨릴 수 있다');
+{
+  const s = newState();
+  const r = foeRow(0);
+  step(s, IN({ place: { k: ITEM.DRUM, c: 3, r } }, {}));   // 슬롯0이 슬롯1 영역에 심음
+  step(s, IN({ ready:1 }, { ready:1 })); step(s, IN({ fire:1 }, {}));
+  for (let i = 0; i < CD_TICKS; i++) step(s, IN({}, {}));
+  const drum = s.items[0];
+  const rect = itemRect(drum);
+  s.coolT = 1e6; s.p[0].cool = s.p[1].cool = 1e6;          // 자동 발사 배제
+
+  // 당한 쪽(슬롯1)의 총알은 통과한다
+  s.bullets.length = 0;
+  s.bullets.push({ x: rect.x + 3*FP, y: rect.y - 2*FP, vy: Math.round(3*FP), o: 1 });
+  for (let i = 0; i < 20; i++) step(s, IN({}, {}));
+  assert(s.items[0].hp > 0, '심지 않은 쪽 총알로는 안 터짐');
+  assert(s.bullets.length === 0, '그 총알도 막혀서 사라짐');
+
+  // 심은 쪽(슬롯0)의 총알은 터뜨린다
+  s.bullets.length = 0;
+  s.bullets.push({ x: rect.x + 3*FP, y: rect.y - 2*FP, vy: Math.round(3*FP), o: 0 });
+  for (let i = 0; i < 20; i++) step(s, IN({}, {}));
+  assert(s.items[0].hp <= 0, '심은 쪽 총알로는 터짐');
+}
+console.log('items.test.js 통과');
+
+console.log('아이템은 영역 주인이 아닌 쪽 총알에만 반응');
+{
+  const s = newState();
+  const mine = myRow(0), foe = foeRow(0);
+  step(s, IN({ place: { k: ITEM.WALL, c: 3, r: mine } }, {}));
+  step(s, IN({ ready:1 }, { ready:1 })); step(s, IN({ fire:1 }, {}));
+  for (let i = 0; i < CD_TICKS; i++) step(s, IN({}, {}));
+  s.coolT = 1e6; s.p[0].cool = s.p[1].cool = 1e6;
+
+  const wall = s.items[0], wr = itemRect(wall);
+  const shoot = (owner, rect) => {
+    s.bullets.length = 0;
+    s.bullets.push({ x: rect.x + 8*FP, y: rect.y - 2*FP, vy: Math.round(3*FP), o: owner });
+    for (let i = 0; i < 20; i++) step(s, IN({}, {}));
+  };
+
+  const hp0 = wall.hp;
+  shoot(0, wr);                                   // 내 벽에 내 총알
+  assert(wall.hp === hp0, '내 벽은 내 총알로 안 깎임');
+  assert(s.bullets.length === 0, '내 총알도 막혀서 사라짐 (통과 아님)');
+  shoot(1, wr);                                   // 상대 총알
+  assert(wall.hp === hp0 - 1, `상대 총알로는 깎임 (${hp0} -> ${wall.hp})`);
+}
+console.log('items.test.js 통과');

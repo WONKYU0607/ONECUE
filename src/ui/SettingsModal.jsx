@@ -6,6 +6,7 @@ const ROWS = [
   ['sound',    '효과음'],
   ['music',    '배경음'],
   ['vibrate',  '진동'],
+  ['softFlash', '화면 효과 줄이기'],
   ['showGrid', '바닥 격자 (디버그)']
 ];
 

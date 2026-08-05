@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Splash from './ui/screens/Splash.jsx';
 import Home from './ui/screens/Home.jsx';
 import AiStages from './ui/screens/AiStages.jsx';
+import PvpMenu from './ui/screens/PvpMenu.jsx';
 import Matching from './ui/screens/Matching.jsx';
 import Result from './ui/screens/Result.jsx';
 import SettingsModal from './ui/SettingsModal.jsx';
@@ -21,7 +22,12 @@ export default function App(){
   useEffect(() => { VIEW.grid = getSettings().showGrid; }, []);
 
   const goHome    = useCallback(() => { disconnect(); setSession(null); setResult(null); setScreen('home'); }, []);
-  const startPvp  = useCallback(() => { disconnect(); setSession({ mode: 'pvp' }); setScreen('matching'); }, []);
+  const startPvp  = useCallback(() => setScreen('pvp'), []);
+  const beginPvp  = useCallback(opt => {
+    disconnect();
+    setSession({ mode: 'pvp', ...opt });      // opt: {mode:'queue'|'create'|'join', code}
+    setScreen('matching');
+  }, []);
   const startAi   = useCallback(stage => {
     SELF.slot = 0;                       // AI전은 항상 내가 아래쪽
     setSession({ mode: 'ai', stage });
@@ -31,7 +37,8 @@ export default function App(){
   const onFinish  = useCallback(r => { setResult(r); setScreen('result'); }, []);
   const again     = useCallback(() => {
     setResult(null);
-    if (session?.mode === 'pvp'){ disconnect(); setScreen('matching'); }
+    // 친구방은 코드가 이미 닫혀 있으므로 다시 할 땐 PVP 메뉴에서 고르게 한다
+    if (session?.mode === 'pvp'){ disconnect(); setScreen('pvp'); }
     else setScreen('game');
   }, [session]);
 
@@ -40,7 +47,8 @@ export default function App(){
       {screen === 'splash'   && <Splash onDone={goHome} />}
       {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onSettings={() => setShowSettings(true)} />}
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} />}
-      {screen === 'matching' && <Matching onCancel={goHome} onMatched={toGame} />}
+      {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
+      {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toGame} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome} onFinish={onFinish} />}
       {screen === 'result'   && <Result result={result} session={session} onAgain={again} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
