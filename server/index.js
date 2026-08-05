@@ -130,11 +130,17 @@ const http = createServer((req, res) => {
       drops: r.server.lateDrops,
       dropBy: r.server.dropBy,
       lastIn: r.server.lastIn,
-      delay: r.server.delay
+      delay: r.server.delay,
+      rxBy: r.server.rxBy          // 슬롯별로 서버가 받은 메시지 종류·개수
+    }));
+    // 소켓 수준: 방에 속하지 않은 연결이 있는지도 본다
+    const socks = [...(wss ? wss.clients : [])].map(w => ({
+      slot: w.slot ?? null, room: w.room ? w.room.id : null, state: w.readyState
     }));
     res.end(JSON.stringify({
       ok: true,
       ver: PROTO_VER,
+      socks,
       pid: process.pid,            // 서버가 두 벌 돌고 있는지 확인용
       uptime: Math.round(process.uptime()),
       waiting: waiting.length,

@@ -185,12 +185,18 @@ export class Server {
     this.lastDrop = -1e9;
     this.lateDrops = 0;
     this.dropBy = [0, 0];      // 슬롯별 폐기 수 (진단용)
+    this.rxBy = [{}, {}];      // 슬롯별로 받은 메시지 종류·개수
     this.lastIn = [null, null];   // 슬롯별 마지막으로 받은 입력
     this.pendingCfg = null;
     this.start = CLOCK.now();
     net.toServer = m => this.onMsg(m);
   }
   onMsg(m){
+    this.rxBy = this.rxBy || [{}, {}];
+    if (m.pid === 0 || m.pid === 1){
+      const b = this.rxBy[m.pid];
+      b[m.t] = (b[m.t] || 0) + 1;
+    }
     if (m.t === 'p'){ this.net.serverSend({ t:'q', id:m.id, pid:m.pid }, m.pid); return; }   // 핑 응답은 보낸 클라에게만
     if (m.t === 'rtt'){ this.rtt[m.pid] = m.rtt; this.recalcDelay(); return; }
     if (m.t === 'cfg'){ this.pendingCfg = Object.assign(this.pendingCfg || {}, m.cfg); return; }
@@ -259,11 +265,20 @@ export class Client {
     this.lastInp = null;
     this.tickAt = CLOCK.now();
     this.desync = 0; this.pendingSnap = null;
+    // 진단 계기판: 무엇을 받았고 무엇을 보냈는지 전부 센다
+    this.stats = { f:0, q:0, snap:0, hello:0, peer:0, other:0, sentIn:0, sendCalls:0, blocked:0 };
     this.awaitSnap = true;             // 스냅샷을 받아야 시작(또는 재개)할 수 있는 상태
     this.ckHist = new Map();
     net.toClient = m => this.onMsg(m);
   }
   onMsg(m){
+    const st = this.stats;
+    if (m.t === 'f') st.f++;
+    else if (m.t === 'q') st.q++;
+    else if (m.t === 's') st.snap++;
+    else if (m.t === 'hello') st.hello++;
+    else if (m.t === 'peer') st.peer++;
+    else st.other++;
     if (m.t === 'f'){
       this.frames.set(m.tick, m);
       this.svTick = m.tick; this.svAt = CLOCK.now();
@@ -313,7 +328,8 @@ export class Client {
     this.net.clientSend({ t:'p', id, pid: this.controlled[0] });
   }
   sendInputs(now){
-    if (this.nextInputTick < 0) return;
+    this.stats.sendCalls++;
+    if (this.nextInputTick < 0){ this.stats.blocked++; return; }
     const target = this.estServerTick(now) + this.delay;
     let guard = 0;
     while (this.nextInputTick <= target && guard++ < 8){
@@ -322,6 +338,7 @@ export class Client {
       for (const pid of this.controlled){
         const q = this.pend[pid];
         this.net.clientSend({ t:'in', pid, tick:t, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place, thr:q.thr });
+        this.stats.sentIn++;
         this.sent.push({ tick:t, pid, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place, thr:q.thr });
         q.dx = 0; q.dy = 0; q.fire = 0; q.ready = 0; q.place = null; q.thr = null;
       }

@@ -23,7 +23,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
       const info = getRoomInfo();
       setReady({
         me: g.isReady(), peer: g.peerReady(), srv: g.confirmedReady(),
-        room: info ? info.room : null, slot: g.mySlot()
+        room: info ? info.room : null, slot: g.mySlot(), net: g.netStats()
       });
     }, 200);
     return () => clearInterval(iv);
@@ -90,6 +90,15 @@ export default function GameCanvas({ session, onExit, onFinish }){
             <span className="sub">
               서버 확정 · 나 {ready.srv.me ? 'O' : 'X'} / 상대 {ready.srv.peer ? 'O' : 'X'}
               {ready.room != null && <><br />방 {ready.room} · 내 자리 {ready.slot}</>}
+              {ready.net && (
+                <><br />
+                소켓 {ready.net.sock} · 프레임 {ready.net.f} · 핑응답 {ready.net.q} · 스냅 {ready.net.snap}
+                <br />
+                RTT {ready.net.rtt} · 지연 {ready.net.delay} · 보냄 {ready.net.sent} · 막힘 {ready.net.blocked}
+                <br />
+                내틱 {ready.net.ctick} · 다음입력틱 {ready.net.nit}
+                </>
+              )}
             </span>
           )}
         </div>

@@ -211,6 +211,17 @@ export function createGame(canvas, opts = {}){
       return { me: !!r[SELF.slot], peer: !!r[1 - SELF.slot], tick: client.s.tick, drops: client.desync };
     },
     mySlot(){ return SELF.slot; },
+    // 클라 쪽 계기판: 무엇을 받았고 보냈는지. 서버 /health와 짝을 이룬다
+    netStats(){
+      const st = client.stats || {};
+      return {
+        sock: online && online.ws ? online.ws.readyState : -1,   // 1=열림
+        f: st.f | 0, q: st.q | 0, snap: st.snap | 0,
+        sent: st.sentIn | 0, blocked: st.blocked | 0,
+        rtt: Math.round(client.rtt), delay: client.delay,
+        nit: client.nextInputTick, ctick: client.s.tick
+      };
+    },
     peerReady(){ return !!(client.pred.ready || [])[1 - SELF.slot]; },
     applyCfg,
     // 튜닝값 한 칸 조절 (UI 버튼용)
