@@ -17,7 +17,8 @@ console.log('스틱 8방향 판정');
 {
   const { uiH } = computeLayout(1080, 2340);
   const g = stickGeom(uiH);
-  TUNE.curve.v = 1.0;                     // 곡선은 아래에서 따로 본다
+  const saved = { c: TUNE.curve.v, s: TUNE.sat.v, d: TUNE.dead.v };
+  TUNE.curve.v = 1.0;                     // 방향 판정만 보는 구간
   const at = deg => {
     const r = deg * Math.PI / 180;
     return stickVector({ x: g.cx + Math.cos(r)*g.r, y: g.cy + Math.sin(r)*g.r }, uiH);
@@ -36,20 +37,24 @@ console.log('스틱 8방향 판정');
     if (Math.sign(Math.round(v.nx*10)/10) !== sx || Math.sign(Math.round(v.ny*10)/10) !== sy) ok = false;
   }
   assert(ok, '8방향 부호 전부 일치');
+  TUNE.curve.v = saved.c; TUNE.sat.v = saved.s; TUNE.dead.v = saved.d;
 }
-console.log('layout.test.js 통과');
 
 console.log('스틱 세기 곡선');
 {
   const { uiH } = computeLayout(1080, 2340);
   const g = stickGeom(uiH);
+  // 감도 기본값이 바뀌어도 흔들리지 않게 검사 동안 값을 고정한다
+  const saved2 = { c: TUNE.curve.v, s: TUNE.sat.v, d: TUNE.dead.v };
+  TUNE.curve.v = 1.0; TUNE.sat.v = 0.82; TUNE.dead.v = 0.14;
   const at = frac => {                       // 반지름의 frac 지점을 오른쪽으로 민 경우
     const v = stickVector({ x: g.cx + g.r * frac, y: g.cy }, uiH);
     return Math.hypot(v.nx, v.ny);
   };
-  assert(at(0.10) === 0, '데드존 안은 0');
-  assert(at(0.14) === 0, '데드존 경계도 0');
-  assert(Math.abs(at(0.82) - 1) < 0.001, `포화반경(82%)에서 최대치 (${at(0.82).toFixed(3)})`);
+  assert(at(TUNE.dead.v * 0.7) === 0, '데드존 안은 0');
+  // 경계는 부동소수 오차로 아주 작은 값이 나올 수 있어 여유를 둔다
+  assert(at(TUNE.dead.v) < 0.02, '데드존 경계도 사실상 0');
+  assert(Math.abs(at(TUNE.sat.v) - 1) < 0.001, `포화 지점에서 최대치 (${at(TUNE.sat.v).toFixed(3)})`);
   assert(Math.abs(at(1.0) - 1) < 0.001, '가장자리도 최대치 (더 커지지 않음)');
   assert(Math.abs(at(1.4) - 1) < 0.001, '원 밖으로 나가도 최대치 유지');
   const mid = at(0.48);
@@ -65,7 +70,7 @@ console.log('스틱 세기 곡선');
   TUNE.curve.v = 2.4; const exp = mag(0.5), expEnd = mag(0.9);
   assert(exp < lin * 0.7, `곡선을 올리면 중앙 근처가 둔해짐 (${lin.toFixed(2)} -> ${exp.toFixed(2)})`);
   assert(Math.abs(expEnd - linEnd) < 0.001, `가장자리 최대 속도는 그대로 (${expEnd.toFixed(3)})`);
-  TUNE.curve.v = 1.6;
+  TUNE.curve.v = saved2.c; TUNE.sat.v = saved2.s; TUNE.dead.v = saved2.d;
 
   // 스틱이 손가락을 따라오는지
   const base0 = clampBase(g.cx, g.cy, uiH);

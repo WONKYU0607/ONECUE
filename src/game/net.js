@@ -1,6 +1,7 @@
 import {
   BASE_MAX_STEP,
   BHf,
+  BLIND_CENTER_BONUS,
   BLIND_FULL,
   BLIND_TICKS,
   BOFF,
@@ -34,6 +35,7 @@ import {
   GRID_Y0,
   GUN_C,
   H,
+  HAND,
   HOME_COL,
   HP_MARKS,
   INVUL_T,
@@ -45,6 +47,7 @@ import {
   MAXHP,
   MAX_DELAY,
   MIN_DELAY,
+  NADE_CENTER_DAMAGE,
   NADE_DAMAGE,
   NADE_RADIUS,
   NET,

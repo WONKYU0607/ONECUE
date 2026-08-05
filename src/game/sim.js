@@ -1,6 +1,7 @@
 import {
   BASE_MAX_STEP,
   BHf,
+  BLIND_CENTER_BONUS,
   BLIND_FULL,
   BLIND_TICKS,
   BOFF,
@@ -34,6 +35,7 @@ import {
   GRID_Y0,
   GUN_C,
   H,
+  HAND,
   HOME_COL,
   HP_MARKS,
   INVUL_T,
@@ -45,6 +47,7 @@ import {
   MAXHP,
   MAX_DELAY,
   MIN_DELAY,
+  NADE_CENTER_DAMAGE,
   NADE_DAMAGE,
   NADE_RADIUS,
   NET,
@@ -211,7 +214,16 @@ export function canPlace(s, slot, k, c, r, from){
 
 // 드럼통이 터지면 근처 플레이어가 피해를 입는다
 // 칸 (c,r)을 중심으로 rad칸 범위를 터뜨린다. 드럼통·수류탄이 함께 쓴다
-export function blast(s, c, r, rad, dmg){
+// 정중앙 칸에 서 있는가 (직격 판정)
+export function atCenter(s, i, c, r){
+  const x0 = Math.round(cellX(c) * FP), x1 = Math.round(cellX(c + 1) * FP);
+  const y0 = Math.round(cellY(r) * FP), y1 = Math.round(cellY(r + 1) * FP);
+  const p = s.p[i];
+  return overlap(p.x, p.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0);
+}
+
+// centerDmg를 주면 정중앙 칸에 있는 사람만 그만큼 더 맞는다
+export function blast(s, c, r, rad, dmg, centerDmg){
   const x0 = Math.round(cellX(c - rad) * FP);
   const x1 = Math.round(cellX(c + rad + 1) * FP);
   const y0 = Math.round(cellY(r - rad) * FP);
@@ -222,7 +234,8 @@ export function blast(s, c, r, rad, dmg){
     if (p.invul > 0) continue;
     p.invul = INVUL_T; p.flash = FLASH_T;
     if (!DEBUG_INF_HP){
-      p.hp -= dmg;
+      const d = (centerDmg && atCenter(s, i, c, r)) ? centerDmg : dmg;
+      p.hp -= d;
       if (p.hp <= 0){ s.over = true; s.phase = PH_OVER; s.winner = i === 0 ? 2 : 1; }
     }
   }
@@ -392,7 +405,8 @@ export function step(s, inp){
         const y1 = Math.round(cellY(pr.r1 + FLASH_RADIUS + 1) * FP);
         const v = 1 - pr.by;
         if (overlap(s.p[v].x, s.p[v].y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)){
-          s.blind[v] = BLIND_TICKS;             // 맞은 쪽이 상대 진영을 못 봄
+          // 정중앙에 맞으면 더 오래 먼다
+          s.blind[v] = BLIND_TICKS + (atCenter(s, v, pr.c, pr.r1) ? BLIND_CENTER_BONUS : 0);
         }
         s.fx.push({ c: pr.c, r: pr.r1, t: EXPLO_TICKS, k: 1 });   // k=1: 섬광 연출
         s.proj.splice(i, 1);
@@ -400,7 +414,7 @@ export function step(s, inp){
       continue;
     }
     if (pr.fuse > 0 && --pr.fuse === 0){
-      blast(s, pr.c, pr.r1, NADE_RADIUS, NADE_DAMAGE);
+      blast(s, pr.c, pr.r1, NADE_RADIUS, NADE_DAMAGE, NADE_CENTER_DAMAGE);
       s.proj.splice(i, 1);
     }
   }

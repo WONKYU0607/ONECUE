@@ -7,6 +7,7 @@ const HOLD_DELAY = 380;   // 길게 누르면 연속 조절
 const HOLD_STEP  = 55;
 
 export default function TunePanel({ gameRef }){
+  const [open, setOpen] = useState(false);   // 게임 중엔 접어둔다
   const [, force] = useState(0);
   const [grid, setGrid] = useState(VIEW.grid);
   const timers = useRef({ delay: 0, iv: 0 });
@@ -39,8 +40,18 @@ export default function TunePanel({ gameRef }){
     >{label}</button>
   );
 
+  if (!open){
+    return (
+      <button className="ui-overlay tunetoggle" onClick={() => setOpen(true)} aria-label="조절">⚙</button>
+    );
+  }
+
   return (
     <div className="ui-overlay tune">
+      <div className="row head">
+        <span className="lbl">조절</span>
+        <button className="wide" onClick={() => setOpen(false)}>닫기</button>
+      </div>
       {KEYS.map(k => (
         <div className="row" key={k}>
           <span className="lbl">{k.toUpperCase()}</span>

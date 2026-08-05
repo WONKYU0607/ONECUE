@@ -1,7 +1,8 @@
 import { newState, step, throwCol, throwRow, canThrow } from '../src/game/sim.js';
 import {
   FP, THROW, THROW_DEF, PH_PLAY, PH_READY, CD_TICKS, FLY_TICKS, FUSE_TICKS,
-  BLIND_TICKS, NADE_DAMAGE, NADE_RADIUS, FLASH_RADIUS, GRID_MIDROW, GRID_ROWS, GRID_COLS,
+  BLIND_TICKS, NADE_DAMAGE, NADE_CENTER_DAMAGE, BLIND_CENTER_BONUS, NADE_RADIUS, FLASH_RADIUS,
+  GRID_MIDROW, GRID_ROWS, GRID_COLS,
   cellOwner, MAXHP, cellX, cellY, GRID_CW, GRID_CH
 } from '../src/game/config.js';
 import { assert } from './harness.js';
@@ -96,8 +97,9 @@ console.log('수류탄 피해와 범위');
     }
     return before - s.p[1].hp;
   };
-  assert(hit(0) === NADE_DAMAGE, `직격 피해 ${NADE_DAMAGE}`);
-  assert(hit(NADE_RADIUS) === NADE_DAMAGE, `${NADE_RADIUS}칸 옆도 피해`);
+  assert(hit(0) === NADE_CENTER_DAMAGE, `정중앙 직격 ${NADE_CENTER_DAMAGE}`);
+  assert(hit(NADE_RADIUS) === NADE_DAMAGE, `${NADE_RADIUS}칸 옆은 ${NADE_DAMAGE}`);
+  assert(NADE_CENTER_DAMAGE > NADE_DAMAGE, '정중앙이 더 아프다');
   assert(hit(NADE_RADIUS + 2) === 0, '범위 밖은 피해 없음');
 }
 
@@ -115,12 +117,14 @@ console.log('섬광탄은 3x3 안에 있어야 맞는다');
   };
   const near = flash(0);
   assert(near.blind[1] > 0 && near.blind[0] === 0, '범위 안이면 맞은 쪽만 눈이 먼다');
-  assert(near.blind[1] >= BLIND_TICKS - 4, `지속 ${BLIND_TICKS}틱 (남은 ${near.blind[1]})`);
+  assert(near.blind[1] >= BLIND_TICKS + BLIND_CENTER_BONUS - 4,
+         `정중앙이면 ${BLIND_TICKS + BLIND_CENTER_BONUS}틱 (남은 ${near.blind[1]})`);
   assert(near.fx.some(f => f.k === 1), '섬광 연출 생성');
   assert(near.proj.length === 0, '섬광탄은 착탄 즉시 사라짐');
 
   const edge = flash(FLASH_RADIUS);
   assert(edge.blind[1] > 0, `${FLASH_RADIUS}칸 옆도 맞는다`);
+  assert(edge.blind[1] < near.blind[1], `옆칸은 정중앙보다 짧다 (${edge.blind[1]} < ${near.blind[1]})`);
 
   const far = flash(FLASH_RADIUS + 2);
   assert(far.blind[1] === 0, '범위 밖이면 안 맞는다');
@@ -129,6 +133,7 @@ console.log('섬광탄은 3x3 안에 있어야 맞는다');
   let n = 0;
   const s2 = near;
   while (s2.blind[1] > 0 && n < 300){ keep(s2); step(s2, IN({}, {})); n++; }
-  assert(n <= BLIND_TICKS + 1, `${(BLIND_TICKS/60).toFixed(1)}초 뒤 풀림 (${n}틱)`);
+  const total = BLIND_TICKS + BLIND_CENTER_BONUS;
+  assert(n <= total + 1, `${(total/60).toFixed(1)}초 뒤 풀림 (${n}틱)`);
 }
 console.log('throw.test.js 통과');
