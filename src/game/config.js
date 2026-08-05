@@ -32,10 +32,10 @@ export const YMIN_S = [ Math.round(H / 2 * FP), 0 ];
 export const YMAX_S = [ Math.round((H - 16) * FP), Math.round((H / 2 - 16) * FP) ];
 // 실시간 조절 대상 (UI 버튼). 전부 서버 권위 상태로 전파됨
 export const TUNE = {
-  spd:  { v:150, min:30,  max:900,  inc:1,    fmt:v => v + '/s' },   // px/초를 직접 다룬다
+  spd:  { v:170, min:30,  max:900,  inc:1,    fmt:v => v + '/s' },   // px/초를 직접 다룬다
   bul:  { v:204, min:60,  max:600,  inc:12,   fmt:v => v + '/s' },
-  rate: { v:0.5, min:0.1, max:2.0,  inc:0.05, fmt:v => v.toFixed(2) + 's' },
-  curve:{ v:1.6, min:1.0, max:3.0,  inc:0.1,  fmt:v => 'x' + v.toFixed(1) }   // 스틱 반응 곡선(클라 전용)
+  rate: { v:0.45, min:0.1, max:2.0,  inc:0.05, fmt:v => v.toFixed(2) + 's' },
+  curve:{ v:1.7, min:1.0, max:3.0,  inc:0.1,  fmt:v => 'x' + v.toFixed(1) }   // 스틱 반응 곡선(클라 전용)
 };
 export const spdMult   = () => TUNE.spd.v / 600;   // BASE_MAX_STEP(=600px/s)에 대한 비율
 export const bulletFP  = () => Math.max(1, Math.round(TUNE.bul.v / 60 * FP));
@@ -116,7 +116,11 @@ export const SELF = { slot: 0 };
 // 서버와 클라가 같은 코드인지 확인하는 표식.
 // **sim.js 규칙이 바뀔 때마다 반드시 올릴 것.** 안 올리면 서버가 뒤처져도 검사를 통과해
 // 화면이 조용히 멈추고 원인을 짐작해야 한다 (자동 시작 규칙을 넣고도 안 올려서 겪음)
-export const PROTO_VER = 12;
+export const FAST_MUL = 2;            // 2배속 대결 배수
+// 클라 전용 입력 곡선에도 2배속을 반영하기 위한 표식 (게임 루프가 갱신)
+export const FAST = { on: false };
+
+export const PROTO_VER = 14;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

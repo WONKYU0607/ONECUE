@@ -10,7 +10,7 @@ import { createJuice } from './juice.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { canPlace, canThrow, allPlaced, myItemAt } from './sim.js';
 import {
-  ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
+  FAST, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
   GRID_X0, GRID_Y0, H, cellOwner, cellX, cellY
 } from './config.js';
 import { padRect, paletteSlots } from './layout.js';
@@ -307,6 +307,7 @@ export function createGame(canvas, opts = {}){
                 ' DRP' + (server ? server.lateDrops : '-') + ' DSY' + client.desync;
     const a = client.alpha(now);
     input.tick(now, CHARGE_MAX_MS);
+    FAST.on = !!client.pred.fast;      // 입력 곡선이 이 값을 본다
     juice.update(dt);
     reactTo(client.pred, dt);
     client.updateRender(a, dt);
@@ -347,6 +348,14 @@ export function createGame(canvas, opts = {}){
         height: Math.max(18, (bottom - top) * k)
       };
     },
+    // 2배속 대결 (PVP 전용)
+    canFast(){ return !!online && client.pred.phase === PH_READY && !client.pred.fast; },
+    fastState(){
+      const st = client.pred;
+      return { on: !!st.fast, by: st.fastBy | 0, mine: st.fastBy === SELF.slot + 1 };
+    },
+    requestFast(){ sfx.place(); client.requestFast(SELF.slot); },
+    answerFast(ok){ ok ? sfx.ready() : sfx.deny(); client.answerFast(SELF.slot, ok); },
     ready(){ sfx.ready(); wantReady = true; nextReadyAt = 0; client.setReady(SELF.slot); },
     isReady(){ return !!(client.pred.ready || [])[SELF.slot]; },
     // 서버가 실제로 확정한 준비 상태 (예측이 아닌 것). 문제 진단용

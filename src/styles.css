@@ -121,3 +121,13 @@ font:20px/1 monospace;letter-spacing:6px;text-align:center;padding:0 8px}
 .help-row .k{flex:0 0 54px;color:#8fd8ff;font:bold 12px monospace}
 .help-row .v{flex:1;color:#c8c8da;font:12px/1.6 monospace}
 .help-ok{margin:10px 14px 14px}
+.fastbtn{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:22;
+padding:8px 16px;background:rgba(18,18,28,.92);border:2px solid #8f6ef0;color:#c3adff;
+font:bold 13px monospace;letter-spacing:2px;cursor:pointer}
+.fastbtn:active{background:#8f6ef0;color:#12121c}
+.link-note.fast{border-color:#8f6ef0;color:#c3adff}
+.modal.ask{width:min(340px,88vw);padding:18px 16px}
+.ask-t{font:bold 14px/1.6 monospace;color:#e8e8f0;margin:0 0 6px}
+.ask-d{font:12px/1.6 monospace;color:#9a9ab0;margin:0 0 14px}
+.ask-row{display:flex;gap:10px}
+.ask-row .menu-btn{flex:1;align-items:center;text-align:center}

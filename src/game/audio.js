@@ -95,12 +95,14 @@ function body({ t0 = 0, dur = 0.2, vol = 0.25, f0 = 200, f1 = f0, type = 'sine',
 }
 
 export const sfx = {
-  // 총성: 날카로운 순간음 + 짧은 저음. 억제된 총소리에 가깝게
+  // 총성: '뿅' 하고 음이 뚝 떨어지는 소리.
+  // 사각파를 쓰면 8비트가 되므로 삼각파로 부드럽게 하고, 아주 짧은 순간음만 얹는다
   shot(mine){
     const v = mine ? 1 : 0.55;
-    hiss({ dur:0.045, vol:0.20*v, type:'highpass', f0:2600, f1:1400, q:0.7 });
-    hiss({ dur:0.09, vol:0.10*v, type:'bandpass', f0:900, f1:400, q:1.6, space:0.25 });
-    body({ dur:0.07, vol:0.16*v, f0: mine ? 150 : 110, f1:60 });
+    hiss({ dur:0.018, vol:0.09*v, type:'highpass', f0:4000 });          // 발사 순간의 '틱'
+    body({ dur:0.11, vol:0.26*v, f0: mine ? 1250 : 900, f1: mine ? 260 : 190,
+           type:'triangle', space:0.3, attack:0.002 });                  // 이게 '뿅'
+    body({ t0:0.004, dur:0.07, vol:0.10*v, f0: mine ? 620 : 460, f1:150, space:0.2 });
   },
   // 피격: 둔탁한 충격 + 여운
   hit(mine){

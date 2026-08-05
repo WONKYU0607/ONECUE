@@ -23,6 +23,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
       const info = getRoomInfo();
       setReady({
         me: g.isReady(), peer: g.peerReady(), srv: g.confirmedReady(), all: g.allPlaced(),
+        fast: g.fastState(), canFast: g.canFast(),
         room: info ? info.room : null, slot: g.mySlot(), net: g.netStats()
       });
     }, 200);
@@ -78,6 +79,30 @@ export default function GameCanvas({ session, onExit, onFinish }){
       )}
       {link.peer === 'left' && (
         <div className="link-note ui-overlay">상대가 나갔다</div>
+      )}
+
+      {placing && ready.fast?.on && (
+        <div className="link-note ui-overlay fast">2배속 대결</div>
+      )}
+      {placing && ready.canFast && !ready.fast?.by && (
+        <button className="fastbtn ui-overlay" onClick={() => gameRef.current?.requestFast()}>
+          2배속 신청
+        </button>
+      )}
+      {placing && ready.fast?.by > 0 && ready.fast?.mine && (
+        <div className="link-note ui-overlay">2배속 신청함 · 상대 응답을 기다리는 중</div>
+      )}
+      {placing && ready.fast?.by > 0 && !ready.fast?.mine && (
+        <div className="modal-back">
+          <div className="modal ask">
+            <p className="ask-t">상대방이 2배속 대결을 신청했습니다.</p>
+            <p className="ask-d">이동·총알 속도·발사 간격이 두 배가 됩니다.</p>
+            <div className="ask-row">
+              <button className="menu-btn ghost" onClick={() => gameRef.current?.answerFast(false)}>거절</button>
+              <button className="menu-btn primary" onClick={() => gameRef.current?.answerFast(true)}>수락</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {placing && !ready.me && (

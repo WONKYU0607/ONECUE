@@ -17,6 +17,8 @@ import {
   DRUM_RADIUS,
   EXPLO_TICKS,
   EXTRAP_MAX,
+  FAST,
+  FAST_MUL,
   FLASH_RADIUS,
   FLASH_T,
   FLY_TICKS,
@@ -103,6 +105,8 @@ export function normalizeState(st){
   if (!Array.isArray(st.covers)) st.covers = [];
   if (!Array.isArray(st.ready)) st.ready = [false, false];
   if (typeof st.solo !== 'boolean') st.solo = false;
+  if (typeof st.fast !== 'boolean') st.fast = false;
+  if (typeof st.fastBy !== 'number') st.fastBy = 0;
   if (!Array.isArray(st.proj)) st.proj = [];
   if (!Array.isArray(st.blind)) st.blind = [0, 0];
   if (!Array.isArray(st.ammo)) st.ammo = [[3, 3], [3, 3]];
@@ -133,13 +137,15 @@ export function newState(){
            [THROW_DEF[0].count, THROW_DEF[1].count]],
     ready: [false, false],      // 설치 완료 여부
     solo: false,                // 연습 모드: 총알·승패 없음
+    fast: false,                // 2배속 대결
+    fastBy: 0,                  // 2배속을 신청한 사람 (1=슬롯0, 2=슬롯1, 0=없음)
     maxStep: stepCap(),   // 아래 3개는 서버가 정하고 프레임으로 전파 → 결정론 유지
     bulletV: bulletFP(),
     coolT:   coolTicks(),
     over: false, winner: 0
   };
 }
-export const NOIN = { dx:0, dy:0, fire:0, ready:0, place:null, thr:null };
+export const NOIN = { dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 };
 export function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
 
 export function overlap(ax,ay,aw,ah,bx,by,bw,bh){
@@ -262,6 +268,12 @@ export function step(s, inp){
         }
         s.items.push({ k: pl.k, c: pl.c, r: pl.r, by: i, hp: ITEM_DEF[pl.k].hp });
       }
+      // 2배속 대결: 한쪽이 신청하고 상대가 수락해야 켜진다
+      if (q.fastReq && !s.fast && !s.fastBy) s.fastBy = i + 1;
+      if (q.fastAns && s.fastBy && s.fastBy !== i + 1){
+        if (q.fastAns === 1) s.fast = true;
+        s.fastBy = 0;
+      }
       // 아이템을 전부 놓아야 완료할 수 있다. 안 그러면 한쪽이 먼저 눌러 바로 시작돼버린다
       if (q.ready && (s.solo || allPlaced(s, i))) s.ready[i] = true;
     }
@@ -279,7 +291,8 @@ export function step(s, inp){
       n.tick = t; n.phase = PH_READY; n.timer = 0;
       s.p = n.p; s.bullets = n.bullets; s.covers = n.covers;
       s.items = n.items; s.ready = n.ready; s.fx = n.fx;
-      s.proj = n.proj; s.blind = n.blind; s.ammo = n.ammo;   // 다시 배치 단계부터
+      s.proj = n.proj; s.blind = n.blind; s.ammo = n.ammo;
+      s.fast = false; s.fastBy = 0;                          // 2배속은 그 판 한정
       s.maxStep = ms; s.bulletV = bv; s.coolT = ct;
       s.phase = n.phase; s.timer = n.timer; s.over = false; s.winner = 0; s.clock = 0;
     }
@@ -292,7 +305,7 @@ export function step(s, inp){
     if (s.phase === PH_PLAY){
       // 자유 이동. dx/dy 는 이동량(고정소수점)
       let dx = q.dx | 0, dy = q.dy | 0;
-      const cap = s.maxStep, len2 = dx*dx + dy*dy;
+      const cap = s.maxStep * (s.fast ? FAST_MUL : 1), len2 = dx*dx + dy*dy;
       if (len2 > cap*cap){                     // 대각선이 빨라지지 않도록 벡터 길이로 제한
         const k = cap / Math.sqrt(len2);
         dx = Math.round(dx * k); dy = Math.round(dy * k);
@@ -361,11 +374,11 @@ export function step(s, inp){
   for (let i = 0; i < 2; i++){
     const p = s.p[i];
     if (p.cool > 0){ p.cool--; continue; }
-    p.cool = s.coolT - 1;                      // 정확히 coolT틱 간격
+    p.cool = Math.max(1, Math.round(s.coolT / (s.fast ? FAST_MUL : 1))) - 1;   // 2배속이면 발사도 두 배로
     s.bullets.push({
       x: p.x + BOFF,
       y: i === 0 ? p.y - BHf : p.y + PHf,
-      vy: i === 0 ? -s.bulletV : s.bulletV,
+      vy: (i === 0 ? -s.bulletV : s.bulletV) * (s.fast ? FAST_MUL : 1),
       o: i
     });
   }
@@ -425,7 +438,7 @@ export function checksum(s){
   for (const b of s.bullets) h = (h*31 + b.x + b.y + b.o) | 0;
   for (const c of s.covers) h = (h*31 + c.hp) | 0;
   for (const it of s.items) h = (h*31 + it.k*7 + it.c*13 + it.r*29 + it.hp*3 + it.by) | 0;
-  h = (h*31 + (s.ready[0] ? 1 : 0) + (s.ready[1] ? 2 : 0) + (s.solo ? 4 : 0)) | 0;
+  h = (h*31 + (s.ready[0] ? 1 : 0) + (s.ready[1] ? 2 : 0) + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;
   h = (h*31 + s.blind[0] + s.blind[1]*3 + s.ammo[0][0]*7 + s.ammo[0][1]*11 + s.ammo[1][0]*13 + s.ammo[1][1]*17) | 0;

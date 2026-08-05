@@ -17,6 +17,8 @@ import {
   DRUM_RADIUS,
   EXPLO_TICKS,
   EXTRAP_MAX,
+  FAST,
+  FAST_MUL,
   FLASH_RADIUS,
   FLASH_T,
   FLY_TICKS,
@@ -223,7 +225,7 @@ export class Server {
     }
     let f = this.inbox.get(m.tick);
     if (!f){ f = [null, null]; this.inbox.set(m.tick, f); }
-    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, ready: m.ready ? 1 : 0, place: m.place || null, thr: m.thr || null };
+    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, ready: m.ready ? 1 : 0, place: m.place || null, thr: m.thr || null, fastReq: m.fastReq|0, fastAns: m.fastAns|0 };
   }
   recalcDelay(){
     const worst = Math.max(this.rtt[0], this.rtt[1]);         // 느린 쪽 기준 = 양쪽 동일 지연
@@ -265,7 +267,7 @@ export class Client {
     this.delay = MIN_DELAY;
     this.rtt = -1; this.pings = new Map(); this.pingId = 1; this.lastPing = -1e9;
     this.svTick = 0; this.svAt = CLOCK.now();
-    const blank = () => ({ dx:0, dy:0, fire:0, ready:0, place:null, thr:null });
+    const blank = () => ({ dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 });
     this.pend = [ blank(), blank() ];
     this.sent = [];                    // 아직 서버가 확정하지 않은 내 입력
     this.pred = newState();            // 예측 상태 (화면에 그리는 것)
@@ -346,10 +348,10 @@ export class Client {
       this.tickAt = now;
       for (const pid of this.controlled){
         const q = this.pend[pid];
-        this.net.clientSend({ t:'in', pid, tick:t, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place, thr:q.thr });
+        this.net.clientSend({ t:'in', pid, tick:t, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns });
         this.stats.sentIn++;
-        this.sent.push({ tick:t, pid, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place, thr:q.thr });
-        q.dx = 0; q.dy = 0; q.fire = 0; q.ready = 0; q.place = null; q.thr = null;
+        this.sent.push({ tick:t, pid, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns });
+        q.dx = 0; q.dy = 0; q.fire = 0; q.ready = 0; q.place = null; q.thr = null; q.fastReq = 0; q.fastAns = 0;
       }
     }
   }
@@ -384,12 +386,12 @@ export class Client {
     let guard = 0;
     while (p.tick < target && guard++ < 40){
       const t = p.tick + 1;
-      const inp = [ { dx:0, dy:0, fire:0, ready:0, place:null, thr:null },
-                    { dx:0, dy:0, fire:0, ready:0, place:null, thr:null } ];
+      const inp = [ { dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 },
+                    { dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 } ];
       if (this.lastInp && t - this.s.tick <= EXTRAP_MAX){   // 상대는 마지막 입력으로 외삽
         for (let k = 0; k < 2; k++){ inp[k].dx = this.lastInp[k].dx; inp[k].dy = this.lastInp[k].dy; }
       }
-      for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, ready:e.ready, place:e.place, thr:e.thr };
+      for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, ready:e.ready, place:e.place, thr:e.thr, fastReq:e.fastReq, fastAns:e.fastAns };
       prevMy = p.p[SELF.slot].x; prevMyY = p.p[SELF.slot].y;
       step(p, inp);
     }
@@ -426,6 +428,14 @@ export class Client {
   place(pid, k, c, r, from){
     if (!this.controlled.includes(pid)) return;
     this.pend[pid].place = from ? { k, c, r, from } : { k, c, r };
+  }
+  requestFast(pid){
+    if (!this.controlled.includes(pid)) return;
+    this.pend[pid].fastReq = 1;
+  }
+  answerFast(pid, ok){
+    if (!this.controlled.includes(pid)) return;
+    this.pend[pid].fastAns = ok ? 1 : 2;
   }
   setReady(pid){
     if (!this.controlled.includes(pid)) return;

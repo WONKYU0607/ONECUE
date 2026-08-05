@@ -1,4 +1,4 @@
-import { W, H, TUNE } from './config.js';
+import { W, H, TUNE, FAST, FAST_MUL } from './config.js';
 
 export const STICK_DEAD = 0.14;   // 중심 근처는 무시
 export const STICK_SAT  = 0.82;   // 이 지점부터 최대 속도 (끝까지 안 밀어도 됨)
@@ -60,7 +60,10 @@ export function stickVector(pt, uiH, base){
   const m = Math.hypot(nx, ny);
   if (m < STICK_DEAD) return { nx: 0, ny: 0 };
   let mag = Math.min(1, (m - STICK_DEAD) / (STICK_SAT - STICK_DEAD));
-  mag = Math.pow(mag, TUNE.curve.v);        // 중앙 근처를 둔감하게, 끝은 그대로 최대
+  // 2배속이면 곡선도 두 배(상한 3.0). 속도가 빠른 만큼 중앙 근처를 더 둔감하게 해야
+  // 미세 조정이 가능하다
+  const curve = Math.min(3, TUNE.curve.v * (FAST.on ? FAST_MUL : 1));
+  mag = Math.pow(mag, curve);
   const k = mag / m;
   return { nx: nx * k, ny: ny * k };
 }
