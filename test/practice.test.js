@@ -43,3 +43,19 @@ console.log('보통 모드는 그대로');
   assert(s.bullets.length > 0, '평소엔 자동 발사된다');
 }
 console.log('practice.test.js 통과');
+
+console.log('연습 모드는 혼자서도 시작된다');
+{
+  const s = newState();
+  s.solo = true;
+  step(s, IN({ ready: 1 }, {}));
+  assert(s.ready[0] === true, '아이템을 안 놓아도 완료 가능');
+  assert(s.phase !== 0, '상대를 기다리지 않고 시작');
+}
+console.log('보통 모드는 여전히 양쪽 필요');
+{
+  const s = newState();
+  step(s, IN({ ready: 1 }, { ready: 1 }));
+  assert(s.phase === 0, '아이템 없이는 시작 안 됨');
+}
+console.log('practice.test.js 통과');

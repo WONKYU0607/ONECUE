@@ -263,10 +263,11 @@ export function step(s, inp){
         s.items.push({ k: pl.k, c: pl.c, r: pl.r, by: i, hp: ITEM_DEF[pl.k].hp });
       }
       // 아이템을 전부 놓아야 완료할 수 있다. 안 그러면 한쪽이 먼저 눌러 바로 시작돼버린다
-      if (q.ready && allPlaced(s, i)) s.ready[i] = true;
+      if (q.ready && (s.solo || allPlaced(s, i))) s.ready[i] = true;
     }
-    // 둘 다 설치를 끝내면 바로 시작한다 (START 버튼 없음)
-    if (s.ready[0] && s.ready[1]){
+    // 둘 다 설치를 끝내면 바로 시작한다 (START 버튼 없음).
+    // 연습 모드는 상대가 없으므로 한쪽만 완료하면 시작한다
+    if (s.solo ? (s.ready[0] || s.ready[1]) : (s.ready[0] && s.ready[1])){
       s.phase = PH_COUNT; s.timer = CD_TICKS;
     }
     return;

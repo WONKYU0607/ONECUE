@@ -159,10 +159,19 @@ export function createGame(canvas, opts = {}){
       for (let r = 0; r < GRID_ROWS; r++) (cellOwner(r) === aiSlot ? myRows : foeRows).push(r);
       const pick = rows => rows[Math.floor(Math.random() * rows.length)];
       const col = () => Math.floor(Math.random() * GRID_COLS);
-      client.place(aiSlot, ITEM.WALL, col(), pick(myRows));
-      client.place(aiSlot, ITEM.BARR, col(), pick(myRows));
-      client.place(aiSlot, ITEM.DRUM, col(), pick(foeRows));
-      setTimeout(() => client.setReady(aiSlot), 350);   // 배치가 확정된 뒤 준비
+      // 정원을 다 채워야 '설치 완료'가 된다. 개수는 ITEM_DEF를 그대로 따른다
+      const put = (k, rows) => {
+        for (let n = 0; n < ITEM_DEF[k].quota; n++){
+          for (let tryN = 0; tryN < 30; tryN++){
+            const c = col(), r = pick(rows);
+            if (canPlace(client.pred, aiSlot, k, c, r)){ client.place(aiSlot, k, c, r); break; }
+          }
+        }
+      };
+      put(ITEM.WALL, myRows);
+      put(ITEM.BARR, myRows);
+      put(ITEM.DRUM, foeRows);
+      setTimeout(() => client.setReady(aiSlot), 900);   // 배치가 확정된 뒤 준비
     }
     if (ai && client.pred.phase !== PH_READY) aiPlaced = false;
 
