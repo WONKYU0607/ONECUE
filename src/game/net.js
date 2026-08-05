@@ -184,6 +184,8 @@ export class Server {
     this.extra = 0;             // 지각 입력 발생 시 즉시 늘리는 여유분
     this.lastDrop = -1e9;
     this.lateDrops = 0;
+    this.dropBy = [0, 0];      // 슬롯별 폐기 수 (진단용)
+    this.lastIn = [null, null];   // 슬롯별 마지막으로 받은 입력
     this.pendingCfg = null;
     this.start = CLOCK.now();
     net.toServer = m => this.onMsg(m);
@@ -193,8 +195,12 @@ export class Server {
     if (m.t === 'rtt'){ this.rtt[m.pid] = m.rtt; this.recalcDelay(); return; }
     if (m.t === 'cfg'){ this.pendingCfg = Object.assign(this.pendingCfg || {}, m.cfg); return; }
     if (m.t !== 'in') return;
+    this.lastIn = this.lastIn || [null, null];
+    this.lastIn[m.pid] = { tick: m.tick, at: this.s.tick, ready: m.ready ? 1 : 0, place: !!m.place };
     if (m.tick <= this.s.tick){                               // 마감 지난 입력은 폐기
       this.lateDrops++;
+      this.dropBy = this.dropBy || [0, 0];
+      this.dropBy[m.pid]++;
       this.lastDrop = this.s.tick;
       this.extra = Math.min(this.extra + 1, 8);               // 즉시 지연을 늘려 재발 방지
       this.recalcDelay();

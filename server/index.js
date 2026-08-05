@@ -125,7 +125,12 @@ const http = createServer((req, res) => {
       ready: r.server.s.ready,
       items: (r.server.s.items || []).length,
       phase: r.server.s.phase,     // 0=배치 1=카운트다운 2=전투 3=종료
-      tick: r.server.s.tick
+      tick: r.server.s.tick,
+      // 입력이 아예 안 오는지, 오는데 늦어서 버려지는지 구분하기 위한 값
+      drops: r.server.lateDrops,
+      dropBy: r.server.dropBy,
+      lastIn: r.server.lastIn,
+      delay: r.server.delay
     }));
     res.end(JSON.stringify({
       ok: true,
