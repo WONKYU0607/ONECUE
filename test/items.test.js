@@ -1,7 +1,7 @@
 import { newState, step, canPlace, itemRect } from '../src/game/sim.js';
 import {
   FP, ITEM, ITEM_DEF, PH_READY, PH_PLAY, PH_OVER, CD_TICKS, GRID_ROWS, GRID_COLS,
-  cellOwner, MAXHP, DRUM_DAMAGE, DRUM_RADIUS, GRID_MIDROW
+  cellOwner, MAXHP, DRUM_DAMAGE, DRUM_RADIUS, GRID_MIDROW, EXPLO_TICKS
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 
@@ -127,5 +127,28 @@ console.log('드럼통');
   for (let i = 0; i < 20; i++){ step(s2, IN({}, {})); s2.bullets = s2.bullets.filter(b => b.o === 0); }
   assert(s2.items[0].hp <= 0, '멀리 있어도 총알 맞으면 터짐');
   assert(s2.p[1].hp === hpC, '폭발 반경 밖은 피해 없음');
+}
+console.log('items.test.js 통과');
+
+console.log('폭발 연출');
+{
+  const s = newState();
+  const r = foeRow(0);
+  step(s, IN({ place: { k: ITEM.DRUM, c: 3, r } }, {}));
+  step(s, IN({ ready:1 }, { ready:1 })); step(s, IN({ fire:1 }, {}));
+  for (let i = 0; i < CD_TICKS; i++) step(s, IN({}, {}));
+  assert(s.fx.length === 0, '평소엔 연출 없음');
+
+  const rect = itemRect(s.items[0]);
+  s.bullets.length = 0;
+  s.bullets.push({ x: rect.x + 3*FP, y: rect.y - 2*FP, vy: Math.round(3*FP), o: 0 });
+  let seen = 0;
+  for (let i = 0; i < 10; i++){ step(s, IN({}, {})); if (s.fx.length) seen++; }
+  assert(seen > 0, '터지면 연출이 생김');
+  assert(s.fx[0].c === 3 && s.fx[0].r === r, '연출 위치가 드럼통 칸과 일치');
+
+  let n = 0;
+  while (s.fx.length && n < 200){ step(s, IN({}, {})); n++; }
+  assert(n > 10 && n < EXPLO_TICKS + 10, `연출이 ${EXPLO_TICKS}틱쯤 뒤 사라짐 (${n}틱)`);
 }
 console.log('items.test.js 통과');

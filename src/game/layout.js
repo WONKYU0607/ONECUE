@@ -1,4 +1,4 @@
-import { W, H } from './config.js';
+import { W, H, TUNE } from './config.js';
 
 export const STICK_DEAD = 0.14;   // 중심 근처는 무시
 export const STICK_SAT  = 0.82;   // 이 지점부터 최대 속도 (끝까지 안 밀어도 됨)
@@ -40,22 +40,34 @@ export function stickGeom(uiH){
   return { cx: W - 6 - r, cy: pd.y + pd.h / 2, r, kr: r * 0.40 };
 }
 
-// 터치 지점 -> 스틱 기울기 (-1..1).
-// 데드존~포화반경 구간을 0~1로 다시 편다. 이걸 안 하면
-// (1) 데드존 직후에 갑자기 0.14 속도로 튀고
-// (2) 원 가장자리까지 밀어야 최대 속도가 나와 키보드보다 항상 느리다
-export function stickVector(pt, uiH){
-  const g = stickGeom(uiH);
-  const nx = (pt.x - g.cx) / g.r, ny = (pt.y - g.cy) / g.r;
+// 터치 지점 -> 스틱 기울기 (-1..1). base는 현재 스틱 중심(손가락을 따라다님)
+// 데드존~포화반경 구간을 0~1로 다시 편 뒤, 반응 곡선을 적용한다.
+// 곡선이 없으면 살짝만 기울여도 속도가 확 붙어 미세 조정이 안 된다.
+export function stickVector(pt, uiH, base){
+  const g = base || stickGeom(uiH);
+  const r = stickGeom(uiH).r;
+  const nx = (pt.x - g.cx) / r, ny = (pt.y - g.cy) / r;
   const m = Math.hypot(nx, ny);
   if (m < STICK_DEAD) return { nx: 0, ny: 0 };
-  const mag = Math.min(1, (m - STICK_DEAD) / (STICK_SAT - STICK_DEAD));
+  let mag = Math.min(1, (m - STICK_DEAD) / (STICK_SAT - STICK_DEAD));
+  mag = Math.pow(mag, TUNE.curve.v);        // 중앙 근처를 둔감하게, 끝은 그대로 최대
   const k = mag / m;
   return { nx: nx * k, ny: ny * k };
 }
 
-// 스틱을 잡을 수 있는 범위인지 (원 주변까지 살짝 여유)
-export function inStickArea(pt, uiH){
-  const g = stickGeom(uiH);
-  return Math.hypot(pt.x - g.cx, pt.y - g.cy) <= g.r * 1.35;
+// 스틱 조작 영역: 패드의 오른쪽 절반쯤. 왼쪽은 배치 팔레트 자리라 비워둔다.
+// 원 안만 인정하면 엄지가 살짝 빗나갔을 때 조작이 아예 안 먹는다
+export function inStickZone(pt, uiH){
+  const pd = padRect(uiH);
+  return pt.x >= pd.x + pd.w * 0.42 && pt.x <= pd.x + pd.w &&
+         pt.y >= pd.y && pt.y <= pd.y + pd.h;
+}
+
+// 스틱 중심이 패드 밖으로 나가지 않게
+export function clampBase(cx, cy, uiH){
+  const pd = padRect(uiH), g = stickGeom(uiH);
+  return {
+    cx: Math.max(pd.x + g.r, Math.min(pd.x + pd.w - g.r, cx)),
+    cy: Math.max(pd.y + g.r, Math.min(pd.y + pd.h - g.r, cy))
+  };
 }

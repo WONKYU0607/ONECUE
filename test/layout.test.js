@@ -1,4 +1,5 @@
-import { computeLayout, stickGeom, stickVector, inStickArea, UI_MIN, UI_MAX } from '../src/game/layout.js';
+import { computeLayout, stickGeom, stickVector, inStickZone, clampBase, UI_MIN, UI_MAX } from '../src/game/layout.js';
+import { TUNE } from '../src/game/config.js';
 import { W, H } from '../src/game/config.js';
 import { assert } from './harness.js';
 
@@ -16,6 +17,7 @@ console.log('스틱 8방향 판정');
 {
   const { uiH } = computeLayout(1080, 2340);
   const g = stickGeom(uiH);
+  TUNE.curve.v = 1.0;                     // 곡선은 아래에서 따로 본다
   const at = deg => {
     const r = deg * Math.PI / 180;
     return stickVector({ x: g.cx + Math.cos(r)*g.r, y: g.cy + Math.sin(r)*g.r }, uiH);
@@ -24,8 +26,8 @@ console.log('스틱 8방향 판정');
   assert(Math.abs(Math.hypot(up.nx, up.ny) - 1) < 0.001, '가장자리 크기 1.000');
   assert(Math.abs(Math.hypot(diag.nx, diag.ny) - 1) < 0.001, '대각선도 크기 1.000');
   assert(center.nx === 0 && center.ny === 0, '데드존 안은 0');
-  assert(inStickArea({ x: g.cx, y: g.cy }, uiH) && !inStickArea({ x: 5, y: H + 20 }, uiH),
-         '스틱 영역 판정');
+  assert(inStickZone({ x: g.cx, y: g.cy }, uiH) && !inStickZone({ x: 8, y: H + 20 }, uiH),
+         '스틱 영역은 패드 오른쪽 (왼쪽은 팔레트 자리)');
   // 8방향 전부 부호가 맞는지
   const dirs = { 270:[0,-1], 315:[1,-1], 0:[1,0], 45:[1,1], 90:[0,1], 135:[-1,1], 180:[-1,0], 225:[-1,-1] };
   let ok = true;
@@ -51,11 +53,27 @@ console.log('스틱 세기 곡선');
   assert(Math.abs(at(1.0) - 1) < 0.001, '가장자리도 최대치 (더 커지지 않음)');
   assert(Math.abs(at(1.4) - 1) < 0.001, '원 밖으로 나가도 최대치 유지');
   const mid = at(0.48);
-  assert(mid > 0.4 && mid < 0.6, `중간쯤은 중간 세기 (${mid.toFixed(3)})`);
+  assert(mid > 0.4 && mid < 0.6, `곡선 x1.0에서 중간쯤은 중간 세기 (${mid.toFixed(3)})`);
   // 단조 증가인지
   let prev = -1, mono = true;
   for (let f = 0.14; f <= 1.0; f += 0.02){ const v = at(f); if (v < prev - 1e-9) mono = false; prev = v; }
   assert(mono, '세기가 중간에 꺾이지 않고 증가');
+
+  // 반응 곡선: 중앙 근처만 둔해지고 끝은 최대치 유지
+  const mag = f => { const v = stickVector({ x: g.cx + g.r * f, y: g.cy }, uiH); return Math.hypot(v.nx, v.ny); };
+  TUNE.curve.v = 1.0; const lin = mag(0.5), linEnd = mag(0.9);
+  TUNE.curve.v = 2.4; const exp = mag(0.5), expEnd = mag(0.9);
+  assert(exp < lin * 0.7, `곡선을 올리면 중앙 근처가 둔해짐 (${lin.toFixed(2)} -> ${exp.toFixed(2)})`);
+  assert(Math.abs(expEnd - linEnd) < 0.001, `가장자리 최대 속도는 그대로 (${expEnd.toFixed(3)})`);
+  TUNE.curve.v = 1.6;
+
+  // 스틱이 손가락을 따라오는지
+  const base0 = clampBase(g.cx, g.cy, uiH);
+  const far = { x: base0.cx + g.r * 2, y: base0.cy };
+  const v0 = stickVector(far, uiH, base0);
+  assert(Math.abs(Math.hypot(v0.nx, v0.ny) - 1) < 0.001, '원 밖이어도 크기 1');
+  const moved = clampBase(base0.cx + g.r, base0.cy, uiH);
+  assert(moved.cx > base0.cx || moved.cx === base0.cx, '중심 이동은 패드 안으로 제한됨');
 
   // 대각선도 최대치가 1 (더 빨라지지 않음)
   const d = stickVector({ x: g.cx + g.r * 0.9, y: g.cy - g.r * 0.9 }, uiH);

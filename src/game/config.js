@@ -32,11 +32,12 @@ export const YMIN_S = [ Math.round(H / 2 * FP), 0 ];
 export const YMAX_S = [ Math.round((H - 16) * FP), Math.round((H / 2 - 16) * FP) ];
 // 실시간 조절 대상 (UI 버튼). 전부 서버 권위 상태로 전파됨
 export const TUNE = {
-  spd:  { v:0.25, min:0.1, max:2.0,  inc:0.05, fmt:v => Math.round(v*600) + '/s' },
+  spd:  { v:150, min:30,  max:900,  inc:1,    fmt:v => v + '/s' },   // px/초를 직접 다룬다
   bul:  { v:204, min:60,  max:600,  inc:12,   fmt:v => v + '/s' },
-  rate: { v:0.5, min:0.1, max:2.0,  inc:0.05, fmt:v => v.toFixed(2) + 's' }
+  rate: { v:0.5, min:0.1, max:2.0,  inc:0.05, fmt:v => v.toFixed(2) + 's' },
+  curve:{ v:1.6, min:1.0, max:3.0,  inc:0.1,  fmt:v => 'x' + v.toFixed(1) }   // 스틱 반응 곡선(클라 전용)
 };
-export const spdMult   = () => TUNE.spd.v;
+export const spdMult   = () => TUNE.spd.v / 600;   // BASE_MAX_STEP(=600px/s)에 대한 비율
 export const bulletFP  = () => Math.max(1, Math.round(TUNE.bul.v / 60 * FP));
 export const coolTicks = () => Math.max(2, Math.round(TUNE.rate.v * 60));
 export const BASE_MAX_STEP = Math.round(10 * FP);    // 틱당 이동 상한 = 600px/s (배속 1.0)
@@ -78,6 +79,7 @@ export const ITEM_DEF = [
 ];
 export const DRUM_DAMAGE = 1;         // 폭발에 휘말리면 이만큼 깎임
 export const DRUM_RADIUS = 1;         // 폭발 범위: 주변 한 칸
+export const EXPLO_TICKS = 34;        // 폭발 이펙트 지속 (틱)
 
 export const ROUND_TICKS = 60 * 60;   // 한 판 60초. 시간 내 승부가 안 나면 체력 많은 쪽 승
 export const SNAP_EVERY = 30;          // 스냅샷 주기(틱)

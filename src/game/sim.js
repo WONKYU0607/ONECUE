@@ -11,6 +11,7 @@ import {
   DEBUG_LOCAL_BOTH,
   DRUM_DAMAGE,
   DRUM_RADIUS,
+  EXPLO_TICKS,
   EXTRAP_MAX,
   FLASH_T,
   FP,
@@ -95,6 +96,7 @@ export function newState(){
     bullets: [],
     covers: newCovers(),
     items: newItems(),          // 배치된 엄폐물·폭탄
+    fx: [],                     // 폭발 연출 (칸 좌표 + 남은 틱). 상태에 넣어야 양쪽 화면에 같이 뜬다
     ready: [false, false],      // 설치 완료 여부
     maxStep: stepCap(),   // 아래 3개는 서버가 정하고 프레임으로 전파 → 결정론 유지
     bulletV: bulletFP(),
@@ -160,6 +162,7 @@ function explode(s, it){
     }
   }
   it.hp = 0;
+  s.fx.push({ c: it.c, r: it.r, t: EXPLO_TICKS });
 }
 
 export function step(s, inp){
@@ -186,7 +189,7 @@ export function step(s, inp){
       const t = s.tick, ms = s.maxStep, bv = s.bulletV, ct = s.coolT, n = newState();
       n.tick = t; n.phase = PH_READY; n.timer = 0;
       s.p = n.p; s.bullets = n.bullets; s.covers = n.covers;
-      s.items = n.items; s.ready = n.ready;      // 다시 배치 단계부터
+      s.items = n.items; s.ready = n.ready; s.fx = n.fx;   // 다시 배치 단계부터
       s.maxStep = ms; s.bulletV = bv; s.coolT = ct;
       s.phase = n.phase; s.timer = n.timer; s.over = false; s.winner = 0; s.clock = 0;
     }
@@ -216,6 +219,9 @@ export function step(s, inp){
     if (--s.timer <= 0){ s.phase = PH_PLAY; s.timer = 0; s.clock = ROUND_TICKS; }
     return;
   }
+
+  // 폭발 연출 수명
+  for (let i = s.fx.length - 1; i >= 0; i--) if (--s.fx[i].t <= 0) s.fx.splice(i, 1);
 
   // 전투 중: 클릭 없이 coolT 간격 자동 발사
   for (let i = 0; i < 2; i++){
@@ -278,5 +284,6 @@ export function checksum(s){
   for (const c of s.covers) h = (h*31 + c.hp) | 0;
   for (const it of s.items) h = (h*31 + it.k*7 + it.c*13 + it.r*29 + it.hp*3 + it.by) | 0;
   h = (h*31 + (s.ready[0] ? 1 : 0) + (s.ready[1] ? 2 : 0)) | 0;
+  for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t) | 0;
   return h | 0;
 }

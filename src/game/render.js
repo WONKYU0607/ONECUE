@@ -2,7 +2,7 @@ import {
   W, H, FP, COL, TEAMS, TEAM_OF, SELF, MAXHP, FLASH_T, VIEW, SHOW_HUD,
   GRID_COLS, GRID_ROWS, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO,
-  ITEM, ITEM_DEF, cellOwner
+  ITEM, ITEM_DEF, cellOwner, DRUM_RADIUS, EXPLO_TICKS
 } from './config.js';
 import { RS, computeLayout, stickGeom } from './layout.js';
 import { getImage, isReady } from './assets.js';
@@ -25,6 +25,7 @@ const fy = (y, h) => SELF.slot === 1 ? H - y - h : y;
 export function createRenderer(canvas){
   const ctx = canvas.getContext('2d');
   const bg = getImage('arena'), sheet = getImage('characters'), items = getImage('items');
+  const boom = getImage('explosion');
 
   let uiH = 86, totalH = H + uiH, scale = 1;
 
@@ -102,7 +103,8 @@ export function createRenderer(canvas){
     }
     ctx.textAlign = 'left';
 
-    const g = stickGeom(uiH);
+    const gg = stickGeom(uiH);
+    const g = stick.base ? { ...gg, ...stick.base } : gg;   // 잡고 있으면 그 자리에 그린다
     circle(g.cx, g.cy, g.r, 'rgba(255,255,255,0.045)', 'rgba(255,255,255,0.18)', 0.8);
     circle(g.cx, g.cy, g.r * 0.60, null, 'rgba(255,255,255,0.08)', 0.5);
     for (const [ax, ay] of [[0,-1],[0,1],[-1,0],[1,0]]){
@@ -139,6 +141,39 @@ export function createRenderer(canvas){
         const ratio = it.hp / def.hp;
         px(box.x + 2, box.y + box.h - 1.6, (box.w - 4) * ratio, 1.2,
            ratio > 0.5 ? 'rgba(120,220,255,0.75)' : 'rgba(240,140,90,0.85)');
+      }
+    }
+  }
+  // 폭발 연출: 피해 범위(3x3)의 칸마다 하나씩 터진다.
+  // 가운데에 큰 것 하나만 그리면 버섯구름이 위로만 솟아 아래쪽 칸이 비어 보인다.
+  function drawFx(s){
+    if (!isReady(boom) || !s.fx.length) return;
+    const ratio = boom.naturalHeight / boom.naturalWidth;
+    for (const f of s.fx){
+      for (let dr = -DRUM_RADIUS; dr <= DRUM_RADIUS; dr++){
+        for (let dc = -DRUM_RADIUS; dc <= DRUM_RADIUS; dc++){
+          const c = f.c + dc, r = f.r + dr;
+          if (c < 0 || c >= GRID_COLS || r < 0 || r >= GRID_ROWS) continue;
+
+          // 중앙부터 터지고 바깥 칸은 조금 늦게 (동시에 터지면 복제한 티가 남)
+          const delay = (Math.abs(dc) + Math.abs(dr)) * 3;
+          const age = (EXPLO_TICKS - f.t) - delay;
+          if (age <= 0) continue;
+          const k = Math.min(1, age / (EXPLO_TICKS - delay));
+
+          const center = dc === 0 && dr === 0;
+          const scale = (center ? 1.5 : 1.15) * (0.7 + k * 0.45);
+          const w = GRID_CW * scale, h = w * ratio;
+          const box = cellBox(c, r);
+          const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+
+          ctx.globalAlpha = (k < 0.6 ? 1 : Math.max(0, 1 - (k - 0.6) / 0.4)) * (center ? 1 : 0.9);
+          ctx.drawImage(boom,
+            Math.round((cx - w / 2) * RS),
+            Math.round((cy - h * 0.62) * RS),      // 불꽃 밑동이 칸 중앙에 오도록
+            Math.round(w * RS), Math.round(h * RS));
+          ctx.globalAlpha = 1;
+        }
       }
     }
   }
@@ -215,6 +250,7 @@ export function createRenderer(canvas){
     }
     for (const b of s.bullets) px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5, TEAMS[TEAM_OF[b.o]].m);
     for (let i = 0; i < 2; i++) drawPlayer(s.p[i], i, cl.rx[i], cl.ry[i]);
+    drawFx(s);
     if (SHOW_HUD){
       ctx.font = (8*RS) + 'px monospace'; ctx.textAlign = 'left';
       ctx.fillStyle = COL.dim;
