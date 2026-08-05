@@ -85,6 +85,7 @@ import {
   newCovers,
   newItems,
   newState,
+  normalizeState,
   overlap,
   step
 } from './sim.js';
@@ -264,7 +265,7 @@ export class Client {
       // 접속 시점엔 서버가 이미 여러 틱 진행돼 있어 프레임 1번부터 받을 수 없다.
       // 첫 스냅샷을 그대로 채택해서 그 지점부터 따라간다.
       if (this.awaitSnap && m.tick > 0){
-        this.s = cloneState(m.st);
+        this.s = normalizeState(cloneState(m.st));
         for (const k of [...this.frames.keys()]) if (k <= m.tick) this.frames.delete(k);
         this.rx = null; this.ry = null;
         this.awaitSnap = false;
@@ -322,7 +323,7 @@ export class Client {
       if (checksum(this.s) !== f.ck){
         this.desync++;
         const sn = this.pendingSnap;
-        if (sn && sn.tick >= this.s.tick){ this.s = cloneState(sn.st); this.pendingSnap = null; }
+        if (sn && sn.tick >= this.s.tick){ this.s = normalizeState(cloneState(sn.st)); this.pendingSnap = null; }
       }
     }
   }

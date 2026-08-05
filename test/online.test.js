@@ -4,7 +4,7 @@ import { spawn } from 'child_process';
 import wsPkg from '../server/node_modules/ws/index.js';
 const { WebSocket } = wsPkg;
 import { Client } from '../src/game/net.js';
-import { SELF, PH_PLAY, PH_COUNT, stepCap, bulletFP, coolTicks } from '../src/game/config.js';
+import { SELF, PH_PLAY, PH_COUNT, stepCap, bulletFP, coolTicks, PROTO_VER } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 const PORT = 8123;
@@ -43,6 +43,7 @@ const helloB = B.msgs.find(m => m.t === 'hello');
 assert(helloA && helloB, '두 클라 모두 hello 수신');
 assert(helloA.pid === 0 && helloB.pid === 1, `슬롯 배정 0/1 (${helloA.pid}/${helloB.pid})`);
 assert(helloA.room === helloB.room, '같은 방에 배정');
+assert(helloA.ver === PROTO_VER, `hello에 서버 버전이 실려온다 (${helloA.ver})`);
 assert(A.msgs.some(m => m.t === 'go') && B.msgs.some(m => m.t === 'go'), '방이 차면 go 브로드캐스트');
 
 const ca = new Client(A, [0]), cb = new Client(B, [1]);

@@ -3,6 +3,7 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { Server } from '../src/game/net.js';
+import { PROTO_VER } from '../src/game/config.js';
 
 const PORT = process.env.PORT || 8080;
 const TICK_MS = 1000 / 60;
@@ -58,7 +59,7 @@ class Room {
     ws.roomId = this.id; ws.slot = slot;
     this.emptyAt = 0;
 
-    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, back: reconnected }));
+    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, back: reconnected, ver: PROTO_VER }));
     // 방은 이미 돌고 있으므로 현재 상태를 먼저 보내 시작점을 맞춘다
     this.snapshotTo(slot);
     this.send({ t: 'peer', slot: 1 - slot, state: this.seats[1 - slot].ws ? 'here' : 'gone' }, slot);
@@ -105,6 +106,7 @@ const http = createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({
       ok: true,
+      ver: PROTO_VER,
       rooms: rooms.size,
       waiting: waiting.length,
       players: wss ? wss.clients.size : 0,

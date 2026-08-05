@@ -11,6 +11,7 @@ import {
   ITEM, ITEM_DEF, PH_READY, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
   GRID_X0, GRID_Y0, H, cellOwner
 } from './config.js';
+import { padRect, paletteSlots } from './layout.js';
 
 // 게임 한 판을 만들고 rAF 루프를 돌린다.
 // React는 이 함수 하나만 호출하고, 언마운트 때 stop()만 부르면 된다.
@@ -54,7 +55,7 @@ export function createGame(canvas, opts = {}){
   // 배치 단계 도우미 ---------------------------------------------------
   const leftCount = k => {
     const st = client.pred;
-    const used = st.items.filter(it => it.by === SELF.slot && it.k === k).length;
+    const used = (st.items || []).filter(it => it.by === SELF.slot && it.k === k).length;
     return Math.max(0, ITEM_DEF[k].quota - used);
   };
   // 화면 좌표 -> 놓을 수 있는 칸 (슬롯1이면 세로가 뒤집혀 있으므로 되돌린다)
@@ -157,9 +158,25 @@ export function createGame(canvas, opts = {}){
   return {
     server, client, session, ai,
     leftCount,
+    // 아이템 칸 바로 위 여백의 화면 좌표. 버튼을 여기에 얹는다
+    // (화면 절대 위치로 두면 기기마다 패널 높이가 달라 어긋난다)
+    uiBox(){
+      const r = canvas.getBoundingClientRect();
+      const pd = padRect(view.uiH);
+      const sl = paletteSlots(view.uiH);
+      const x0 = sl[0].x, x1 = sl[sl.length - 1].x + sl[0].w;
+      const top = pd.y + 1, bottom = sl[0].y - 2;
+      const k = view.scale;
+      return {
+        left: r.left + x0 * k,
+        top: r.top + top * k,
+        width: (x1 - x0) * k,
+        height: Math.max(18, (bottom - top) * k)
+      };
+    },
     ready(){ client.setReady(SELF.slot); },
-    isReady(){ return client.pred.ready[SELF.slot]; },
-    peerReady(){ return client.pred.ready[1 - SELF.slot]; },
+    isReady(){ return !!(client.pred.ready || [])[SELF.slot]; },
+    peerReady(){ return !!(client.pred.ready || [])[1 - SELF.slot]; },
     applyCfg,
     // 튜닝값 한 칸 조절 (UI 버튼용)
     bump(k, dir){

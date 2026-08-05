@@ -90,3 +90,12 @@ color:#f0c86e;font:12px/1.4 monospace;white-space:nowrap}
 padding:14px 28px;background:rgba(18,18,28,.92);color:#f0c86e;border:2px solid #f0a81e;
 font:bold 16px/1 monospace;letter-spacing:2px;cursor:pointer}
 .placebtn:active{background:#f0a81e;color:#12121c}
+
+/* 패널 안(아이템 칸 위 여백)에 얹는 버튼 — 위치·크기는 JS가 계산해 넣는다 */
+.panelbtn{position:fixed;z-index:20;display:flex;align-items:center;justify-content:center;
+padding:0;background:rgba(18,18,28,.92);font-family:monospace;font-weight:bold;
+letter-spacing:2px;cursor:pointer;line-height:1}
+.panelbtn.place{color:#f0c86e;border:2px solid #f0a81e}
+.panelbtn.place:active{background:#f0a81e;color:#12121c}
+.panelbtn.start{color:#8fd8ff;border:2px solid #4ec9f0}
+.panelbtn.start:active{background:#4ec9f0;color:#12121c}

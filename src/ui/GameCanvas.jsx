@@ -12,6 +12,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
   const [phase, setPhase] = useState(PH_READY);
   const [link, setLink] = useState({ self: 'ok', peer: 'here' });
   const [ready, setReady] = useState({ me: false, peer: false });
+  const [box, setBox] = useState(null);   // 버튼을 놓을 자리 (아이템 칸 위 여백)
 
   // 배치 단계에선 준비 상태를 자주 확인해야 버튼이 제때 바뀐다
   useEffect(() => {
@@ -22,6 +23,21 @@ export default function GameCanvas({ session, onExit, onFinish }){
     }, 200);
     return () => clearInterval(iv);
   }, [phase]);
+
+  // 버튼 자리는 캔버스 크기·패널 높이에 따라 달라진다
+  useEffect(() => {
+    const upd = () => { const g = gameRef.current; if (g) setBox(g.uiBox()); };
+    upd();
+    const iv = setInterval(upd, 400);
+    addEventListener('resize', upd);
+    return () => { clearInterval(iv); removeEventListener('resize', upd); };
+  }, [phase]);
+
+  const boxStyle = box ? {
+    left: box.left + 'px', top: box.top + 'px',
+    width: box.width + 'px', height: box.height + 'px',
+    fontSize: Math.max(9, Math.round(box.height * 0.42)) + 'px'
+  } : { display: 'none' };
 
   useEffect(() => {
     // StrictMode가 개발 중 effect를 두 번 실행하므로, cleanup에서 반드시 정리해야
@@ -57,7 +73,8 @@ export default function GameCanvas({ session, onExit, onFinish }){
       )}
 
       {placing && !ready.me && (
-        <button className="placebtn ui-overlay" onClick={() => gameRef.current?.ready()}>
+        <button className="panelbtn place ui-overlay" style={boxStyle}
+                onClick={() => gameRef.current?.ready()}>
           설치 완료
         </button>
       )}
@@ -65,7 +82,8 @@ export default function GameCanvas({ session, onExit, onFinish }){
         <div className="link-note ui-overlay">상대가 설치하는 중…</div>
       )}
       {showStart && (
-        <button className="startbtn ui-overlay" onClick={() => gameRef.current?.start()}>
+        <button className="panelbtn start ui-overlay" style={boxStyle}
+                onClick={() => gameRef.current?.start()}>
           START
         </button>
       )}

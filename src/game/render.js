@@ -124,7 +124,7 @@ export function createRenderer(canvas){
   }
   function drawItems(s){
     if (!isReady(items)) return;
-    for (const it of s.items){
+    for (const it of (s.items || [])){
       if (it.hp <= 0) continue;
       // 상대가 내 영역에 심은 드럼통은 시작 전엔 안 보인다
       if (it.k === ITEM.DRUM && it.by !== SELF.slot && s.phase !== PH_PLAY) continue;
@@ -147,7 +147,7 @@ export function createRenderer(canvas){
   // 폭발 연출: 피해 범위(3x3)의 칸마다 하나씩 터진다.
   // 가운데에 큰 것 하나만 그리면 버섯구름이 위로만 솟아 아래쪽 칸이 비어 보인다.
   function drawFx(s){
-    if (!isReady(boom) || !s.fx.length) return;
+    if (!isReady(boom) || !s.fx || !s.fx.length) return;
     const ratio = boom.naturalHeight / boom.naturalWidth;
     for (const f of s.fx){
       for (let dr = -DRUM_RADIUS; dr <= DRUM_RADIUS; dr++){
@@ -199,7 +199,7 @@ export function createRenderer(canvas){
   }
   // 팔레트: 스틱 왼쪽 아이콘 3개 + 남은 개수
   function drawPalette(s, uiH2, left, drag){
-    if (s.phase !== PH_READY || !isReady(items)) return;
+    if (s.phase !== PH_READY) return;
     for (const sl of paletteSlots(uiH2)){
       const def = ITEM_DEF[sl.k], f = ITEM_FRAME[def.key];
       const n = left(sl.k);
@@ -207,6 +207,13 @@ export function createRenderer(canvas){
       const c = n > 0 ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.10)';
       px(sl.x, sl.y, sl.w, 0.7, c); px(sl.x, sl.y + sl.h - 0.7, sl.w, 0.7, c);
       px(sl.x, sl.y, 0.7, sl.h, c); px(sl.x + sl.w - 0.7, sl.y, 0.7, sl.h, c);
+      if (!isReady(items)){                       // 그림이 아직이면 빈 칸이라도 보여준다
+        ctx.font = 'bold ' + (7*RS) + 'px monospace'; ctx.textAlign = 'right';
+        ctx.fillStyle = n > 0 ? '#8fd8ff' : '#4a4a63';
+        ctx.fillText('x' + n, (sl.x + sl.w - 1.5) * RS, (sl.y + sl.h - 1.5) * RS);
+        ctx.textAlign = 'left';
+        continue;
+      }
       const sc = Math.min((sl.w - 6) / (f.w / RS), (sl.h - 6) / (f.h / RS));
       const dw = f.w / RS * sc, dh = f.h / RS * sc;
       ctx.globalAlpha = n > 0 ? 1 : 0.25;
@@ -242,7 +249,7 @@ export function createRenderer(canvas){
     px(8, H/2 - 1, W - 16, 2, '#ffffff');            // 진영 경계 (정확히 절반)
     drawPlacing(s, cl, drag, ok);
     drawItems(s);
-    for (const c of s.covers){
+    for (const c of (s.covers || [])){
       if (c.hp <= 0) continue;
       const cy2 = fy(c.y/FP, c.h/FP);
       px(c.x/FP, cy2, c.w/FP, c.h/FP, c.hp > 2 ? COL.cover : COL.cover2);

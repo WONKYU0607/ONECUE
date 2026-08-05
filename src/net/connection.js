@@ -1,5 +1,5 @@
 import { WsTransport } from '../game/net.js';
-import { SELF } from '../game/config.js';
+import { SELF, PROTO_VER } from '../game/config.js';
 
 // 서버 연결은 화면 전환보다 오래 살아야 한다 (매칭 화면 -> 게임 화면).
 // 그래서 React 밖 모듈에 두고, 게임을 나갈 때만 끊는다.
@@ -83,6 +83,14 @@ export async function connectAndWait({ onStage } = {}){
     };
     transport.toClient = m => {
       if (m.t === 'hello'){
+        // 서버가 옛 코드면 아이템·준비 같은 새 기능이 통째로 동작하지 않는다.
+        // 조용히 멈추는 대신 원인을 알려준다
+        if ((m.ver || 0) !== PROTO_VER){
+          settled = true;
+          transport.close();
+          reject(new Error(`서버 버전이 다르다 (서버 ${m.ver || '없음'} / 앱 ${PROTO_VER}) — 서버 재배포 필요`));
+          return;
+        }
         slot = m.pid; room = m.room;
         SELF.slot = slot;                   // 내 슬롯은 서버가 정한다
         onStage?.('waiting');

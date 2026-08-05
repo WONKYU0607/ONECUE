@@ -80,6 +80,18 @@ import {
 // ================= SIM (pure, deterministic) =================
 export function newItems(){ return []; }
 
+// 서버가 보내준 상태에 새 필드가 없을 수 있다(서버가 옛 버전일 때).
+// 없는 채로 두면 렌더·배치 코드가 예외를 내고 그리기 루프가 통째로 죽는다.
+export function normalizeState(st){
+  if (!st) return st;
+  if (!Array.isArray(st.items)) st.items = [];
+  if (!Array.isArray(st.fx)) st.fx = [];
+  if (!Array.isArray(st.covers)) st.covers = [];
+  if (!Array.isArray(st.ready)) st.ready = [false, false];
+  if (typeof st.clock !== 'number') st.clock = 0;
+  return st;
+}
+
 export function newCovers(){
   // 기본 엄폐물 없음. 아이템/맵 오브젝트로 채울 때 여기서 push
   // 예) c.push({x:19*FP, y:147*FP, w:32*FP, h:10*FP, hp:4});
@@ -134,10 +146,10 @@ export function canPlace(s, slot, k, c, r){
   // 드럼통은 중앙선에 붙은 한 칸에 못 심는다 (폭발 반경이 내 영역까지 닿아 자폭)
   if (k === ITEM.DRUM && (r === GRID_MIDROW - 1 || r === GRID_MIDROW)) return false;
   // 개수 제한
-  const used = s.items.filter(it => it.by === slot && it.k === k).length;
+  const used = (s.items || []).filter(it => it.by === slot && it.k === k).length;
   if (used >= def.quota) return false;
   // 겹침
-  for (const it of s.items){
+  for (const it of (s.items || [])){
     const w = ITEM_DEF[it.k].cells;
     if (it.r === r && c < it.c + w && c + def.cells > it.c) return false;
   }

@@ -95,6 +95,8 @@ export const TEAMS = [
 export const TEAM_OF = [0, 1, 2, 3];     // 플레이어 슬롯 -> 팀 컬러
 // 내 슬롯은 서버가 배정한다. 화면에선 항상 내가 아래쪽에 보이도록 렌더에서 뒤집는다
 export const SELF = { slot: 0 };
+// 서버와 클라가 같은 코드인지 확인하는 표식. 게임 규칙이 바뀔 때마다 올린다
+export const PROTO_VER = 4;
 export const GUN_C = '#23232b', LENS_C = '#101014', GLINT_C = '#dfe8f0';
 
 export const COL = {

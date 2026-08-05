@@ -19,7 +19,7 @@ export default function Matching({ onCancel, onMatched }){
 
     connectAndWait({ onStage: s => alive.current && setStage(s) })
       .then(() => { if (alive.current) setTimeout(onMatched, 400); })
-      .catch(() => { if (alive.current) setStage('error'); });
+      .catch(e => { if (alive.current){ setErr(e?.message || ''); setStage('error'); } });
 
     return () => {
       alive.current = false;
