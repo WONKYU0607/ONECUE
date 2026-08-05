@@ -14,6 +14,8 @@ let conn = null;          // { transport, slot, room }
 
 export const serverUrl = BASE;
 export function getConnection(){ return conn; }
+// 화면에 띄울 방 번호·슬롯 (둘이 같은 방인지 눈으로 확인하기 위함)
+export function getRoomInfo(){ return conn ? { room: conn.room, slot: conn.slot } : null; }
 
 // 재접속할 때 "누구였는지" 알려면 세션 id가 필요하다. 없으면 남이 내 자리를 채간다
 export function getSid(){

@@ -210,6 +210,7 @@ export function createGame(canvas, opts = {}){
       const r = client.s.ready || [];
       return { me: !!r[SELF.slot], peer: !!r[1 - SELF.slot], tick: client.s.tick, drops: client.desync };
     },
+    mySlot(){ return SELF.slot; },
     peerReady(){ return !!(client.pred.ready || [])[1 - SELF.slot]; },
     applyCfg,
     // 튜닝값 한 칸 조절 (UI 버튼용)

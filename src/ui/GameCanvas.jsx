@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createGame } from '../game/game.js';
 import { PH_READY } from '../game/config.js';
 import TunePanel from './TunePanel.jsx';
-import { getConnection, disconnect } from '../net/connection.js';
+import { getConnection, disconnect, getRoomInfo } from '../net/connection.js';
 import { getSettings } from '../state/settings.js';
 
 // 캔버스를 마운트하고 게임을 붙였다 떼는 얇은 껍데기.
@@ -20,7 +20,11 @@ export default function GameCanvas({ session, onExit, onFinish }){
     if (phase !== PH_READY){ setReady({ me: false, peer: false }); return; }
     const iv = setInterval(() => {
       const g = gameRef.current; if (!g) return;
-      setReady({ me: g.isReady(), peer: g.peerReady(), srv: g.confirmedReady() });
+      const info = getRoomInfo();
+      setReady({
+        me: g.isReady(), peer: g.peerReady(), srv: g.confirmedReady(),
+        room: info ? info.room : null, slot: g.mySlot()
+      });
     }, 200);
     return () => clearInterval(iv);
   }, [phase]);
@@ -85,6 +89,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
           {ready.srv && (
             <span className="sub">
               서버 확정 · 나 {ready.srv.me ? 'O' : 'X'} / 상대 {ready.srv.peer ? 'O' : 'X'}
+              {ready.room != null && <><br />방 {ready.room} · 내 자리 {ready.slot}</>}
             </span>
           )}
         </div>
