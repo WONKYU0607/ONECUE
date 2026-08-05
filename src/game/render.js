@@ -164,7 +164,7 @@ export function createRenderer(canvas){
           const k = Math.min(1, age / (EXPLO_TICKS - delay));
 
           const center = dc === 0 && dr === 0;
-          const scale = (center ? 1.5 : 1.15) * (0.7 + k * 0.45);
+          const scale = (center ? 1.15 : 0.9) * (0.7 + k * 0.45);
           const w = GRID_CW * scale, h = w * ratio;
           const box = cellBox(c, r);
           const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
@@ -204,8 +204,8 @@ export function createRenderer(canvas){
       const blink = pr.fuse > 0 ? (Math.floor(pr.fuse / 4) % 2 === 0) : true;
       const c = pr.k === THROW.NADE ? (blink ? 'rgba(240,120,60,0.85)' : 'rgba(240,120,60,0.3)')
                                     : 'rgba(200,220,255,0.7)';
-      const R = pr.k === THROW.NADE ? NADE_RADIUS : 0;
-      const w = GRID_CW * (R * 2 + 1), h = GRID_CH * (R * 2 + 1);
+      // 표시는 떨어지는 칸만. 폭발 범위(3x3)까지 칠하면 화면이 너무 요란해진다
+      const w = GRID_CW, h = GRID_CH;
       const x0 = mx - w / 2, y0 = my - h / 2;
       px(x0, y0, w, 0.8, c); px(x0, y0 + h - 0.8, w, 0.8, c);
       px(x0, y0, 0.8, h, c); px(x0 + w - 0.8, y0, 0.8, h, c);

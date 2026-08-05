@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node test/run-all.js"
+    "test": "npm run lint && node test/run-all.js",
+    "lint": "eslint src server test --ext .js,.jsx --max-warnings 200"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -15,6 +16,8 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.5",
     "vite": "^5.4.0"
   }
 }
