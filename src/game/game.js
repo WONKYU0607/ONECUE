@@ -166,7 +166,7 @@ export function createGame(canvas, opts = {}){
     for (let i = 0; i < 2; i++){
       if (cur.flash[i] > prev.flash[i]){
         sfx.hit(i === me);
-        if (i === me){ juice.shake(2.2); buzz(30); }
+        if (i === me){ juice.shake(1.1); buzz(12); }
         const p = st.p[i];
         juice.spark((p.x + 7 * FP) / FP, viewY(p.y / FP, i) + 8,
                     'rgba(255,190,120,ALPHA)', 7, 60);
@@ -186,7 +186,7 @@ export function createGame(canvas, opts = {}){
     if (cur.fx > prev.fx){
       const last = st.fx[st.fx.length - 1];
       if ((last?.k || 0) === 1) sfx.flash();
-      else { sfx.explode(); juice.shake(4.5); buzz(60); }
+      else { sfx.explode(); juice.shake(2.4); buzz(28); }
     }
     // 투척물이 새로 날아감
     if (cur.proj > prev.proj) sfx.throw_();
@@ -200,7 +200,7 @@ export function createGame(canvas, opts = {}){
       const w = st.winner;
       if (w === 0) sfx.count(0);
       else if (w === me + 1) sfx.win();
-      else { sfx.lose(); buzz([40, 60, 40]); }
+      else { sfx.lose(); buzz([18, 50, 18]); }
     }
     prev = cur;
   }

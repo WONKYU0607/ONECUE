@@ -26,7 +26,7 @@ export function createJuice(){
 
     update(dt){
       if (shakeT > 0){
-        shakeT -= dt * 6;                 // 0.17초쯤에 잦아든다
+        shakeT -= dt * 9;                 // 0.11초쯤에 잦아든다 (길면 조준이 흔들린다)
         if (shakeT <= 0){ shakeT = 0; shakeAmp = 0; }
       }
       for (let i = sparks.length - 1; i >= 0; i--){
