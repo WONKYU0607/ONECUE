@@ -30,9 +30,10 @@ export function getSid(){
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const wsUrl = (mode = 'queue', code = '') =>
+const wsUrl = (mode = 'queue', code = '', resume = false) =>
   BASE + '?sid=' + encodeURIComponent(getSid()) +
-  '&mode=' + mode + (code ? '&code=' + encodeURIComponent(code) : '');
+  '&mode=' + mode + (code ? '&code=' + encodeURIComponent(code) : '') +
+  (resume ? '&resume=1' : '');
 
 // 잠든 서버는 HTTP 요청으로도 깨어난다. 소켓보다 먼저 두드려 둔다.
 // 시간 제한이 없으면 잠든 서버가 요청을 붙잡고 있는 동안 화면이 멈춘 것처럼 보인다.
@@ -93,6 +94,9 @@ export async function connectAndWait({ onStage, onCode, mode = 'queue', code = '
       if (settled) return;
       settled = true;
       transport.auto = true;                // 이제부터 끊기면 자동으로 다시 붙는다
+      // 자동 재접속은 '복귀'로 표시해야 서버가 원래 자리로 되돌려준다.
+      // 반대로 사용자가 직접 새 매칭을 시작할 땐 이 표시가 없어야 새 방을 받는다
+      transport.url = wsUrl(mode, code, true);
       conn = { transport, slot, room };
       onStage?.('matched');
       resolve(conn);

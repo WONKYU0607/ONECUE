@@ -19,9 +19,9 @@ proc.stderr.on('data', d => logs.push('ERR ' + d));
 await sleep(600);
 
 // 브라우저 WebSocket 대신 ws 모듈을 쓰는 전송 계층 (WsTransport와 같은 인터페이스)
-function makeTransport(sid){
+function makeTransport(sid, resume = false){
   const t = { toClient: null, ws: null, msgs: [], sid };
-  t.ws = new WebSocket(`ws://127.0.0.1:${PORT}?sid=${encodeURIComponent(sid)}`);
+  t.ws = new WebSocket(`ws://127.0.0.1:${PORT}?sid=${encodeURIComponent(sid)}${resume ? '&resume=1' : ''}`);
   t.clientSend = msg => { if (t.ws.readyState === 1) t.ws.send(JSON.stringify(msg)); };
   t.serverSend = () => {};
   t.ws.on('message', raw => {
@@ -106,7 +106,7 @@ C.ws.close();
 await sleep(200);
 
 // 같은 sid로 다시 붙으면 원래 방·슬롯으로 복귀
-const B2 = makeTransport(sidB);
+const B2 = makeTransport(sidB, true);   // 자동 재접속은 resume 표시를 붙인다
 await B2.ready; await sleep(400);
 const helloB2 = B2.msgs.find(m => m.t === 'hello');
 assert(helloB2 && helloB2.pid === 1 && helloB2.room === helloA.room,

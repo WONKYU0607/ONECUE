@@ -12,9 +12,9 @@ const proc = spawn(process.execPath, ['server/index.js'], {
 let err = ''; proc.stderr.on('data', d => err += d);
 await sleep(700);
 
-function conn(sid, mode = 'queue', code = ''){
+function conn(sid, mode = 'queue', code = '', resume = false){
   const t = { msgs: [], ws: null };
-  t.ws = new WebSocket(`ws://127.0.0.1:${PORT}?sid=${sid}&mode=${mode}&code=${code}`);
+  t.ws = new WebSocket(`ws://127.0.0.1:${PORT}?sid=${sid}&mode=${mode}&code=${code}${resume ? '&resume=1' : ''}`);
   t.ws.on('message', raw => t.msgs.push(JSON.parse(raw)));
   t.ready = new Promise(r => t.ws.on('open', r));
   t.closed = new Promise(r => t.ws.on('close', r));
@@ -55,7 +55,33 @@ await r2.ready; await sleep(300);
 const h1 = r1.msgs.find(m => m.t === 'hello'), h2 = r2.msgs.find(m => m.t === 'hello');
 assert(h1 && h2 && h1.room === h2.room && h1.room !== hg.room, '랜덤끼리 새 방에서 매칭');
 
-for (const c of [host, guest, r1, r2]) c.ws.close();
+console.log('나갔다가 다시 만들면 새 방이 나온다');
+{
+  // 코드 없이 끊고(=나가기), 곧바로 다시 '방 만들기'
+  host.ws.close(); guest.ws.close();
+  await sleep(300);
+  const again = conn('host', 'create');
+  await again.ready; await sleep(400);
+  const rm = again.msgs.find(m => m.t === 'room');
+  const hl = again.msgs.find(m => m.t === 'hello');
+  assert(rm && rm.code, `새 코드가 발급됨 (${rm?.code})`);
+  assert(rm.code !== roomMsg.code, `옛 코드와 다름 (${roomMsg.code} -> ${rm.code})`);
+  assert(hl && !hl.back, '재접속이 아니라 새 방으로 취급');
+  assert(!again.msgs.some(m => m.t === 'go'), '혼자이므로 시작하지 않음');
+
+  // resume=1이면 원래대로 복귀
+  const g2 = conn('guest', 'join', rm.code);
+  await g2.ready; await sleep(300);
+  g2.ws.close(); await sleep(200);
+  const back = conn('guest', 'join', rm.code, true);
+  await back.ready; await sleep(400);
+  const hb = back.msgs.find(m => m.t === 'hello');
+  assert(hb && hb.back === true, '자동 재접속(resume)은 원래 자리로 복귀');
+  again.ws.close(); back.ws.close();
+  await sleep(200);
+}
+
+for (const c of [r1, r2]) c.ws.close();
 await sleep(300);
 proc.kill();
 await sleep(200);

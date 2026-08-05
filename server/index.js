@@ -158,10 +158,18 @@ wss.on('connection', (ws, req) => {
   const sid = q.get('sid') || String(Math.random());
   const mode = q.get('mode') || 'queue';      // queue | create | join
   const code = (q.get('code') || '').trim();
+  const resume = q.get('resume') === '1';    // 끊겼다 자동으로 다시 붙는 경우에만 true
   ws.sid = sid;
 
-  // 재접속이면 예약해 둔 자리로 바로 복귀
-  const back = [...rooms.values()].find(r => r.seatOf(sid) >= 0);
+  // 예약석 복귀는 '자동 재접속'일 때만. 사용자가 직접 매칭/방만들기를 눌렀는데
+  // 옛 방으로 되돌리면, 아무도 없는 방에 혼자 들어가 상대를 영영 기다리게 된다
+  const held = [...rooms.values()].find(r => r.seatOf(sid) >= 0);
+  if (held && !resume){
+    const slot = held.seatOf(sid);
+    held.quit(slot);                          // 새로 시작하겠다는 뜻이므로 옛 자리를 비운다
+    console.log(`옛 자리 정리: room ${held.id} slot ${slot}`);
+  }
+  const back = resume ? held : null;
   if (back){
     ws.room = back;
     back.join(ws, sid);

@@ -113,7 +113,7 @@ export const SELF = { slot: 0 };
 // 서버와 클라가 같은 코드인지 확인하는 표식.
 // **sim.js 규칙이 바뀔 때마다 반드시 올릴 것.** 안 올리면 서버가 뒤처져도 검사를 통과해
 // 화면이 조용히 멈추고 원인을 짐작해야 한다 (자동 시작 규칙을 넣고도 안 올려서 겪음)
-export const PROTO_VER = 5;
+export const PROTO_VER = 6;
 export const GUN_C = '#23232b', LENS_C = '#101014', GLINT_C = '#dfe8f0';
 
 export const COL = {
