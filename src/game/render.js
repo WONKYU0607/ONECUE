@@ -129,7 +129,10 @@ export function createRenderer(canvas){
   }
   function drawItems(s){
     if (!isReady(items)) return;
-    for (const it of (s.items || [])){
+    // 같은 칸에 겹칠 수 있으므로 드럼통을 먼저 깔고 엄폐물을 그 위에 그린다
+    const list = (s.items || []);
+    const ordered = list.filter(it => it.k === ITEM.DRUM).concat(list.filter(it => it.k !== ITEM.DRUM));
+    for (const it of ordered){
       if (it.hp <= 0) continue;
       // 상대가 뭘 어디에 깔았는지는 시작 전엔 안 보인다 (벽·바리케이트·드럼통 모두)
       if (it.by !== SELF.slot && s.phase !== PH_PLAY) continue;

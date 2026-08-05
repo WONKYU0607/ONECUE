@@ -202,3 +202,48 @@ console.log('아이템은 영역 주인이 아닌 쪽 총알에만 반응');
   assert(wall.hp === hp0 - 1, `상대 총알로는 깎임 (${hp0} -> ${wall.hp})`);
 }
 console.log('items.test.js 통과');
+
+console.log('내 엄폐물 자리에 상대 드럼통을 겹쳐 놓을 수 있다');
+{
+  const s = newState();
+  const mine = GRID_ROWS - 2;                  // 슬롯0의 영역 (중앙선 인접 칸은 드럼통 금지)
+  step(s, IN({ place: { k: ITEM.WALL, c: 3, r: mine } }, {}));
+  assert(s.items.length === 1, '내 벽 배치');
+  assert(canPlace(s, 1, ITEM.DRUM, 3, mine), '상대는 같은 칸에 드럼통을 심을 수 있다');
+  assert(!canPlace(s, 0, ITEM.BARR, 3, mine), '내 아이템끼리는 여전히 겹칠 수 없다');
+  step(s, IN({}, { place: { k: ITEM.DRUM, c: 3, r: mine } }));
+  assert(s.items.length === 2, '같은 칸에 둘 다 배치됨');
+
+  // 반대 순서도 되는지
+  const s2 = newState();
+  step(s2, IN({}, { place: { k: ITEM.DRUM, c: 4, r: GRID_ROWS - 2 } }));
+  assert(canPlace(s2, 0, ITEM.WALL, 4, GRID_ROWS - 2), '드럼통이 먼저 깔려 있어도 벽을 놓을 수 있다');
+}
+
+console.log('겹친 칸은 벽이 부서진 뒤에야 드럼통이 터진다');
+{
+  const s = newState();
+  const mine = GRID_ROWS - 2;
+  step(s, IN({ place: { k: ITEM.WALL, c: 3, r: mine } }, {}));
+  step(s, IN({}, { place: { k: ITEM.DRUM, c: 3, r: mine } }));
+  step(s, IN({ ready:1 }, { ready:1 }));
+  for (let i = 0; i < CD_TICKS + 2; i++) step(s, IN({}, {}));
+  s.coolT = 1e6; s.p[0].cool = s.p[1].cool = 1e6;
+
+  const wall = s.items.find(it => it.k === ITEM.WALL);
+  const drum = s.items.find(it => it.k === ITEM.DRUM);
+  const rect = itemRect(wall);
+  const shoot = () => {
+    s.bullets.length = 0;
+    s.bullets.push({ x: rect.x + 8*FP, y: rect.y - 3*FP, vy: Math.round(3*FP), o: 1 });
+    for (let i = 0; i < 20; i++){ s.p[0].hp = s.p[1].hp = MAXHP; step(s, IN({}, {})); }
+  };
+  const hp0 = wall.hp;
+  shoot();
+  assert(wall.hp === hp0 - 1 && drum.hp > 0, '벽이 있는 동안은 벽만 깎이고 드럼통은 무사');
+  for (let i = 0; i < hp0; i++) shoot();
+  assert(wall.hp <= 0, '벽이 부서짐');
+  shoot();
+  assert(drum.hp <= 0, '벽이 사라진 뒤에야 드럼통이 터짐');
+}
+console.log('items.test.js 통과');

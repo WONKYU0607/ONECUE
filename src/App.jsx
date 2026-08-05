@@ -25,12 +25,14 @@ export default function App(){
   const startPvp  = useCallback(() => setScreen('pvp'), []);
   const beginPvp  = useCallback(opt => {
     disconnect();
-    setSession({ mode: 'pvp', ...opt });      // opt: {mode:'queue'|'create'|'join', code}
+    // kind는 게임 종류(pvp/ai), mode는 접속 방식(queue/create/join).
+    // 예전엔 둘 다 mode라 펼치기에서 덮어써져 온라인인지 판정이 깨졌다
+    setSession({ kind: 'pvp', ...opt });      // opt: {mode:'queue'|'create'|'join', code}
     setScreen('matching');
   }, []);
   const startAi   = useCallback(stage => {
     SELF.slot = 0;                       // AI전은 항상 내가 아래쪽
-    setSession({ mode: 'ai', stage });
+    setSession({ kind: 'ai', stage });
     setScreen('game');
   }, []);
   const toGame    = useCallback(() => setScreen('game'), []);
@@ -38,7 +40,7 @@ export default function App(){
   const again     = useCallback(() => {
     setResult(null);
     // 친구방은 코드가 이미 닫혀 있으므로 다시 할 땐 PVP 메뉴에서 고르게 한다
-    if (session?.mode === 'pvp'){ disconnect(); setScreen('pvp'); }
+    if (session?.kind === 'pvp'){ disconnect(); setScreen('pvp'); }
     else setScreen('game');
   }, [session]);
 

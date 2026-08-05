@@ -21,15 +21,18 @@ export function createGame(canvas, opts = {}){
   const onPhase = opts.onPhase || (() => {});
   const onLink = opts.onLink || (() => {});   // 연결·상대 상태 알림
   const onFinish = opts.onFinish || (() => {});
-  const session = opts.session || { mode: 'pvp' };   // TODO: ai 모드면 상대를 AI가 조작
+  const session = opts.session || { kind: 'pvp' };
 
   // 온라인이면 서버가 원격이라 여기서 Server를 만들지 않는다
   const online = opts.transport || null;
+  // PVP인데 연결이 없으면 예전처럼 조용히 혼자 도는 가짜 서버로 떨어진다.
+  // 그러면 화면은 멀쩡해 보이는데 상대에게 아무것도 전달되지 않는다
+  if (session.kind === 'pvp' && !online) onLink({ self: 'noconn' });
   const net = online || new Loopback();
   const server = online ? null : new Server(net);
   // 온라인이면 내 슬롯만, 로컬(AI·디버그)이면 둘 다 이 클라가 입력을 넣는다
   const client = new Client(net, online ? [SELF.slot] : [0, 1]);
-  const ai = (!online && session.mode === 'ai') ? createAI(session.stage || 1) : null;
+  const ai = (!online && session.kind === 'ai') ? createAI(session.stage || 1) : null;
   const aiSlot = 1 - SELF.slot;
   let aiPlaced = false;
   // 재접속하면 옛 프레임을 버리고 서버 스냅샷으로 다시 맞춘다

@@ -166,10 +166,14 @@ export function canPlace(s, slot, k, c, r){
   // 개수 제한
   const used = (s.items || []).filter(it => it.by === slot && it.k === k).length;
   if (used >= def.quota) return false;
-  // 겹침
+  // 겹침. 단, 내 엄폐물과 상대 드럼통은 같은 칸에 놓을 수 있다.
+  // (안 그러면 배치 단계에 빈 칸이 생겨 상대가 드럼통 위치를 눈치챈다)
   for (const it of (s.items || [])){
     const w = ITEM_DEF[it.k].cells;
-    if (it.r === r && c < it.c + w && c + def.cells > it.c) return false;
+    if (it.r !== r || c >= it.c + w || c + def.cells <= it.c) continue;
+    const mixed = it.by !== slot &&
+                  ((it.k === ITEM.DRUM) !== (k === ITEM.DRUM));   // 한쪽만 드럼통
+    if (!mixed) return false;
   }
   return true;
 }
@@ -336,8 +340,10 @@ export function step(s, inp){
     b.y += b.vy;
     if (b.y < -8*FP || b.y > (H+8)*FP){ s.bullets.splice(k,1); continue; }
     let gone = false;
-    for (const it of (s.items || [])){
-      if (it.hp <= 0) continue;
+    // 엄폐물을 먼저 본다. 같은 칸에 드럼통이 겹쳐 있어도 벽이 남아 있으면 벽이 막는다
+    const live = (s.items || []).filter(it => it.hp > 0);
+    const ordered = live.filter(it => it.k !== ITEM.DRUM).concat(live.filter(it => it.k === ITEM.DRUM));
+    for (const it of ordered){
       const r = itemRect(it);
       if (!overlap(b.x, b.y, BWf, BHf, r.x, r.y, r.w, r.h)) continue;
       // 총알은 누구 것이든 막히고 사라진다. 다만 그 칸이 속한 영역의 주인이

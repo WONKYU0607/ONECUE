@@ -47,7 +47,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
   useEffect(() => {
     // StrictMode가 개발 중 effect를 두 번 실행하므로, cleanup에서 반드시 정리해야
     // 서버·루프가 두 개 생겨 총알이 두 배로 나오는 일이 없다
-    const conn = session?.mode === 'pvp' ? getConnection() : null;
+    const conn = session?.kind === 'pvp' ? getConnection() : null;
     const game = createGame(canvasRef.current, {
       onPhase: setPhase,
       session,
@@ -67,6 +67,9 @@ export default function GameCanvas({ session, onExit, onFinish }){
       <div className="wrap"><canvas ref={canvasRef} /></div>
       <button className="icon-btn top-left ui-overlay"
               onClick={() => { disconnect(); onExit(); }} aria-label="나가기">‹</button>
+      {link.self === 'noconn' && (
+        <div className="link-note ui-overlay">서버에 연결되지 않았다 · 나갔다가 다시 시작해라</div>
+      )}
       {link.self === 'reconnecting' && (
         <div className="link-note ui-overlay">연결이 끊겼다 · 다시 붙는 중…</div>
       )}
