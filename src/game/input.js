@@ -1,5 +1,5 @@
 import { NET } from './config.js';
-import { stickVector, inStickZone, clampBase, stickGeom, paletteSlots, throwSlots } from './layout.js';
+import { stickVector, inStickZone, paletteSlots, throwSlots } from './layout.js';
 import { unlockAudio } from './audio.js';
 
 // 스틱 상태와 눌린 키를 들고 있다가 루프가 매 프레임 읽어간다.
@@ -9,8 +9,7 @@ import { unlockAudio } from './audio.js';
 // opts.onPlace(k,c,r): 칸에 놓기
 // opts.cellAt(pt)    : 월드 좌표 -> {c,r} 또는 null
 export function attachInput(canvas, view, opts = {}){
-  // base = 현재 스틱 중심. 누른 자리로 옮겨가고, 원 밖으로 끌면 손가락을 따라온다
-  const stick = { on: false, id: null, nx: 0, ny: 0, base: null };
+  const stick = { on: false, id: null, nx: 0, ny: 0 };
   const keys = {};
   const drag = { on: false, id: null, k: -1, x: 0, y: 0, cell: null, from: null };
   // 투척: 누르고 있는 동안 차징, 떼면 던진다
@@ -59,8 +58,7 @@ export function attachInput(canvas, view, opts = {}){
 
     if (!inStickZone(wp, view.uiH)) return;
     stick.on = true; stick.id = e.pointerId;
-    stick.base = clampBase(wp.x, wp.y, view.uiH);   // 누른 지점을 중심으로 삼는다
-    stick.nx = 0; stick.ny = 0;
+    Object.assign(stick, stickVector(wp, view.uiH));
   };
   const onMove = e => {
     if (drag.on && e.pointerId === drag.id){
@@ -70,16 +68,11 @@ export function attachInput(canvas, view, opts = {}){
       return;
     }
     if (!stick.on || e.pointerId !== stick.id) return;
-    const wp = worldPt(e);
-    const r = stickGeom(view.uiH).r;
-    // 원 밖으로 끌면 중심이 따라와서, 계속 최대 기울기를 유지하며 방향만 바뀐다
-    const dx = wp.x - stick.base.cx, dy = wp.y - stick.base.cy;
-    const d = Math.hypot(dx, dy);
-    if (d > r){
-      const k = (d - r) / d;
-      stick.base = clampBase(stick.base.cx + dx * k, stick.base.cy + dy * k, view.uiH);
-    }
-    Object.assign(stick, stickVector(wp, view.uiH, stick.base));
+    // 브라우저가 예측한 다음 위치가 있으면 그걸 쓴다. 터치는 화면에 반영되기까지
+    // 수십 ms가 걸리는데, 이걸로 그만큼을 앞당길 수 있다
+    const pred = e.getPredictedEvents?.();
+    const src = pred && pred.length ? pred[pred.length - 1] : e;
+    Object.assign(stick, stickVector(worldPt(src), view.uiH));
   };
   const onUp = e => {
     if (charge.on && e.pointerId === charge.id){
@@ -93,7 +86,7 @@ export function attachInput(canvas, view, opts = {}){
       return;
     }
     if (e.pointerId !== stick.id) return;
-    stick.on = false; stick.id = null; stick.nx = 0; stick.ny = 0; stick.base = null;
+    stick.on = false; stick.id = null; stick.nx = 0; stick.ny = 0;
   };
   const onCtx = e => e.preventDefault();
   const onKeyDown = e => {

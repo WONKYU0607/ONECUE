@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { TUNE, VIEW } from '../game/config.js';
 
 // 디버그용 실시간 튜닝 패널. 값은 game.bump()가 시뮬 상태로 밀어넣는다
-const KEYS = ['spd', 'bul', 'rate', 'curve'];
+const KEYS = ['spd', 'bul', 'rate', 'curve', 'sat', 'rad', 'dead'];
 const HOLD_DELAY = 380;   // 길게 누르면 연속 조절
 const HOLD_STEP  = 55;
 

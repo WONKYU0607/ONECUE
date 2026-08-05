@@ -1,7 +1,8 @@
-import { W, H, TUNE, FAST, FAST_MUL } from './config.js';
+import { W, H, TUNE, FAST, FAST_MUL, HAND } from './config.js';
 
-export const STICK_DEAD = 0.14;   // 중심 근처는 무시
-export const STICK_SAT  = 0.82;   // 이 지점부터 최대 속도 (끝까지 안 밀어도 됨)
+// 감도 값은 튜닝 패널에서 실시간으로 바꾼다
+const dead = () => TUNE.dead.v;   // 중심 근처는 무시
+const sat  = () => TUNE.sat.v;    // 이 지점부터 최대 속도 (끝까지 안 밀어도 됨)
 
 // 렌더 배율. 시뮬 좌표는 그대로 두고 캔버스만 3배로 그린다
 export const RS = 3;
@@ -23,13 +24,20 @@ export function computeLayout(innerW, innerH){
 export const padRect = uiH => ({ x: 3, y: H + UI_TOP, w: W - 6, h: uiH - UI_TOP - UI_ROW });
 
 // 원형 스틱: 패드 오른쪽 끝
-// 배치 팔레트: 스틱 왼쪽에 아이콘 3개
+// 스틱 반대쪽 영역의 가운데 x
+function side(pd, total){
+  const free = pd.w - 2 * 40;                    // 스틱이 차지하는 폭을 뺀 나머지
+  const cx = HAND.left ? pd.x + pd.w - free / 2 : pd.x + free / 2;
+  return Math.max(4, Math.min(pd.x + pd.w - total - 4, cx - total / 2));
+}
+
+// 배치 팔레트: 스틱 반대쪽에 아이콘 3개
 export function paletteSlots(uiH){
   const pd = padRect(uiH);
   const n = 3, size = Math.min(pd.h - 6, 26);
   const gap = 5;
   const total = n * size + (n - 1) * gap;
-  const x0 = Math.max(4, (pd.x + (W - 6 - 2 * 36) / 2) - total / 2);   // 스틱 왼쪽 영역 가운데
+  const x0 = side(pd, total);
   const y = pd.y + (pd.h - size) / 2;
   return Array.from({ length: n }, (_, i) => ({ k: i, x: x0 + i * (size + gap), y, w: size, h: size }));
 }
@@ -39,27 +47,29 @@ export function throwSlots(uiH){
   const pd = padRect(uiH);
   const size = Math.min(pd.h - 6, 30), gap = 6;
   const total = 2 * size + gap;
-  const x0 = Math.max(4, (pd.x + (W - 6 - 2 * 36) / 2) - total / 2);
+  const x0 = side(pd, total);
   const y = pd.y + (pd.h - size) / 2;
   return [0, 1].map(i => ({ k: i, x: x0 + i * (size + gap), y, w: size, h: size }));
 }
 
 export function stickGeom(uiH){
   const pd = padRect(uiH);
-  const r = Math.min(pd.h / 2 - 2, STICK_R_MAX);
-  return { cx: W - 6 - r, cy: pd.y + pd.h / 2, r, kr: r * 0.40 };
+  const r = Math.min(pd.h / 2 - 2, TUNE.rad.v);
+  // 스틱은 한쪽에 고정한다. 손가락을 따라 움직이면 기준점이 매번 달라져 감이 안 잡힌다
+  const cx = HAND.left ? 6 + r : W - 6 - r;
+  return { cx, cy: pd.y + pd.h / 2, r, kr: r * 0.40 };
 }
 
 // 터치 지점 -> 스틱 기울기 (-1..1). base는 현재 스틱 중심(손가락을 따라다님)
 // 데드존~포화반경 구간을 0~1로 다시 편 뒤, 반응 곡선을 적용한다.
 // 곡선이 없으면 살짝만 기울여도 속도가 확 붙어 미세 조정이 안 된다.
-export function stickVector(pt, uiH, base){
-  const g = base || stickGeom(uiH);
-  const r = stickGeom(uiH).r;
+export function stickVector(pt, uiH){
+  const g = stickGeom(uiH);
+  const r = g.r;
   const nx = (pt.x - g.cx) / r, ny = (pt.y - g.cy) / r;
   const m = Math.hypot(nx, ny);
-  if (m < STICK_DEAD) return { nx: 0, ny: 0 };
-  let mag = Math.min(1, (m - STICK_DEAD) / (STICK_SAT - STICK_DEAD));
+  if (m < dead()) return { nx: 0, ny: 0 };
+  let mag = Math.min(1, (m - dead()) / Math.max(0.05, sat() - dead()));
   // 2배속이면 곡선도 두 배(상한 3.0). 속도가 빠른 만큼 중앙 근처를 더 둔감하게 해야
   // 미세 조정이 가능하다
   const curve = Math.min(3, TUNE.curve.v * (FAST.on ? FAST_MUL : 1));
@@ -72,8 +82,8 @@ export function stickVector(pt, uiH, base){
 // 원 안만 인정하면 엄지가 살짝 빗나갔을 때 조작이 아예 안 먹는다
 export function inStickZone(pt, uiH){
   const pd = padRect(uiH);
-  return pt.x >= pd.x + pd.w * 0.42 && pt.x <= pd.x + pd.w &&
-         pt.y >= pd.y && pt.y <= pd.y + pd.h;
+  if (pt.y < pd.y || pt.y > pd.y + pd.h) return false;
+  return HAND.left ? pt.x <= pd.x + pd.w * 0.58 : pt.x >= pd.x + pd.w * 0.42;
 }
 
 // 스틱 중심이 패드 밖으로 나가지 않게

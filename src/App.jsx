@@ -11,7 +11,7 @@ import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings, setSetting } from './state/settings.js';
 import { disconnect } from './net/connection.js';
 import { recordResult } from './state/progress.js';
-import { VIEW, SELF } from './game/config.js';
+import { VIEW, SELF, HAND } from './game/config.js';
 
 // 화면 전환은 여기 한 곳에서만 한다.
 // GameCanvas는 'game'일 때만 마운트되므로, 화면을 벗어나면 게임 루프·소켓이 자동으로 정리된다.
@@ -22,7 +22,11 @@ export default function App(){
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
-  useEffect(() => { VIEW.grid = getSettings().showGrid; }, []);
+  useEffect(() => {
+    const st = getSettings();
+    VIEW.grid = st.showGrid;
+    HAND.left = st.leftStick;
+  }, []);
   // 처음 온 사람에게는 진입창이 끝난 뒤 조작 안내를 한 번 띄운다
   const goHomeFirst = useCallback(() => {
     if (!getSettings().seenHelp){ setSetting('seenHelp', true); setShowHelp(true); }

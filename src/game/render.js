@@ -121,8 +121,7 @@ export function createRenderer(canvas){
     }
     ctx.textAlign = 'left';
 
-    const gg = stickGeom(uiH);
-    const g = stick.base ? { ...gg, ...stick.base } : gg;   // 잡고 있으면 그 자리에 그린다
+    const g = stickGeom(uiH);
     circle(g.cx, g.cy, g.r, 'rgba(255,255,255,0.045)', 'rgba(255,255,255,0.18)', 0.8);
     circle(g.cx, g.cy, g.r * 0.60, null, 'rgba(255,255,255,0.08)', 0.5);
     for (const [ax, ay] of [[0,-1],[0,1],[-1,0],[1,0]]){

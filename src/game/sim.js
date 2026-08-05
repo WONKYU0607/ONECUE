@@ -252,6 +252,17 @@ export function canThrow(s, slot, k){
   return (s.ammo?.[slot]?.[k] || 0) > 0;
 }
 
+// 이 위치에 서면 엄폐물과 겹치는가. 드럼통은 함정이라 막지 않는다
+// (막으면 안 보이는 상태에서 길이 막혀 위치가 드러난다)
+export function blocked(s, x, y){
+  for (const it of (s.items || [])){
+    if (it.hp <= 0 || it.k === ITEM.DRUM) continue;
+    const r = itemRect(it);
+    if (overlap(x, y, PWf, PHf, r.x, r.y, r.w, r.h)) return true;
+  }
+  return false;
+}
+
 export function step(s, inp){
   s.tick++;
 
@@ -310,9 +321,38 @@ export function step(s, inp){
         const k = cap / Math.sqrt(len2);
         dx = Math.round(dx * k); dy = Math.round(dy * k);
       }
-      p.y = Math.max(YMIN_S[i], Math.min(YMAX_S[i], p.y + dy));
+      // 축을 따로 처리해야 벽에 붙어서도 옆으로 미끄러질 수 있다.
+      // 한 번에 처리하면 벽 모서리에 닿는 순간 완전히 멈춰버린다
+      // 축을 따로 처리해야 벽에 붙어서도 옆으로 미끄러질 수 있다.
+      // 막히면 통째로 취소하지 말고 절반씩 줄여서 닿는 데까지 붙인다
+      // (한 걸음이 남은 틈보다 크면 영영 다가가지 못한다)
+      const oy = p.y, ox = p.x;
+      let ty = Math.max(YMIN_S[i], Math.min(YMAX_S[i], p.y + dy));
+      if (blocked(s, p.x, ty)){
+        let step2 = ty - oy, best = oy;
+        for (let k = 0; k < 5; k++){
+          step2 = (step2 / 2) | 0;
+          if (!step2) break;
+          const cand = best + step2;
+          if (!blocked(s, p.x, cand)) best = cand;
+        }
+        ty = best;
+      }
+      p.y = ty;
+
       const wi = wallIdx(p.y);                 // 세로 위치에 따라 좌우 한계가 달라짐
-      p.x = Math.max(WALL_L[wi], Math.min(WALL_R[wi], p.x + dx));
+      let tx = Math.max(WALL_L[wi], Math.min(WALL_R[wi], p.x + dx));
+      if (blocked(s, tx, p.y)){
+        let step3 = tx - ox, best = ox;
+        for (let k = 0; k < 5; k++){
+          step3 = (step3 / 2) | 0;
+          if (!step3) break;
+          const cand = best + step3;
+          if (!blocked(s, cand, p.y)) best = cand;
+        }
+        tx = best;
+      }
+      p.x = tx;
     }
     if (p.invul > 0) p.invul--;
     if (p.flash > 0) p.flash--;
