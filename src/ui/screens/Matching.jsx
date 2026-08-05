@@ -63,6 +63,7 @@ export default function Matching({ session, onCancel, onMatched }){
         <p className="hint note">
           무료 서버라 잠들어 있으면 깨우는 데 1분쯤 걸린다
           {tries[1] ? ` (${tries[0]}/${tries[1]})` : ''}
+          <br />30초가 넘으면 서버 주소를 브라우저로 열어 확인해봐라
         </p>
       )}
 

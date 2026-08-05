@@ -35,12 +35,17 @@ const wsUrl = (mode = 'queue', code = '') =>
   '&mode=' + mode + (code ? '&code=' + encodeURIComponent(code) : '');
 
 // 잠든 서버는 HTTP 요청으로도 깨어난다. 소켓보다 먼저 두드려 둔다.
-export async function wakeServer(){
+// 시간 제한이 없으면 잠든 서버가 요청을 붙잡고 있는 동안 화면이 멈춘 것처럼 보인다.
+export async function wakeServer(timeoutMs = 9000){
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const res = await fetch(HTTP_URL + '/health', { cache: 'no-store' });
+    const res = await fetch(HTTP_URL + '/health', { cache: 'no-store', signal: ac.signal });
     return res.ok ? await res.json() : null;
   } catch {
-    return null;
+    return null;                     // 실패해도 소켓 쪽에서 다시 시도한다
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -59,8 +64,16 @@ function openOnce(transport){
 // 접속해서 상대가 들어올 때까지 기다린다. onStage로 진행 상황을 알린다.
 // mode: 'queue'(랜덤) | 'create'(방 만들기) | 'join'(코드 입장)
 export async function connectAndWait({ onStage, onCode, mode = 'queue', code = '' } = {}){
-  onStage?.('waking');
-  await wakeServer();                       // 실패해도 그냥 진행 (소켓이 깨울 수도 있으므로)
+  // 깨우기를 여러 번 두드린다. 한 번에 응답이 없어도 화면이 멈추지 않게 진행 상황을 알린다
+  let health = null;
+  for (let i = 0; i < 4 && !health; i++){
+    onStage?.('waking', i + 1, 4);
+    health = await wakeServer();
+  }
+  // 서버가 살아 있는데 버전이 다르면 소켓을 열어봐야 소용없다. 여기서 바로 알린다
+  if (health && (health.ver || 0) !== PROTO_VER){
+    throw new Error(`서버 버전이 다르다 (서버 ${health.ver || '없음'} / 앱 ${PROTO_VER}) — 서버 재배포 필요`);
+  }
 
   let transport = null;
   for (let i = 0; i < TRIES; i++){

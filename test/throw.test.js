@@ -1,7 +1,7 @@
 import { newState, step, throwCol, throwRow, canThrow } from '../src/game/sim.js';
 import {
   FP, THROW, THROW_DEF, PH_PLAY, PH_READY, CD_TICKS, FLY_TICKS, FUSE_TICKS,
-  BLIND_TICKS, NADE_DAMAGE, NADE_RADIUS, GRID_MIDROW, GRID_ROWS, GRID_COLS,
+  BLIND_TICKS, NADE_DAMAGE, NADE_RADIUS, FLASH_RADIUS, GRID_MIDROW, GRID_ROWS, GRID_COLS,
   cellOwner, MAXHP, cellX, cellY, GRID_CW, GRID_CH
 } from '../src/game/config.js';
 import { assert } from './harness.js';
@@ -100,19 +100,34 @@ console.log('수류탄 피해와 범위');
   assert(hit(NADE_RADIUS + 2) === 0, '범위 밖은 피해 없음');
 }
 
-console.log('섬광탄');
+console.log('섬광탄은 3x3 안에 있어야 맞는다');
 {
-  const s = play();
-  step(s, IN({ thr: { k: THROW.FLASH, ch: 50 } }, {}));
-  for (let i = 0; i < FLY_TICKS; i++){ keep(s); step(s, IN({}, {})); }
-  assert(s.blind[1] > 0 && s.blind[0] === 0, '맞은 쪽만 눈이 먼다');
-  assert(s.blind[1] >= BLIND_TICKS - 2, `지속 ${BLIND_TICKS}틱`);
-  assert(s.proj.length === 0, '섬광탄은 착탄 즉시 사라짐');
-  const hp = s.p[1].hp;
-  for (let i = 0; i < 30; i++){ s.p[0].hp = MAXHP; step(s, IN({}, {})); }
-  assert(s.p[1].hp === hp || true, '섬광탄 자체 피해는 없음(총알 피해는 별개)');
+  const flash = off => {
+    const s = play();
+    const r = throwRow(0, 50 / 100);
+    s.p[0].x = Math.round((cellX(3) + (GRID_CW - 14) / 2) * FP);
+    s.p[1].x = Math.round((cellX(3 + off) + (GRID_CW - 14) / 2) * FP);
+    s.p[1].y = Math.round(cellY(r) * FP);
+    step(s, IN({ thr: { k: THROW.FLASH, ch: 50 } }, {}));
+    for (let i = 0; i < FLY_TICKS + 2; i++){ keep(s); step(s, IN({}, {})); }
+    return s;
+  };
+  const near = flash(0);
+  assert(near.blind[1] > 0 && near.blind[0] === 0, '범위 안이면 맞은 쪽만 눈이 먼다');
+  assert(near.blind[1] >= BLIND_TICKS - 4, `지속 ${BLIND_TICKS}틱 (남은 ${near.blind[1]})`);
+  assert(near.fx.some(f => f.k === 1), '섬광 연출 생성');
+  assert(near.proj.length === 0, '섬광탄은 착탄 즉시 사라짐');
+
+  const edge = flash(FLASH_RADIUS);
+  assert(edge.blind[1] > 0, `${FLASH_RADIUS}칸 옆도 맞는다`);
+
+  const far = flash(FLASH_RADIUS + 2);
+  assert(far.blind[1] === 0, '범위 밖이면 안 맞는다');
+  assert(far.fx.some(f => f.k === 1), '안 맞아도 연출은 뜬다');
+
   let n = 0;
-  while (s.blind[1] > 0 && n < 300){ keep(s); step(s, IN({}, {})); n++; }
+  const s2 = near;
+  while (s2.blind[1] > 0 && n < 300){ keep(s2); step(s2, IN({}, {})); n++; }
   assert(n <= BLIND_TICKS + 1, `${(BLIND_TICKS/60).toFixed(1)}초 뒤 풀림 (${n}틱)`);
 }
 console.log('throw.test.js 통과');

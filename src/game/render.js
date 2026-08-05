@@ -3,7 +3,7 @@ import {
   GRID_COLS, GRID_ROWS, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO,
   ITEM, ITEM_DEF, cellOwner, DRUM_RADIUS, EXPLO_TICKS,
-  THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
+  THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
 } from './config.js';
 import { RS, computeLayout, stickGeom } from './layout.js';
 import { getImage, isReady } from './assets.js';
@@ -27,6 +27,7 @@ export function createRenderer(canvas){
   const ctx = canvas.getContext('2d');
   const bg = getImage('arena'), sheet = getImage('characters'), items = getImage('items');
   const boom = getImage('explosion');
+  const flashfx = getImage('flashfx');
   const throwImg = [getImage('grenade'), getImage('flash')];
 
   let uiH = 86, totalH = H + uiH, scale = 1;
@@ -62,11 +63,13 @@ export function createRenderer(canvas){
     }
     px(x + 5, y + 7, 4, 4, '#ffffff');
   }
-  function drawPlayer(p, i, xOverride, yOverride){
+  function drawPlayer(p, i, xOverride, yOverride, blind = 0, tick = 0){
     if (p.invul > 0 && (p.invul >> 2) % 2 === 0) return;
     const xw = (xOverride === undefined ? p.x : xOverride) / FP;
     const yw = fy((yOverride === undefined ? p.y : yOverride) / FP, 16);
-    const hit = p.flash > 0;
+    // 섬광에 당한 캐릭터는 지속 시간 내내 흰색으로 깜빡인다 (상대도 맞았는지 알 수 있게)
+    const dazzled = blind > 0 && Math.floor(tick / 5) % 2 === 0;
+    const hit = p.flash > 0 || dazzled;
     if (isReady(sheet)){
       // 프레임 순서: [팀0앞, 팀0뒤, 팀1앞, 팀1뒤, ...] + 8부터 피격(흰색) 버전
       const idx = (hit ? 8 : 0) + TEAM_OF[i] * 2 + (i === SELF.slot ? 1 : 0);
@@ -149,11 +152,15 @@ export function createRenderer(canvas){
   // 폭발 연출: 피해 범위(3x3)의 칸마다 하나씩 터진다.
   // 가운데에 큰 것 하나만 그리면 버섯구름이 위로만 솟아 아래쪽 칸이 비어 보인다.
   function drawFx(s){
-    if (!isReady(boom) || !s.fx || !s.fx.length) return;
-    const ratio = boom.naturalHeight / boom.naturalWidth;
+    if (!s.fx || !s.fx.length) return;
     for (const f of s.fx){
-      for (let dr = -DRUM_RADIUS; dr <= DRUM_RADIUS; dr++){
-        for (let dc = -DRUM_RADIUS; dc <= DRUM_RADIUS; dc++){
+      const isFlash = (f.k || 0) === 1;
+      const img = isFlash ? flashfx : boom;
+      if (!isReady(img)) continue;
+      const ratio = img.naturalHeight / img.naturalWidth;
+      const rad = isFlash ? FLASH_RADIUS : DRUM_RADIUS;
+      for (let dr = -rad; dr <= rad; dr++){
+        for (let dc = -rad; dc <= rad; dc++){
           const c = f.c + dc, r = f.r + dr;
           if (c < 0 || c >= GRID_COLS || r < 0 || r >= GRID_ROWS) continue;
 
@@ -164,15 +171,18 @@ export function createRenderer(canvas){
           const k = Math.min(1, age / (EXPLO_TICKS - delay));
 
           const center = dc === 0 && dr === 0;
-          const scale = (center ? 1.15 : 0.9) * (0.7 + k * 0.45);
+          // 섬광은 폭발보다 균일하게, 살짝 크게 퍼진다
+          const base = isFlash ? (center ? 1.25 : 1.1) : (center ? 1.15 : 0.9);
+          const scale = base * (0.7 + k * 0.45);
           const w = GRID_CW * scale, h = w * ratio;
           const box = cellBox(c, r);
           const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
 
           ctx.globalAlpha = (k < 0.6 ? 1 : Math.max(0, 1 - (k - 0.6) / 0.4)) * (center ? 1 : 0.9);
-          ctx.drawImage(boom,
+          ctx.drawImage(img,
             Math.round((cx - w / 2) * RS),
-            Math.round((cy - h * 0.62) * RS),      // 불꽃 밑동이 칸 중앙에 오도록
+            // 폭발은 불꽃 밑동이, 섬광은 한가운데가 칸 중앙에 오게
+            Math.round((cy - h * (isFlash ? 0.5 : 0.62)) * RS),
             Math.round(w * RS), Math.round(h * RS));
           ctx.globalAlpha = 1;
         }
@@ -336,7 +346,7 @@ export function createRenderer(canvas){
       px(c.x/FP, cy2, c.w/FP, 2, '#7676a0');
     }
     for (const b of s.bullets) px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5, TEAMS[TEAM_OF[b.o]].m);
-    for (let i = 0; i < 2; i++) drawPlayer(s.p[i], i, cl.rx[i], cl.ry[i]);
+    for (let i = 0; i < 2; i++) drawPlayer(s.p[i], i, cl.rx[i], cl.ry[i], (s.blind || [0,0])[i], s.tick);
     drawProjectiles(s, a);
     drawFx(s);
     drawBlind(s, extra.softFlash);

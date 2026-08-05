@@ -16,6 +16,7 @@ import {
   DRUM_RADIUS,
   EXPLO_TICKS,
   EXTRAP_MAX,
+  FLASH_RADIUS,
   FLASH_T,
   FLY_TICKS,
   FP,
@@ -190,7 +191,7 @@ export function blast(s, c, r, rad, dmg){
       if (p.hp <= 0){ s.over = true; s.phase = PH_OVER; s.winner = i === 0 ? 2 : 1; }
     }
   }
-  s.fx.push({ c, r, t: EXPLO_TICKS });
+  s.fx.push({ c, r, t: EXPLO_TICKS, k: 0 });   // k=0: 폭발
 }
 
 function explode(s, it){
@@ -228,8 +229,8 @@ export function step(s, inp){
       }
       if (q.ready) s.ready[i] = true;
     }
-    // 둘 다 설치를 끝냈을 때만 시작할 수 있다
-    if ((inp[0].fire || inp[1].fire) && s.ready[0] && s.ready[1]){
+    // 둘 다 설치를 끝내면 바로 시작한다 (START 버튼 없음)
+    if (s.ready[0] && s.ready[1]){
       s.phase = PH_COUNT; s.timer = CD_TICKS;
     }
     return;
@@ -294,7 +295,16 @@ export function step(s, inp){
     if (pr.t > 0){
       if (--pr.t === 0 && pr.k === THROW.NADE) pr.fuse = FUSE_TICKS;
       if (pr.t === 0 && pr.k === THROW.FLASH){
-        s.blind[1 - pr.by] = BLIND_TICKS;       // 맞은 쪽이 상대 진영을 못 봄
+        // 3x3 안에 있어야 맞는다 (수류탄과 같은 범위 판정)
+        const x0 = Math.round(cellX(pr.c - FLASH_RADIUS) * FP);
+        const x1 = Math.round(cellX(pr.c + FLASH_RADIUS + 1) * FP);
+        const y0 = Math.round(cellY(pr.r1 - FLASH_RADIUS) * FP);
+        const y1 = Math.round(cellY(pr.r1 + FLASH_RADIUS + 1) * FP);
+        const v = 1 - pr.by;
+        if (overlap(s.p[v].x, s.p[v].y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)){
+          s.blind[v] = BLIND_TICKS;             // 맞은 쪽이 상대 진영을 못 봄
+        }
+        s.fx.push({ c: pr.c, r: pr.r1, t: EXPLO_TICKS, k: 1 });   // k=1: 섬광 연출
         s.proj.splice(i, 1);
       }
       continue;
@@ -376,7 +386,7 @@ export function checksum(s){
   for (const c of s.covers) h = (h*31 + c.hp) | 0;
   for (const it of s.items) h = (h*31 + it.k*7 + it.c*13 + it.r*29 + it.hp*3 + it.by) | 0;
   h = (h*31 + (s.ready[0] ? 1 : 0) + (s.ready[1] ? 2 : 0)) | 0;
-  for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t) | 0;
+  for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;
   h = (h*31 + s.blind[0] + s.blind[1]*3 + s.ammo[0][0]*7 + s.ammo[0][1]*11 + s.ammo[1][0]*13 + s.ammo[1][1]*17) | 0;
   return h | 0;

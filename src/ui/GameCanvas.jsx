@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createGame } from '../game/game.js';
-import { PH_READY, PH_OVER } from '../game/config.js';
+import { PH_READY } from '../game/config.js';
 import TunePanel from './TunePanel.jsx';
 import { getConnection, disconnect } from '../net/connection.js';
 import { getSettings } from '../state/settings.js';
@@ -57,7 +57,6 @@ export default function GameCanvas({ session, onExit, onFinish }){
   }, [session, onFinish]);
 
   const placing = phase === PH_READY;
-  const showStart = (placing && ready.me && ready.peer) || phase === PH_OVER;
 
   return (
     <div className="game-root">
@@ -83,11 +82,8 @@ export default function GameCanvas({ session, onExit, onFinish }){
       {placing && ready.me && !ready.peer && (
         <div className="link-note ui-overlay">상대가 설치하는 중…</div>
       )}
-      {showStart && (
-        <button className="panelbtn start ui-overlay" style={boxStyle}
-                onClick={() => gameRef.current?.start()}>
-          START
-        </button>
+      {placing && ready.me && ready.peer && (
+        <div className="link-note ui-overlay">곧 시작한다…</div>
       )}
       <TunePanel gameRef={gameRef} />
     </div>

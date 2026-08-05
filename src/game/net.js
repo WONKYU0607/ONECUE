@@ -16,6 +16,7 @@ import {
   DRUM_RADIUS,
   EXPLO_TICKS,
   EXTRAP_MAX,
+  FLASH_RADIUS,
   FLASH_T,
   FLY_TICKS,
   FP,

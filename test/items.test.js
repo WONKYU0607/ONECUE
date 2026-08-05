@@ -29,17 +29,16 @@ console.log('배치 규칙');
   assert(canPlace(s, 0, ITEM.BARR, 3, myRow(0)), '다른 칸에는 바리케이트 가능');
 }
 
-console.log('설치 완료 전에는 시작 못 함');
+console.log('양쪽 설치 완료로 자동 시작');
 {
   const s = newState();
-  step(s, IN({ fire: 1 }, { fire: 1 }));
-  assert(s.phase === PH_READY, '둘 다 준비 전이면 START 무시');
+  step(s, IN({}, {}));
+  assert(s.phase === PH_READY, '아무도 준비 안 하면 대기');
   step(s, IN({ ready: 1 }, {}));
-  step(s, IN({ fire: 1 }, {}));
-  assert(s.phase === PH_READY, '한쪽만 준비돼도 시작 안 됨');
+  step(s, IN({}, {}));
+  assert(s.phase === PH_READY, '한쪽만 준비하면 시작 안 됨');
   step(s, IN({}, { ready: 1 }));
-  step(s, IN({ fire: 1 }, {}));
-  assert(s.phase !== PH_READY, '양쪽 준비 후 START로 진행');
+  assert(s.phase !== PH_READY, '양쪽 준비되면 버튼 없이 자동 시작');
 }
 
 console.log('벽이 총알을 막는가');

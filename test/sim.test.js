@@ -6,10 +6,14 @@ import {
 import { assert } from './harness.js';
 
 // 배치 단계가 생겨서 시작하려면 양쪽 다 '설치 완료'가 필요하다
-const IN = (f0 = 0, f1 = 0) => [{ dx:0, dy:0, fire:f0, ready:1, place:null },
-                                { dx:0, dy:0, fire:f1, ready:1, place:null }];
-const P  = (dx, dy) => [{ dx:Math.round(dx*FP), dy:Math.round(dy*FP), fire:0, ready:1, place:null },
-                        { dx:Math.round(dx*FP), dy:Math.round(dy*FP), fire:0, ready:1, place:null }];
+// 시작은 양쪽 '설치 완료'로 자동. fire 인자를 주면 둘 다 준비된 것으로 본다
+const IN = (f0 = 0, f1 = 0) => {
+  const r = (f0 || f1) ? 1 : 0;
+  return [{ dx:0, dy:0, fire:f0, ready:r, place:null, thr:null },
+          { dx:0, dy:0, fire:f1, ready:r, place:null, thr:null }];
+};
+const P  = (dx, dy) => [{ dx:Math.round(dx*FP), dy:Math.round(dy*FP), fire:0, ready:0, place:null, thr:null },
+                        { dx:Math.round(dx*FP), dy:Math.round(dy*FP), fire:0, ready:0, place:null, thr:null }];
 const keep = t => { t.p[0].hp = t.p[1].hp = 9; t.bullets.length = 0; t.phase = PH_PLAY; t.over = false; };
 
 console.log('페이즈 전이');

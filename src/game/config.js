@@ -92,6 +92,7 @@ export const FLY_TICKS  = 36;         // 날아가는 시간 (0.6초)
 export const FUSE_TICKS = 30;         // 착탄 후 폭발까지 (0.5초)
 export const NADE_RADIUS = 1;         // 폭발 범위: 주변 한 칸
 export const NADE_DAMAGE = 2;
+export const FLASH_RADIUS = 1;        // 섬광탄도 3x3 안에 있어야 맞는다
 export const BLIND_TICKS = 108;       // 섬광 지속 (1.8초)
 export const BLIND_FULL  = 18;        // 이 구간은 완전히 하얗게
 

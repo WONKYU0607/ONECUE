@@ -6,7 +6,8 @@ export const ASSET_SRC = {
   items:      'assets/items.webp',
   explosion:  'assets/explosion.webp',
   grenade:    'assets/grenade.webp',
-  flash:      'assets/flash.webp'
+  flash:      'assets/flash.webp',
+  flashfx:    'assets/flashfx.webp'
 };
 
 const cache = {};

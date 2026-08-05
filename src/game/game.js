@@ -76,7 +76,7 @@ export function createGame(canvas, opts = {}){
     canPlaceNow: () => client.pred.phase === PH_READY,
     leftCount,
     cellAt,
-    onPlace: (k, c, r) => client.place(SELF.slot, k, c, r),
+    onPlace: (k, c, r) => { pendPlace = { k, c, r, until: performance.now() + 4000 }; client.place(SELF.slot, k, c, r); nextPlaceAt = performance.now() + 350; },
     canThrowNow: () => client.pred.phase === PH_PLAY,
     ammo: ammoLeft,
     onThrow: (k, ch) => { if (canThrow(client.pred, SELF.slot, k)) client.throwItem(SELF.slot, k, ch); }
@@ -92,6 +92,10 @@ export function createGame(canvas, opts = {}){
   applyCfg();
 
   let raf = 0, running = true, lastNow = performance.now(), lastPhase = -1;
+  // 준비·배치 신호는 한 번만 보내면 지연으로 유실될 수 있다(서버가 마감 지난 입력을 버림).
+  // 확정 상태에 반영될 때까지 다시 보낸다.
+  let wantReady = false, nextReadyAt = 0;
+  let pendPlace = null, nextPlaceAt = 0;
 
   function loop(){
     if (!running) return;
@@ -134,6 +138,21 @@ export function createGame(canvas, opts = {}){
       const a = ai.think(client.pred, aiSlot, dt, now);
       if (a.vx || a.vy) client.input(aiSlot, a.vx * sp * dt, a.vy * sp * dt, 0);
       if (a.thr && canThrow(client.pred, aiSlot, a.thr.k)) client.throwItem(aiSlot, a.thr.k, a.thr.ch);
+    }
+
+    // 유실 대비 재전송
+    if (wantReady){
+      if (client.s.ready?.[SELF.slot]) wantReady = false;
+      else if (now >= nextReadyAt){ client.setReady(SELF.slot); nextReadyAt = now + 250; }
+    }
+    if (pendPlace){
+      const done = (client.s.items || []).some(
+        it => it.by === SELF.slot && it.k === pendPlace.k && it.c === pendPlace.c && it.r === pendPlace.r);
+      if (done || now > pendPlace.until) pendPlace = null;
+      else if (now >= nextPlaceAt){
+        client.place(SELF.slot, pendPlace.k, pendPlace.c, pendPlace.r);
+        nextPlaceAt = now + 350;
+      }
     }
 
     client.ping(now);
@@ -184,7 +203,7 @@ export function createGame(canvas, opts = {}){
         height: Math.max(18, (bottom - top) * k)
       };
     },
-    ready(){ client.setReady(SELF.slot); },
+    ready(){ wantReady = true; nextReadyAt = 0; client.setReady(SELF.slot); },
     isReady(){ return !!(client.pred.ready || [])[SELF.slot]; },
     peerReady(){ return !!(client.pred.ready || [])[1 - SELF.slot]; },
     applyCfg,
