@@ -20,7 +20,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
     if (phase !== PH_READY){ setReady({ me: false, peer: false }); return; }
     const iv = setInterval(() => {
       const g = gameRef.current; if (!g) return;
-      setReady({ me: g.isReady(), peer: g.peerReady() });
+      setReady({ me: g.isReady(), peer: g.peerReady(), srv: g.confirmedReady() });
     }, 200);
     return () => clearInterval(iv);
   }, [phase]);
@@ -80,7 +80,14 @@ export default function GameCanvas({ session, onExit, onFinish }){
         </button>
       )}
       {placing && ready.me && !ready.peer && (
-        <div className="link-note ui-overlay">상대가 설치하는 중…</div>
+        <div className="link-note ui-overlay">
+          상대가 설치하는 중…
+          {ready.srv && (
+            <span className="sub">
+              서버 확정 · 나 {ready.srv.me ? 'O' : 'X'} / 상대 {ready.srv.peer ? 'O' : 'X'}
+            </span>
+          )}
+        </div>
       )}
       {placing && ready.me && ready.peer && (
         <div className="link-note ui-overlay">곧 시작한다…</div>

@@ -205,6 +205,11 @@ export function createGame(canvas, opts = {}){
     },
     ready(){ wantReady = true; nextReadyAt = 0; client.setReady(SELF.slot); },
     isReady(){ return !!(client.pred.ready || [])[SELF.slot]; },
+    // 서버가 실제로 확정한 준비 상태 (예측이 아닌 것). 문제 진단용
+    confirmedReady(){
+      const r = client.s.ready || [];
+      return { me: !!r[SELF.slot], peer: !!r[1 - SELF.slot], tick: client.s.tick, drops: client.desync };
+    },
     peerReady(){ return !!(client.pred.ready || [])[1 - SELF.slot]; },
     applyCfg,
     // 튜닝값 한 칸 조절 (UI 버튼용)

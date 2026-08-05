@@ -109,3 +109,4 @@ font:20px/1 monospace;letter-spacing:6px;text-align:center;padding:0 8px}
 .roomcode{display:flex;flex-direction:column;align-items:center;gap:6px;margin:6px 0}
 .roomcode .lbl{font-size:11px;color:#7a7a95;letter-spacing:2px}
 .roomcode strong{font:bold 40px monospace;letter-spacing:10px;color:#8fd8ff}
+.link-note .sub{display:block;margin-top:4px;font-size:10px;color:#9a9ab0;letter-spacing:0}
