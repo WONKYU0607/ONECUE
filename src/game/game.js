@@ -6,7 +6,7 @@ import { Loopback, Server, Client } from './net.js';
 import { createRenderer } from './render.js';
 import { attachInput } from './input.js';
 import { createAI } from './ai.js';
-import { canPlace, canThrow } from './sim.js';
+import { canPlace, canThrow, allPlaced, myItemAt } from './sim.js';
 import {
   ITEM, ITEM_DEF, PH_READY, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
   GRID_X0, GRID_Y0, H, cellOwner
@@ -33,6 +33,13 @@ export function createGame(canvas, opts = {}){
   // 온라인이면 내 슬롯만, 로컬(AI·디버그)이면 둘 다 이 클라가 입력을 넣는다
   const client = new Client(net, online ? [SELF.slot] : [0, 1]);
   const ai = (!online && session.kind === 'ai') ? createAI(session.stage || 1) : null;
+  const practice = !online && session.kind === 'practice';
+  if (practice){
+    // 상대도 총알도 승패도 없다. 이동·배치·투척만 자유롭게 해보는 모드
+    if (server) server.s.solo = true;
+    client.s.solo = true;
+    client.pred.solo = true;
+  }
   const aiSlot = 1 - SELF.slot;
   let aiPlaced = false;
   // 재접속하면 옛 프레임을 버리고 서버 스냅샷으로 다시 맞춘다
@@ -63,14 +70,27 @@ export function createGame(canvas, opts = {}){
     return Math.max(0, ITEM_DEF[k].quota - used);
   };
   // 화면 좌표 -> 놓을 수 있는 칸 (슬롯1이면 세로가 뒤집혀 있으므로 되돌린다)
-  const okCell = (k, c, r) => canPlace(client.pred, SELF.slot, k, c, r);
-  const cellAt = (wp, k) => {
+  const okCell = (k, c, r, from) => canPlace(client.pred, SELF.slot, k, c, r, from);
+  // 격자 위의 내 아이템을 집어서 옮길 수 있게 한다
+  const pickAt = wp => {
+    if (client.pred.phase !== PH_READY) return null;
+    const cell = rawCell(wp);
+    if (!cell) return null;
+    const it = myItemAt(client.pred, SELF.slot, cell.c, cell.r);
+    return it ? { k: it.k, from: { c: it.c, r: it.r } } : null;
+  };
+  const rawCell = wp => {
     const c = Math.floor((wp.x - GRID_X0) / GRID_CW);
     let yTop = wp.y;
     if (SELF.slot === 1) yTop = H - wp.y;
     const r = Math.floor((yTop - GRID_Y0) / GRID_CH);
     if (c < 0 || c >= GRID_COLS || r < 0 || r >= GRID_ROWS) return null;
-    return okCell(k, c, r) ? { c, r } : null;
+    return { c, r };
+  };
+  const cellAt = (wp, k, from) => {
+    const cell = rawCell(wp);
+    if (!cell) return null;
+    return okCell(k, cell.c, cell.r, from) ? cell : null;
   };
 
   const ammoLeft = k => (client.pred.ammo?.[SELF.slot]?.[k] ?? 0);
@@ -79,7 +99,12 @@ export function createGame(canvas, opts = {}){
     canPlaceNow: () => client.pred.phase === PH_READY,
     leftCount,
     cellAt,
-    onPlace: (k, c, r) => { pendPlace = { k, c, r, until: performance.now() + 4000 }; client.place(SELF.slot, k, c, r); nextPlaceAt = performance.now() + 350; },
+    pickAt,
+    onPlace: (k, c, r, from) => {
+      pendPlace = { k, c, r, from, until: performance.now() + 4000 };
+      client.place(SELF.slot, k, c, r, from);
+      nextPlaceAt = performance.now() + 350;
+    },
     canThrowNow: () => client.pred.phase === PH_PLAY,
     ammo: ammoLeft,
     onThrow: (k, ch) => { if (canThrow(client.pred, SELF.slot, k)) client.throwItem(SELF.slot, k, ch); }
@@ -122,6 +147,11 @@ export function createGame(canvas, opts = {}){
     const fvy = SELF.slot === 1 ? -vy : vy;   // 화면이 뒤집힌 쪽은 세로 입력도 반전
     if (vx || vy) client.input(SELF.slot, vx * sp * dt, fvy * sp * dt, 0);
 
+    // 연습 모드는 상대를 기다릴 필요가 없다
+    if (practice && client.pred.phase === PH_READY && !client.pred.ready[1 - SELF.slot]){
+      client.setReady(1 - SELF.slot);
+    }
+
     // AI도 배치 단계를 거친다
     if (ai && client.pred.phase === PH_READY && !aiPlaced){
       aiPlaced = true;
@@ -153,7 +183,7 @@ export function createGame(canvas, opts = {}){
         it => it.by === SELF.slot && it.k === pendPlace.k && it.c === pendPlace.c && it.r === pendPlace.r);
       if (done || now > pendPlace.until) pendPlace = null;
       else if (now >= nextPlaceAt){
-        client.place(SELF.slot, pendPlace.k, pendPlace.c, pendPlace.r);
+        client.place(SELF.slot, pendPlace.k, pendPlace.c, pendPlace.r, pendPlace.from);
         nextPlaceAt = now + 350;
       }
     }
@@ -190,6 +220,7 @@ export function createGame(canvas, opts = {}){
   return {
     server, client, session, ai,
     leftCount, ammoLeft,
+    allPlaced(){ return allPlaced(client.pred, SELF.slot); },
     // 아이템 칸 바로 위 여백의 화면 좌표. 버튼을 여기에 얹는다
     // (화면 절대 위치로 두면 기기마다 패널 높이가 달라 어긋난다)
     uiBox(){

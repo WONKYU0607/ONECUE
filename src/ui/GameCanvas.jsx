@@ -22,7 +22,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
       const g = gameRef.current; if (!g) return;
       const info = getRoomInfo();
       setReady({
-        me: g.isReady(), peer: g.peerReady(), srv: g.confirmedReady(),
+        me: g.isReady(), peer: g.peerReady(), srv: g.confirmedReady(), all: g.allPlaced(),
         room: info ? info.room : null, slot: g.mySlot(), net: g.netStats()
       });
     }, 200);
@@ -81,9 +81,10 @@ export default function GameCanvas({ session, onExit, onFinish }){
       )}
 
       {placing && !ready.me && (
-        <button className="panelbtn place ui-overlay" style={boxStyle}
+        <button className={'panelbtn place ui-overlay' + (ready.all ? '' : ' off')} style={boxStyle}
+                disabled={!ready.all}
                 onClick={() => gameRef.current?.ready()}>
-          설치 완료
+          {ready.all ? '설치 완료' : '아이템을 모두 배치'}
         </button>
       )}
       {placing && ready.me && !ready.peer && (
@@ -108,6 +109,9 @@ export default function GameCanvas({ session, onExit, onFinish }){
       )}
       {placing && ready.me && ready.peer && (
         <div className="link-note ui-overlay">곧 시작한다…</div>
+      )}
+      {placing && !ready.me && ready.peer && (
+        <div className="link-note ui-overlay">상대 설치 완료 · 나를 기다리는 중</div>
       )}
       <TunePanel gameRef={gameRef} />
     </div>

@@ -87,9 +87,22 @@ export function createRenderer(canvas){
     const BW = 62, BH = 5, BY = H + 4.5;
     const bar = (x, hp, team, rightAlign) => {
       px(x, BY, BW, BH, 'rgba(255,255,255,0.10)');
+      const pct = Math.max(0, Math.round(hp / MAXHP * 100));
       const w = BW * Math.max(0, hp) / MAXHP;
       px(rightAlign ? x + BW - w : x, BY, w, BH, TEAMS[team].m);
       for (let i = 1; i < HP_MARKS; i++) px(x + BW * i / HP_MARKS, BY, 0.4, BH, 'rgba(13,13,22,0.85)');
+      // 남은 체력을 숫자로도 보여준다. 막대 위에 얹되 어두운 테두리로 대비를 준다
+      ctx.font = 'bold ' + (5 * RS) + 'px monospace';
+      ctx.textAlign = rightAlign ? 'left' : 'right';
+      ctx.textBaseline = 'middle';
+      const tx = (rightAlign ? x + 2.5 : x + BW - 2.5) * RS;
+      const ty = (BY + BH / 2 + 0.2) * RS;
+      ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(8,8,14,0.9)';
+      ctx.strokeText(pct + '%', tx, ty);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(pct + '%', tx, ty);
+      ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'left';
     };
     bar(4, s.p[my].hp, TEAM_OF[my], false);
     bar(W - 4 - BW, s.p[op].hp, TEAM_OF[op], true);
@@ -139,11 +152,16 @@ export function createRenderer(canvas){
       const def = ITEM_DEF[it.k];
       const f = ITEM_FRAME[def.key];
       const box = cellBox(it.c, it.r, def.cells);
+      // 옮기는 중인 아이템은 원래 자리에서 흐리게 보여준다
+      const moving = s.moveFrom && it.by === SELF.slot && it.k === s.moveFrom.k &&
+                     it.c === s.moveFrom.c && it.r === s.moveFrom.r;
+      ctx.globalAlpha = moving ? 0.3 : 1;
       const dw = f.w / RS, dh = f.h / RS;
       const dx = box.x + (box.w - dw) / 2;          // 칸 가로 중앙
       const dy = box.y + box.h - dh;               // 칸 아래 정렬
       ctx.drawImage(items, f.x, f.y, f.w, f.h,
                     Math.round(dx * RS), Math.round(dy * RS), f.w, f.h);
+      ctx.globalAlpha = 1;
       // 남은 내구도
       if (def.hp > 1){
         const ratio = it.hp / def.hp;
@@ -276,7 +294,7 @@ export function createRenderer(canvas){
     for (let r = 0; r < GRID_ROWS; r++){
       for (let c = 0; c < GRID_COLS; c++){
         // 끌고 있을 땐 실제 배치 규칙으로 판정한다 (드럼통 중앙선 금지 등)
-        const usable = k < 0 ? cellOwner(r) === SELF.slot : (ok ? ok(k, c, r) : false);
+        const usable = k < 0 ? cellOwner(r) === SELF.slot : (ok ? ok(k, c, r, drag.from) : false);
         if (!usable) continue;
         const box = cellBox(c, r);
         px(box.x + 0.6, box.y + 0.6, box.w - 1.2, box.h - 1.2,
@@ -341,6 +359,7 @@ export function createRenderer(canvas){
     }
     px(8, H/2 - 1, W - 16, 2, '#ffffff');            // 진영 경계 (정확히 절반)
     drawPlacing(s, cl, drag, ok);
+    s.moveFrom = (drag && drag.on && drag.from) ? { ...drag.from, k: drag.k } : null;
     drawItems(s);
     for (const c of (s.covers || [])){
       if (c.hp <= 0) continue;

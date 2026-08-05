@@ -4,7 +4,7 @@ import { spawn } from 'child_process';
 import wsPkg from '../server/node_modules/ws/index.js';
 const { WebSocket } = wsPkg;
 import { Client } from '../src/game/net.js';
-import { SELF, PH_PLAY, PH_COUNT, stepCap, bulletFP, coolTicks, PROTO_VER } from '../src/game/config.js';
+import { SELF, PH_PLAY, PH_COUNT, stepCap, bulletFP, coolTicks, PROTO_VER, ITEM, GRID_ROWS, cellOwner } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 const PORT = 8123;
@@ -66,8 +66,18 @@ assert(ca.rtt >= 0 && cb.rtt >= 0, `RTT 측정됨 (${ca.rtt.toFixed(1)}ms / ${cb
 assert(!A.msgs.some(m => m.t === 'q' && m.pid === 1), 'A는 B의 핑 응답을 받지 않음');
 
 // 한쪽이 START를 누르면 양쪽 다 시작
+// 아이템을 전부 놓아야 설치 완료가 된다
+const mineRow = slot => { for (let r = GRID_ROWS - 1; r >= 0; r--) if (cellOwner(r) === slot) return r; };
+const foeRow2 = slot => { for (let r = 0; r < GRID_ROWS; r++) if (cellOwner(r) !== slot) return r + 1; };
+for (const [c, slot] of [[ca, 0], [cb, 1]]){
+  c.place(slot, ITEM.WALL, 0, mineRow(slot)); await sleep(120);
+  c.place(slot, ITEM.BARR, 1, mineRow(slot)); await sleep(120);
+  c.place(slot, ITEM.DRUM, 0, foeRow2(slot)); await sleep(120);
+  c.place(slot, ITEM.DRUM, 2, foeRow2(slot)); await sleep(120);
+}
+await sleep(400);
 ca.setReady(0); cb.setReady(1);
-await sleep(300);
+await sleep(400);
 ca.input(0, 0, 0, 1);
 await sleep(500);
 assert(ca.s.phase === PH_COUNT && cb.s.phase === PH_COUNT,

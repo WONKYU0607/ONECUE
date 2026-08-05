@@ -30,6 +30,11 @@ export default function App(){
     setSession({ kind: 'pvp', ...opt });      // opt: {mode:'queue'|'create'|'join', code}
     setScreen('matching');
   }, []);
+  const startPractice = useCallback(() => {
+    SELF.slot = 0;
+    setSession({ kind: 'practice' });
+    setScreen('game');
+  }, []);
   const startAi   = useCallback(stage => {
     SELF.slot = 0;                       // AI전은 항상 내가 아래쪽
     setSession({ kind: 'ai', stage });
@@ -47,7 +52,7 @@ export default function App(){
   return (
     <>
       {screen === 'splash'   && <Splash onDone={goHome} />}
-      {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onSettings={() => setShowSettings(true)} />}
+      {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={startPractice} onSettings={() => setShowSettings(true)} />}
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toGame} />}

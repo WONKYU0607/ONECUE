@@ -11,7 +11,7 @@ export function attachInput(canvas, view, opts = {}){
   // base = 현재 스틱 중심. 누른 자리로 옮겨가고, 원 밖으로 끌면 손가락을 따라온다
   const stick = { on: false, id: null, nx: 0, ny: 0, base: null };
   const keys = {};
-  const drag = { on: false, id: null, k: -1, x: 0, y: 0, cell: null };
+  const drag = { on: false, id: null, k: -1, x: 0, y: 0, cell: null, from: null };
   // 투척: 누르고 있는 동안 차징, 떼면 던진다
   const charge = { on: false, id: null, k: -1, t0: 0, ch: 0 };
 
@@ -25,15 +25,21 @@ export function attachInput(canvas, view, opts = {}){
     if (e.target && e.target.closest && e.target.closest('.ui-overlay')) return;   // UI 버튼은 조작 아님
     const wp = worldPt(e);
 
-    // 배치 단계: 팔레트 아이콘을 집어서 격자로 끈다
+    // 배치 단계: 팔레트 아이콘을 집거나, 이미 놓은 내 아이템을 집어서 옮긴다
     if (opts.canPlaceNow?.()){
       for (const sl of paletteSlots(view.uiH)){
         if (wp.x >= sl.x && wp.x <= sl.x + sl.w && wp.y >= sl.y && wp.y <= sl.y + sl.h){
           if ((opts.leftCount?.(sl.k) ?? 0) <= 0) return;
           drag.on = true; drag.id = e.pointerId; drag.k = sl.k;
-          drag.x = wp.x; drag.y = wp.y; drag.cell = null;
+          drag.x = wp.x; drag.y = wp.y; drag.cell = null; drag.from = null;
           return;
         }
+      }
+      const pick = opts.pickAt?.(wp);
+      if (pick){
+        drag.on = true; drag.id = e.pointerId; drag.k = pick.k;
+        drag.x = wp.x; drag.y = wp.y; drag.cell = null; drag.from = pick.from;
+        return;
       }
     }
 
@@ -58,7 +64,7 @@ export function attachInput(canvas, view, opts = {}){
     if (drag.on && e.pointerId === drag.id){
       const wp = worldPt(e);
       drag.x = wp.x; drag.y = wp.y;
-      drag.cell = opts.cellAt?.(wp, drag.k) ?? null;
+      drag.cell = opts.cellAt?.(wp, drag.k, drag.from) ?? null;
       return;
     }
     if (!stick.on || e.pointerId !== stick.id) return;
@@ -80,8 +86,8 @@ export function attachInput(canvas, view, opts = {}){
       return;
     }
     if (drag.on && e.pointerId === drag.id){
-      if (drag.cell) opts.onPlace?.(drag.k, drag.cell.c, drag.cell.r);
-      drag.on = false; drag.id = null; drag.k = -1; drag.cell = null;
+      if (drag.cell) opts.onPlace?.(drag.k, drag.cell.c, drag.cell.r, drag.from);
+      drag.on = false; drag.id = null; drag.k = -1; drag.cell = null; drag.from = null;
       return;
     }
     if (e.pointerId !== stick.id) return;

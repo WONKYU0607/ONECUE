@@ -10,8 +10,8 @@ const mk = (o = {}) => ({ dx:0, dy:0, fire:0, ready:0, place:null, thr:null, ...
 const IN = (a, b) => [mk(a), mk(b)];
 const play = () => {
   const s = newState();
-  step(s, IN({ ready:1 }, { ready:1 }));
-  step(s, IN({ fire:1 }, {}));
+  s.ready = [true, true];
+  step(s, IN({}, {}));
   for (let i = 0; i < CD_TICKS; i++) step(s, IN({}, {}));
   return s;
 };

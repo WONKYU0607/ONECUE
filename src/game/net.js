@@ -92,16 +92,22 @@ import {
 } from './config.js';
 import {
   NOIN,
+  allPlaced,
+  blast,
   canPlace,
+  canThrow,
   checksum,
   cloneState,
   itemRect,
+  myItemAt,
   newCovers,
   newItems,
   newState,
   normalizeState,
   overlap,
-  step
+  step,
+  throwCol,
+  throwRow
 } from './sim.js';
 
 // ================= TRANSPORT (NET SEAM) =================
@@ -416,9 +422,10 @@ export class Client {
     if (fire) this.pend[pid].fire = 1;
   }
   // 아이템 배치·설치 완료도 같은 입력 경로로 보낸다 (서버가 검증)
-  place(pid, k, c, r){
+  // from을 주면 그 자리의 아이템을 옮긴다
+  place(pid, k, c, r, from){
     if (!this.controlled.includes(pid)) return;
-    this.pend[pid].place = { k, c, r };
+    this.pend[pid].place = from ? { k, c, r, from } : { k, c, r };
   }
   setReady(pid){
     if (!this.controlled.includes(pid)) return;

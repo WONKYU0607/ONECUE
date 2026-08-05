@@ -102,6 +102,7 @@ export function normalizeState(st){
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
   if (!Array.isArray(st.ready)) st.ready = [false, false];
+  if (typeof st.solo !== 'boolean') st.solo = false;
   if (!Array.isArray(st.proj)) st.proj = [];
   if (!Array.isArray(st.blind)) st.blind = [0, 0];
   if (!Array.isArray(st.ammo)) st.ammo = [[3, 3], [3, 3]];
@@ -131,6 +132,7 @@ export function newState(){
     ammo: [[THROW_DEF[0].count, THROW_DEF[1].count],
            [THROW_DEF[0].count, THROW_DEF[1].count]],
     ready: [false, false],      // 설치 완료 여부
+    solo: false,                // 연습 모드: 총알·승패 없음
     maxStep: stepCap(),   // 아래 3개는 서버가 정하고 프레임으로 전파 → 결정론 유지
     bulletV: bulletFP(),
     coolT:   coolTicks(),
@@ -156,7 +158,24 @@ export function itemRect(it){
   };
 }
 // 해당 슬롯이 이 칸에 이 아이템을 놓을 수 있는가
-export function canPlace(s, slot, k, c, r){
+// 이 슬롯이 놓아야 할 아이템을 전부 놓았는가 (설치 완료 조건)
+export function allPlaced(s, slot){
+  for (let k = 0; k < ITEM_DEF.length; k++){
+    const used = (s.items || []).filter(it => it.by === slot && it.k === k).length;
+    if (used < ITEM_DEF[k].quota) return false;
+  }
+  return true;
+}
+// 내가 놓은 아이템 찾기 (옮기려고 집을 때)
+export function myItemAt(s, slot, c, r){
+  return (s.items || []).find(it => {
+    const w = ITEM_DEF[it.k].cells;
+    return it.by === slot && it.r === r && c >= it.c && c < it.c + w;
+  }) || null;
+}
+
+// from을 주면 그 자리의 내 아이템은 없는 셈 치고 검사한다 (자리 옮기기)
+export function canPlace(s, slot, k, c, r, from){
   const def = ITEM_DEF[k];
   if (!def) return false;
   if (s.phase !== PH_READY) return false;
@@ -167,11 +186,14 @@ export function canPlace(s, slot, k, c, r){
   // 드럼통은 중앙선에 붙은 한 칸에 못 심는다 (폭발 반경이 내 영역까지 닿아 자폭)
   if (k === ITEM.DRUM && (r === GRID_MIDROW - 1 || r === GRID_MIDROW)) return false;
   // 개수 제한
-  const used = (s.items || []).filter(it => it.by === slot && it.k === k).length;
+  const used = (s.items || []).filter(it =>
+    it.by === slot && it.k === k &&
+    !(from && it.c === from.c && it.r === from.r)).length;
   if (used >= def.quota) return false;
   // 겹침. 단, 내 엄폐물과 상대 드럼통은 같은 칸에 놓을 수 있다.
   // (안 그러면 배치 단계에 빈 칸이 생겨 상대가 드럼통 위치를 눈치챈다)
   for (const it of (s.items || [])){
+    if (from && it.by === slot && it.k === k && it.c === from.c && it.r === from.r) continue;
     const w = ITEM_DEF[it.k].cells;
     if (it.r !== r || c >= it.c + w || c + def.cells <= it.c) continue;
     const mixed = it.by !== slot &&
@@ -231,10 +253,17 @@ export function step(s, inp){
   if (s.phase === PH_READY){
     for (let i = 0; i < 2; i++){
       const q = inp[i] || NOIN;
-      if (q.place && canPlace(s, i, q.place.k, q.place.c, q.place.r)){
-        s.items.push({ k: q.place.k, c: q.place.c, r: q.place.r, by: i, hp: ITEM_DEF[q.place.k].hp });
+      const pl = q.place;
+      if (pl && canPlace(s, i, pl.k, pl.c, pl.r, pl.from)){
+        if (pl.from){                                   // 자리 옮기기: 옛 자리를 먼저 비운다
+          const idx = s.items.findIndex(it =>
+            it.by === i && it.k === pl.k && it.c === pl.from.c && it.r === pl.from.r);
+          if (idx >= 0) s.items.splice(idx, 1);
+        }
+        s.items.push({ k: pl.k, c: pl.c, r: pl.r, by: i, hp: ITEM_DEF[pl.k].hp });
       }
-      if (q.ready) s.ready[i] = true;
+      // 아이템을 전부 놓아야 완료할 수 있다. 안 그러면 한쪽이 먼저 눌러 바로 시작돼버린다
+      if (q.ready && allPlaced(s, i)) s.ready[i] = true;
     }
     // 둘 다 설치를 끝내면 바로 시작한다 (START 버튼 없음)
     if (s.ready[0] && s.ready[1]){
@@ -326,7 +355,8 @@ export function step(s, inp){
   // 폭발 연출 수명
   for (let i = s.fx.length - 1; i >= 0; i--) if (--s.fx[i].t <= 0) s.fx.splice(i, 1);
 
-  // 전투 중: 클릭 없이 coolT 간격 자동 발사
+  // 전투 중: 클릭 없이 coolT 간격 자동 발사 (연습 모드에선 쏘지 않는다)
+  if (!s.solo)
   for (let i = 0; i < 2; i++){
     const p = s.p[i];
     if (p.cool > 0){ p.cool--; continue; }
@@ -371,7 +401,7 @@ export function step(s, inp){
           t.invul = INVUL_T; t.flash = FLASH_T;
           if (!DEBUG_INF_HP){
             t.hp -= BULLET_DAMAGE;
-            if (t.hp <= 0){ s.over = true; s.phase = PH_OVER; s.winner = b.o === 0 ? 1 : 2; }
+            if (t.hp <= 0 && !s.solo){ s.over = true; s.phase = PH_OVER; s.winner = b.o === 0 ? 1 : 2; }
           }
         }
       }
@@ -381,7 +411,7 @@ export function step(s, inp){
   if (s.over && s.p[0].hp <= 0 && s.p[1].hp <= 0) s.winner = 0;   // 동시 사망 = 무승부
 
   // 제한 시간. 다 되면 체력이 많은 쪽 승, 같으면 무승부
-  if (!s.over && s.phase === PH_PLAY && s.clock > 0 && --s.clock === 0){
+  if (!s.solo && !s.over && s.phase === PH_PLAY && s.clock > 0 && --s.clock === 0){
     s.over = true; s.phase = PH_OVER;
     s.winner = s.p[0].hp === s.p[1].hp ? 0 : (s.p[0].hp > s.p[1].hp ? 1 : 2);
   }
@@ -394,7 +424,7 @@ export function checksum(s){
   for (const b of s.bullets) h = (h*31 + b.x + b.y + b.o) | 0;
   for (const c of s.covers) h = (h*31 + c.hp) | 0;
   for (const it of s.items) h = (h*31 + it.k*7 + it.c*13 + it.r*29 + it.hp*3 + it.by) | 0;
-  h = (h*31 + (s.ready[0] ? 1 : 0) + (s.ready[1] ? 2 : 0)) | 0;
+  h = (h*31 + (s.ready[0] ? 1 : 0) + (s.ready[1] ? 2 : 0) + (s.solo ? 4 : 0)) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;
   h = (h*31 + s.blind[0] + s.blind[1]*3 + s.ammo[0][0]*7 + s.ammo[0][1]*11 + s.ammo[1][0]*13 + s.ammo[1][1]*17) | 0;
