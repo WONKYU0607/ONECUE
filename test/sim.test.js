@@ -106,10 +106,10 @@ console.log('제한 시간 / 승패 판정');
   for (let i = 0; i < CD_TICKS; i++) step(s, IN());
   assert(s.clock === ROUND_TICKS, `PLAY 진입 시 제한 시간 ${ROUND_TICKS}틱(60초) 설정`);
 
-  s.p[0].hp = 7; s.p[1].hp = 4;
+  s.p[0].hp = 70; s.p[1].hp = 40;
   let n = 0;
   while (s.phase !== PH_OVER && n < ROUND_TICKS + 200){
-    s.p[0].hp = 7; s.p[1].hp = 4;                 // 체력을 고정해 시간승만 확인
+    s.p[0].hp = 70; s.p[1].hp = 40;               // 체력을 고정해 시간승만 확인
     step(s, IN()); n++;
   }
   assert(n <= ROUND_TICKS, `제한 시간 안에 종료 (${(n/60).toFixed(1)}초)`);
@@ -121,7 +121,7 @@ console.log('제한 시간 / 승패 판정');
   for (let i = 0; i < CD_TICKS; i++) step(s, IN());
   let n = 0;
   while (s.phase !== PH_OVER && n < ROUND_TICKS + 200){
-    s.p[0].hp = 5; s.p[1].hp = 5;
+    s.p[0].hp = 50; s.p[1].hp = 50;
     step(s, IN()); n++;
   }
   assert(s.winner === 0, '시간 만료 + 동점 = 무승부');
@@ -133,6 +133,6 @@ console.log('제한 시간 / 승패 판정');
   while (s.phase !== PH_OVER && n < ROUND_TICKS + 400){ step(s, IN()); n++; }
   assert(n < ROUND_TICKS, `체력 소진으로 시간 전에 종료 (${(n/60).toFixed(1)}초)`);
   assert(s.p[0].hp <= 0 || s.p[1].hp <= 0, '누군가 체력 0');
-  assert(MAXHP === 10, `최대 체력 ${MAXHP}`);
+  assert(MAXHP === 100, `최대 체력 ${MAXHP}%`);
 }
 console.log('sim.test.js 통과');

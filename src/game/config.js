@@ -67,7 +67,10 @@ export const VIEW = { grid: true };          // 디버그 표시
 export const SHOW_HUD = false;   // SV/CL/LAT 디버그 수치 표시
 export const INV_SLOTS = 5;     // 아이템 인벤토리 칸 수 (임시)
 export const EXTRAP_MAX = 15;   // 상대 입력을 모를 때 마지막 입력을 이어붙이는 최대 틱
-export const MAXHP = 10;              // 10대 맞으면 끝
+// 체력은 100% 기준. 총알 한 발 8%, 폭발 20%
+export const MAXHP = 100;
+export const BULLET_DAMAGE = 8;       // 총알 한 발
+export const HP_MARKS = 5;            // HP 막대 눈금 (20%마다)
 export const DEBUG_INF_HP = false;  // 디버그: 체력 무한 (라운드가 안 끝남)
 // 아이템: 0=벽(1칸) 1=바리케이트(1칸) 2=드럼통 폭탄(1칸)
 // 벽·바리케이트는 자기 영역에, 드럼통은 상대 영역에 심는다
@@ -77,7 +80,7 @@ export const ITEM_DEF = [
   { key: 'barr1', name: '바리케이트', hp: 3, cells: 1, mine: true,  quota: 1 },
   { key: 'drum',  name: '드럼통',    hp: 1, cells: 1, mine: false, quota: 2 }
 ];
-export const DRUM_DAMAGE = 1;         // 폭발에 휘말리면 이만큼 깎임
+export const DRUM_DAMAGE = 20;        // 드럼통 폭발
 export const DRUM_RADIUS = 1;         // 폭발 범위: 주변 한 칸
 export const EXPLO_TICKS = 34;        // 폭발 이펙트 지속 (틱)
 
@@ -88,12 +91,12 @@ export const THROW_DEF = [
   { key: 'flash',   name: '섬광탄', count: 3 }
 ];
 export const CHARGE_MAX_MS = 1000;    // 최대로 눌렀을 때 상대 맨 뒷줄
-export const FLY_TICKS  = 36;         // 날아가는 시간 (0.6초)
+export const FLY_TICKS  = 60;         // 날아가는 시간 (1초)
 export const FUSE_TICKS = 30;         // 착탄 후 폭발까지 (0.5초)
 export const NADE_RADIUS = 1;         // 폭발 범위: 주변 한 칸
-export const NADE_DAMAGE = 2;
+export const NADE_DAMAGE = 20;        // 수류탄 폭발
 export const FLASH_RADIUS = 1;        // 섬광탄도 3x3 안에 있어야 맞는다
-export const BLIND_TICKS = 108;       // 섬광 지속 (1.8초)
+export const BLIND_TICKS = 120;       // 섬광 지속 (2초)
 export const BLIND_FULL  = 18;        // 이 구간은 완전히 하얗게
 
 export const ROUND_TICKS = 60 * 60;   // 한 판 60초. 시간 내 승부가 안 나면 체력 많은 쪽 승
@@ -113,7 +116,10 @@ export const SELF = { slot: 0 };
 // 서버와 클라가 같은 코드인지 확인하는 표식.
 // **sim.js 규칙이 바뀔 때마다 반드시 올릴 것.** 안 올리면 서버가 뒤처져도 검사를 통과해
 // 화면이 조용히 멈추고 원인을 짐작해야 한다 (자동 시작 규칙을 넣고도 안 올려서 겪음)
-export const PROTO_VER = 7;
+export const PROTO_VER = 9;
+// 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
+// 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
+export const SHOW_NETINFO = false;
 export const GUN_C = '#23232b', LENS_C = '#101014', GLINT_C = '#dfe8f0';
 
 export const COL = {

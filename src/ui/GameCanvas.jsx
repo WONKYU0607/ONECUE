@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createGame } from '../game/game.js';
-import { PH_READY } from '../game/config.js';
+import { PH_READY, SHOW_NETINFO } from '../game/config.js';
 import TunePanel from './TunePanel.jsx';
 import { getConnection, disconnect, getRoomInfo } from '../net/connection.js';
 import { getSettings } from '../state/settings.js';
@@ -89,7 +89,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
       {placing && ready.me && !ready.peer && (
         <div className="link-note ui-overlay">
           상대가 설치하는 중…
-          {ready.srv && (
+          {SHOW_NETINFO && ready.srv && (
             <span className="sub">
               서버 확정 · 나 {ready.srv.me ? 'O' : 'X'} / 상대 {ready.srv.peer ? 'O' : 'X'}
               {ready.room != null && <><br />방 {ready.room} · 내 자리 {ready.slot}</>}

@@ -1,7 +1,7 @@
 import {
   W, H, FP, COL, TEAMS, TEAM_OF, SELF, MAXHP, FLASH_T, VIEW, SHOW_HUD,
   GRID_COLS, GRID_ROWS, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
-  PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO,
+  PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO, HP_MARKS,
   ITEM, ITEM_DEF, cellOwner, DRUM_RADIUS, EXPLO_TICKS,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
 } from './config.js';
@@ -89,7 +89,7 @@ export function createRenderer(canvas){
       px(x, BY, BW, BH, 'rgba(255,255,255,0.10)');
       const w = BW * Math.max(0, hp) / MAXHP;
       px(rightAlign ? x + BW - w : x, BY, w, BH, TEAMS[team].m);
-      for (let i = 1; i < MAXHP; i++) px(x + BW * i / MAXHP, BY, 0.4, BH, 'rgba(13,13,22,0.85)');
+      for (let i = 1; i < HP_MARKS; i++) px(x + BW * i / HP_MARKS, BY, 0.4, BH, 'rgba(13,13,22,0.85)');
     };
     bar(4, s.p[my].hp, TEAM_OF[my], false);
     bar(W - 4 - BW, s.p[op].hp, TEAM_OF[op], true);

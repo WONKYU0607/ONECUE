@@ -90,7 +90,8 @@ console.log('수류탄 피해와 범위');
     step(s, IN({ thr: { k: THROW.NADE, ch: 100 } }, {}));
     const before = MAXHP;
     for (let i = 0; i < FLY_TICKS + FUSE_TICKS + 5; i++){
-      s.p[0].hp = MAXHP; if (i < FLY_TICKS + FUSE_TICKS - 1) s.p[1].hp = MAXHP;
+      s.bullets.length = 0;                                   // 자동 발사 총알 배제
+      s.p[0].hp = MAXHP; if (i < FLY_TICKS + FUSE_TICKS - 1){ s.p[1].hp = MAXHP; s.p[1].invul = 0; }
       step(s, IN({}, {}));
     }
     return before - s.p[1].hp;

@@ -4,6 +4,7 @@ import {
   BLIND_FULL,
   BLIND_TICKS,
   BOFF,
+  BULLET_DAMAGE,
   BWf,
   CD_GO,
   CD_STEP,
@@ -32,6 +33,7 @@ import {
   GUN_C,
   H,
   HOME_COL,
+  HP_MARKS,
   INVUL_T,
   INV_SLOTS,
   ITEM,
@@ -58,6 +60,7 @@ import {
   ROW_MIN,
   SELF,
   SHOW_HUD,
+  SHOW_NETINFO,
   SNAP_EVERY,
   TEAMS,
   TEAM_OF,
@@ -367,7 +370,7 @@ export function step(s, inp){
         if (t.invul === 0){
           t.invul = INVUL_T; t.flash = FLASH_T;
           if (!DEBUG_INF_HP){
-            t.hp--;
+            t.hp -= BULLET_DAMAGE;
             if (t.hp <= 0){ s.over = true; s.phase = PH_OVER; s.winner = b.o === 0 ? 1 : 2; }
           }
         }
