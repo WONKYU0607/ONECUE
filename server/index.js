@@ -116,14 +116,25 @@ const http = createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');   // 브라우저 fetch로 깨울 수 있어야 함
   if (req.url === '/' || req.url === '/health'){
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    // 서버가 실제로 무엇을 갖고 있는지 그대로 내보낸다.
+    // 클라 화면만 보면 양쪽이 서로 다른 말을 해도 누가 맞는지 알 수 없다
+    const detail = [...rooms.values()].map(r => ({
+      id: r.id,
+      code: r.code || null,
+      seats: r.seats.map(x => (x.ws ? 'on' : x.sid ? 'held' : 'empty')),
+      ready: r.server.s.ready,
+      items: (r.server.s.items || []).length,
+      phase: r.server.s.phase,     // 0=배치 1=카운트다운 2=전투 3=종료
+      tick: r.server.s.tick
+    }));
     res.end(JSON.stringify({
       ok: true,
       ver: PROTO_VER,
-      rooms: rooms.size,
+      pid: process.pid,            // 서버가 두 벌 돌고 있는지 확인용
+      uptime: Math.round(process.uptime()),
       waiting: waiting.length,
-      codeRooms: codes.size,
       players: wss ? wss.clients.size : 0,
-      uptime: Math.round(process.uptime())
+      rooms: detail
     }));
     return;
   }
