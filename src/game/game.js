@@ -1,15 +1,17 @@
 import {
-  FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH, PH_OVER,
+  FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH,
   stepCap, bulletFP, coolTicks, clampi
 } from './config.js';
 import { Loopback, Server, Client } from './net.js';
 import { createRenderer } from './render.js';
 import { attachInput } from './input.js';
 import { createAI } from './ai.js';
+import { createJuice } from './juice.js';
+import { sfx, buzz, unlockAudio } from './audio.js';
 import { canPlace, canThrow, allPlaced, myItemAt } from './sim.js';
 import {
-  ITEM, ITEM_DEF, PH_READY, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
-  GRID_X0, GRID_Y0, H, cellOwner
+  ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
+  GRID_X0, GRID_Y0, H, cellOwner, cellX, cellY
 } from './config.js';
 import { padRect, paletteSlots } from './layout.js';
 import { CHARGE_MAX_MS, PH_PLAY, THROW } from './config.js';
@@ -41,7 +43,10 @@ export function createGame(canvas, opts = {}){
     client.pred.solo = true;
   }
   const aiSlot = 1 - SELF.slot;
-  let aiPlaced = false;
+  let aiPlan = null, nextAiPlaceAt = 0;
+  // 이 종류를 정원만큼 놓았는가
+  const allPlacedKind = (st, slot, k) =>
+    (st.items || []).filter(it => it.by === slot && it.k === k).length >= ITEM_DEF[k].quota;
   // 재접속하면 옛 프레임을 버리고 서버 스냅샷으로 다시 맞춘다
   if (online){
     let first = true;
@@ -60,6 +65,22 @@ export function createGame(canvas, opts = {}){
       inner(m);
     };
   }
+
+  const juice = createJuice();
+  // 소리·연출을 붙이려면 지난 프레임 상태와 비교해야 한다 (시뮬은 안 건드린다)
+  let prev = null;
+  const snapshot = st => ({
+    bullets: st.bullets.length,
+    cool: st.p.map(p => p.cool),
+    flash: st.p.map(p => p.flash),
+    hp: st.p.map(p => p.hp),
+    fx: st.fx.length,
+    proj: st.proj.length,
+    items: (st.items || []).map(it => it.hp),
+    phase: st.phase,
+    timer: st.timer,
+    blind: (st.blind || [0,0]).slice()
+  });
 
   const view = createRenderer(canvas);
 
@@ -101,6 +122,7 @@ export function createGame(canvas, opts = {}){
     cellAt,
     pickAt,
     onPlace: (k, c, r, from) => {
+      sfx.place();
       pendPlace = { k, c, r, from, until: performance.now() + 4000 };
       client.place(SELF.slot, k, c, r, from);
       nextPlaceAt = performance.now() + 350;
@@ -124,6 +146,66 @@ export function createGame(canvas, opts = {}){
   // 확정 상태에 반영될 때까지 다시 보낸다.
   let wantReady = false, nextReadyAt = 0;
   let pendPlace = null, nextPlaceAt = 0;
+
+  // 지난 프레임과 비교해 무슨 일이 일어났는지 알아내고 소리·연출을 낸다
+  function reactTo(st, dt){
+    const cur = snapshot(st);
+    if (!prev){ prev = cur; return; }
+    const me = SELF.slot;
+
+    // 발사: 쿨다운이 막 채워진 순간
+    for (let i = 0; i < 2; i++){
+      if (cur.cool[i] > prev.cool[i]){
+        sfx.shot(i === me);
+        const p = st.p[i];
+        const up = i === 0;
+        juice.muzzle((p.x + 6 * FP) / FP + 1, viewY(p.y / FP, i), up);
+      }
+    }
+    // 피격
+    for (let i = 0; i < 2; i++){
+      if (cur.flash[i] > prev.flash[i]){
+        sfx.hit(i === me);
+        if (i === me){ juice.shake(2.2); buzz(30); }
+        const p = st.p[i];
+        juice.spark((p.x + 7 * FP) / FP, viewY(p.y / FP, i) + 8,
+                    'rgba(255,190,120,ALPHA)', 7, 60);
+      }
+    }
+    // 아이템이 깎이거나 부서짐
+    for (let i = 0; i < cur.items.length && i < prev.items.length; i++){
+      if (cur.items[i] < prev.items[i]){
+        const it = st.items[i];
+        const bx = cellX(it.c) + GRID_CW / 2;
+        const by = viewY(cellY(it.r), 0) + GRID_CH / 2;
+        juice.spark(bx, by, 'rgba(200,215,240,ALPHA)', 5, 45);
+        if (cur.items[i] <= 0) sfx.break_();
+      }
+    }
+    // 폭발·섬광 연출이 새로 생김
+    if (cur.fx > prev.fx){
+      const last = st.fx[st.fx.length - 1];
+      if ((last?.k || 0) === 1) sfx.flash();
+      else { sfx.explode(); juice.shake(4.5); buzz(60); }
+    }
+    // 투척물이 새로 날아감
+    if (cur.proj > prev.proj) sfx.throw_();
+    // 카운트다운 숫자가 바뀔 때마다 한 번씩
+    if (cur.phase === PH_COUNT){
+      const a = Math.ceil(prev.timer / 60), b = Math.ceil(cur.timer / 60);
+      if (b !== a) sfx.count(b);
+    }
+    // 라운드 종료
+    if (cur.phase === PH_OVER && prev.phase !== PH_OVER){
+      const w = st.winner;
+      if (w === 0) sfx.count(0);
+      else if (w === me + 1) sfx.win();
+      else { sfx.lose(); buzz([40, 60, 40]); }
+    }
+    prev = cur;
+  }
+  // 슬롯1이면 화면이 뒤집혀 있으므로 연출 좌표도 뒤집는다
+  function viewY(y, i){ return SELF.slot === 1 ? H - y - 16 : y; }
 
   function loop(){
     if (!running) return;
@@ -152,28 +234,45 @@ export function createGame(canvas, opts = {}){
       client.setReady(1 - SELF.slot);
     }
 
-    // AI도 배치 단계를 거친다
-    if (ai && client.pred.phase === PH_READY && !aiPlaced){
-      aiPlaced = true;
-      const myRows = [], foeRows = [];
-      for (let r = 0; r < GRID_ROWS; r++) (cellOwner(r) === aiSlot ? myRows : foeRows).push(r);
-      const pick = rows => rows[Math.floor(Math.random() * rows.length)];
-      const col = () => Math.floor(Math.random() * GRID_COLS);
-      // 정원을 다 채워야 '설치 완료'가 된다. 개수는 ITEM_DEF를 그대로 따른다
-      const put = (k, rows) => {
-        for (let n = 0; n < ITEM_DEF[k].quota; n++){
-          for (let tryN = 0; tryN < 30; tryN++){
-            const c = col(), r = pick(rows);
-            if (canPlace(client.pred, aiSlot, k, c, r)){ client.place(aiSlot, k, c, r); break; }
+    // AI도 배치 단계를 거친다.
+    // 대기 중인 배치 요청 자리는 하나뿐이라 한 프레임에 여러 개를 보내면 마지막만 남는다.
+    // 그래서 한 번에 하나씩, 확정된 걸 보고 다음 것을 보낸다.
+    if (ai && client.pred.phase === PH_READY){
+      if (!aiPlan){
+        aiPlan = [];
+        for (let n = 0; n < ITEM_DEF[ITEM.WALL].quota; n++) aiPlan.push(ITEM.WALL);
+        for (let n = 0; n < ITEM_DEF[ITEM.BARR].quota; n++) aiPlan.push(ITEM.BARR);
+        for (let n = 0; n < ITEM_DEF[ITEM.DRUM].quota; n++) aiPlan.push(ITEM.DRUM);
+      }
+      if (aiPlan.length && now >= nextAiPlaceAt){
+        const k = aiPlan[0];
+        const rows = [];
+        for (let r = 0; r < GRID_ROWS; r++){
+          const mineSide = cellOwner(r) === aiSlot;
+          if (ITEM_DEF[k].mine ? mineSide : !mineSide) rows.push(r);
+        }
+        // 놓을 수 있는 칸을 전부 모아서 그중에서 고른다 (무작위로 찍고 재시도하지 않는다)
+        const spots = [];
+        for (const r of rows){
+          for (let c = 0; c < GRID_COLS; c++){
+            if (canPlace(client.pred, aiSlot, k, c, r)) spots.push({ c, r });
           }
         }
-      };
-      put(ITEM.WALL, myRows);
-      put(ITEM.BARR, myRows);
-      put(ITEM.DRUM, foeRows);
-      setTimeout(() => client.setReady(aiSlot), 900);   // 배치가 확정된 뒤 준비
+        if (spots.length){
+          const spot = spots[Math.floor(Math.random() * spots.length)];
+          client.place(aiSlot, k, spot.c, spot.r);
+          nextAiPlaceAt = now + 260;          // 확정될 시간을 준다
+        } else {
+          aiPlan.shift();                     // 놓을 데가 없으면 건너뛴다
+        }
+        // 확정된 개수가 계획만큼 늘었으면 다음 것으로
+        if (aiPlan.length && allPlacedKind(client.s, aiSlot, k)) aiPlan.shift();
+      }
+      if (!aiPlan.length && !client.pred.ready[aiSlot] && allPlaced(client.s, aiSlot)){
+        client.setReady(aiSlot);
+      }
     }
-    if (ai && client.pred.phase !== PH_READY) aiPlaced = false;
+    if (ai && client.pred.phase !== PH_READY){ aiPlan = null; }
 
     // AI는 사람과 완전히 같은 입력 경로를 탄다 (서버가 판정하는 건 동일)
     if (ai){
@@ -208,9 +307,11 @@ export function createGame(canvas, opts = {}){
                 ' DRP' + (server ? server.lateDrops : '-') + ' DSY' + client.desync;
     const a = client.alpha(now);
     input.tick(now, CHARGE_MAX_MS);
+    juice.update(dt);
+    reactTo(client.pred, dt);
     client.updateRender(a, dt);
     view.draw(client.pred, dbg, a, client, stick, input.drag, leftCount, okCell, {
-      ammo: ammoLeft, charge: input.charge, softFlash: opts.softFlash?.() || false
+      ammo: ammoLeft, charge: input.charge, softFlash: opts.softFlash?.() || false, juice
     });
 
     // 페이즈가 바뀔 때만 React에 알린다 (매 프레임 setState 하면 안 됨)
@@ -246,7 +347,7 @@ export function createGame(canvas, opts = {}){
         height: Math.max(18, (bottom - top) * k)
       };
     },
-    ready(){ wantReady = true; nextReadyAt = 0; client.setReady(SELF.slot); },
+    ready(){ sfx.ready(); wantReady = true; nextReadyAt = 0; client.setReady(SELF.slot); },
     isReady(){ return !!(client.pred.ready || [])[SELF.slot]; },
     // 서버가 실제로 확정한 준비 상태 (예측이 아닌 것). 문제 진단용
     confirmedReady(){

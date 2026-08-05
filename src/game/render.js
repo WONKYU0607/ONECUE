@@ -347,12 +347,25 @@ export function createRenderer(canvas){
     }
   }
 
+  function drawJuice(j){
+    for (const m of j.muzzles){
+      const k = 1 - m.life / m.max;
+      px(m.x - 1.5, m.y + (m.up ? -3 : 1), 3, 3, `rgba(255,236,160,${(0.85*k).toFixed(2)})`);
+      px(m.x - 0.8, m.y + (m.up ? -4.5 : 2.5), 1.6, 2, `rgba(255,255,255,${(0.9*k).toFixed(2)})`);
+    }
+    for (const sp of j.sparks){
+      const k = 1 - sp.life / sp.max;
+      px(sp.x, sp.y, 1.2, 1.2, sp.color.replace('ALPHA', (0.9 * k).toFixed(2)));
+    }
+  }
+
   function draw(s, dbg, a, cl, stick, drag, left, ok, extra = {}){
+    const j = extra.juice;
+    const sh = j ? j.offset() : { x: 0, y: 0 };
+    ctx.save();
+    ctx.translate(Math.round(sh.x * RS), Math.round(sh.y * RS));   // 아레나만 흔든다
     if (isReady(bg)) ctx.drawImage(bg, 0, 0, W * RS, H * RS);
     else px(0, 0, W, H, COL.bg);
-    drawPanel(s, stick);
-    if (left) drawPalette(s, uiH, left, drag);
-    if (extra.ammo) drawThrowPad(s, uiH, extra.ammo, extra.charge);
     if (VIEW.grid){
       for (let c = 0; c <= GRID_COLS; c++) px(cellX(c), GRID_Y0, 0.4, GRID_CH*GRID_ROWS, 'rgba(255,255,255,0.14)');
       for (let r = 0; r <= GRID_ROWS; r++) px(GRID_X0, cellY(r), GRID_CW*GRID_COLS, 0.4, 'rgba(255,255,255,0.14)');
@@ -371,6 +384,11 @@ export function createRenderer(canvas){
     for (let i = 0; i < 2; i++) drawPlayer(s.p[i], i, cl.rx[i], cl.ry[i], (s.blind || [0,0])[i], s.tick);
     drawProjectiles(s, a);
     drawFx(s);
+    if (j) drawJuice(j);
+    ctx.restore();
+    drawPanel(s, stick);
+    if (left) drawPalette(s, uiH, left, drag);
+    if (extra.ammo) drawThrowPad(s, uiH, extra.ammo, extra.charge);
     drawBlind(s, extra.softFlash);
     if (SHOW_HUD){
       ctx.font = (8*RS) + 'px monospace'; ctx.textAlign = 'left';

@@ -6,9 +6,11 @@ import PvpMenu from './ui/screens/PvpMenu.jsx';
 import Matching from './ui/screens/Matching.jsx';
 import Result from './ui/screens/Result.jsx';
 import SettingsModal from './ui/SettingsModal.jsx';
+import HelpModal from './ui/HelpModal.jsx';
 import GameCanvas from './ui/GameCanvas.jsx';
-import { getSettings } from './state/settings.js';
+import { getSettings, setSetting } from './state/settings.js';
 import { disconnect } from './net/connection.js';
+import { recordResult } from './state/progress.js';
 import { VIEW, SELF } from './game/config.js';
 
 // 화면 전환은 여기 한 곳에서만 한다.
@@ -18,8 +20,13 @@ export default function App(){
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => { VIEW.grid = getSettings().showGrid; }, []);
+  // 처음 온 사람에게는 진입창이 끝난 뒤 조작 안내를 한 번 띄운다
+  const goHomeFirst = useCallback(() => {
+    if (!getSettings().seenHelp){ setSetting('seenHelp', true); setShowHelp(true); }
+  }, []);
 
   const goHome    = useCallback(() => { disconnect(); setSession(null); setResult(null); setScreen('home'); }, []);
   const startPvp  = useCallback(() => setScreen('pvp'), []);
@@ -41,7 +48,11 @@ export default function App(){
     setScreen('game');
   }, []);
   const toGame    = useCallback(() => setScreen('game'), []);
-  const onFinish  = useCallback(r => { setResult(r); setScreen('result'); }, []);
+  const onFinish  = useCallback(r => {
+    // AI 모드에서 이기면 다음 단계가 열린다
+    if (session?.kind === 'ai') recordResult(session.stage, r);
+    setResult(r); setScreen('result');
+  }, [session]);
   const again     = useCallback(() => {
     setResult(null);
     // 친구방은 코드가 이미 닫혀 있으므로 다시 할 땐 PVP 메뉴에서 고르게 한다
@@ -51,14 +62,16 @@ export default function App(){
 
   return (
     <>
-      {screen === 'splash'   && <Splash onDone={goHome} />}
-      {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={startPractice} onSettings={() => setShowSettings(true)} />}
+      {screen === 'splash'   && <Splash onDone={() => { goHome(); goHomeFirst(); }} />}
+      {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={startPractice}
+                                     onSettings={() => setShowSettings(true)} onHelp={() => setShowHelp(true)} />}
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toGame} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome} onFinish={onFinish} />}
       {screen === 'result'   && <Result result={result} session={session} onAgain={again} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </>
   );
 }

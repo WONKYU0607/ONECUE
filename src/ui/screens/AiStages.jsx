@@ -1,8 +1,9 @@
 import { AI_STAGES } from '../../game/ai.js';
+import { isUnlocked, isCleared, getProgress } from '../../state/progress.js';
 
-// AI 모드 스테이지 선택.
-// 아직 클리어 판정이 없어(무한 체력 디버그 모드) 전부 열어둔다.
+// AI 모드 스테이지 선택. 앞 단계를 깨야 다음이 열린다
 export default function AiStages({ onBack, onStart }){
+  const p = getProgress();
   return (
     <div className="screen list">
       <header className="bar-top">
@@ -11,14 +12,26 @@ export default function AiStages({ onBack, onStart }){
         <span className="spacer" />
       </header>
 
+      <p className="hint record">{p.wins}승 {p.losses}패 {p.draws}무</p>
+
       <div className="stages">
-        {AI_STAGES.map((s, i) => (
-          <button key={i} className="stage" onClick={() => onStart(i + 1)}>
-            <span className="no">{i + 1}</span>
-            <span className="nm">{s.name}</span>
-            <span className="st">{Math.round(s.speed * 100)}%</span>
-          </button>
-        ))}
+        {AI_STAGES.map((s, i) => {
+          const stage = i + 1;
+          const open = isUnlocked(stage);
+          const done = isCleared(stage);
+          return (
+            <button
+              key={stage}
+              className={'stage' + (open ? '' : ' locked') + (done ? ' done' : '')}
+              disabled={!open}
+              onClick={() => onStart(stage)}
+            >
+              <span className="no">{stage}</span>
+              <span className="nm">{s.name}</span>
+              <span className="st">{!open ? '잠김' : done ? '클리어' : '도전'}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

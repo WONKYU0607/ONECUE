@@ -40,3 +40,19 @@ assert(JSON.stringify(__reloadFromStorage()) === JSON.stringify(DEFAULTS),
 setSetting('music', false);
 assert(getSettings().music === false, '저장 실패해도 메모리 상태는 유지');
 console.log('settings.test.js 통과');
+
+console.log('안내를 본 적 있는지 기록');
+{
+  // 앞 검사에서 저장소를 막아뒀으므로 되돌린다
+  store.clear();
+  globalThis.localStorage = {
+    getItem: k => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: k => store.delete(k)
+  };
+  resetSettings();
+  assert(getSettings().seenHelp === false, '처음엔 안 본 상태');
+  setSetting('seenHelp', true);
+  assert(__reloadFromStorage().seenHelp === true, '본 뒤에는 저장돼 다시 안 뜬다');
+}
+console.log('settings.test.js 통과');

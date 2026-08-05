@@ -1,5 +1,6 @@
 import { NET } from './config.js';
 import { stickVector, inStickZone, clampBase, stickGeom, paletteSlots, throwSlots } from './layout.js';
+import { unlockAudio } from './audio.js';
 
 // 스틱 상태와 눌린 키를 들고 있다가 루프가 매 프레임 읽어간다.
 // React 언마운트 시 detach()로 리스너를 전부 떼야 StrictMode 이중 마운트에서 입력이 겹치지 않는다.
@@ -22,6 +23,7 @@ export function attachInput(canvas, view, opts = {}){
   }
 
   const onDown = e => {
+    unlockAudio();          // 브라우저는 첫 터치 전에는 소리를 막는다
     if (e.target && e.target.closest && e.target.closest('.ui-overlay')) return;   // UI 버튼은 조작 아님
     const wp = worldPt(e);
 
