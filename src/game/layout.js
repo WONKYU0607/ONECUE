@@ -31,6 +31,19 @@ function side(pd, total){
   return Math.max(4, Math.min(pd.x + pd.w - total - 4, cx - total / 2));
 }
 
+// 화면 위에 겹쳐 띄우는 버튼·배너가 차지할 자리 (월드 좌표).
+// 팔레트 위쪽을 쓰되, 칼전처럼 팔레트가 비어 있으면 패드 전체를 기준으로 잡는다.
+// (예전엔 game.js가 sl[0].y를 그냥 읽어 칼전에서 화면이 통째로 죽었다)
+export function uiBoxRect(uiH){
+  const pd = padRect(uiH);
+  const sl = paletteSlots(uiH);
+  const x = sl.length ? Math.min(...sl.map(v => v.x)) : pd.x;
+  const x1 = sl.length ? Math.max(...sl.map(v => v.x + v.w)) : pd.x + pd.w * 0.5;
+  const top = pd.y + 1;
+  const bottom = (sl.length ? sl[0].y : pd.y + pd.h) - 2;
+  return { x, y: top, w: x1 - x, h: Math.max(6, bottom - top) };
+}
+
 // 배치 팔레트: 스틱 반대쪽에 아이템 아이콘. 종류 수는 아레나에 따라 다르다
 // (1대1 3개 / 2대2 7개). 5개부터는 두 줄로 접는다
 export function paletteSlots(uiH){

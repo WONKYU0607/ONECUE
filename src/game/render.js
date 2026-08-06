@@ -14,7 +14,11 @@ import { paletteSlots, throwSlots } from './layout.js';
 // 스프라이트 시트의 한 칸 크기 (원본은 14x16 고정)
 const FW = 14 * RS, FH = 16 * RS;
 // 칼전 시트 규격 (melee.json)
-const MELEE_FW = 310, MELEE_FH = 184, MELEE_BODY_H = 180;
+const MELEE_FW = 312, MELEE_FH = 190, MELEE_BODY_H = 180;
+// 시트 열: 앞대기 앞공격 뒤대기 뒤공격 좌대기 좌공격 우대기 우공격
+// 화면이 뒤집힌 팀은 위·아래가 바뀌므로 그때만 앞뒤를 맞바꾼다
+const MELEE_COL = { 0: 2, 1: 0, 2: 4, 3: 6 };        // face -> 대기 열
+const MELEE_FLIP = { 0: 1, 1: 0, 2: 2, 3: 3 };       // 뒤집힌 화면에서의 face
 
 // items.webp 안의 프레임 위치 (824x66)
 const ITEM_FRAME = {
@@ -94,14 +98,17 @@ export function createRenderer(canvas){
       // 칼전 시트: 4행(색) x 4열(앞대기·앞공격·뒤대기·뒤공격), 프레임 310x184
       // 몸통(193x180)이 한 칸이 되도록 배율을 잡고 **왼쪽 아래**를 캐릭터 자리에 맞춘다
       const col = (colorOf && colorOf[i] != null) ? colorOf[i] : TEAM_OF[i];
-      const mineSide = teamOf(i, SELF.n || 2) === myTeamNow();
+      const face = flipped() ? MELEE_FLIP[p.face || 0] : (p.face || 0);
       const swing = (p.atk || 0) > 0;
-      const fc = (mineSide ? 2 : 0) + (swing ? 1 : 0);
+      const fc = MELEE_COL[face] + (swing ? 1 : 0);
       const sc = ARENA.ph / MELEE_BODY_H;
       const dw = MELEE_FW * sc, dh = MELEE_FH * sc;
-      if (hit) ctx.filter = 'brightness(2.2) saturate(0.2)';
+      // 총격전은 흰색 프레임이 따로 있는데 칼전 시트엔 없다.
+      // 밝기만 올리면 색이 남아 '몸 색이 바뀐 것'처럼 보이므로 완전히 하얗게 만든다
+      if (hit) ctx.filter = 'grayscale(1) brightness(3.4)';
+      // 시트는 몸통 가로 중심 기준이라, 캐릭터 상자 가운데에 맞춰 그린다
       ctx.drawImage(melee, fc * MELEE_FW, col * MELEE_FH, MELEE_FW, MELEE_FH,
-        Math.round(xw * RS), Math.round((yw + ARENA.ph - dh) * RS),
+        Math.round((xw + ARENA.pw / 2 - dw / 2) * RS), Math.round((yw + ARENA.ph - dh) * RS),
         Math.round(dw * RS), Math.round(dh * RS));
       ctx.filter = 'none';
     } else if (isReady(sheet)){

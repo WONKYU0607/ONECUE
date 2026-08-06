@@ -1,9 +1,9 @@
 // 칼전(근접전). 총알·아이템 없이 칼로만, 앞으로 한 칸을 때린다.
 import { newState, step, checksum, normalizeState, cloneState, NOIN } from '../src/game/sim.js';
 import {
-  FP, MAXHP, PH_PLAY, ARENA, setArena, teamOf, cellUsable, rowCols,
+  FP, MAXHP, PH_PLAY, ARENA, setArena, teamOf, cellUsable, rowCols, topSpan, botSpan,
   GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH, GRID_X0, GRID_Y0, PWf, PHf,
-  YMIN_S, YMAX_S, WALL_L, WALL_R, wallIdx, topSpan, botSpan,
+  YMIN_S, YMAX_S, WALL_L, WALL_R, wallIdx,
   MELEE_DAMAGE, ATK_TICKS, MELEE_COOL, stepCap
 } from '../src/game/config.js';
 import { assert } from './harness.js';
@@ -34,7 +34,10 @@ console.log('진영 구분이 없다 (중앙선 없음)');
   s.p[2].y = Math.round(150 * FP); s.p[3].y = Math.round(170 * FP);
   const up = IN(4); up[0].dy = -stepCap();
   for (let t = 0; t < 900; t++) step(s, up);
-  assert(s.p[0].y <= YMIN_S[0] + 2, '아래 팀이 맨 위까지 올라간다 ' + (s.p[0].y / FP).toFixed(1));
+  // 세로 한계는 x마다 다르다(모서리 구조물). 그 x에서 갈 수 있는 끝까지 갔는지 본다
+  const top = topSpan(s.p[0].x);
+  assert(s.p[0].y <= top + 2 * FP, '아래 팀이 그 자리에서 갈 수 있는 맨 위까지 올라간다 '
+    + (s.p[0].y / FP).toFixed(1) + ' vs ' + (top / FP).toFixed(1));
 }
 
 console.log('모서리 노치');
@@ -162,6 +165,54 @@ console.log('팀원은 안 때린다');
   assert(s.p[1].hp === hp0, '같은 팀은 안 맞는다');
 }
 
+console.log('바라보는 방향으로 벤다 (좌우 포함)');
+{
+  const { GRID_CW } = await import('../src/game/config.js');
+  const cases = [
+    ['위',   0, 0, -GRID_CH],
+    ['아래', 1, 0,  GRID_CH],
+    ['왼쪽', 2, -GRID_CW, 0],
+    ['오른쪽', 3, GRID_CW, 0]
+  ];
+  for (const [name, face, ox, oy] of cases){
+    const s = newState(2, true);
+    s.phase = PH_PLAY;
+    s.p[0].x = Math.round(90 * FP); s.p[0].y = Math.round(150 * FP);
+    s.p[0].face = face;
+    s.p[1].x = s.p[0].x + Math.round(ox * FP);
+    s.p[1].y = s.p[0].y + Math.round(oy * FP);
+    const hp0 = s.p[1].hp;
+    for (let t = 0; t < ATK_TICKS + 4; t++) step(s, IN(2));
+    assert(hp0 - s.p[1].hp === MELEE_DAMAGE, `${name}을 보면 ${name} 한 칸을 벤다`);
+  }
+  // 반대쪽은 안 맞는다
+  const s2 = newState(2, true);
+  s2.phase = PH_PLAY;
+  s2.p[0].x = Math.round(90 * FP); s2.p[0].y = Math.round(150 * FP);
+  s2.p[0].face = 3;                                  // 오른쪽을 본다
+  s2.p[1].x = s2.p[0].x - Math.round(GRID_CW * FP);  // 상대는 왼쪽
+  s2.p[1].y = s2.p[0].y;
+  const hp0 = s2.p[1].hp;
+  for (let t = 0; t < ATK_TICKS + 4; t++) step(s2, IN(2));
+  assert(s2.p[1].hp === hp0, '등 뒤는 안 맞는다');
+}
+
+console.log('이동하면 그쪽을 본다');
+{
+  const s = newState(2, true);
+  s.phase = PH_PLAY;
+  const dirs = [[-stepCap(), 0, 2, '왼쪽'], [stepCap(), 0, 3, '오른쪽'],
+                [0, -stepCap(), 0, '위'], [0, stepCap(), 1, '아래']];
+  for (const [dx, dy, want, name] of dirs){
+    const q = IN(2); q[0].dx = dx; q[0].dy = dy;
+    step(s, q);
+    assert(s.p[0].face === want, `${name}으로 움직이면 ${name}을 본다 (${s.p[0].face})`);
+  }
+  const keepFace = s.p[0].face;
+  for (let t = 0; t < 30; t++) step(s, IN(2));
+  assert(s.p[0].face === keepFace, '멈추면 마지막 방향을 유지');
+}
+
 console.log('위 팀은 아래를 향해 친다');
 {
   const s = newState(4, true);
@@ -170,7 +221,7 @@ console.log('위 팀은 아래를 향해 친다');
   s.p[0].y = s.p[2].y + PHf;                                  // 위 팀 바로 아래
   const hp0 = s.p[0].hp;
   for (let t = 0; t < ATK_TICKS + 5; t++) step(s, IN(4));
-  assert(hp0 - s.p[0].hp === MELEE_DAMAGE, '위 팀의 칼은 아래로 나간다');
+  assert(hp0 - s.p[0].hp === MELEE_DAMAGE, '위 팀은 처음에 아래를 본다');
 }
 
 console.log('죽으면 못 친다');
@@ -230,6 +281,18 @@ console.log('AI가 붙어서 때린다 (공격은 자동, AI는 자리만 잡는
   }
   assert(swings > 0, '자동으로 휘둘러진다 (' + swings + ')');
   assert(s.p.some(p => p.hp < MAXHP), '실제로 맞는다 ' + s.p.map(p => p.hp).join('/'));
+}
+
+console.log('죽어도 폭발 연출이 없다');
+{
+  const s = newState(2, true);
+  s.phase = PH_PLAY;
+  s.p[1].hp = 1;
+  s.p[1].x = s.p[0].x;
+  s.p[1].y = s.p[0].y - Math.round(GRID_CH * FP);
+  for (let t = 0; t < ATK_TICKS + 4; t++) step(s, IN(2));
+  assert(s.p[1].hp <= 0, '쓰러진다');
+  assert(s.fx.length === 0, '폭발 아이콘이 안 뜬다');
 }
 
 console.log('melee.test.js 통과');

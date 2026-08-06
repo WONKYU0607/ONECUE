@@ -138,6 +138,8 @@ export function normalizeState(st){
   if (!Array.isArray(st.proj)) st.proj = [];
   if (!Array.isArray(st.fire)) st.fire = [];
   if (!Array.isArray(st.off)) st.off = Array(st.n || 2).fill(false);
+  for (let i = 0; i < (st.p || []).length; i++)
+    if (typeof st.p[i].face !== 'number') st.p[i].face = teamOf(i, st.n || 2) === 0 ? 0 : 1;
   st.melee = !!st.melee;
   if (!Array.isArray(st.blind)) st.blind = [0, 0];
   if (typeof st.blindMax !== 'number') st.blindMax = 0;
@@ -163,7 +165,9 @@ export function newState(n = 2, melee = false){
     players.push({
       x: homeXFP(col),
       y: team === 0 ? homeYFP(ROW_MAX[0]) : homeYFP(ROW_MIN[1]),
-      hp: MAXHP, cool: 0, invul: 0, flash: 0, atk: 0   // atk = 칼 휘두르는 모션 남은 틱
+      hp: MAXHP, cool: 0, invul: 0, flash: 0,
+      atk: 0,                     // 칼 휘두르는 모션 남은 틱
+      face: team === 0 ? 0 : 1    // 0=위 1=아래 2=왼 3=오른. 이동 방향을 따라간다
     });
   }
   return {
@@ -300,6 +304,7 @@ export function atCenter(s, i, c, r){
 // 쓰러진 자리에 폭발을 한 번 띄우고 사라진다. 시신이 남아 있으면
 // 아레나가 지저분하고 누가 살아 있는지 헷갈린다
 function killFx(s, p){
+  if (s.melee) return;                 // 칼전은 폭발 연출 없이 그냥 쓰러진다
   const c = Math.round(((p.x + PWf / 2) / FP - GRID_X0) / GRID_CW - 0.5);
   const r = Math.round(((p.y + PHf / 2) / FP - GRID_Y0) / GRID_CH - 0.5);
   s.fx.push({
@@ -472,6 +477,10 @@ export function step(s, inp){
       // (한 걸음이 남은 틈보다 크면 영영 다가가지 못한다)
       const oy = p.y, ox = p.x;
       const tm = teamOf(i, s.n);
+      // 바라보는 방향은 이동 입력을 따라간다. 멈추면 마지막 방향을 유지
+      if (s.melee && (dx || dy)){
+        p.face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 2 : 3) : (dy < 0 ? 0 : 1);
+      }
       // 위아래 끝은 x마다 다르다 (모서리는 잘리고 팻말 옆은 더 깊다)
       const lo = Math.max(teamYMin(tm), topSpan(p.x));
       const hi = Math.min(teamYMax(tm), botSpan(p.x) - PHf);
@@ -581,14 +590,18 @@ export function step(s, inp){
       if (p.atk > 0){
         p.atk--;
         if (p.atk === ATK_TICKS - ATK_HIT){          // 모션 중간에 한 번만 판정
-          const up = teamOf(i, s.n) === 0;           // 아래 팀은 위를 본다
-          const hy = up ? p.y - Math.round(GRID_CH * FP) : p.y + PHf;
-          const hh = Math.round(GRID_CH * FP);
+          // 판정 상자는 **바라보는 쪽 한 칸**. 좌우로도 벨 수 있다
+          const cwF = Math.round(GRID_CW * FP), chF = Math.round(GRID_CH * FP);
+          let hx = p.x, hy = p.y, hw = PWf, hh = PHf;
+          if (p.face === 0){ hy = p.y - chF; hh = chF; }
+          else if (p.face === 1){ hy = p.y + PHf; hh = chF; }
+          else if (p.face === 2){ hx = p.x - cwF; hw = cwF; }
+          else { hx = p.x + PWf; hw = cwF; }
           for (let v = 0; v < s.n; v++){
             if (v === i || teamOf(v, s.n) === teamOf(i, s.n)) continue;
             const t = s.p[v];
             if (t.hp <= 0) continue;
-            if (!overlap(t.x, t.y, PWf, PHf, p.x, hy, PWf, hh)) continue;
+            if (!overlap(t.x, t.y, PWf, PHf, hx, hy, hw, hh)) continue;
             const was = t.hp;
             if (!DEBUG_INF_HP) t.hp -= MELEE_DAMAGE;
             t.flash = FLASH_T;
@@ -717,7 +730,7 @@ export function checksum(s){
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;
   for (const fr of s.fire) h = (h*31 + fr.c*7 + fr.r*13 + fr.t) | 0;
-  for (let i = 0; i < s.n; i++) h = (h*31 + (s.off[i] ? i + 3 : 0) + (s.p[i].atk || 0) * 5) | 0;
+  for (let i = 0; i < s.n; i++) h = (h*31 + (s.off[i] ? i + 3 : 0) + (s.p[i].atk || 0) * 5 + (s.p[i].face || 0) * 3) | 0;
   for (let i = 0; i < s.n; i++){
     h = (h*31 + s.blind[i] * (i + 1)) | 0;
     for (let k = 0; k < s.ammo[i].length; k++) h = (h*31 + s.ammo[i][k] * (7 + k*4)) | 0;

@@ -14,7 +14,7 @@ import {
   ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed,
   GRID_X0, GRID_Y0, H, cellOwner, cellX, cellY
 } from './config.js';
-import { padRect, paletteSlots } from './layout.js';
+import { padRect, paletteSlots, uiBoxRect } from './layout.js';
 import { CHARGE_MAX_MS, PH_PLAY, THROW } from './config.js';
 
 // 게임 한 판을 만들고 rAF 루프를 돌린다.
@@ -188,6 +188,8 @@ export function createGame(canvas, opts = {}){
     for (let i = 0; i < n; i++){
       if (cur.cool[i] > prev.cool[i]){
         sfx.shot(i === me);
+        // 칼전은 총구 불빛이 없다 (총 쏘는 것처럼 보인다는 지적)
+        if (st.melee) continue;
         const p = st.p[i];
         juice.muzzle((p.x + PWf / 2 - FP) / FP + 1, viewY(p.y / FP), i === 0);
       }
@@ -383,19 +385,13 @@ export function createGame(canvas, opts = {}){
     // (화면 절대 위치로 두면 기기마다 패널 높이가 달라 어긋난다)
     uiBox(){
       const r = canvas.getBoundingClientRect();
-      const pd = padRect(view.uiH);
-      // 칼전은 배치할 아이템이 없어 팔레트가 비어 있다.
-      // 빈 배열에서 sl[0]을 읽어 화면이 통째로 죽었었다 — 패드 전체를 기준으로 잡는다
-      const sl = paletteSlots(view.uiH);
-      const x0 = sl.length ? Math.min(...sl.map(v => v.x)) : pd.x;
-      const x1 = sl.length ? Math.max(...sl.map(v => v.x + v.w)) : pd.x + pd.w * 0.5;
-      const top = pd.y + 1, bottom = (sl.length ? sl[0].y : pd.y + pd.h) - 2;
+      const b = uiBoxRect(view.uiH);          // 계산은 layout.js에 (테스트가 닿게)
       const k = view.scale;
       return {
-        left: r.left + x0 * k,
-        top: r.top + top * k,
-        width: (x1 - x0) * k,
-        height: Math.max(18, (bottom - top) * k)
+        left: r.left + b.x * k,
+        top: r.top + b.y * k,
+        width: b.w * k,
+        height: Math.max(18, b.h * k)
       };
     },
     // 2배속 대결 (PVP 전용)

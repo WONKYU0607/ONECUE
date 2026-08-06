@@ -1,13 +1,17 @@
 {
  "frame": {
-  "w": 310,
-  "h": 184
+  "w": 312,
+  "h": 190
  },
  "cols": [
   "front_idle",
-  "front_attack",
+  "front_atk",
   "back_idle",
-  "back_attack"
+  "back_atk",
+  "left_idle",
+  "left_atk",
+  "right_idle",
+  "right_atk"
  ],
  "rows": [
   "blue",
@@ -15,5 +19,5 @@
   "green",
   "yellow"
  ],
- "anchor": "왼쪽 아래(발끝) 기준. 대기·공격의 몸 위치가 같아 같은 자리에 그리면 된다"
+ "anchor": "몸통 가로 중심이 프레임 가운데, 발끝이 아래. 방향·자세가 바뀌어도 몸이 안 튄다"
 }

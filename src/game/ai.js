@@ -118,10 +118,19 @@ export function createAI(stage = 1){
 
       // 칼전: 총알도 엄폐물도 없다. 붙어서 때리고, 쿨 동안은 조금 물러난다
       if (s.melee){
-        const up = teamOf(me, s.n) === 0;                 // 아래 팀은 위를 본다
+        // 좌우로도 벨 수 있으므로, 세로·가로 중 더 가까운 축으로 붙는다
         const reach = GRID_CH * FP;
+        const dxc = foe.x - my.x, dyc = foe.y - my.y;
+        const sideways = Math.abs(dxc) > Math.abs(dyc) * 1.3;
+        if (sideways){
+          const want2 = (my.cool > 0 && (my.atk || 0) === 0) ? reach * 1.4 : reach * 0.5;
+          const gapX = Math.abs(dxc) - PWf;
+          const vx2 = gapX > want2 ? Math.sign(dxc) : (gapX < want2 - reach * 0.3 ? -Math.sign(dxc) : 0);
+          const vy2 = Math.abs(dyc) < PHf * 0.5 ? 0 : Math.sign(dyc);
+          return { vx: vx2 * p.speed, vy: vy2 * p.speed };
+        }
+        const up = dyc < 0;                               // 상대가 위에 있으면 위를 본다
         const gap = up ? my.y - (foe.y + PHf) : foe.y - (my.y + PHf);
-        const dxc = foe.x - my.x;
         const lined = Math.abs(dxc) < PWf * 0.7;          // 같은 세로줄에 섰는가
         // 칼이 닿으면 휘두른다. 쿨 중이면 조금 떨어져서 기다린다.
         // 단, **휘두르는 모션 중에는 물러나면 안 된다** — 판정이 모션 중간에 나므로
