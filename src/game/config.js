@@ -170,7 +170,7 @@ const A1 = {
 //   가운데(3~7열)는 세로 21칸(10+중립1+10), 바깥(1·2·8·9열)은 19칸(9+1+9)
 const A2 = {
   cols: 11, rows: 23, x0: 18.73, cw: 12.878, y0: 17.04, ch: 11.905, mid: 11,
-  pw: 10, ph: 11, bg: 'arena2', neutral: true, hc: 5, tc: [3, 7],   // 3·7열 = 팻말 사이 빈 칸
+  pw: 12, ph: 13, bg: 'arena2', neutral: true, hc: 5, tc: [3, 7],   // 3·7열 = 팻말 사이 빈 칸
   flip: 17.04 * 2 + 11.905 * 23, quota: [3, 3, 3, 3, 3, 3, 2], cover: 3,
   bands: [[1, 1, 3, 7], [2, 20, 1, 9], [21, 21, 3, 7]],
   wl: WALL2_L, wr: WALL2_R
@@ -195,24 +195,10 @@ export function setArena(n){
   GRID_X0 = a.x0; GRID_CW = a.cw; GRID_Y0 = a.y0; GRID_CH = a.ch;
   PWf = Math.round(a.pw * FP); PHf = Math.round(a.ph * FP);
   BOFF = Math.round((PWf - BWf) / 2);
-  // 벽 그림 한계와 밴드(모서리·양끝 열) 중 더 좁은 쪽을 쓴다.
-  // 이렇게 합쳐두면 이동·충돌 코드는 예전처럼 표만 보면 된다
-  if (a.bands.length === 1 && a.bands[0][2] === 0 && a.bands[0][3] === a.cols - 1){
-    WALL_L = a.wl; WALL_R = a.wr;                  // 1대1은 사각형이라 그대로
-  } else {
-    const L = a.wl.slice(), R = a.wr.slice();
-    for (let i = 0; i < L.length; i++){
-      const r = Math.floor((i - a.y0) / a.ch);
-      let b = null;
-      for (const [r0, r1, c0, c1] of a.bands) if (r >= r0 && r <= r1){ b = [c0, c1]; break; }
-      if (!b){ L[i] = R[i] = 0; continue; }         // 그 높이는 통째로 벽
-      const lo = Math.round((a.x0 + a.cw * b[0]) * FP);
-      const hi = Math.round((a.x0 + a.cw * (b[1] + 1) - a.pw) * FP);
-      L[i] = Math.max(L[i], lo);
-      R[i] = Math.max(L[i], Math.min(R[i], hi));
-    }
-    WALL_L = L; WALL_R = R;
-  }
+  // 이동 한계는 **벽 그림 표를 그대로** 쓴다. 밴드로 칸 단위로 자르면
+  // 울퉁불퉁한 벽 안쪽 공간에 못 들어가서 움직임이 뚝뚝 끊긴다.
+  // 밴드는 아이템 배치 판정(cellUsable)에만 쓴다
+  WALL_L = a.wl; WALL_R = a.wr;
   HOME_COL = a.hc; TEAM_COLS = a.tc;
   // 중립 행이 있으면 아래 팀은 그 다음 행부터 (가운데 한 칸은 아무도 못 들어간다).
   // 맨 앞뒤 행이 통째로 벽인 경우가 있어 밴드에서 실제 첫·끝 행을 가져온다
@@ -249,7 +235,7 @@ export const FAST = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 25;
+export const PROTO_VER = 26;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

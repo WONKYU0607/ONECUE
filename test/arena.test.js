@@ -6,7 +6,7 @@ import {
   FP, H, ITEM, ITEM_DEF, PH_PLAY, teamOf, setArena, ARENA, itemQuota, itemKinds, coverBudget, coverUsed,
   rowCols, cellUsable,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CH, GRID_Y0,
-  PWf, PHf, WALL_L, YMIN_S, YMAX_S, ROW_MIN, ROW_MAX, cellOwner, wallIdx
+  PWf, PHf, WALL_L, WALL_R, YMIN_S, YMAX_S, ROW_MIN, ROW_MAX, cellOwner, wallIdx
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 
@@ -26,7 +26,7 @@ assert(cellOwner(6) === 1 && cellOwner(7) === 0, '1대1은 중립 행이 없다'
 console.log('2대2 아레나');
 const s = newState(4);
 assert(GRID_COLS === 11 && GRID_ROWS === 23 && GRID_MIDROW === 11, '격자 11x23, 중립 행 11');
-assert(PWf === 10 * FP && PHf === 11 * FP, '캐릭터 10x11로 축소');
+assert(PWf === 12 * FP && PHf === 13 * FP, '캐릭터 12x13');
 assert(ARENA.bg === 'arena2' && ARENA.neutral === true, '배경 arena2 · 중립 행 있음');
 assert(cellOwner(10) === 1 && cellOwner(11) === -1 && cellOwner(12) === 0, '11행은 아무도 못 쓰는 중립');
 assert(ROW_MIN[0] === 12 && ROW_MAX[0] === 21 && ROW_MIN[1] === 1 && ROW_MAX[1] === 10,
@@ -38,6 +38,13 @@ assert(JSON.stringify(rowCols(1)) === '[3,7]' && JSON.stringify(rowCols(21)) ===
   '1행·21행은 가운데 3~7열만');
 assert(JSON.stringify(rowCols(11)) === '[1,9]', '가운데 행은 1~9열');
 assert(!cellUsable(0, 11) && !cellUsable(10, 11), '양끝 열은 벽');
+// 밴드는 **배치 판정에만** 쓴다. 이동까지 칸 단위로 자르면 울퉁불퉁한 벽 안쪽을
+// 못 타서 움직임이 뚝뚝 끊긴다 (사용자 지적)
+{
+  const wi = wallIdx(Math.round((GRID_Y0 + GRID_CH * GRID_MIDROW) * FP));
+  assert(WALL_L[wi] < Math.round((ARENA.x0 + ARENA.cw) * FP), '1열보다 왼쪽으로도 갈 수 있다');
+  assert(WALL_R[wi] > Math.round((ARENA.x0 + ARENA.cw * 9 - ARENA.pw) * FP), '9열보다 오른쪽으로도 갈 수 있다');
+}
 // 가로 9칸 / 가운데 세로 21칸 / 바깥 세로 19칸
 let wide = 0, tall = 0, side = 0;
 for (let c = 0; c < GRID_COLS; c++){

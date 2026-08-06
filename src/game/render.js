@@ -3,6 +3,7 @@ import {
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO, HP_MARKS,
   ITEM, ITEM_DEF, cellOwner, teamOf, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
+  WALL_L, WALL_R, wallIdx, PWf,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
 } from './config.js';
 import { RS, computeLayout, stickGeom } from './layout.js';
@@ -433,9 +434,17 @@ export function createRenderer(canvas){
     }
     // 진영 경계. 1대1은 정확히 절반, 2대2는 가운데 중립 행이 경계 역할을 한다
     if (ARENA.neutral){
-      px(GRID_X0, cellY(GRID_MIDROW), GRID_CW * GRID_COLS, GRID_CH, 'rgba(255,255,255,0.07)');
-      px(8, cellY(GRID_MIDROW) - 1, W - 16, 1.5, 'rgba(255,255,255,0.75)');
-      px(8, cellY(GRID_MIDROW + 1) - 0.5, W - 16, 1.5, 'rgba(255,255,255,0.75)');
+      // 선을 W 전체로 그으면 아레나 밖 검은 여백까지 삐져나온다.
+      // 그 높이의 실제 벽 안쪽까지만 긋는다 (WALL_R은 왼쪽 끝 기준이라 캐릭터 폭을 더한다)
+      const edge = y => {
+        const i = wallIdx(Math.round(y * FP));
+        return [WALL_L[i] / FP, (WALL_R[i] + PWf) / FP];
+      };
+      const yTop = cellY(GRID_MIDROW), yBot = cellY(GRID_MIDROW + 1);
+      const [lt, rt] = edge(yTop + 0.5), [lb, rb] = edge(yBot - 0.5);
+      px(Math.min(lt, lb), yTop, Math.max(rt, rb) - Math.min(lt, lb), GRID_CH, 'rgba(255,255,255,0.07)');
+      px(lt, yTop - 1, rt - lt, 1.5, 'rgba(255,255,255,0.75)');
+      px(lb, yBot - 0.5, rb - lb, 1.5, 'rgba(255,255,255,0.75)');
     } else {
       px(8, H/2 - 1, W - 16, 2, '#ffffff');
     }
