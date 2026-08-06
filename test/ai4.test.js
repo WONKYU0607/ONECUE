@@ -18,7 +18,7 @@ const mv = (q, a) => {
 console.log('네 명 다 AI로 한 판이 굴러간다');
 {
   const s = newState(4);
-  const brains = [0, 1, 2, 3].map(() => createAI(6));
+  const brains = [0, 1, 2, 3].map(() => createAI(2));   // 낮은 단계 = 잘 못 피함 = 반드시 맞는다
 
   // 배치: 팀마다 한 명이 팀 몫을 전부 놓는다
   for (const team of [0, 1]){
@@ -75,6 +75,21 @@ console.log('네 명 다 AI로 한 판이 굴러간다');
   assert(shot.size === 4, '네 명 다 총을 쏜다 (' + [...shot].sort().join(',') + ')');
   const dmg = s.p.filter(p => p.hp < 10).length;
   assert(dmg >= 1, '실제로 맞는다 (체력 깎인 사람 ' + dmg + '명)');
+}
+
+console.log('섬광탄 (2대2에서 게임이 죽던 자리)');
+{
+  const s = newState(4);
+  s.phase = PH_PLAY;
+  // 슬롯 3(위 팀)이 아래 팀 쪽으로 던진다. 예전엔 s.p[1-3] = s.p[-2]를 읽어 예외
+  const q = IN(4);
+  q[3].thr = { k: 1, ch: 100 };            // k=1: 섬광탄, 최대 차징 = 상대 맨 뒷줄
+  let threw = false;
+  try { for (let t = 0; t < 200; t++) step(s, IN(4).map((v, i) => (i === 3 && t === 0 ? q[3] : v))); }
+  catch { threw = true; }
+  assert(!threw, '위 팀 슬롯이 던져도 죽지 않는다');
+  assert(s.blind.length === 4, '눈멀기 상태도 네 명분');
+  assert(s.blind[2] === 0 && s.blind[3] === 0, '같은 팀은 안 먼다');
 }
 
 console.log('상대는 같은 팀이 아니라 반대 팀을 노린다');

@@ -492,12 +492,18 @@ export function step(s, inp){
         const x1 = Math.round(cellX(pr.c + FLASH_RADIUS + 1) * FP);
         const y0 = Math.round(cellY(pr.r1 - FLASH_RADIUS) * FP);
         const y1 = Math.round(cellY(pr.r1 + FLASH_RADIUS + 1) * FP);
-        const v = 1 - pr.by;
-        if (overlap(s.p[v].x, s.p[v].y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)){
+        // 상대 팀 전원을 검사한다. 예전엔 `1 - pr.by`로 한 명만 봤는데,
+        // 2대2에서 슬롯 2·3이 던지면 s.p[-1]을 읽어 그 자리에서 죽었다
+        const foeTeam = 1 - teamOf(pr.by, s.n);
+        for (let v = 0; v < s.n; v++){
+          if (teamOf(v, s.n) !== foeTeam) continue;
+          const t = s.p[v];
+          if (!t || t.hp <= 0) continue;
+          if (!overlap(t.x, t.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
           // 정중앙에 맞으면 더 오래 먼다
           const dur = BLIND_TICKS + (atCenter(s, v, pr.c, pr.r1) ? BLIND_CENTER_BONUS : 0);
           s.blind[v] = dur;
-          s.blindMax = dur;                    // 걷히는 속도를 맞추기 위한 기준값
+          s.blindMax = Math.max(s.blindMax, dur);   // 걷히는 속도를 맞추기 위한 기준값
         }
         s.fx.push({ c: pr.c, r: pr.r1, t: EXPLO_TICKS, k: 1 });   // k=1: 섬광 연출
         s.proj.splice(i, 1);
