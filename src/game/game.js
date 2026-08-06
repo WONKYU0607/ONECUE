@@ -157,8 +157,7 @@ export function createGame(canvas, opts = {}){
     },
     canThrowNow: () => client.pred.phase === PH_PLAY,
     ammo: ammoLeft,
-    onThrow: (k, ch) => { if (canThrow(client.pred, SELF.slot, k)) client.throwItem(SELF.slot, k, ch); },
-    onSwing: () => { sfx.shot?.(true); client.swing(SELF.slot); }
+    onThrow: (k, ch) => { if (canThrow(client.pred, SELF.slot, k)) client.throwItem(SELF.slot, k, ch); }
   });
 
   const doResize = () => view.resize(innerWidth, innerHeight);
@@ -323,7 +322,6 @@ export function createGame(canvas, opts = {}){
       const a = brain.think(client.pred, slot, dt, now);
       if (a.vx || a.vy) client.input(slot, a.vx * sp * dt, a.vy * sp * dt, 0);
       if (a.thr && canThrow(client.pred, slot, a.thr.k)) client.throwItem(slot, a.thr.k, a.thr.ch);
-      if (a.atk) client.swing(slot);
     }
 
     // 유실 대비 재전송
@@ -361,7 +359,7 @@ export function createGame(canvas, opts = {}){
     reactTo(client.pred, dt);
     client.updateRender(a, dt);
     view.draw(client.pred, dbg, a, client, stick, input.drag, leftCount, okCell, {
-      ammo: ammoLeft, charge: input.charge, swinging: input.atk?.on, softFlash: opts.softFlash?.() || false, juice
+      ammo: ammoLeft, charge: input.charge, softFlash: opts.softFlash?.() || false, juice
     });
 
     // 페이즈가 바뀔 때만 React에 알린다 (매 프레임 setState 하면 안 됨)

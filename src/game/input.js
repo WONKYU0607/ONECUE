@@ -1,5 +1,5 @@
-import { NET, ARENA } from './config.js';
-import { stickVector, inStickZone, paletteSlots, throwSlots, attackBtn } from './layout.js';
+import { NET } from './config.js';
+import { stickVector, inStickZone, paletteSlots, throwSlots } from './layout.js';
 import { unlockAudio } from './audio.js';
 
 // 스틱 상태와 눌린 키를 들고 있다가 루프가 매 프레임 읽어간다.
@@ -47,14 +47,6 @@ export function attachInput(canvas, view, opts = {}){
 
     // 전투 중: 투척 버튼을 누르면 차징 시작
     if (opts.canThrowNow?.()){
-      if (ARENA.melee){
-        const b = attackBtn(view.uiH);
-        if (wp.x >= b.x && wp.x <= b.x + b.w && wp.y >= b.y && wp.y <= b.y + b.h){
-          atk.on = true; atk.id = e.pointerId;
-          opts.onSwing?.();
-          return;
-        }
-      }
       for (const sl of throwSlots(view.uiH)){
         if (wp.x >= sl.x && wp.x <= sl.x + sl.w && wp.y >= sl.y && wp.y <= sl.y + sl.h){
           if ((opts.ammo?.(sl.k) ?? 0) <= 0) return;
@@ -91,7 +83,6 @@ export function attachInput(canvas, view, opts = {}){
     Object.assign(stick, stickVector(worldPt(src), view.uiH));
   };
   const onUp = e => {
-    if (atk.on && e.pointerId === atk.id){ atk.on = false; atk.id = null; return; }
     if (charge.on && e.pointerId === charge.id){
       if (!charge.out) opts.onThrow?.(charge.k, charge.ch);   // 밖에서 떼면 취소
       charge.on = false; charge.id = null; charge.k = -1; charge.ch = 0; charge.out = false;
@@ -128,7 +119,7 @@ export function attachInput(canvas, view, opts = {}){
   }
 
   return {
-    stick, keys, drag, charge, atk, tick,
+    stick, keys, drag, charge, tick,
     detach(){
       removeEventListener('pointerdown', onDown);
       removeEventListener('pointermove', onMove);

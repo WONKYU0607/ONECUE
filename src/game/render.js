@@ -3,12 +3,11 @@ import {
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO, HP_MARKS,
   ITEM, ITEM_DEF, cellOwner, teamOf, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
-  MELEE_COOL,
   FIRE_TICKS, FIRE_RADIUS,
   WALL_L, WALL_R, wallIdx, PWf,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
 } from './config.js';
-import { RS, computeLayout, stickGeom, attackBtn } from './layout.js';
+import { RS, computeLayout, stickGeom } from './layout.js';
 import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
 
@@ -372,32 +371,6 @@ export function createRenderer(canvas){
   }
 
   // 전투 중 투척 버튼 (배치 팔레트와 같은 자리)
-  // 칼전 공격 버튼
-  function drawAttackBtn(s, uiH2, pressed){
-    const b = attackBtn(uiH2);
-    const me = s.p[SELF.slot];
-    const ready = me && me.hp > 0 && (me.cool || 0) === 0;
-    px(b.x, b.y, b.w, b.h, pressed ? 'rgba(240,168,30,0.30)'
-                          : ready ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)');
-    const c = pressed ? '#f0a81e' : ready ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
-    px(b.x, b.y, b.w, 1, c); px(b.x, b.y + b.h - 1, b.w, 1, c);
-    px(b.x, b.y, 1, b.h, c); px(b.x + b.w - 1, b.y, 1, b.h, c);
-    // 칼 모양: 비스듬한 날 + 손잡이
-    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-    ctx.save();
-    ctx.translate(cx * RS, cy * RS); ctx.rotate(-Math.PI / 4);
-    const col2 = ready ? '#e8e8f4' : '#6a6a85';
-    ctx.fillStyle = col2; ctx.fillRect(-1.6 * RS, -13 * RS, 3.2 * RS, 20 * RS);
-    ctx.fillStyle = ready ? '#c8a24a' : '#5a5a70';
-    ctx.fillRect(-5 * RS, 6 * RS, 10 * RS, 2.4 * RS);
-    ctx.fillRect(-1.6 * RS, 8 * RS, 3.2 * RS, 5 * RS);
-    ctx.restore();
-    // 쿨다운 게이지
-    if (me && (me.cool || 0) > 0){
-      const t = 1 - me.cool / MELEE_COOL;
-      px(b.x + 1, b.y + b.h - 3, (b.w - 2) * t, 1.6, '#f0a81e');
-    }
-  }
   function drawThrowPad(s, uiH2, ammo, charge){
     if (s.phase !== PH_PLAY) return;
     for (const sl of throwSlots(uiH2)){
@@ -518,7 +491,7 @@ export function createRenderer(canvas){
   }
 
   function draw(s, dbg, a, cl, stick, drag, left, ok, extra = {}){
-    setArena(s && s.n ? s.n : 2);   // 격자·캐릭터 크기를 이 판에 맞춘다
+    setArena(s && s.n ? s.n : 2, s && s.melee);   // 격자·캐릭터·배경을 이 판에 맞춘다
     const j = extra.juice;
     const sh = j ? j.offset() : { x: 0, y: 0 };
     ctx.save();
@@ -530,8 +503,10 @@ export function createRenderer(canvas){
       for (let c = 0; c <= GRID_COLS; c++) px(cellX(c), GRID_Y0, 0.4, GRID_CH*GRID_ROWS, 'rgba(255,255,255,0.14)');
       for (let r = 0; r <= GRID_ROWS; r++) px(GRID_X0, cellY(r), GRID_CW*GRID_COLS, 0.4, 'rgba(255,255,255,0.14)');
     }
-    // 진영 경계. 1대1은 정확히 절반, 2대2는 가운데 중립 행이 경계 역할을 한다
-    if (ARENA.neutral){
+    // 진영 경계. 칼전은 진영이 없어 선을 안 그린다
+    if (ARENA.melee){
+      // 아무것도 안 그림
+    } else if (ARENA.neutral){
       // 선을 W 전체로 그으면 아레나 밖 검은 여백까지 삐져나온다.
       // 그 높이의 실제 벽 안쪽까지만 긋는다 (WALL_R은 왼쪽 끝 기준이라 캐릭터 폭을 더한다)
       const edge = y => {
@@ -571,7 +546,6 @@ export function createRenderer(canvas){
     drawPanel(s, stick);
     if (left) drawPalette(s, uiH, left, drag);
     if (extra.ammo) drawThrowPad(s, uiH, extra.ammo, extra.charge);
-    if (ARENA.melee) drawAttackBtn(s, uiH, extra.swinging);
     drawBlind(s, extra.softFlash);
     if (SHOW_HUD){
       ctx.font = (8*RS) + 'px monospace'; ctx.textAlign = 'left';

@@ -31,13 +31,6 @@ function side(pd, total){
   return Math.max(4, Math.min(pd.x + pd.w - total - 4, cx - total / 2));
 }
 
-// 칼전 공격 버튼: 스틱 반대쪽. 스와이프(스틱)와 확실히 떨어뜨린다
-export function attackBtn(uiH){
-  const pd = padRect(uiH);
-  const size = Math.min(pd.h - 8, 46);
-  return { x: pd.x + 8, y: pd.y + (pd.h - size) / 2, w: size, h: size };
-}
-
 // 배치 팔레트: 스틱 반대쪽에 아이템 아이콘. 종류 수는 아레나에 따라 다르다
 // (1대1 3개 / 2대2 7개). 5개부터는 두 줄로 접는다
 export function paletteSlots(uiH){

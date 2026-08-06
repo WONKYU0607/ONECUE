@@ -195,7 +195,7 @@ export function newState(n = 2, melee = false){
   };
 }
 
-export const NOIN = { dx:0, dy:0, fire:0, atk:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 };
+export const NOIN = { dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 };
 export function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
 
 export function overlap(ax,ay,aw,ah,bx,by,bw,bh){
@@ -343,8 +343,8 @@ export function throwCol(p){
   return Math.max(0, Math.min(GRID_COLS - 1, c));
 }
 // 차징(0~1) -> 착탄 행. 0이면 중앙선 건너 첫 칸, 1이면 상대 맨 뒷줄
-export function throwRow(slot, charge, n = 2){
-  setArena(n);
+export function throwRow(slot, charge, n = 2, melee = false){
+  setArena(n, melee);
   const ch = Math.max(0, Math.min(1, charge));
   const tm = teamOf(slot, n);
   // 중앙선(중립 행이 있으면 그 너머) 건너 첫 칸 ~ 상대 맨 뒷줄
@@ -520,7 +520,7 @@ export function step(s, inp){
       k, by: i,
       c: throwCol(s.p[i]),
       r0: teamOf(i, s.n) === 0 ? ROW_MAX[0] : ROW_MIN[1],   // 출발은 내 진영 끝쪽(연출용)
-      r1: throwRow(i, q.thr.ch / 100, s.n),     // 차징은 0~100 정수로 온다
+      r1: throwRow(i, q.thr.ch / 100, s.n, s.melee),     // 차징은 0~100 정수로 온다
       t: FLY_TICKS, fuse: 0
     });
   }
@@ -569,10 +569,13 @@ export function step(s, inp){
   // 칼전: 휘두르기 모션과 판정. 앞으로 한 칸을 때린다
   if (s.melee && s.phase === PH_PLAY){
     for (let i = 0; i < s.n; i++){
-      const p = s.p[i], q = s.off[i] ? NOIN : (inp[i] || NOIN);
+      const p = s.p[i];
       if (p.cool > 0) p.cool--;
       if (p.hp <= 0){ p.atk = 0; continue; }
-      if (q.atk && p.atk === 0 && p.cool === 0){ p.atk = ATK_TICKS; p.cool = MELEE_COOL; }
+      // 자동 공격. 총격전의 자동 발사와 같은 구조로, 칼전은 스틱만으로 조작한다
+      // (수동으로 되돌리려면 여기에 입력 조건만 다시 붙이면 된다)
+      if (s.off[i]) continue;                       // 끊긴 사람은 안 휘두른다
+      if (p.atk === 0 && p.cool === 0){ p.atk = ATK_TICKS; p.cool = MELEE_COOL; }
       if (p.atk > 0){
         p.atk--;
         if (p.atk === ATK_TICKS - ATK_HIT){          // 모션 중간에 한 번만 판정

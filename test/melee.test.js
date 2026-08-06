@@ -60,6 +60,20 @@ console.log('스폰');
   assert(s.p.every(p => cellUsable(col(p), row(p))), '전부 쓸 수 있는 칸에서 시작');
 }
 
+console.log('설치할 아이템이 없다');
+{
+  const s = newState(2, true);
+  const { itemKinds, coverBudget, itemQuota, ITEM } = await import('../src/game/config.js');
+  assert(itemKinds().length === 0, '팔레트에 아무것도 없다');
+  assert(coverBudget() === 0 && itemQuota(ITEM.DRUM) === 0, '엄폐물·드럼통 정원 0');
+  const { canPlace, allPlaced } = await import('../src/game/sim.js');
+  assert(!canPlace(s, 0, ITEM.WALL, 3, 5), '벽을 못 놓는다');
+  assert(!canPlace(s, 0, ITEM.DRUM, 3, 3), '드럼통도 못 놓는다');
+  assert(allPlaced(s, 0), '놓을 게 없으니 처음부터 준비 가능');
+  const { throwSlots, paletteSlots } = await import('../src/game/layout.js');
+  assert(throwSlots(86).length === 0 && paletteSlots(86).length === 0, '투척·팔레트 UI가 안 뜬다');
+}
+
 console.log('총알이 없다');
 {
   const s = newState(2, true);
@@ -69,7 +83,7 @@ console.log('총알이 없다');
   assert(s.p.every(p => p.hp === MAXHP), '가만히 있으면 아무도 안 닳는다');
 }
 
-console.log('칼은 앞 한 칸만 닿는다');
+console.log('공격은 자동으로 나간다 (스틱만으로 조작)');
 {
   const s = newState(2, true);
   s.phase = PH_PLAY;
@@ -77,9 +91,8 @@ console.log('칼은 앞 한 칸만 닿는다');
   s.p[1].x = s.p[0].x;
   s.p[1].y = s.p[0].y - Math.round(GRID_CH * FP);
   const hp0 = s.p[1].hp;
-  const q = IN(2); q[0].atk = 1;
-  step(s, q);
-  assert(s.p[0].atk === ATK_TICKS - 1, '휘두르는 모션이 시작된다');
+  step(s, IN(2));                                   // 아무 입력 없이
+  assert(s.p[0].atk === ATK_TICKS - 1, '입력 없이 휘두르기 시작');
   for (let t = 0; t < ATK_TICKS; t++) step(s, IN(2));
   assert(hp0 - s.p[1].hp === MELEE_DAMAGE, `한 방에 ${MELEE_DAMAGE} (${hp0 - s.p[1].hp})`);
   assert(s.p[0].atk === 0, '모션이 끝난다');
@@ -92,8 +105,6 @@ console.log('두 칸 떨어지면 안 닿는다');
   s.p[1].x = s.p[0].x;
   s.p[1].y = s.p[0].y - Math.round(GRID_CH * 2.5 * FP);
   const hp0 = s.p[1].hp;
-  const q = IN(2); q[0].atk = 1;
-  step(s, q);
   for (let t = 0; t < ATK_TICKS + 5; t++) step(s, IN(2));
   assert(s.p[1].hp === hp0, '사거리 밖은 안 맞는다');
 }
@@ -105,10 +116,9 @@ console.log('쿨다운');
   s.p[1].x = s.p[0].x;
   s.p[1].y = s.p[0].y - Math.round(GRID_CH * FP);
   const hp0 = s.p[1].hp;
-  const q = IN(2); q[0].atk = 1;
-  for (let t = 0; t < MELEE_COOL - 2; t++) step(s, q);       // 계속 눌러도
+  for (let t = 0; t < MELEE_COOL - 2; t++) step(s, IN(2));
   assert(hp0 - s.p[1].hp === MELEE_DAMAGE, '쿨 안에서는 한 번만 맞는다');
-  for (let t = 0; t < MELEE_COOL; t++) step(s, q);
+  for (let t = 0; t < MELEE_COOL; t++) step(s, IN(2));
   assert(hp0 - s.p[1].hp === MELEE_DAMAGE * 2, '쿨이 끝나면 다시 때린다');
 }
 
@@ -119,8 +129,7 @@ console.log('팀원은 안 때린다');
   s.p[1].x = s.p[0].x;
   s.p[1].y = s.p[0].y - Math.round(GRID_CH * FP);            // 팀원을 앞에 세운다
   const hp0 = s.p[1].hp;
-  const q = IN(4); q[0].atk = 1;
-  for (let t = 0; t < ATK_TICKS + 5; t++) step(s, q);
+  for (let t = 0; t < ATK_TICKS + 5; t++) step(s, IN(4));
   assert(s.p[1].hp === hp0, '같은 팀은 안 맞는다');
 }
 
@@ -131,8 +140,7 @@ console.log('위 팀은 아래를 향해 친다');
   s.p[0].x = s.p[2].x;
   s.p[0].y = s.p[2].y + PHf;                                  // 위 팀 바로 아래
   const hp0 = s.p[0].hp;
-  const q = IN(4); q[2].atk = 1;
-  for (let t = 0; t < ATK_TICKS + 5; t++) step(s, q);
+  for (let t = 0; t < ATK_TICKS + 5; t++) step(s, IN(4));
   assert(hp0 - s.p[0].hp === MELEE_DAMAGE, '위 팀의 칼은 아래로 나간다');
 }
 
@@ -144,8 +152,7 @@ console.log('죽으면 못 친다');
   s.p[1].y = s.p[0].y - Math.round(GRID_CH * FP);
   s.p[0].hp = 0;
   const hp0 = s.p[1].hp;
-  const q = IN(2); q[0].atk = 1;
-  for (let t = 0; t < ATK_TICKS + 5; t++) step(s, q);
+  for (let t = 0; t < ATK_TICKS + 5; t++) step(s, IN(2));
   assert(s.p[1].hp === hp0 && s.p[0].atk === 0, '쓰러진 사람은 안 휘두른다');
 }
 
@@ -153,8 +160,7 @@ console.log('상태 전송');
 {
   const s = newState(4, true);
   s.phase = PH_PLAY;
-  const q = IN(4); q[0].atk = 1;
-  step(s, q);
+  step(s, IN(4));
   const ck = checksum(s);
   const back = normalizeState(cloneState(JSON.parse(JSON.stringify(s))));
   assert(back.melee === true, '칼전 표시가 유지된다');
@@ -173,7 +179,7 @@ console.log('총격전은 그대로 (회귀)');
   assert(s.bullets.length > 0, '총알은 여전히 나간다');
 }
 
-console.log('AI가 붙어서 때린다');
+console.log('AI가 붙어서 때린다 (공격은 자동, AI는 자리만 잡는다)');
 {
   const { createAI } = await import('../src/game/ai.js');
   const s = newState(2, true);
@@ -188,12 +194,12 @@ console.log('AI가 붙어서 때린다');
       const a = brains[i].think(s, i, 1 / 60, now);
       q[i].dx = Math.round(a.vx * sp * (1 / 60) * FP);
       q[i].dy = Math.round(a.vy * sp * (1 / 60) * FP);
-      if (a.atk){ q[i].atk = 1; swings++; }
+      if (s.p[i].atk === ATK_TICKS - 1) swings++;
     }
     step(s, q);
     now += 1000 / 60;
   }
-  assert(swings > 0, 'AI가 칼을 휘두른다 (' + swings + ')');
+  assert(swings > 0, '자동으로 휘둘러진다 (' + swings + ')');
   assert(s.p.some(p => p.hp < MAXHP), '실제로 맞는다 ' + s.p.map(p => p.hp).join('/'));
 }
 

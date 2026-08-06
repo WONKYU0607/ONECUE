@@ -123,7 +123,6 @@ export function createAI(stage = 1){
         const gap = up ? my.y - (foe.y + PHf) : foe.y - (my.y + PHf);
         const dxc = foe.x - my.x;
         const lined = Math.abs(dxc) < PWf * 0.7;          // 같은 세로줄에 섰는가
-        const inRange = lined && gap >= -PHf * 0.5 && gap <= reach * 0.85;
         // 칼이 닿으면 휘두른다. 쿨 중이면 조금 떨어져서 기다린다.
         // 단, **휘두르는 모션 중에는 물러나면 안 된다** — 판정이 모션 중간에 나므로
         // 바로 빠지면 자기 칼을 자기가 피한다
@@ -134,7 +133,7 @@ export function createAI(stage = 1){
         else if (gap > want + reach * 0.15) vy = up ? -1 : 1;
         else if (gap < want - reach * 0.15) vy = up ? 1 : -1;
         const vx = Math.abs(dxc) < PWf * 0.35 ? 0 : Math.sign(dxc);
-        return { vx: vx * p.speed, vy: vy * p.speed, atk: inRange && my.cool === 0 ? 1 : 0 };
+        return { vx: vx * p.speed, vy: vy * p.speed };
       }
 
       const myCx = my.x + HALF;

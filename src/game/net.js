@@ -230,7 +230,7 @@ export class Server {
     }
     let f = this.inbox.get(m.tick);
     if (!f){ f = Array(this.n).fill(null); this.inbox.set(m.tick, f); }
-    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, atk: m.atk ? 1 : 0, ready: m.ready ? 1 : 0, go: m.go ? 1 : 0, place: m.place || null, thr: m.thr || null, fastReq: m.fastReq|0, fastAns: m.fastAns|0 };
+    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, ready: m.ready ? 1 : 0, go: m.go ? 1 : 0, place: m.place || null, thr: m.thr || null, fastReq: m.fastReq|0, fastAns: m.fastAns|0 };
   }
   recalcDelay(){
     const worst = Math.max(...this.rtt.map(v => v || 0));     // 가장 느린 사람 기준 = 전원 동일 지연
@@ -272,7 +272,7 @@ export class Client {
     this.delay = MIN_DELAY;
     this.rtt = -1; this.pings = new Map(); this.pingId = 1; this.lastPing = -1e9;
     this.svTick = 0; this.svAt = CLOCK.now();
-    const blank = () => ({ dx:0, dy:0, fire:0, atk:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 });
+    const blank = () => ({ dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 });
     this.pend = [ blank(), blank(), blank(), blank() ];   // 최대 4명
     this.sent = [];                    // 아직 서버가 확정하지 않은 내 입력
     this.pred = newState();            // 예측 상태 (화면에 그리는 것)
@@ -362,15 +362,15 @@ export class Client {
         let dx = q.dx, dy = q.dy;
         const len = Math.sqrt(dx*dx + dy*dy);
         if (len > cap){ const k = cap / len; dx = Math.round(dx * k); dy = Math.round(dy * k); }
-        const e = { t:'in', pid, tick:t, dx, dy, fire:q.fire, atk:q.atk, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns };
+        const e = { t:'in', pid, tick:t, dx, dy, fire:q.fire, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns };
         this.net.clientSend(e);
         this.stats.sentIn++;
-        this.sent.push({ tick:t, pid, dx, dy, fire:q.fire, atk:q.atk, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns });
+        this.sent.push({ tick:t, pid, dx, dy, fire:q.fire, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns });
         // 못 실은 이동량만 남긴다. 탭이 오래 멈췄다 돌아왔을 때 몰아서 튀지 않게 상한을 둔다
         const BACKLOG = cap * 3;
         q.dx = clampi(q.dx - dx, -BACKLOG, BACKLOG);
         q.dy = clampi(q.dy - dy, -BACKLOG, BACKLOG);
-        q.fire = 0; q.atk = 0; q.ready = 0; q.go = 0; q.place = null; q.thr = null; q.fastReq = 0; q.fastAns = 0;
+        q.fire = 0; q.ready = 0; q.go = 0; q.place = null; q.thr = null; q.fastReq = 0; q.fastAns = 0;
       }
     }
   }
@@ -412,14 +412,14 @@ export class Client {
     while (p.tick < target && guard++ < 40){
       const t = p.tick + 1;
       const n = p.n || 2;
-      const inp = Array.from({ length: n }, () => ({ dx:0, dy:0, fire:0, atk:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 }));
+      const inp = Array.from({ length: n }, () => ({ dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 }));
       if (this.lastInp && t - this.s.tick <= EXTRAP_MAX){   // 남들은 마지막 입력으로 외삽
         for (let k = 0; k < n; k++){
           const li = this.lastInp[k];
           if (li){ inp[k].dx = li.dx; inp[k].dy = li.dy; }
         }
       }
-      for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, atk:e.atk, ready:e.ready, go:e.go, place:e.place, thr:e.thr, fastReq:e.fastReq, fastAns:e.fastAns };
+      for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, ready:e.ready, go:e.go, place:e.place, thr:e.thr, fastReq:e.fastReq, fastAns:e.fastAns };
       prevMy = p.p[SELF.slot].x; prevMyY = p.p[SELF.slot].y;
       step(p, inp);
     }
@@ -473,11 +473,6 @@ export class Client {
   answerFast(pid, ok){
     if (!this.controlled.includes(pid)) return;
     this.pend[pid].fastAns = ok ? 1 : 2;
-  }
-  // 칼 휘두르기
-  swing(pid){
-    if (!this.controlled.includes(pid)) return;
-    this.pend[pid].atk = 1;
   }
   // 준비완료(2단계). 설치 완료를 누른 사람만 서버가 받아준다
   setGo(pid){
