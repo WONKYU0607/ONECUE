@@ -11,7 +11,7 @@ import { sfx, buzz, unlockAudio } from './audio.js';
 import { canPlace, canThrow, allPlaced, myItemAt } from './sim.js';
 import {
   FAST, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, teamOf, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
-  ARENA, PWf, PHf, itemQuota, itemKinds,
+  ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed,
   GRID_X0, GRID_Y0, H, cellOwner, cellX, cellY
 } from './config.js';
 import { padRect, paletteSlots } from './layout.js';
@@ -47,7 +47,9 @@ export function createGame(canvas, opts = {}){
   let aiPlan = null, nextAiPlaceAt = 0;
   // 이 종류를 정원만큼 놓았는가
   const allPlacedKind = (st, slot, k) =>
-    (st.items || []).filter(it => it.by === slot && it.k === k).length >= itemQuota(k);
+    isCover(k)
+      ? coverUsed(st.items, slot) >= coverBudget()
+      : (st.items || []).filter(it => it.by === slot && it.k === k).length >= itemQuota(k);
   // 재접속하면 옛 프레임을 버리고 서버 스냅샷으로 다시 맞춘다
   if (online){
     let first = true;
@@ -89,6 +91,8 @@ export function createGame(canvas, opts = {}){
   const leftCount = k => {
     const st = client.pred;
     const myTeam = teamOf(SELF.slot, st.n || 2);
+    // 엄폐물은 종류별이 아니라 합계로 센다 (1·2·3칸 조합 자유, 총 N개)
+    if (isCover(k)) return Math.max(0, coverBudget() - coverUsed(st.items, myTeam));
     const used = (st.items || []).filter(it => it.by === myTeam && it.k === k).length;
     return Math.max(0, itemQuota(k) - used);
   };
@@ -243,8 +247,14 @@ export function createGame(canvas, opts = {}){
       if (!aiPlan){
         aiPlan = [];
         // 넓은 것부터 놓는다. 좁은 걸 먼저 흩뿌리면 3칸짜리가 들어갈 자리가 없어진다
-        for (const k of itemKinds().slice().sort((a, b) => ITEM_DEF[b].cells - ITEM_DEF[a].cells)){
-          for (let n = 0; n < itemQuota(k); n++) aiPlan.push(k);
+        const wide = itemKinds().slice().sort((a, b) => ITEM_DEF[b].cells - ITEM_DEF[a].cells);
+        let budget = coverBudget();
+        for (const k of wide){
+          if (isCover(k)){
+            for (let n = 0; n < Math.min(itemQuota(k), budget); n++){ aiPlan.push(k); budget--; }
+          } else {
+            for (let n = 0; n < itemQuota(k); n++) aiPlan.push(k);
+          }
         }
       }
       if (aiPlan.length && now >= nextAiPlaceAt){

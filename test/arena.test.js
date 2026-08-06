@@ -3,7 +3,7 @@
 // 조용히 깨지기 쉽다. 1대1 값이 1FP라도 달라지면 결정론이 깨진다.
 import { newState, step, canPlace, checksum, NOIN } from '../src/game/sim.js';
 import {
-  FP, H, ITEM, ITEM_DEF, PH_PLAY, teamOf, setArena, ARENA, itemQuota, itemKinds,
+  FP, H, ITEM, ITEM_DEF, PH_PLAY, teamOf, setArena, ARENA, itemQuota, itemKinds, coverBudget, coverUsed,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CH, GRID_Y0,
   PWf, PHf, WALL_L, YMIN_S, YMAX_S, ROW_MIN, ROW_MAX, cellOwner, wallIdx
 } from '../src/game/config.js';
@@ -36,6 +36,9 @@ const rowOf = p => Math.round((p.y / FP - GRID_Y0 - (GRID_CH - PHf / FP) / 2) / 
 assert(rowOf(s.p[0]) === 18 && rowOf(s.p[1]) === 18, '아래 팀 둘 다 맨 뒷줄');
 assert(rowOf(s.p[2]) === 0 && rowOf(s.p[3]) === 0, '위 팀 둘 다 맨 뒷줄');
 assert(s.p[0].x !== s.p[1].x && s.p[2].x !== s.p[3].x, '같은 팀은 가로로 떨어져 선다');
+const colOfP = p => Math.round((p.x / FP - ARENA.x0 - (ARENA.cw - ARENA.pw) / 2) / ARENA.cw);
+assert(colOfP(s.p[0]) === 3 && colOfP(s.p[1]) === 5, '팻말을 피해 3·5열에 선다');
+assert(colOfP(s.p[2]) === 3 && colOfP(s.p[3]) === 5, '위 팀도 같은 열 (아레나가 좌우 대칭)');
 assert(s.p.every(p => p.x >= WALL_L[wallIdx(p.y)]), '전원 벽 안쪽에서 시작');
 
 console.log('배치 규칙');
@@ -54,10 +57,10 @@ console.log('아이템 종류');
 setArena(2);
 assert(itemKinds().length === 3, '1대1은 예전 그대로 3종');
 assert(itemQuota(ITEM.WALL2) === 0 && itemQuota(ITEM.DRUM) === 2, '1대1엔 2칸 벽이 없고 드럼통 2개');
+assert(coverBudget() === 2, '1대1은 예전대로 벽1 + 바리1');
 setArena(4);
 assert(itemKinds().length === 7, '2대2는 7종 (벽 1·2·3칸, 바리케이트 1·2·3칸, 드럼통)');
-assert([ITEM.WALL, ITEM.WALL2, ITEM.WALL3, ITEM.BARR, ITEM.BARR2, ITEM.BARR3]
-  .every(k => itemQuota(k) === 1), '엄폐물은 폭별로 하나씩');
+assert(coverBudget() === 3, '엄폐물은 조합 자유, 합계 3개');
 assert(ITEM_DEF[ITEM.WALL3].cells === 3 && ITEM_DEF[ITEM.BARR2].cells === 2, '칸 수가 이름과 맞는다');
 
 console.log('여러 칸짜리 배치');
@@ -72,6 +75,14 @@ assert(canPlace(si, 0, ITEM.BARR, 1, backRow), '비어 있는 칸엔 놓인다')
 // 정원을 다 채워야 준비 완료가 된다
 const { allPlaced } = await import('../src/game/sim.js');
 assert(!allPlaced(si, 0), '아직 다 안 놓았으면 준비 불가');
+
+console.log('엄폐물 합계 한도');
+si.items.push({ k: ITEM.BARR2, c: 0, r: backRow - 1, by: 0, hp: 3 });
+si.items.push({ k: ITEM.WALL, c: 7, r: backRow - 1, by: 0, hp: 5 });
+assert(coverUsed(si.items, 0) === 3, '3칸 벽 + 2칸 바리 + 1칸 벽 = 3개');
+assert(!canPlace(si, 0, ITEM.WALL, 0, backRow - 2), '한도를 다 쓰면 폭에 상관없이 못 놓는다');
+assert(canPlace(si, 0, ITEM.DRUM, 0, 0), '드럼통은 별도 정원이라 놓을 수 있다');
+assert(coverUsed(si.items, 1) === 0, '상대 팀 한도는 따로다');
 
 console.log('이동 범위');
 const s2 = newState(4);
@@ -124,6 +135,26 @@ const dirs = [0, 1, 2, 3].map(i => {
 });
 assert(dirs[0] === -1 && dirs[1] === -1, '아래 팀(슬롯0·1)은 위로 쏜다');
 assert(dirs[2] === 1 && dirs[3] === 1, '위 팀(슬롯2·3)은 아래로 쏜다');
+
+console.log('스냅샷 전 예측 (슬롯 2·3이 검은 화면으로 죽던 자리)');
+{
+  const { Loopback, Client } = await import('../src/game/net.js');
+  const { SELF } = await import('../src/game/config.js');
+  const keep = { slot: SELF.slot, n: SELF.n };
+  SELF.slot = 2; SELF.n = 4;                       // 위 팀 = 스냅샷을 받아야 존재하는 슬롯
+  const cl = new Client(new Loopback(), [2]);
+  cl.nextInputTick = 6;
+  let threw = false;
+  // 확정 상태가 아직 2인용 기본값인 채로 프레임이 돌아도 죽으면 안 된다
+  try { cl.predict(); cl.updateRender(0.5, 1 / 60); } catch { threw = true; }
+  assert(!threw, '스냅샷 전이라도 예측이 죽지 않는다');
+  // 스냅샷이 오면 네 명 다 예측·보정된다
+  cl.s = newState(4); cl.pred = newState(4);
+  cl.predict(); cl.updateRender(0.5, 1 / 60);
+  assert(cl.pred.p.length === 4, '네 명짜리로 예측');
+  assert(cl.rx.length === 4 && cl.rx.every(v => typeof v === 'number'), '렌더 위치도 네 명분');
+  SELF.slot = keep.slot; SELF.n = keep.n;
+}
 
 console.log('1대1로 되돌아오는지');
 setArena(4);

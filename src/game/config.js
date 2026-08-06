@@ -59,7 +59,7 @@ export const CD_TICKS = CD_STEP * 3 + CD_GO;
 // 바닥 타일 격자 (배경 실측: 가로 21.67, 세로 22.11)
 // 배경이 상하 대칭이라 14행 전체가 맵에 딱 맞고 7번 경계가 정확히 중앙
 // 전부 setArena(n)가 아레나에 맞춰 갈아끼운다 (import 쪽은 live binding으로 자동 반영)
-export const SHEET_CW = 21.638;   // 아이템 시트를 만든 기준 칸 너비 (1대1)
+export const SHEET_CW = 21.638, SHEET_CH = 22.214;   // 아이템 시트를 만든 기준 칸 크기 (1대1)
 export let GRID_CW = 21.638, GRID_X0 = 24.9, GRID_COLS = 6;
 export let GRID_CH = 22.214, GRID_ROWS = 14, GRID_Y0 = 0;
 export let GRID_MIDROW = 7;                       // 1대1은 이 경계가 정확히 H/2
@@ -73,7 +73,7 @@ export const homeYFP = r => Math.round(homeY(r) * FP);
 export const homeX = c => GRID_X0 + GRID_CW * c + (GRID_CW - PWf / FP) / 2;   // 칸 가로 중앙
 export const homeXFP = c => Math.round(homeX(c) * FP);
 export let HOME_COL = 3;                          // 1대1 시작 열 (0~5 중 가운데)
-export let TEAM_COLS = [1, 4];                    // 2대2에서 같은 팀 둘이 서는 열
+export let TEAM_COLS = [1, 4];                    // 같은 팀 둘이 서는 열 (2대2)
 export let ROW_MIN = [GRID_MIDROW, 0];            // 팀별 이동 가능한 행 범위
 export let ROW_MAX = [GRID_ROWS - 1, GRID_MIDROW - 1];
 export const VIEW = { grid: true };          // 디버그 표시
@@ -99,9 +99,14 @@ export const ITEM_DEF = [
   { key: 'barr3', name: '바리케이트 3칸', hp: 3, cells: 3, mine: true },
   { key: 'drum',  name: '드럼통',       hp: 1, cells: 1, mine: false }
 ];
-// 정원은 아레나마다 다르다. 1대1은 예전 그대로(벽1·바리1·드럼2),
-// 2대2는 넓어진 만큼 폭별로 하나씩 더 준다. 0이면 그 모드엔 없는 아이템
+// 정원은 아레나마다 다르다. 0이면 그 모드엔 없는 아이템
 export const itemQuota = k => (ARENA.quota[k] || 0);
+// 엄폐물(벽·바리케이트)은 종류별 정원과 별개로 **합계**가 묶여 있다.
+// 2대2는 1·2·3칸을 마음대로 조합하되 총 3개까지. 1대1은 2개(벽1+바리1)로 예전과 동일
+export const isCover = k => !!(ITEM_DEF[k] && ITEM_DEF[k].mine);
+export const coverBudget = () => ARENA.cover;
+export const coverUsed = (items, team) =>
+  (items || []).filter(it => it.by === team && isCover(it.k)).length;
 // 이 아레나에서 쓸 수 있는 아이템 번호들 (팔레트 순서)
 export const itemKinds = () => ITEM_DEF.map((_, k) => k).filter(k => itemQuota(k) > 0);
 export const DRUM_DAMAGE = 20;        // 드럼통 폭발
@@ -154,12 +159,12 @@ export const WALL2_R = '133,133,133,133,133,133,133,133,134,135,136,137,138,139,
 const A1 = {
   cols: 6, rows: 14, x0: 24.9, cw: 21.638, y0: 0, ch: 22.214, mid: 7,
   pw: 14, ph: 16, bg: 'arena', neutral: false, hc: 3, tc: [1, 4],
-  flip: H, quota: [1, 0, 0, 1, 0, 0, 2], wl: WALL1_L, wr: WALL1_R
+  flip: H, quota: [1, 0, 0, 1, 0, 0, 2], cover: 2, wl: WALL1_L, wr: WALL1_R
 };
 const A2 = {
   cols: 9, rows: 19, x0: 12.013, cw: 17.31, y0: 7.59, ch: 15.45, mid: 9,
-  pw: 11, ph: 12, bg: 'arena2', neutral: true, hc: 4, tc: [2, 6],
-  flip: 7.59 * 2 + 15.45 * 19, quota: [1, 1, 1, 1, 1, 1, 2], wl: WALL2_L, wr: WALL2_R
+  pw: 11, ph: 12, bg: 'arena2', neutral: true, hc: 4, tc: [3, 5],   // 3·5열 = 아래 팻말 사이 빈 칸
+  flip: 7.59 * 2 + 15.45 * 19, quota: [3, 3, 3, 3, 3, 3, 2], cover: 3, wl: WALL2_L, wr: WALL2_R
 };
 export const ARENA = { ...A1 };
 
@@ -205,7 +210,7 @@ export const FAST = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 20;
+export const PROTO_VER = 21;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

@@ -3,7 +3,7 @@ import { spawn } from 'child_process';
 import wsPkg from '../server/node_modules/ws/index.js';
 const { WebSocket } = wsPkg;
 import { Client } from '../src/game/net.js';
-import { GRID_ROWS, GRID_COLS, teamOf, itemKinds, itemQuota } from '../src/game/config.js';
+import { GRID_ROWS, GRID_COLS, teamOf, itemKinds, itemQuota, isCover, coverBudget } from '../src/game/config.js';
 import { canPlace } from '../src/game/sim.js';
 import { assert } from './harness.js';
 
@@ -88,7 +88,8 @@ assert(cs.every(c => c.s.p.length === 4), '플레이어 네 명');
 assert(cs[0].s.tick > 30 && cs[3].s.tick > 30, '전원 확정 프레임 수신');
 
 // 아이템을 팀 단위로 채운다. 종류가 아레나마다 달라지므로 놓을 수 있는 칸을 찾아서 넣는다
-const need = itemKinds().reduce((a, k) => a + itemQuota(k), 0);
+// 엄폐물은 종류별이 아니라 합계로 묶여 있다
+const need = coverBudget() + itemKinds().filter(k => !isCover(k)).reduce((a, k) => a + itemQuota(k), 0);
 const spot = (slot, k) => {
   const st = cs[slot].pred || cs[slot].s;
   for (let r = 0; r < GRID_ROWS; r++)
@@ -98,9 +99,10 @@ const spot = (slot, k) => {
 };
 for (const slot of [0, 2]){                       // 팀마다 한 명이 팀 몫을 전부 놓는다
   for (const k of itemKinds()){
-    for (let n = 0; n < itemQuota(k); n++){
+    const want = isCover(k) ? coverBudget() : itemQuota(k);
+    for (let n = 0; n < want; n++){
       const at = spot(slot, k);
-      if (!at) break;
+      if (!at) break;                              // 한도를 다 썼으면 canPlace가 막는다
       cs[slot].place(slot, k, at.c, at.r);
       await sleep(140);
     }

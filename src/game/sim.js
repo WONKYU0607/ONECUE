@@ -86,6 +86,9 @@ import {
   setArena,
   itemQuota,
   itemKinds,
+  isCover,
+  coverBudget,
+  coverUsed,
   TEAM_COLS,
   cellX,
   cellY,
@@ -196,7 +199,9 @@ export function itemRect(it){
 export function allPlaced(s, slot){
   setArena(s.n);
   const team = teamOf(slot, s.n);
+  if (coverUsed(s.items, team) < coverBudget()) return false;      // 엄폐물 합계
   for (const k of itemKinds()){
+    if (isCover(k)) continue;                                       // 위에서 합계로 셌다
     const used = (s.items || []).filter(it => it.by === team && it.k === k).length;
     if (used < itemQuota(k)) return false;
   }
@@ -236,6 +241,11 @@ export function canPlace(s, slot, k, c, r, from){
     it.by === team && it.k === k &&
     !(from && it.c === from.c && it.r === from.r)).length;
   if (used >= itemQuota(k)) return false;
+  // 엄폐물은 1·2·3칸을 마음대로 섞되 합계가 한도를 넘을 수 없다
+  if (isCover(k)){
+    const held = coverUsed(s.items, team) - (from && isCover(from.k) ? 1 : 0);
+    if (held >= coverBudget()) return false;
+  }
   // 겹침. 단, 내 엄폐물과 상대 드럼통은 같은 칸에 놓을 수 있다.
   // (안 그러면 배치 단계에 빈 칸이 생겨 상대가 드럼통 위치를 눈치챈다)
   for (const it of (s.items || [])){

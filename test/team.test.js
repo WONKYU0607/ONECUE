@@ -61,12 +61,16 @@ console.log('장애물은 팀 단위');
   const a = IN(4); a[0] = mk({ place: { k: ITEM.WALL, c: 2, r: mine } });
   step(s, a);
   assert(s.items.length === 1 && s.items[0].by === 0, '팀 번호로 기록된다');
-  // 팀원이 같은 종류를 또 놓을 수는 없다 (정원이 팀 단위)
-  assert(!canPlace(s, 1, ITEM.WALL, 4, mine), '팀원이 벽을 더 놓지 못한다');
-  assert(canPlace(s, 1, ITEM.BARR, 4, mine), '아직 안 놓은 종류는 팀원이 놓을 수 있다');
+  // 엄폐물 한도는 사람이 아니라 팀 단위로 깎인다
+  assert(canPlace(s, 1, ITEM.WALL, 4, mine), '한도가 남으면 팀원도 같은 종류를 놓는다');
   const b = IN(4); b[1] = mk({ place: { k: ITEM.BARR, c: 4, r: mine } });
   step(s, b);
   assert(s.items.length === 2, '팀원이 놓은 것도 같은 팀 소유');
+  const c = IN(4); c[1] = mk({ place: { k: ITEM.BARR2, c: 6, r: mine } });
+  step(s, c);
+  assert(s.items.length === 3, '세 개까지');
+  assert(!canPlace(s, 0, ITEM.WALL, 0, mine) && !canPlace(s, 1, ITEM.WALL, 0, mine),
+    '한도를 다 쓰면 팀 전체가 더 못 놓는다');
   assert(!allPlaced(s, 0) && !allPlaced(s, 1), '드럼통이 남아 완료 불가');
 }
 

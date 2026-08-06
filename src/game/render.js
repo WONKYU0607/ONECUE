@@ -2,7 +2,7 @@ import {
   W, H, FP, COL, TEAMS, TEAM_OF, SELF, MAXHP, FLASH_T, VIEW, SHOW_HUD,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO, HP_MARKS,
-  ITEM, ITEM_DEF, cellOwner, teamOf, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW,
+  ITEM, ITEM_DEF, cellOwner, teamOf, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
 } from './config.js';
 import { RS, computeLayout, stickGeom } from './layout.js';
@@ -22,8 +22,8 @@ const ITEM_FRAME = {
   barr3: { x: 585, y: 0, w: 195, h: 66 },
   drum:  { x: 780, y: 3, w: 44,  h: 63 }
 };
-// 시트는 1대1 칸(21.638) 기준으로 만들었다. 칸이 작아지면 같은 비율로 줄여 그린다
-const itemScale = () => GRID_CW / SHEET_CW;
+// 시트는 1대1 칸 기준으로 만들었다. 칸 비율이 가로·세로가 달라서 배율도 따로 준다
+const itemScale = () => ({ x: GRID_CW / SHEET_CW, y: GRID_CH / SHEET_CH });
 
 // 캔버스 하나에 붙는 렌더러. React는 이 객체만 만들고 정리하면 된다
 // 슬롯 1인 플레이어는 화면을 뒤집어 자기가 항상 아래쪽에 보이게 한다.
@@ -184,7 +184,7 @@ export function createRenderer(canvas){
                      it.c === s.moveFrom.c && it.r === s.moveFrom.r;
       ctx.globalAlpha = moving ? 0.3 : 1;
       const sc = itemScale();
-      const dw = f.w / RS * sc, dh = f.h / RS * sc;
+      const dw = f.w / RS * sc.x, dh = f.h / RS * sc.y;
       const dx = box.x + (box.w - dw) / 2;          // 칸 가로 중앙
       const dy = box.y + box.h - dh;               // 칸 아래 정렬
       ctx.drawImage(items, f.x, f.y, f.w, f.h,
@@ -379,7 +379,7 @@ export function createRenderer(canvas){
       const f = ITEM_FRAME[ITEM_DEF[drag.k].key];
       // 끌고 있는 그림도 실제로 놓일 크기와 같게 (2·3칸짜리가 손가락 밑에서 커 보이면 안 맞는다)
       const sc = itemScale();
-      const dw = f.w / RS * sc, dh = f.h / RS * sc;
+      const dw = f.w / RS * sc.x, dh = f.h / RS * sc.y;
       ctx.globalAlpha = 0.85;
       ctx.drawImage(items, f.x, f.y, f.w, f.h,
         Math.round((drag.x - dw / 2) * RS), Math.round((drag.y - dh / 2) * RS),

@@ -198,34 +198,31 @@ export class Server {
     this.n = n;
     this.s = newState(n);
     this.inbox = new Map();     // tick -> 슬롯별 입력
-    this.rtt = [0, 0];
+    this.rtt = Array(n).fill(0);
     this.delay = MIN_DELAY;     // 양 플레이어에게 동일 적용되는 공통 입력 지연
     this.extra = 0;             // 지각 입력 발생 시 즉시 늘리는 여유분
     this.lastDrop = -1e9;
     this.lateDrops = 0;
-    this.dropBy = [0, 0];      // 슬롯별 폐기 수 (진단용)
-    this.rxBy = [{}, {}];      // 슬롯별로 받은 메시지 종류·개수
-    this.lastIn = [null, null];   // 슬롯별 마지막으로 받은 입력
+    this.dropBy = Array(n).fill(0);          // 슬롯별 폐기 수 (진단용)
+    this.rxBy = Array.from({ length: n }, () => ({}));   // 슬롯별로 받은 메시지 종류·개수
+    this.lastIn = Array(n).fill(null);       // 슬롯별 마지막으로 받은 입력
     this.pendingCfg = null;
     this.start = CLOCK.now();
     net.toServer = m => this.onMsg(m);
   }
   onMsg(m){
-    this.rxBy = this.rxBy || [{}, {}];
-    if (m.pid === 0 || m.pid === 1){
-      const b = this.rxBy[m.pid];
+    if (m.pid >= 0 && m.pid < this.n){
+      const b = (this.rxBy[m.pid] = this.rxBy[m.pid] || {});
       b[m.t] = (b[m.t] || 0) + 1;
     }
     if (m.t === 'p'){ this.net.serverSend({ t:'q', id:m.id, pid:m.pid }, m.pid); return; }   // 핑 응답은 보낸 클라에게만
     if (m.t === 'rtt'){ this.rtt[m.pid] = m.rtt; this.recalcDelay(); return; }
     if (m.t === 'cfg'){ this.pendingCfg = Object.assign(this.pendingCfg || {}, m.cfg); return; }
     if (m.t !== 'in') return;
-    this.lastIn = this.lastIn || [null, null];
     this.lastIn[m.pid] = { tick: m.tick, at: this.s.tick, ready: m.ready ? 1 : 0, place: !!m.place };
     if (m.tick <= this.s.tick){                               // 마감 지난 입력은 폐기
       this.lateDrops++;
-      this.dropBy = this.dropBy || [0, 0];
-      this.dropBy[m.pid]++;
+      this.dropBy[m.pid] = (this.dropBy[m.pid] || 0) + 1;
       this.lastDrop = this.s.tick;
       this.extra = Math.min(this.extra + 1, 8);               // 즉시 지연을 늘려 재발 방지
       this.recalcDelay();
@@ -236,7 +233,7 @@ export class Server {
     f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, ready: m.ready ? 1 : 0, place: m.place || null, thr: m.thr || null, fastReq: m.fastReq|0, fastAns: m.fastAns|0 };
   }
   recalcDelay(){
-    const worst = Math.max(this.rtt[0], this.rtt[1]);         // 느린 쪽 기준 = 양쪽 동일 지연
+    const worst = Math.max(...this.rtt.map(v => v || 0));     // 가장 느린 사람 기준 = 전원 동일 지연
     this.delay = clampi(Math.ceil((worst/2 + JITTER_MS) / TICK_MS) + this.extra, MIN_DELAY, MAX_DELAY);
   }
   update(now){
@@ -388,6 +385,9 @@ export class Client {
   // 확정 상태에서 내 입력을 다시 적용해 '지금'까지 앞당긴 상태를 만든다.
   // 내 입력은 sent에 그대로 남아 있으므로 내 캐릭터는 서버와 어긋나지 않는다.
   predict(){
+    // 스냅샷을 받기 전에는 확정 상태가 아직 2인용 기본값이라 슬롯 2·3이 없다.
+    // 그대로 진행하면 p[SELF.slot]이 undefined라 루프가 죽고 화면이 통째로 검게 남는다
+    if (!this.s.p || !this.s.p[SELF.slot]) return;
     const target = this.nextInputTick - 1;
     const p = cloneState(this.s);
     let prevMy = p.p[SELF.slot].x, prevMyY = p.p[SELF.slot].y;
@@ -396,8 +396,11 @@ export class Client {
       const t = p.tick + 1;
       const n = this.pred.n || 2;
       const inp = Array.from({ length: n }, () => ({ dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 }));
-      if (this.lastInp && t - this.s.tick <= EXTRAP_MAX){   // 상대는 마지막 입력으로 외삽
-        for (let k = 0; k < 2; k++){ inp[k].dx = this.lastInp[k].dx; inp[k].dy = this.lastInp[k].dy; }
+      if (this.lastInp && t - this.s.tick <= EXTRAP_MAX){   // 남들은 마지막 입력으로 외삽
+        for (let k = 0; k < n; k++){
+          const li = this.lastInp[k];
+          if (li){ inp[k].dx = li.dx; inp[k].dy = li.dy; }
+        }
       }
       for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, ready:e.ready, place:e.place, thr:e.thr, fastReq:e.fastReq, fastAns:e.fastAns };
       prevMy = p.p[SELF.slot].x; prevMyY = p.p[SELF.slot].y;
@@ -405,15 +408,17 @@ export class Client {
     }
     this.prevMy = prevMy; this.prevMyY = prevMyY;
     this.pred = p;
-    if (!this.rx){ this.rx = [p.p[0].x, p.p[1].x]; this.ry = [p.p[0].y, p.p[1].y]; }
+    if (!this.rx){ this.rx = p.p.map(q => q.x); this.ry = p.p.map(q => q.y); }
   }
   // 내 캐릭터는 틱 보간(지연 0), 상대는 따라가기 필터로 부드럽게.
   // 필터 계수를 프레임당 고정값으로 두면 주사율에 따라 수렴 속도가 달라진다
   // (120Hz 폰에서는 60Hz PC의 두 배로 빨리 따라붙어 상대가 확확 튀어 보임).
   // dt 기준 지수 감쇠로 바꿔야 주사율과 무관하게 같은 시간에 같은 만큼 수렴한다.
   updateRender(a, dt = 1 / 60){
+    if (!this.rx || !this.pred.p[SELF.slot]) return;
     const k = 1 - Math.exp(-FOLLOW_RATE * Math.min(dt, 0.1));
-    for (let i = 0; i < 2; i++){
+    for (let i = 0; i < this.pred.p.length; i++){        // 2대2는 네 명 다 보정해야 한다
+      if (this.rx[i] === undefined){ this.rx[i] = this.pred.p[i].x; this.ry[i] = this.pred.p[i].y; }
       const tx = this.pred.p[i].x, ty = this.pred.p[i].y;
       if (i === SELF.slot){
         this.rx[i] = lerp(this.prevMy, tx, a);
