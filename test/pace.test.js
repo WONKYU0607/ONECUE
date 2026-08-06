@@ -73,46 +73,82 @@ console.log('대각선도 같다');
   assert(r.over === 0, '대각선도 cap 안 넘김');
 }
 
-console.log('내 캐릭터와 상대 캐릭터가 비슷하게 매끄럽다');
+console.log('내 캐릭터와 상대 캐릭터가 둘 다 매끄럽다 (진짜 원격 상대로 측정)');
 {
-  // 예측 상태는 렌더 프레임당 0·1·2틱씩 불규칙하게 전진한다.
-  // 내 캐릭터를 거기 그대로 붙이면 0 → 2틱 → 0 으로 덜컹거리는데
-  // 상대는 따라가기 필터가 펴줘서 혼자 매끄럽다 → "상대가 더 빨라 보인다"
-  const { makeNetGame } = await import('./harness.js');
+  // 예전 테스트는 한 클라가 양쪽을 다 조작해서 **상대가 진짜 원격이 아니었다**.
+  // 그래서 "둘 다 매끄럽다"가 나왔는데 실제로는 상대만 튀고 있었다.
+  // 여기서는 클라 두 개를 한 서버에 따로 붙인다
+  const { Server, Client, setClock } = await import('../src/game/net.js');
   const { PH_PLAY, WALL_L, wallIdx } = await import('../src/game/config.js');
-  const g = makeNetGame(60);
   const keep = { slot: SELF.slot, n: SELF.n };
-  SELF.slot = 0; SELF.n = 2;
-  for (const st of [g.server.s, g.client.s, g.client.pred]) st.phase = PH_PLAY;
-  for (let f = 0; f < 240; f++) g.frame();            // 접속·스냅샷 안정화
-  const step = 150 / 60;
-  const rec = [[], []];
-  for (let cyc = 0; cyc < 5; cyc++){
-    for (const st of [g.server.s, g.client.s, g.client.pred])
-      for (const p of st.p) p.x = WALL_L[wallIdx(p.y)] + 2 * FP;
-    for (let f = 0; f < 40; f++){
-      g.client.input(0, step, 0, 0); g.client.input(1, step, 0, 0);
-      g.frame();
-      if (f >= 8 && g.client.rx){ rec[0].push(g.client.rx[0]); rec[1].push(g.client.rx[1]); }
-    }
+
+  function world(oneway, jitter){
+    let now = 0; const q = [];
+    setClock({ now: () => now, delay: (fn, d) => q.push([now + d, fn]) });
+    const lat = () => Math.max(0, oneway + (jitter ? (Math.random() * 2 - 1) * jitter : 0));
+    let srv = null; const cs = [];
+    const netFor = pid => ({
+      clientSend(m){ q.push([now + lat(), () => srv.onMsg({ ...m, pid })]); },
+      serverSend(){}, close(){}
+    });
+    srv = new Server({
+      clientSend(){}, close(){},
+      serverSend(m, pid){
+        for (const i of (pid === undefined ? [0, 1] : [pid]))
+          q.push([now + lat(), () => cs[i] && cs[i].onMsg(JSON.parse(JSON.stringify(m)))]);
+      }
+    }, 2);
+    for (let i = 0; i < 2; i++) cs.push(new Client(netFor(i), [i]));
+    const frame = inp => {
+      for (let i = 0; i < 2; i++){
+        SELF.slot = i; SELF.n = 2;
+        cs[i].ping(now);
+        if (inp) cs[i].input(i, inp[0], inp[1], 0);
+        cs[i].sendInputs(now);
+      }
+      srv.update(now);
+      now += 1000 / 60;
+      q.sort((a, b) => a[0] - b[0]);
+      while (q.length && q[0][0] <= now) q.shift()[1]();
+      for (let i = 0; i < 2; i++){
+        SELF.slot = i; SELF.n = 2;
+        cs[i].applyFrames(); cs[i].predict(); cs[i].updateRender(cs[i].alpha(now), 1 / 60);
+      }
+    };
+    return { srv, cs, frame };
   }
-  const ratio = h => {
-    const v = [];
-    for (let i = 1; i < h.length; i++){ const d = (h[i] - h[i - 1]) / FP; if (d > -1 && d < 30) v.push(d); }
-    const avg = v.reduce((a, b) => a + b, 0) / v.length;
-    return Math.max(...v) / avg;
-  };
-  const me = ratio(rec[0]), foe = ratio(rec[1]);
+
+  function run(oneway, jitter){
+    const w = world(oneway, jitter);
+    for (let f = 0; f < 400; f++) w.frame(null);
+    for (const st of [w.srv.s, ...w.cs.map(c => c.s), ...w.cs.map(c => c.pred)]) st.phase = PH_PLAY;
+    const step = 150 / 60;
+    for (let f = 0; f < 120; f++) w.frame([step, 0]);
+    const rec = [[], []];
+    let dir = 1;
+    for (let f = 0; f < 700; f++){
+      if (f % 45 === 0) dir = -dir;                 // 방향 전환이 있어야 외삽 오차가 드러난다
+      w.frame([step * dir, 0]);
+      if (w.cs[0].rx){ rec[0].push(w.cs[0].rx[0]); rec[1].push(w.cs[0].rx[1]); }
+    }
+    const stat = h => {
+      const d = [];
+      for (let i = 1; i < h.length; i++){ const v = Math.abs((h[i] - h[i - 1]) / FP); if (v < 40) d.push(v); }
+      const s2 = [...d].sort((a, b) => a - b);
+      return { avg: d.reduce((a, b) => a + b, 0) / d.length, p95: s2[Math.floor(s2.length * 0.95)] };
+    };
+    return { me: stat(rec[0]), foe: stat(rec[1]) };
+  }
+
+  for (const [ow, j] of [[0, 0], [60, 0], [120, 0], [120, 40]]){
+    const r = run(ow, j);
+    const cap = stepCap() / FP;                     // 한 틱 최대 이동
+    assert(r.foe.p95 <= cap + 0.1,
+      `편도 ${ow}/지터 ${j} — 상대가 한 틱치를 넘게 튀지 않는다 (p95 ${r.foe.p95.toFixed(2)} / 한 틱 ${cap.toFixed(2)})`);
+    assert(Math.abs(r.foe.avg - r.me.avg) < 0.35,
+      `편도 ${ow}/지터 ${j} — 상대 평균 속도가 나와 비슷하다 (나 ${r.me.avg.toFixed(2)} / 상대 ${r.foe.avg.toFixed(2)})`);
+  }
   SELF.slot = keep.slot; SELF.n = keep.n;
-  assert(me < 1.1, `내 캐릭터가 튀지 않는다 (최대/평균 ${me.toFixed(3)})`);
-  assert(foe < 1.1, `상대도 튀지 않는다 (${foe.toFixed(3)})`);
-  // 계수가 다르면 매끄러움이 달라져 한쪽이 빨라 보인다 = 불공정.
-  // 같은 필터를 같은 계수로 걸어 **완전히 같은 값**이 나와야 한다
-  assert(Math.abs(me - foe) < 0.02, `나와 상대가 똑같이 보인다 (나 ${me.toFixed(3)} / 상대 ${foe.toFixed(3)})`);
-  // 뒤처짐이 없어야 한다. 화면 위치가 예측 위치를 alpha만큼만 앞서거나 같아야 함
-  const lagMe = Math.abs(g.client.pred.p[0].x - g.client.rx[0]) / FP;
-  const lagFoe = Math.abs(g.client.pred.p[1].x - g.client.rx[1]) / FP;
-  assert(lagMe < 3 && lagFoe < 3, `뒤처짐이 없다 (나 ${lagMe.toFixed(2)}px / 상대 ${lagFoe.toFixed(2)}px)`);
 }
 
 console.log('pace.test.js 통과');

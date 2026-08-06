@@ -277,7 +277,11 @@ export class Client {
     this.sent = [];                    // 아직 서버가 확정하지 않은 내 입력
     this.pred = newState();            // 예측 상태 (화면에 그리는 것)
     this.rx = null; this.ry = null;    // 렌더 위치 (전원 같은 필터)
-    this.nextPos = null;               // 다음 틱 위치 (서브틱 보간용)
+    this.nextPos = null;               // 다음 틱 위치 (내 캐릭터 서브틱 보간용)
+    this.hist = [];                    // 확정 위치 기록 [{tick, p:[[x,y],...]}]
+    this.mhist = [];                   // 내 예측 위치 기록 (같은 방식으로 펴기 위해)
+    this.mrt = null;
+    this.rt = null;                    // 상대를 그릴 시각 (틱, 소수 포함)
     this.lastInp = null;
     this.tickAt = CLOCK.now();
     this.desync = 0; this.pendingSnap = null;
@@ -316,7 +320,8 @@ export class Client {
       if (this.awaitSnap && m.tick > 0){
         this.s = normalizeState(cloneState(m.st));
         for (const k of [...this.frames.keys()]) if (k <= m.tick) this.frames.delete(k);
-        this.rx = null; this.ry = null;
+        this.rx = null; this.ry = null; this.hist = []; this.rt = null;
+        this.mhist = []; this.mrt = null;
         this.awaitSnap = false;
       } else {
         this.pendingSnap = m;
@@ -384,6 +389,9 @@ export class Client {
       this.s.bulletV = f.bv; this.s.coolT = f.ct;
       step(this.s, f.inp);
       this.lastInp = f.inp;
+      // 상대를 그릴 재료. 확정된 위치만 모은다
+      this.hist.push({ tick: this.s.tick, p: this.s.p.map(q => [q.x, q.y]) });
+      if (this.hist.length > 60) this.hist.shift();
       while (this.sent.length && this.sent[0].tick <= this.s.tick) this.sent.shift();
       if (checksum(this.s) !== f.ck){
         this.desync++;
@@ -431,7 +439,50 @@ export class Client {
     const nx = cloneState(p);
     step(nx, inputsFor(nx.tick + 1));
     this.nextPos = nx.p.map(q => [q.x, q.y]);
+    // 내 예측 위치도 기록해 둔다. 목표 틱이 한 프레임에 2틱 뛰면 그대로 그릴 때
+    // 내 캐릭터만 덜컹거려서, 상대와 같은 방식으로 시간 보간해 편다
+    if (!this.mhist.length || this.mhist[this.mhist.length - 1].tick !== p.tick){
+      this.mhist.push({ tick: p.tick, p: p.p.map(q => [q.x, q.y]) });
+      if (this.mhist.length > 20) this.mhist.shift();
+    }
     this.seedRender(p);
+  }
+  // 상대를 그릴 시각. 실시간으로 굴리되 확정 기록 범위 안에 잡아둔다.
+  // BUF만큼 뒤에서 그려야 다음 확정 프레임이 조금 늦어도 화면이 안 끊긴다
+  renderTick(dt){
+    const BUF = 2;
+    if (!this.hist.length) return this.rt;
+    const newest = this.hist[this.hist.length - 1].tick;
+    const oldest = this.hist[0].tick;
+    const want = newest - BUF;
+    if (this.rt === null){ this.rt = want; return this.rt; }
+    this.rt += dt * 60;                                   // 화면은 실시간으로 흐른다
+    if (this.rt > want) this.rt -= (this.rt - want) * 0.2; // 앞서가면 살살 늦춘다
+    if (this.rt < want - 6) this.rt = want - 6;            // 너무 뒤처지면 당긴다
+    if (this.rt < oldest) this.rt = oldest;
+    return this.rt;
+  }
+  // 내 캐릭터를 그릴 시각. 최신 예측 틱에 최대한 붙이되 실시간으로 흐르게 한다
+  // (지연은 최대 1틱 = 17ms. 그 대신 덜컹거림이 사라진다)
+  myTick(dt){
+    if (!this.mhist.length) return this.mrt;
+    const newest = this.mhist[this.mhist.length - 1].tick;
+    if (this.mrt === null){ this.mrt = newest; return this.mrt; }
+    this.mrt += dt * 60;
+    if (this.mrt > newest) this.mrt = newest;
+    if (this.mrt < newest - 1.5) this.mrt = newest - 1.5;
+    return this.mrt;
+  }
+  // 확정 기록에서 그 시각의 위치를 뽑는다 (두 기록 사이는 선형 보간)
+  sampleAt(i, rt, h = this.hist){
+    if (h.length < 2 || rt === null) return null;
+    let k = h.length - 1;
+    while (k > 0 && h[k].tick > rt) k--;
+    const A = h[k], B = h[Math.min(k + 1, h.length - 1)];
+    if (!A.p[i] || !B.p[i]) return null;
+    const span = B.tick - A.tick;
+    const f = span > 0 ? Math.max(0, Math.min(1, (rt - A.tick) / span)) : 0;
+    return [lerp(A.p[i][0], B.p[i][0], f), lerp(A.p[i][1], B.p[i][1], f)];
   }
   // 렌더 위치를 아직 안 만들었으면 지금 상태로 채운다.
   // draw가 첫 predict보다 먼저 돌 수 있어서, null인 채로 두면 렌더가 죽는다
@@ -447,25 +498,30 @@ export class Client {
   updateRender(a, dt = 1 / 60){
     if (!this.rx || !this.pred.p[SELF.slot]) return;
     const cap = 2 * (this.pred.maxStep || stepCap()) * (this.pred.fast ? FAST_MUL : 1);
+    const rt = this.renderTick(dt);
+    const mrt = this.myTick(dt);
     for (let i = 0; i < this.pred.p.length; i++){        // 2대2는 네 명 다 보정해야 한다
       if (this.rx[i] === undefined){
         this.rx[i] = this.pred.p[i].x; this.ry[i] = this.pred.p[i].y;
       }
-      // 예측 상태는 렌더 프레임당 0·1·2틱씩 불규칙하게 전진한다.
-      // 내 캐릭터를 그 값에 그대로 붙이면 0 → 2틱 → 0 으로 덜컹거리고(측정: 평균의 2배),
-      // 상대는 따라가기 필터가 그걸 펴줘서 혼자 매끄럽다.
-      // 그래서 **내 쪽이 느리고 무겁게, 상대가 빨라 보인다** — 양쪽이 서로 그렇게 느낀다.
-      // 내 캐릭터도 같은 필터로 펴되, 조작 반응이 죽지 않게 훨씬 빠른 계수를 쓴다
-      // 나와 상대를 **완전히 같은 식으로** 그린다. 계수가 다르면 매끄러움이 달라져
-      // 한쪽이 더 빨라 보이고, 그건 곧 불공정이다.
-      //
-      // 전방 보정(속도를 더해 뒤처짐을 없애는 방식)도 재봤는데, 목표가 0·1·2틱씩
-      // 불규칙하게 오다 보니 속도 추정이 흔들려 오히려 튐이 커졌다(1.09 → 1.74). 안 씀
-      // 나도 상대도 완전히 같은 식. 현재 틱과 다음 틱 사이를 alpha로 보간한다.
-      // 뒤처짐 0, 프레임당 이동량 일정, 분기 없음 = 구조적으로 공평
-      const nx = this.nextPos && this.nextPos[i];
-      let gx = nx ? lerp(this.pred.p[i].x, nx[0], a) : this.pred.p[i].x;
-      let gy = nx ? lerp(this.pred.p[i].y, nx[1], a) : this.pred.p[i].y;
+      // 내 캐릭터: 예측 상태를 현재 틱~다음 틱 사이로 보간한다 (뒤처짐 0).
+      // 상대: **확정 기록 사이를 시간으로 보간**한다. 외삽하면 상대가 방향을 바꿀 때마다
+      //       틀린 쪽으로 갔다가 되돌아오면서 두 배 속도로 튀고,
+      //       그게 "상대가 훨씬 빨라 보인다"의 정체다. 예전 방식은 이 튐을 못 없앴다
+      let gx, gy;
+      if (i === SELF.slot){
+        const at = this.sampleAt(i, mrt, this.mhist);
+        const nx = this.nextPos && this.nextPos[i];
+        if (at){ gx = at[0]; gy = at[1]; }
+        else {
+          gx = nx ? lerp(this.pred.p[i].x, nx[0], a) : this.pred.p[i].x;
+          gy = nx ? lerp(this.pred.p[i].y, nx[1], a) : this.pred.p[i].y;
+        }
+      } else {
+        const at = this.sampleAt(i, rt);
+        gx = at ? at[0] : this.pred.p[i].x;
+        gy = at ? at[1] : this.pred.p[i].y;
+      }
       // 늦게 온 입력으로 과거가 바뀌면 목표가 확 움직인다. 그 순간에도 화면이
       // 순간이동하지 않도록 **한 프레임 이동량에 상한**을 둔다(따라잡기는 다음 프레임에).
       // 상한은 실제 최고 속도의 두 배 — 평소엔 절대 안 걸리고 보정 때만 걸린다
