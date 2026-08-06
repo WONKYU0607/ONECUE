@@ -1,0 +1,19 @@
+{
+ "frame": {
+  "w": 310,
+  "h": 184
+ },
+ "cols": [
+  "front_idle",
+  "front_attack",
+  "back_idle",
+  "back_attack"
+ ],
+ "rows": [
+  "blue",
+  "red",
+  "green",
+  "yellow"
+ ],
+ "anchor": "왼쪽 아래(발끝) 기준. 대기·공격의 몸 위치가 같아 같은 자리에 그리면 된다"
+}

@@ -22,9 +22,10 @@ export default function GameCanvas({ session, onExit, onFinish }){
       const g = gameRef.current; if (!g) return;
       const info = getRoomInfo();
       const cnt = g.readyCount();
+      const melee = g.isMelee?.() || false;
       setReady({
         me: g.isReady(), peer: g.peerReady(), srv: g.confirmedReady(), all: g.allPlaced(),
-        cnt,
+        cnt, melee,
         fast: g.fastState(), canFast: g.canFast(),
         room: info ? info.room : null, slot: g.mySlot(), net: g.netStats()
       });
@@ -107,19 +108,25 @@ export default function GameCanvas({ session, onExit, onFinish }){
         </div>
       )}
 
+      {/* 칼전은 배치할 게 없어 준비 버튼 하나만 */}
+      {placing && ready.melee && !ready.me && (
+        <button className="panelbtn place go ui-overlay" style={boxStyle}
+                onClick={() => gameRef.current?.meleeReady()}>
+          준비 완료
+        </button>
+      )}
       {/* 1단계: 아이템을 다 놓아야 설치 완료 */}
-      {placing && !ready.cnt?.meDone && (
-        <button className={'panelbtn place ui-overlay' + (ready.all ? '' : ' off')} style={boxStyle}
-                disabled={!ready.all}
+      {placing && !ready.melee && !ready.cnt?.meDone && (
+        <button className="panelbtn place ui-overlay" style={boxStyle}
                 onClick={() => gameRef.current?.ready()}>
-          {ready.all ? '설치 완료' : '아이템을 모두 배치'}
+          설치 완료
         </button>
       )}
       {/* 2단계: 전원이 눌러야 시작한다 */}
-      {placing && ready.cnt?.meDone && !ready.me && (
+      {placing && !ready.melee && ready.cnt?.meDone && !ready.me && (
         <button className="panelbtn place go ui-overlay" style={boxStyle}
                 onClick={() => gameRef.current?.go()}>
-          준비완료
+          준비 완료
         </button>
       )}
       {placing && ready.me && !ready.peer && (

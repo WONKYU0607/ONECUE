@@ -72,6 +72,10 @@ import {
   TEAM_OF,
   THROW,
   THROW_DEF,
+  MELEE_DAMAGE,
+  ATK_TICKS,
+  ATK_HIT,
+  MELEE_COOL,
   FIRE_TICKS,
   FIRE_RADIUS,
   FIRE_DMG_EVERY,
@@ -120,7 +124,7 @@ export function newItems(){ return []; }
 // 서버가 보내준 상태에 새 필드가 없을 수 있다(서버가 옛 버전일 때).
 // 없는 채로 두면 렌더·배치 코드가 예외를 내고 그리기 루프가 통째로 죽는다.
 export function normalizeState(st){
-  setArena(st && st.n);
+  setArena(st && st.n, st && st.melee);
   if (!st) return st;
   if (!Array.isArray(st.items)) st.items = [];
   if (!Array.isArray(st.fx)) st.fx = [];
@@ -134,6 +138,7 @@ export function normalizeState(st){
   if (!Array.isArray(st.proj)) st.proj = [];
   if (!Array.isArray(st.fire)) st.fire = [];
   if (!Array.isArray(st.off)) st.off = Array(st.n || 2).fill(false);
+  st.melee = !!st.melee;
   if (!Array.isArray(st.blind)) st.blind = [0, 0];
   if (typeof st.blindMax !== 'number') st.blindMax = 0;
   if (!Array.isArray(st.ammo)) st.ammo = st.p.map(() => THROW_DEF.map(d => d.count));
@@ -146,8 +151,8 @@ export function newCovers(){
   // 예) c.push({x:19*FP, y:147*FP, w:32*FP, h:10*FP, hp:4});
   return [];
 }
-export function newState(n = 2){
-  setArena(n);
+export function newState(n = 2, melee = false){
+  setArena(n, melee);
   const players = [];
   for (let i = 0; i < n; i++){
     const team = teamOf(i, n);
@@ -158,12 +163,13 @@ export function newState(n = 2){
     players.push({
       x: homeXFP(col),
       y: team === 0 ? homeYFP(ROW_MAX[0]) : homeYFP(ROW_MIN[1]),
-      hp: MAXHP, cool: 0, invul: 0, flash: 0
+      hp: MAXHP, cool: 0, invul: 0, flash: 0, atk: 0   // atk = 칼 휘두르는 모션 남은 틱
     });
   }
   return {
     tick: 0,
     n,                          // 플레이어 수 (2 또는 4)
+    melee,                      // 칼전이면 true. 총알·아이템 없이 칼로만 싸운다
     p: players,
     bullets: [],
     covers: newCovers(),
@@ -189,7 +195,7 @@ export function newState(n = 2){
   };
 }
 
-export const NOIN = { dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 };
+export const NOIN = { dx:0, dy:0, fire:0, atk:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 };
 export function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
 
 export function overlap(ax,ay,aw,ah,bx,by,bw,bh){
@@ -210,7 +216,7 @@ export function itemRect(it){
 // 해당 슬롯이 이 칸에 이 아이템을 놓을 수 있는가
 // 이 슬롯이 놓아야 할 아이템을 전부 놓았는가 (설치 완료 조건)
 export function allPlaced(s, slot){
-  setArena(s.n);
+  setArena(s.n, s.melee);
   const team = teamOf(slot, s.n);
   if (coverUsed(s.items, team) < coverBudget()) return false;      // 엄폐물 합계
   for (const k of itemKinds()){
@@ -222,7 +228,7 @@ export function allPlaced(s, slot){
 }
 // 내가 놓은 아이템 찾기 (옮기려고 집을 때)
 export function myItemAt(s, slot, c, r){
-  setArena(s.n);
+  setArena(s.n, s.melee);
   const team = teamOf(slot, s.n);
   return (s.items || []).find(it => {
     const w = ITEM_DEF[it.k].cells;
@@ -232,7 +238,7 @@ export function myItemAt(s, slot, c, r){
 
 // from을 주면 그 자리의 내 아이템은 없는 셈 치고 검사한다 (자리 옮기기)
 export function canPlace(s, slot, k, c, r, from){
-  setArena(s.n);
+  setArena(s.n, s.melee);
   const team = teamOf(slot, s.n);
   const def = ITEM_DEF[k];
   if (!def) return false;
@@ -256,9 +262,14 @@ export function canPlace(s, slot, k, c, r, from){
     it.by === team && it.k === k &&
     !(from && it.c === from.c && it.r === from.r)).length;
   if (used >= itemQuota(k)) return false;
-  // 엄폐물은 1·2·3칸을 마음대로 섞되 합계가 한도를 넘을 수 없다
+  // 엄폐물은 1·2·3칸을 마음대로 섞되 합계가 한도를 넘을 수 없다.
+  // from은 {c,r}만 들고 오므로 종류는 그 자리의 아이템을 찾아서 본다
+  // (from.k로 판단하면 undefined라 옮기기가 한도 초과로 막힌다)
   if (isCover(k)){
-    const held = coverUsed(s.items, team) - (from && isCover(from.k) ? 1 : 0);
+    const prev = from
+      ? (s.items || []).find(it => it.by === team && it.c === from.c && it.r === from.r)
+      : null;
+    const held = coverUsed(s.items, team) - (prev && isCover(prev.k) ? 1 : 0);
     if (held >= coverBudget()) return false;
   }
   // 겹침. 단, 내 엄폐물과 상대 드럼통은 같은 칸에 놓을 수 있다.
@@ -278,7 +289,7 @@ export function canPlace(s, slot, k, c, r, from){
 // 칸 (c,r)을 중심으로 rad칸 범위를 터뜨린다. 드럼통·수류탄이 함께 쓴다
 // 정중앙 칸에 서 있는가 (직격 판정)
 export function atCenter(s, i, c, r){
-  setArena(s.n);
+  setArena(s.n, s.melee);
   const x0 = Math.round(cellX(c) * FP), x1 = Math.round(cellX(c + 1) * FP);
   const y0 = Math.round(cellY(r) * FP), y1 = Math.round(cellY(r + 1) * FP);
   const p = s.p[i];
@@ -299,7 +310,7 @@ function killFx(s, p){
 }
 
 export function blast(s, c, r, rad, dmg, centerDmg){
-  setArena(s.n);
+  setArena(s.n, s.melee);
   const x0 = Math.round(cellX(c - rad) * FP);
   const x1 = Math.round(cellX(c + rad + 1) * FP);
   const y0 = Math.round(cellY(r - rad) * FP);
@@ -344,13 +355,13 @@ export function throwRow(slot, charge, n = 2){
 // 연결 끊김 표시. 1대1은 나간 사람이 지고, 2대2는 그대로 두고 계속 굴린다
 // (한 명 끊겼다고 나머지 셋의 판을 망치는 게 더 이상하다는 판단)
 export function setOff(s, slot, v){
-  setArena(s.n);
+  setArena(s.n, s.melee);
   if (!Array.isArray(s.off)) s.off = Array(s.n).fill(false);
   s.off[slot] = !!v;
 }
 // 자리를 완전히 뜬 경우 (직접 나감 / 유예 시간 초과)
 export function forfeit(s, slot){
-  setArena(s.n);
+  setArena(s.n, s.melee);
   setOff(s, slot, true);
   if (s.n > 2) return;                       // 2대2는 계속 진행
   if (s.phase === PH_OVER || s.solo) return;
@@ -358,8 +369,10 @@ export function forfeit(s, slot){
   s.winner = teamOf(slot, s.n) === 0 ? 2 : 1;
 }
 export function canThrow(s, slot, k){
-  setArena(s.n);
+  setArena(s.n, s.melee);
   if (s.phase !== PH_PLAY) return false;
+  if (!s.p[slot] || s.p[slot].hp <= 0) return false;   // 죽으면 관전. 던지기도 안 된다
+  if (s.off[slot]) return false;                       // 끊긴 사람도 마찬가지
   if (!THROW_DEF[k]) return false;
   return (s.ammo?.[slot]?.[k] || 0) > 0;
 }
@@ -367,7 +380,7 @@ export function canThrow(s, slot, k){
 // 이 위치에 서면 엄폐물과 겹치는가. 드럼통은 함정이라 막지 않는다
 // (막으면 안 보이는 상태에서 길이 막혀 위치가 드러난다)
 export function blocked(s, x, y, self = -1){
-  setArena(s.n);
+  setArena(s.n, s.melee);
   for (const it of (s.items || [])){
     if (it.hp <= 0 || it.k === ITEM.DRUM) continue;
     const r = itemRect(it);
@@ -384,7 +397,7 @@ export function blocked(s, x, y, self = -1){
 }
 
 export function step(s, inp){
-  setArena(s.n);
+  setArena(s.n, s.melee);
   s.tick++;
 
   // 대기/종료 화면: START 입력(fire)으로만 카운트다운 시작
@@ -406,8 +419,9 @@ export function step(s, inp){
         if (q.fastAns === 1) s.fast = true;
         s.fastBy = 0;
       }
-      // 1단계 설치 완료: 아이템을 전부 놓아야 누를 수 있다
-      if (q.ready && (s.solo || allPlaced(s, i))){
+      // 1단계 설치 완료: 몇 개를 놓았든 누를 수 있다.
+      // 엄폐물을 아예 안 깔고 싶은 사람도 있어서 정원을 채우도록 강제하지 않는다
+      if (q.ready){
         s.done[i] = true;
         if (s.solo) s.ready[i] = true;              // 연습은 상대가 없으니 바로 준비까지
       }
@@ -552,6 +566,33 @@ export function step(s, inp){
       s.proj.splice(i, 1);
     }
   }
+  // 칼전: 휘두르기 모션과 판정. 앞으로 한 칸을 때린다
+  if (s.melee && s.phase === PH_PLAY){
+    for (let i = 0; i < s.n; i++){
+      const p = s.p[i], q = s.off[i] ? NOIN : (inp[i] || NOIN);
+      if (p.cool > 0) p.cool--;
+      if (p.hp <= 0){ p.atk = 0; continue; }
+      if (q.atk && p.atk === 0 && p.cool === 0){ p.atk = ATK_TICKS; p.cool = MELEE_COOL; }
+      if (p.atk > 0){
+        p.atk--;
+        if (p.atk === ATK_TICKS - ATK_HIT){          // 모션 중간에 한 번만 판정
+          const up = teamOf(i, s.n) === 0;           // 아래 팀은 위를 본다
+          const hy = up ? p.y - Math.round(GRID_CH * FP) : p.y + PHf;
+          const hh = Math.round(GRID_CH * FP);
+          for (let v = 0; v < s.n; v++){
+            if (v === i || teamOf(v, s.n) === teamOf(i, s.n)) continue;
+            const t = s.p[v];
+            if (t.hp <= 0) continue;
+            if (!overlap(t.x, t.y, PWf, PHf, p.x, hy, PWf, hh)) continue;
+            const was = t.hp;
+            if (!DEBUG_INF_HP) t.hp -= MELEE_DAMAGE;
+            t.flash = FLASH_T;
+            if (was > 0 && t.hp <= 0) killFx(s, t);
+          }
+        }
+      }
+    }
+  }
   // 화염병 불꽃: 수명을 깎고, 주기마다 그 안에 있는 사람에게 피해
   for (let i = s.fire.length - 1; i >= 0; i--){
     const fr = s.fire[i];
@@ -576,8 +617,8 @@ export function step(s, inp){
   // 폭발 연출 수명
   for (let i = s.fx.length - 1; i >= 0; i--) if (--s.fx[i].t <= 0) s.fx.splice(i, 1);
 
-  // 전투 중: 클릭 없이 coolT 간격 자동 발사 (연습 모드에선 쏘지 않는다)
-  if (!s.solo)
+  // 전투 중: 클릭 없이 coolT 간격 자동 발사 (연습 모드·칼전에선 쏘지 않는다)
+  if (!s.solo && !s.melee)
   for (let i = 0; i < s.n; i++){
     const p = s.p[i];
     if (p.hp <= 0) continue;                   // 죽으면 관전
@@ -658,7 +699,7 @@ export function step(s, inp){
 }
 
 export function checksum(s){
-  setArena(s.n);
+  setArena(s.n, s.melee);
   let h = s.tick + s.maxStep + s.bulletV + s.coolT + s.phase * 7 + s.timer + s.clock;
   for (const p of s.p) h = (h*31 + p.x + p.y*3 + p.hp*7 + p.cool*3 + p.invul) | 0;
   for (const b of s.bullets) h = (h*31 + b.x + b.y + b.o) | 0;
@@ -671,7 +712,7 @@ export function checksum(s){
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;
   for (const fr of s.fire) h = (h*31 + fr.c*7 + fr.r*13 + fr.t) | 0;
-  for (let i = 0; i < s.n; i++) h = (h*31 + (s.off[i] ? i + 3 : 0)) | 0;
+  for (let i = 0; i < s.n; i++) h = (h*31 + (s.off[i] ? i + 3 : 0) + (s.p[i].atk || 0) * 5) | 0;
   for (let i = 0; i < s.n; i++){
     h = (h*31 + s.blind[i] * (i + 1)) | 0;
     for (let k = 0; k < s.ammo[i].length; k++) h = (h*31 + s.ammo[i][k] * (7 + k*4)) | 0;

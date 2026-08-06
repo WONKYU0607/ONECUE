@@ -1,7 +1,7 @@
 import {
   FP, WALL_L, WALL_R, wallIdx, PH_PLAY, THROW,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CW, GRID_CH, GRID_X0, GRID_Y0,
-  FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX
+  FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX, PHf, PWf
 } from './config.js';
 
 // 노릴 상대. 2대2에서는 살아 있는 적 중 가로로 가장 가까운 쪽을 본다.
@@ -115,6 +115,28 @@ export function createAI(stage = 1){
       if (s.phase !== PH_PLAY){ targetX = null; aimKind = -1; return { vx: 0, vy: 0 }; }
       const my = s.p[me], foe = foeOf(s, me);
       if (!foe) return { vx: 0, vy: 0 };
+
+      // 칼전: 총알도 엄폐물도 없다. 붙어서 때리고, 쿨 동안은 조금 물러난다
+      if (s.melee){
+        const up = teamOf(me, s.n) === 0;                 // 아래 팀은 위를 본다
+        const reach = GRID_CH * FP;
+        const gap = up ? my.y - (foe.y + PHf) : foe.y - (my.y + PHf);
+        const dxc = foe.x - my.x;
+        const lined = Math.abs(dxc) < PWf * 0.7;          // 같은 세로줄에 섰는가
+        const inRange = lined && gap >= -PHf * 0.5 && gap <= reach * 0.85;
+        // 칼이 닿으면 휘두른다. 쿨 중이면 조금 떨어져서 기다린다.
+        // 단, **휘두르는 모션 중에는 물러나면 안 된다** — 판정이 모션 중간에 나므로
+        // 바로 빠지면 자기 칼을 자기가 피한다
+        const swinging = (my.atk || 0) > 0;
+        const want = (my.cool > 0 && !swinging) ? reach * 1.4 : reach * 0.5;
+        let vy = 0;
+        if (!lined) vy = 0;                                // 가로를 먼저 맞춘다
+        else if (gap > want + reach * 0.15) vy = up ? -1 : 1;
+        else if (gap < want - reach * 0.15) vy = up ? 1 : -1;
+        const vx = Math.abs(dxc) < PWf * 0.35 ? 0 : Math.sign(dxc);
+        return { vx: vx * p.speed, vy: vy * p.speed, atk: inRange && my.cool === 0 ? 1 : 0 };
+      }
+
       const myCx = my.x + HALF;
 
       // react가 짧을수록 자주 다시 판단한다 = 반응이 빠르다

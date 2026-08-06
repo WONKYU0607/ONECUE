@@ -120,6 +120,13 @@ export const THROW_DEF = [
   { key: 'flash',   name: '섬광탄', count: 3 },
   { key: 'molotov', name: '화염병', count: 1 }    // 한 판에 한 번
 ];
+// 칼전(근접전). 총알·아이템 없이 칼로만 싸운다
+export const MELEE_DAMAGE = 8;          // 한 방에 최대 체력의 8%
+export const ATK_TICKS = 18;            // 휘두르는 모션 길이 (0.3초)
+export const ATK_HIT = 12;              // 이 틱에 판정 (모션 중간)
+export const MELEE_COOL = 30;           // 다음 공격까지 0.5초
+export const MELEE_REACH = 1;           // 앞으로 한 칸
+
 // 화염병: 착탄한 칸 + 주변 한 칸(3x3)이 4초간 탄다. 그 안에 서 있으면 주기적으로 피해
 export const FIRE_TICKS = 240;          // 4초
 export const FIRE_RADIUS = 1;           // 3x3
@@ -173,7 +180,7 @@ export const WALL2_R = '148,148,148,148,148,148,148,148,148,148,148,148,148,148,
 const A1 = {
   cols: 6, rows: 14, x0: 24.9, cw: 21.638, y0: 0, ch: 22.214, mid: 7,
   pw: 14, ph: 16, bg: 'arena', neutral: false, hc: 3, tc: [1, 4],
-  flip: H, quota: [1, 0, 0, 1, 0, 0, 2], cover: 2,
+  flip: H, quota: [2, 2, 2, 2, 2, 2, 2], cover: 2,   // 엄폐물은 조합 자유, 합계 2개
   bands: [[0, 13, 0, 5]],
   wl: WALL1_L, wr: WALL1_R
 };
@@ -191,6 +198,14 @@ const A2 = {
   yTop: 9, yBot: 301,
   wt: TOP2, wb: BOT2,          // x마다 다른 바닥 위/아래 끝
   wl: WALL2_L, wr: WALL2_R
+};
+// 칼전 아레나(던전). 벽이 직선이라 밴드를 그대로 이동 한계로 써도 된다(straight)
+const A3 = {
+  cols: 10, rows: 22, x0: 26.76, cw: 12.580, y0: 22.54, ch: 12.236, mid: 11,
+  pw: 12, ph: 12, bg: 'arena3', neutral: false, hc: 4, tc: [3, 6],
+  flip: 22.54 * 2 + 12.236 * 22, quota: [0, 0, 0, 0, 0, 0, 0], cover: 0,
+  bands: [[0, 0, 1, 8], [1, 20, 0, 9], [21, 21, 1, 8]],
+  straight: true, melee: true
 };
 export const ARENA = { ...A1 };
 
@@ -212,18 +227,43 @@ export const cellUsable = (c, r) => {
   return !!b && c >= b[0] && c <= b[1];
 };
 
-export function setArena(n){
-  const a = n > 2 ? A2 : A1;
+export function setArena(n, melee = false){
+  const a = melee ? A3 : (n > 2 ? A2 : A1);
   if (ARENA.bg === a.bg && ARENA.cols === a.cols) return ARENA;   // 이미 맞으면 건너뜀
   Object.assign(ARENA, a);
   GRID_COLS = a.cols; GRID_ROWS = a.rows; GRID_MIDROW = a.mid;
   GRID_X0 = a.x0; GRID_CW = a.cw; GRID_Y0 = a.y0; GRID_CH = a.ch;
   PWf = Math.round(a.pw * FP); PHf = Math.round(a.ph * FP);
   BOFF = Math.round((PWf - BWf) / 2);
-  // 이동 한계는 **벽 그림 표를 그대로** 쓴다. 밴드로 칸 단위로 자르면
-  // 울퉁불퉁한 벽 안쪽 공간에 못 들어가서 움직임이 뚝뚝 끊긴다.
-  // 밴드는 아이템 배치 판정(cellUsable)에만 쓴다
-  WALL_L = a.wl; WALL_R = a.wr;
+  // 얼음 아레나는 벽이 울퉁불퉁해서 **벽 그림 표를 그대로** 써야 한다.
+  // 밴드로 칸 단위로 자르면 벽 안쪽 공간에 못 들어가 움직임이 끊긴다.
+  // 반대로 던전 아레나(straight)는 벽이 직선이라 밴드에서 표를 만들면 정확히 맞는다
+  if (a.straight){
+    const L = new Array(311), R = new Array(311);
+    const rowAt = y => a.bands.find(([r0, r1]) => {
+      const ya = a.y0 + a.ch * r0, yb = a.y0 + a.ch * (r1 + 1);
+      return y >= ya && y < yb;
+    });
+    for (let y = 0; y < 311; y++){
+      const b = rowAt(y) || (y < a.y0 ? a.bands[0] : a.bands[a.bands.length - 1]);
+      const lo = Math.round((a.x0 + a.cw * b[2]) * FP);
+      const hi = Math.round((a.x0 + a.cw * (b[3] + 1) - a.pw) * FP);
+      L[y] = lo; R[y] = Math.max(lo, hi);
+    }
+    WALL_L = L; WALL_R = R;
+    // x별 위아래 한계도 밴드에서. 양끝 줄이 좁아 모서리에 노치가 생긴다
+    const T = new Array(180), B = new Array(180);
+    for (let x = 0; x < 180; x++){
+      const c = clampi(Math.floor((x - a.x0) / a.cw), 0, a.cols - 1);   // 격자 밖은 가장 가까운 열로
+      const rows = a.bands.filter(b => c >= b[2] && c <= b[3]);
+      if (!rows.length){ T[x] = Math.round(a.y0 * FP); B[x] = T[x]; continue; }
+      T[x] = Math.round((a.y0 + a.ch * Math.min(...rows.map(b => b[0]))) * FP);
+      B[x] = Math.round((a.y0 + a.ch * (Math.max(...rows.map(b => b[1])) + 1)) * FP);
+    }
+    A3.wt = T; A3.wb = B; ARENA.wt = T; ARENA.wb = B;
+  } else {
+    WALL_L = a.wl; WALL_R = a.wr;
+  }
   HOME_COL = a.hc; TEAM_COLS = a.tc;
   // 중립 행이 있으면 아래 팀은 그 다음 행부터 (가운데 한 칸은 아무도 못 들어간다).
   // 맨 앞뒤 행이 통째로 벽인 경우가 있어 밴드에서 실제 첫·끝 행을 가져온다
@@ -232,7 +272,13 @@ export function setArena(n){
   const lastRow  = Math.max(...a.bands.map(b => b[1]));
   ROW_MIN = [lo0, firstRow];
   ROW_MAX = [lastRow, a.mid - 1];
-  if (a.neutral){
+  if (a.melee){
+    // 칼전은 중앙선도 진영도 없다. 아레나 전체를 양쪽이 같이 쓴다
+    const top = Math.round(a.y0 * FP);
+    const bot = Math.round((a.y0 + a.ch * a.rows - a.ph) * FP);
+    YMIN_S = [top, top]; YMAX_S = [bot, bot];
+    ROW_MIN = [0, 0]; ROW_MAX = [a.rows - 1, a.rows - 1];
+  } else if (a.neutral){
     const cy = r => a.y0 + a.ch * r;
     // 위아래 끝은 격자가 아니라 바닥 끝까지. 가운데는 중립 행이 경계
     YMIN_S = [ Math.round(cy(lo0) * FP), Math.round((a.yTop ?? cy(firstRow)) * FP) ];
@@ -262,7 +308,7 @@ export const FAST = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 32;
+export const PROTO_VER = 36;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

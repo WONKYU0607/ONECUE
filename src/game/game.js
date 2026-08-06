@@ -34,21 +34,22 @@ export function createGame(canvas, opts = {}){
   const net = online || new Loopback();
   // 로컬 AI전은 2인/4인을 고를 수 있다. 4인이면 나 말고 셋이 AI
   const nLocal = (!online && session.n === 4) ? 4 : 2;
+  const isMelee = session.kind === 'melee';        // 칼전 (총알·아이템 없음)
   if (!online){ SELF.slot = 0; SELF.n = nLocal; }
-  const server = online ? null : new Server(net, nLocal);
+  const server = online ? null : new Server(net, nLocal, isMelee);
   const all = Array.from({ length: nLocal }, (_, i) => i);
   // 온라인이면 내 슬롯만, 로컬(AI·디버그)이면 전원 이 클라가 입력을 넣는다
   const client = new Client(net, online ? [SELF.slot] : all);
   // AI는 슬롯마다 따로 만든다 (각자 상태를 들고 있다)
-  const aiSlots = (!online && session.kind === 'ai') ? all.filter(i => i !== SELF.slot) : [];
+  const aiSlots = (!online && (session.kind === 'ai' || isMelee)) ? all.filter(i => i !== SELF.slot) : [];
   const ais = new Map(aiSlots.map(i => [i, createAI(session.stage || 1)]));
   const ai = ais.get(aiSlots[0]) || null;   // 1대1 호환
   // 클라 기본 상태는 2인용이라, 4인 판이면 첫 프레임이 1대1 아레나로 그려졌다가
   // 스냅샷이 와서야 바뀐다(맵이 깜빡임). 슬롯 2·3은 그 사이 존재하지 않아 예측이 죽는다.
   // 인원수는 시작 전에 이미 알고 있으니 미리 맞춰둔다
   const n0 = online ? (SELF.n || 2) : nLocal;
-  if (n0 !== client.s.n){ client.s = newState(n0); client.pred = newState(n0); }
-  setArena(n0);
+  if (n0 !== client.s.n || isMelee){ client.s = newState(n0, isMelee); client.pred = newState(n0, isMelee); }
+  setArena(n0, isMelee);
   const practice = !online && session.kind === 'practice';
   if (practice){
     // 상대도 총알도 승패도 없다. 이동·배치·투척만 자유롭게 해보는 모드
@@ -156,7 +157,8 @@ export function createGame(canvas, opts = {}){
     },
     canThrowNow: () => client.pred.phase === PH_PLAY,
     ammo: ammoLeft,
-    onThrow: (k, ch) => { if (canThrow(client.pred, SELF.slot, k)) client.throwItem(SELF.slot, k, ch); }
+    onThrow: (k, ch) => { if (canThrow(client.pred, SELF.slot, k)) client.throwItem(SELF.slot, k, ch); },
+    onSwing: () => { sfx.shot?.(true); client.swing(SELF.slot); }
   });
 
   const doResize = () => view.resize(innerWidth, innerHeight);
@@ -171,7 +173,10 @@ export function createGame(canvas, opts = {}){
   let raf = 0, running = true, lastNow = performance.now(), lastPhase = -1;
   // 준비·배치 신호는 한 번만 보내면 지연으로 유실될 수 있다(서버가 마감 지난 입력을 버림).
   // 확정 상태에 반영될 때까지 다시 보낸다.
-  let wantReady = false, nextReadyAt = 0;
+  // 두 단계를 따로 재전송한다. 한 곳에서 둘 다 보내면 설치 완료를 누른 순간
+  // 준비완료까지 눌려서 파란 버튼이 화면에 뜨지 않는다
+  let wantDone = false, nextDoneAt = 0;
+  let wantGo = false, nextGoAt = 0;
   let pendPlace = null, nextPlaceAt = 0;
 
   // 지난 프레임과 비교해 무슨 일이 일어났는지 알아내고 소리·연출을 낸다
@@ -303,7 +308,7 @@ export function createGame(canvas, opts = {}){
           if (plan.length && allPlacedKind(client.s, team, k)) plan.shift();
         }
         // 팀 몫이 다 놓였으면 준비까지 누른다 (놓는 사람이 아니어도)
-        if ((!plan || !plan.length) && !client.pred.ready[slot] && allPlaced(client.s, slot)){
+        if ((!plan || !plan.length) && !client.pred.ready[slot]){
           client.setReady(slot); client.setGo(slot);
         }
       }
@@ -318,12 +323,17 @@ export function createGame(canvas, opts = {}){
       const a = brain.think(client.pred, slot, dt, now);
       if (a.vx || a.vy) client.input(slot, a.vx * sp * dt, a.vy * sp * dt, 0);
       if (a.thr && canThrow(client.pred, slot, a.thr.k)) client.throwItem(slot, a.thr.k, a.thr.ch);
+      if (a.atk) client.swing(slot);
     }
 
     // 유실 대비 재전송
-    if (wantReady){
-      if (client.s.ready?.[SELF.slot]) wantReady = false;
-      else if (now >= nextReadyAt){ client.setReady(SELF.slot); client.setGo(SELF.slot); nextReadyAt = now + 250; }
+    if (wantDone){
+      if (client.s.done?.[SELF.slot]) wantDone = false;
+      else if (now >= nextDoneAt){ client.setReady(SELF.slot); nextDoneAt = now + 250; }
+    }
+    if (wantGo){
+      if (client.s.ready?.[SELF.slot]) wantGo = false;
+      else if (now >= nextGoAt){ client.setGo(SELF.slot); nextGoAt = now + 250; }
     }
     if (pendPlace){
       const done = (client.s.items || []).some(
@@ -351,7 +361,7 @@ export function createGame(canvas, opts = {}){
     reactTo(client.pred, dt);
     client.updateRender(a, dt);
     view.draw(client.pred, dbg, a, client, stick, input.drag, leftCount, okCell, {
-      ammo: ammoLeft, charge: input.charge, softFlash: opts.softFlash?.() || false, juice
+      ammo: ammoLeft, charge: input.charge, swinging: input.atk?.on, softFlash: opts.softFlash?.() || false, juice
     });
 
     // 페이즈가 바뀔 때만 React에 알린다 (매 프레임 setState 하면 안 됨)
@@ -395,8 +405,15 @@ export function createGame(canvas, opts = {}){
     },
     requestFast(){ sfx.place(); client.requestFast(SELF.slot); },
     answerFast(ok){ ok ? sfx.ready() : sfx.deny(); client.answerFast(SELF.slot, ok); },
-    ready(){ sfx.ready(); wantReady = true; nextReadyAt = 0; client.setReady(SELF.slot); },
-    go(){ sfx.ready(); client.setGo(SELF.slot); },
+    ready(){ sfx.ready(); wantDone = true; nextDoneAt = 0; client.setReady(SELF.slot); },
+    go(){ sfx.ready(); wantGo = true; nextGoAt = 0; client.setGo(SELF.slot); },
+    // 칼전은 배치할 아이템이 없어 한 번에 준비까지 간다
+    meleeReady(){
+      sfx.ready();
+      wantDone = true; nextDoneAt = 0; wantGo = true; nextGoAt = 0;
+      client.setReady(SELF.slot); client.setGo(SELF.slot);
+    },
+    isMelee(){ return !!client.pred.melee; },
     isReady(){ return !!(client.pred.ready || [])[SELF.slot]; },
     // 서버가 실제로 확정한 준비 상태 (예측이 아닌 것). 문제 진단용
     confirmedReady(){

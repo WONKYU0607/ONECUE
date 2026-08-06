@@ -46,6 +46,12 @@ export default function App(){
     setSession({ kind: 'practice' });
     setScreen('game');
   }, []);
+  const startMelee = useCallback((n = 2) => {
+    disconnect();
+    setResult(null);
+    setSession({ kind: 'melee', n });
+    setScreen('game');
+  }, []);
   const startAi   = useCallback((stage, n = 2) => {
     SELF.slot = 0;                       // AI전은 항상 내가 아래쪽
     setSession({ kind: 'ai', stage, n });
@@ -67,7 +73,7 @@ export default function App(){
   return (
     <>
       {screen === 'splash'   && <Splash onDone={() => { goHome(); goHomeFirst(); }} />}
-      {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={startPractice}
+      {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={startPractice} onMelee={startMelee}
                                      onSettings={() => setShowSettings(true)} onHelp={() => setShowHelp(true)} />}
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}

@@ -1,5 +1,5 @@
-import { NET } from './config.js';
-import { stickVector, inStickZone, paletteSlots, throwSlots } from './layout.js';
+import { NET, ARENA } from './config.js';
+import { stickVector, inStickZone, paletteSlots, throwSlots, attackBtn } from './layout.js';
 import { unlockAudio } from './audio.js';
 
 // 스틱 상태와 눌린 키를 들고 있다가 루프가 매 프레임 읽어간다.
@@ -13,7 +13,8 @@ export function attachInput(canvas, view, opts = {}){
   const keys = {};
   const drag = { on: false, id: null, k: -1, x: 0, y: 0, cell: null, from: null };
   // 투척: 누르고 있는 동안 차징, 떼면 던진다
-  const charge = { on: false, id: null, k: -1, t0: 0, ch: 0, out: false };   // out = 아이콘 밖으로 밀어 취소된 상태
+  const charge = { on: false, id: null, k: -1, t0: 0, ch: 0, out: false };
+  const atk = { on: false, id: null };   // 칼전 공격 버튼   // out = 아이콘 밖으로 밀어 취소된 상태
 
   // 화면 좌표 -> 월드 좌표
   function worldPt(e){
@@ -46,6 +47,14 @@ export function attachInput(canvas, view, opts = {}){
 
     // 전투 중: 투척 버튼을 누르면 차징 시작
     if (opts.canThrowNow?.()){
+      if (ARENA.melee){
+        const b = attackBtn(view.uiH);
+        if (wp.x >= b.x && wp.x <= b.x + b.w && wp.y >= b.y && wp.y <= b.y + b.h){
+          atk.on = true; atk.id = e.pointerId;
+          opts.onSwing?.();
+          return;
+        }
+      }
       for (const sl of throwSlots(view.uiH)){
         if (wp.x >= sl.x && wp.x <= sl.x + sl.w && wp.y >= sl.y && wp.y <= sl.y + sl.h){
           if ((opts.ammo?.(sl.k) ?? 0) <= 0) return;
@@ -82,6 +91,7 @@ export function attachInput(canvas, view, opts = {}){
     Object.assign(stick, stickVector(worldPt(src), view.uiH));
   };
   const onUp = e => {
+    if (atk.on && e.pointerId === atk.id){ atk.on = false; atk.id = null; return; }
     if (charge.on && e.pointerId === charge.id){
       if (!charge.out) opts.onThrow?.(charge.k, charge.ch);   // 밖에서 떼면 취소
       charge.on = false; charge.id = null; charge.k = -1; charge.ch = 0; charge.out = false;
@@ -118,7 +128,7 @@ export function attachInput(canvas, view, opts = {}){
   }
 
   return {
-    stick, keys, drag, charge, tick,
+    stick, keys, drag, charge, atk, tick,
     detach(){
       removeEventListener('pointerdown', onDown);
       removeEventListener('pointermove', onMove);

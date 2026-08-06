@@ -3,16 +3,19 @@ import {
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO, HP_MARKS,
   ITEM, ITEM_DEF, cellOwner, teamOf, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
+  MELEE_COOL,
   FIRE_TICKS, FIRE_RADIUS,
   WALL_L, WALL_R, wallIdx, PWf,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
 } from './config.js';
-import { RS, computeLayout, stickGeom } from './layout.js';
+import { RS, computeLayout, stickGeom, attackBtn } from './layout.js';
 import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
 
 // 스프라이트 시트의 한 칸 크기 (원본은 14x16 고정)
 const FW = 14 * RS, FH = 16 * RS;
+// 칼전 시트 규격 (melee.json)
+const MELEE_FW = 310, MELEE_FH = 184, MELEE_BODY_H = 180;
 
 // items.webp 안의 프레임 위치 (824x66)
 const ITEM_FRAME = {
@@ -39,6 +42,7 @@ const fy = (y, h) => flipped() ? ARENA.flip - y - h : y;
 export function createRenderer(canvas){
   const ctx = canvas.getContext('2d');
   const sheet = getImage('characters'), items = getImage('items');
+  const melee = getImage('melee');          // 칼전 캐릭터 시트 (310x184, 4색 x 4자세)
   const bgOf = () => getImage(ARENA.bg);   // 아레나에 따라 배경이 달라진다
   const boom = getImage('explosion');
   const flashfx = getImage('flashfx');
@@ -87,11 +91,28 @@ export function createRenderer(canvas){
     // 섬광에 당한 캐릭터는 지속 시간 내내 흰색으로 깜빡인다 (상대도 맞았는지 알 수 있게)
     const dazzled = blind > 0 && Math.floor(tick / 5) % 2 === 0;
     const hit = p.flash > 0 || dazzled;
-    if (isReady(sheet)){
+    if (ARENA.melee && isReady(melee)){
+      // 칼전 시트: 4행(색) x 4열(앞대기·앞공격·뒤대기·뒤공격), 프레임 310x184
+      // 몸통(193x180)이 한 칸이 되도록 배율을 잡고 **왼쪽 아래**를 캐릭터 자리에 맞춘다
+      const col = (colorOf && colorOf[i] != null) ? colorOf[i] : TEAM_OF[i];
+      const mineSide = teamOf(i, SELF.n || 2) === myTeamNow();
+      const swing = (p.atk || 0) > 0;
+      const fc = (mineSide ? 2 : 0) + (swing ? 1 : 0);
+      const sc = ARENA.ph / MELEE_BODY_H;
+      const dw = MELEE_FW * sc, dh = MELEE_FH * sc;
+      if (hit) ctx.filter = 'brightness(2.2) saturate(0.2)';
+      ctx.drawImage(melee, fc * MELEE_FW, col * MELEE_FH, MELEE_FW, MELEE_FH,
+        Math.round(xw * RS), Math.round((yw + ARENA.ph - dh) * RS),
+        Math.round(dw * RS), Math.round(dh * RS));
+      ctx.filter = 'none';
+    } else if (isReady(sheet)){
       // 프레임 순서: [팀0앞, 팀0뒤, 팀1앞, 팀1뒤, ...] + 8부터 피격(흰색) 버전
       // 색은 각자 고른 것. 내 캐릭터만 뒷모습을 쓴다
       const col = (colorOf && colorOf[i] != null) ? colorOf[i] : TEAM_OF[i];
-      const idx = (hit ? 8 : 0) + col * 2 + (i === SELF.slot ? 1 : 0);
+      // 우리 팀은 등을 보이고(위를 향해 쏨), 상대 팀은 앞을 보인다.
+      // 예전엔 `i === SELF.slot`이라 2대2에서 팀원만 나를 마주 보고 서 있었다
+      const mineSide = teamOf(i, SELF.n || 2) === myTeamNow();
+      const idx = (hit ? 8 : 0) + col * 2 + (mineSide ? 1 : 0);
       // 월드 정수px가 아니라 디바이스 픽셀 단위로 반올림해야 계단이 안 생긴다
       // 2대2는 칸이 작아 캐릭터를 줄여 그린다. 원본 칸은 그대로 두고 그릴 크기만 바꾼다
       const dw = ARENA.pw * RS, dh = ARENA.ph * RS;
@@ -351,6 +372,32 @@ export function createRenderer(canvas){
   }
 
   // 전투 중 투척 버튼 (배치 팔레트와 같은 자리)
+  // 칼전 공격 버튼
+  function drawAttackBtn(s, uiH2, pressed){
+    const b = attackBtn(uiH2);
+    const me = s.p[SELF.slot];
+    const ready = me && me.hp > 0 && (me.cool || 0) === 0;
+    px(b.x, b.y, b.w, b.h, pressed ? 'rgba(240,168,30,0.30)'
+                          : ready ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)');
+    const c = pressed ? '#f0a81e' : ready ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
+    px(b.x, b.y, b.w, 1, c); px(b.x, b.y + b.h - 1, b.w, 1, c);
+    px(b.x, b.y, 1, b.h, c); px(b.x + b.w - 1, b.y, 1, b.h, c);
+    // 칼 모양: 비스듬한 날 + 손잡이
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    ctx.save();
+    ctx.translate(cx * RS, cy * RS); ctx.rotate(-Math.PI / 4);
+    const col2 = ready ? '#e8e8f4' : '#6a6a85';
+    ctx.fillStyle = col2; ctx.fillRect(-1.6 * RS, -13 * RS, 3.2 * RS, 20 * RS);
+    ctx.fillStyle = ready ? '#c8a24a' : '#5a5a70';
+    ctx.fillRect(-5 * RS, 6 * RS, 10 * RS, 2.4 * RS);
+    ctx.fillRect(-1.6 * RS, 8 * RS, 3.2 * RS, 5 * RS);
+    ctx.restore();
+    // 쿨다운 게이지
+    if (me && (me.cool || 0) > 0){
+      const t = 1 - me.cool / MELEE_COOL;
+      px(b.x + 1, b.y + b.h - 3, (b.w - 2) * t, 1.6, '#f0a81e');
+    }
+  }
   function drawThrowPad(s, uiH2, ammo, charge){
     if (s.phase !== PH_PLAY) return;
     for (const sl of throwSlots(uiH2)){
@@ -524,6 +571,7 @@ export function createRenderer(canvas){
     drawPanel(s, stick);
     if (left) drawPalette(s, uiH, left, drag);
     if (extra.ammo) drawThrowPad(s, uiH, extra.ammo, extra.charge);
+    if (ARENA.melee) drawAttackBtn(s, uiH, extra.swinging);
     drawBlind(s, extra.softFlash);
     if (SHOW_HUD){
       ctx.font = (8*RS) + 'px monospace'; ctx.textAlign = 'left';
