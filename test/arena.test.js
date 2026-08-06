@@ -120,6 +120,16 @@ assert(YMIN_S[1] < Math.round((ARENA.y0 + ARENA.ch) * FP),
 assert(YMAX_S[0] + PHf <= Math.round(ARENA.yBot * FP) + 1, '아래 벽 라인은 안 넘는다');
 assert(YMIN_S[1] >= Math.round(ARENA.yTop * FP), '위 벽 라인도 안 넘는다');
 
+console.log('벽 안쪽 움푹 들어간 구간까지 들어갈 수 있다');
+{
+  // 벽 표는 벽 그림선이 아니라 **실제 바닥**에서 뽑았다. 움푹 들어간 곳(팻말 옆 등)이
+  // 잘려 있으면 그 높이의 좌우 폭이 평평한 구간과 같아져 버린다
+  const w = y => { const i = wallIdx(Math.round(y * FP)); return (WALL_R[i] + PWf - WALL_L[i]) / FP; };
+  const flat = w(120);
+  assert(w(63) > flat + 2, '위쪽 오목한 구간이 더 넓다 ' + w(63).toFixed(0) + ' vs ' + flat.toFixed(0));
+  assert(w(267) > flat + 2, '아래쪽 오목한 구간이 더 넓다 ' + w(267).toFixed(0));
+}
+
 console.log('이동 범위');
 const s2 = newState(4);
 s2.phase = PH_PLAY;
