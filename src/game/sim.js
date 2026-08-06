@@ -109,6 +109,8 @@ import {
   teamOf,
   teamYMax,
   teamYMin,
+  topSpan,
+  botSpan,
   wallIdx
 } from './config.js';
 
@@ -435,7 +437,10 @@ export function step(s, inp){
       // (한 걸음이 남은 틈보다 크면 영영 다가가지 못한다)
       const oy = p.y, ox = p.x;
       const tm = teamOf(i, s.n);
-      let ty = Math.max(teamYMin(tm), Math.min(teamYMax(tm), p.y + dy));
+      // 위아래 끝은 x마다 다르다 (모서리는 잘리고 팻말 옆은 더 깊다)
+      const lo = Math.max(teamYMin(tm), topSpan(p.x));
+      const hi = Math.min(teamYMax(tm), botSpan(p.x) - PHf);
+      let ty = Math.max(lo, Math.min(Math.max(lo, hi), p.y + dy));
       if (blocked(s, p.x, ty, i)){
         let step2 = ty - oy, best = oy;
         for (let k = 0; k < 5; k++){

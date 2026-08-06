@@ -4,7 +4,7 @@
 import { newState, step, canPlace, checksum, NOIN } from '../src/game/sim.js';
 import {
   FP, H, ITEM, ITEM_DEF, PH_PLAY, teamOf, setArena, ARENA, itemQuota, itemKinds, coverBudget, coverUsed,
-  rowCols, cellUsable,
+  rowCols, cellUsable, topSpan, botSpan,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CH, GRID_Y0,
   PWf, PHf, WALL_L, WALL_R, YMIN_S, YMAX_S, ROW_MIN, ROW_MAX, cellOwner, wallIdx
 } from '../src/game/config.js';
@@ -119,6 +119,17 @@ assert(YMIN_S[1] < Math.round((ARENA.y0 + ARENA.ch) * FP),
 // 그래도 회색 벽 라인(난간·계단 그림)은 넘지 않는다
 assert(YMAX_S[0] + PHf <= Math.round(ARENA.yBot * FP) + 1, '아래 벽 라인은 안 넘는다');
 assert(YMIN_S[1] >= Math.round(ARENA.yTop * FP), '위 벽 라인도 안 넘는다');
+
+console.log('위아래 끝도 x마다 다르다 (팻말 옆은 더 깊고, 모서리는 잘린다)');
+{
+  const at = x => Math.round(x * FP);
+  const bot = x => botSpan(at(x)) / FP, top = x => topSpan(at(x)) / FP;
+  assert(bot(48) > bot(90) + 3, '팻말 옆(48)이 가운데(90)보다 깊다 ' + bot(48) + ' vs ' + bot(90));
+  assert(bot(130) > bot(90) + 3, '오른쪽 팻말 옆도 마찬가지 ' + bot(130));
+  assert(bot(20) < bot(48) - 5 && bot(160) < bot(130) - 5, '모서리는 잘려서 얕다');
+  assert(top(48) < top(20) - 5, '위쪽도 모서리가 잘린다');
+  assert(bot(48) - top(48) > bot(20) - top(20), '가운데 쪽이 세로로 더 넓다');
+}
 
 console.log('벽 안쪽 움푹 들어간 구간까지 들어갈 수 있다');
 {
