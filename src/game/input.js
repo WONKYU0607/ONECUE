@@ -13,7 +13,7 @@ export function attachInput(canvas, view, opts = {}){
   const keys = {};
   const drag = { on: false, id: null, k: -1, x: 0, y: 0, cell: null, from: null };
   // 투척: 누르고 있는 동안 차징, 떼면 던진다
-  const charge = { on: false, id: null, k: -1, t0: 0, ch: 0 };
+  const charge = { on: false, id: null, k: -1, t0: 0, ch: 0, out: false };   // out = 아이콘 밖으로 밀어 취소된 상태
 
   // 화면 좌표 -> 월드 좌표
   function worldPt(e){
@@ -50,7 +50,7 @@ export function attachInput(canvas, view, opts = {}){
         if (wp.x >= sl.x && wp.x <= sl.x + sl.w && wp.y >= sl.y && wp.y <= sl.y + sl.h){
           if ((opts.ammo?.(sl.k) ?? 0) <= 0) return;
           charge.on = true; charge.id = e.pointerId; charge.k = sl.k;
-          charge.t0 = performance.now(); charge.ch = 0;
+          charge.t0 = performance.now(); charge.ch = 0; charge.out = false;
           return;
         }
       }
@@ -61,6 +61,13 @@ export function attachInput(canvas, view, opts = {}){
     Object.assign(stick, stickVector(wp, view.uiH));
   };
   const onMove = e => {
+    // 차징 중 손가락을 아이콘 밖으로 밀면 취소. 다시 아이콘 안으로 들어오면 이어서 찬다
+    if (charge.on && e.pointerId === charge.id){
+      const wp = worldPt(e);
+      const sl = throwSlots(view.uiH).find(v => v.k === charge.k);
+      charge.out = !sl || wp.x < sl.x || wp.x > sl.x + sl.w || wp.y < sl.y || wp.y > sl.y + sl.h;
+      return;
+    }
     if (drag.on && e.pointerId === drag.id){
       const wp = worldPt(e);
       drag.x = wp.x; drag.y = wp.y;
@@ -76,8 +83,8 @@ export function attachInput(canvas, view, opts = {}){
   };
   const onUp = e => {
     if (charge.on && e.pointerId === charge.id){
-      opts.onThrow?.(charge.k, charge.ch);
-      charge.on = false; charge.id = null; charge.k = -1; charge.ch = 0;
+      if (!charge.out) opts.onThrow?.(charge.k, charge.ch);   // 밖에서 떼면 취소
+      charge.on = false; charge.id = null; charge.k = -1; charge.ch = 0; charge.out = false;
       return;
     }
     if (drag.on && e.pointerId === drag.id){

@@ -169,6 +169,13 @@ console.log('스냅샷 전 예측 (슬롯 2·3이 검은 화면으로 죽던 자
   assert(!threw, '스냅샷 전이라도 예측이 죽지 않는다');
   // draw가 첫 예측보다 먼저 돌 수 있다. 렌더 위치가 null이면 렌더가 통째로 죽는다
   assert(Array.isArray(cl.rx) && Array.isArray(cl.ry), '예측을 못 돌려도 렌더 위치는 준비된다');
+  // 확정본만 4인이고 예측본이 아직 2인이어도 죽지 않아야 한다
+  // (예측 입력 길이를 pred.n으로 잡으면 슬롯 2·3이 빠져 뒤에서 터진다)
+  cl.s = newState(4);
+  let threw2 = false;
+  try { cl.predict(); } catch { threw2 = true; }
+  assert(!threw2, '확정본이 먼저 4인이 돼도 예측이 죽지 않는다');
+  assert(cl.pred.p.length === 4, '예측본도 네 명으로 따라온다');
   // 스냅샷이 오면 네 명 다 예측·보정된다
   cl.s = newState(4); cl.pred = newState(4);
   cl.predict(); cl.updateRender(0.5, 1 / 60);

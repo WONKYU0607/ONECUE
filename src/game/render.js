@@ -183,6 +183,10 @@ export function createRenderer(canvas){
       const moving = s.moveFrom && it.by === myTeamNow() && it.k === s.moveFrom.k &&
                      it.c === s.moveFrom.c && it.r === s.moveFrom.r;
       ctx.globalAlpha = moving ? 0.3 : 1;
+      if (VIEW.grid){                               // 격자를 켜면 아이템이 차지하는 칸을 표시
+        px(box.x, box.y, box.w, 0.6, '#ff4df0'); px(box.x, box.y + box.h - 0.6, box.w, 0.6, '#ff4df0');
+        px(box.x, box.y, 0.6, box.h, '#ff4df0'); px(box.x + box.w - 0.6, box.y, 0.6, box.h, '#ff4df0');
+      }
       const sc = itemScale();
       const dw = f.w / RS * sc.x, dh = f.h / RS * sc.y;
       const dx = box.x + (box.w - dw) / 2;          // 칸 가로 중앙
@@ -300,9 +304,12 @@ export function createRenderer(canvas){
     for (const sl of throwSlots(uiH2)){
       const n = ammo(sl.k);
       const active = charge && charge.on && charge.k === sl.k;
-      px(sl.x, sl.y, sl.w, sl.h, active ? 'rgba(240,168,30,0.25)'
-                                        : n > 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)');
-      const c = active ? '#f0a81e' : n > 0 ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.10)';
+      // 손가락을 아이콘 밖으로 밀면 취소 상태. 떼도 안 날아간다는 걸 색으로 알린다
+      const off = active && charge.out;
+      px(sl.x, sl.y, sl.w, sl.h, off ? 'rgba(120,120,140,0.20)'
+                                     : active ? 'rgba(240,168,30,0.25)'
+                                     : n > 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)');
+      const c = off ? '#7a7a95' : active ? '#f0a81e' : n > 0 ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.10)';
       px(sl.x, sl.y, sl.w, 0.7, c); px(sl.x, sl.y + sl.h - 0.7, sl.w, 0.7, c);
       px(sl.x, sl.y, 0.7, sl.h, c); px(sl.x + sl.w - 0.7, sl.y, 0.7, sl.h, c);
       const img = throwImg[sl.k];
@@ -320,7 +327,7 @@ export function createRenderer(canvas){
       ctx.textAlign = 'left';
       // 차징 게이지
       if (active){
-        px(sl.x + 1, sl.y + sl.h - 3, (sl.w - 2) * charge.ch / 100, 1.6, '#f0a81e');
+        px(sl.x + 1, sl.y + sl.h - 3, (sl.w - 2) * charge.ch / 100, 1.6, off ? '#5a5a75' : '#f0a81e');
       }
     }
   }
@@ -380,9 +387,20 @@ export function createRenderer(canvas){
       // 끌고 있는 그림도 실제로 놓일 크기와 같게 (2·3칸짜리가 손가락 밑에서 커 보이면 안 맞는다)
       const sc = itemScale();
       const dw = f.w / RS * sc.x, dh = f.h / RS * sc.y;
+      // 놓일 칸이 정해졌으면 손가락이 아니라 **그 칸에 붙여서** 그린다.
+      // 손가락 중심으로 그리면 여러 칸짜리가 하이라이트와 반 칸씩 어긋난다
+      let gx, gy;
+      if (drag.cell){
+        const box = cellBox(drag.cell.c, drag.cell.r, ITEM_DEF[drag.k].cells);
+        gx = box.x + (box.w - dw) / 2;
+        gy = box.y + box.h - dh;
+      } else {
+        gx = drag.x - dw / 2;
+        gy = drag.y - dh / 2;
+      }
       ctx.globalAlpha = 0.85;
       ctx.drawImage(items, f.x, f.y, f.w, f.h,
-        Math.round((drag.x - dw / 2) * RS), Math.round((drag.y - dh / 2) * RS),
+        Math.round(gx * RS), Math.round(gy * RS),
         Math.round(dw * RS), Math.round(dh * RS));
       ctx.globalAlpha = 1;
     }
@@ -433,8 +451,10 @@ export function createRenderer(canvas){
     for (const b of s.bullets)
       px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5,
          TEAMS[(s.color && s.color[b.o] != null) ? s.color[b.o] : TEAM_OF[b.o]].m);
+    // 렌더 위치 배열은 첫 예측이 끝나야 생긴다. 없으면 보정 없이 확정 위치로 그린다
+    const rx = cl.rx || [], ry = cl.ry || [];
     for (let i = 0; i < s.p.length; i++)
-      drawPlayer(s.p[i], i, cl.rx[i], cl.ry[i], (s.blind || [])[i] || 0, s.tick, s.color);
+      drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, s.color);
     drawProjectiles(s, a);
     drawFx(s);
     if (j) drawJuice(j);

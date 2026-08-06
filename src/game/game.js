@@ -1,5 +1,5 @@
 import {
-  FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH,
+  FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH, setArena,
   stepCap, bulletFP, coolTicks, clampi
 } from './config.js';
 import { Loopback, Server, Client } from './net.js';
@@ -8,7 +8,7 @@ import { attachInput } from './input.js';
 import { createAI } from './ai.js';
 import { createJuice } from './juice.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
-import { canPlace, canThrow, allPlaced, myItemAt } from './sim.js';
+import { canPlace, canThrow, allPlaced, myItemAt, newState } from './sim.js';
 import {
   FAST, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, teamOf, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
   ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed,
@@ -43,6 +43,12 @@ export function createGame(canvas, opts = {}){
   const aiSlots = (!online && session.kind === 'ai') ? all.filter(i => i !== SELF.slot) : [];
   const ais = new Map(aiSlots.map(i => [i, createAI(session.stage || 1)]));
   const ai = ais.get(aiSlots[0]) || null;   // 1대1 호환
+  // 클라 기본 상태는 2인용이라, 4인 판이면 첫 프레임이 1대1 아레나로 그려졌다가
+  // 스냅샷이 와서야 바뀐다(맵이 깜빡임). 슬롯 2·3은 그 사이 존재하지 않아 예측이 죽는다.
+  // 인원수는 시작 전에 이미 알고 있으니 미리 맞춰둔다
+  const n0 = online ? (SELF.n || 2) : nLocal;
+  if (n0 !== client.s.n){ client.s = newState(n0); client.pred = newState(n0); }
+  setArena(n0);
   const practice = !online && session.kind === 'practice';
   if (practice){
     // 상대도 총알도 승패도 없다. 이동·배치·투척만 자유롭게 해보는 모드
@@ -307,7 +313,8 @@ export function createGame(canvas, opts = {}){
     // AI는 사람과 완전히 같은 입력 경로를 탄다 (서버가 판정하는 건 동일)
     for (const slot of aiSlots){
       const brain = ais.get(slot);
-      if (!brain || client.pred.p[slot]?.hp <= 0) continue;   // 죽은 AI는 가만히 있는다
+      const me = client.pred.p[slot];
+      if (!brain || !me || me.hp <= 0) continue;   // 아직 없거나 죽은 AI는 건너뛴다
       const a = brain.think(client.pred, slot, dt, now);
       if (a.vx || a.vy) client.input(slot, a.vx * sp * dt, a.vy * sp * dt, 0);
       if (a.thr && canThrow(client.pred, slot, a.thr.k)) client.throwItem(slot, a.thr.k, a.thr.ch);

@@ -397,7 +397,7 @@ export class Client {
     let guard = 0;
     while (p.tick < target && guard++ < 40){
       const t = p.tick + 1;
-      const n = this.pred.n || 2;
+      const n = p.n || 2;
       const inp = Array.from({ length: n }, () => ({ dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 }));
       if (this.lastInp && t - this.s.tick <= EXTRAP_MAX){   // 남들은 마지막 입력으로 외삽
         for (let k = 0; k < n; k++){
