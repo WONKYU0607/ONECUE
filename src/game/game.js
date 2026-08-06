@@ -384,9 +384,12 @@ export function createGame(canvas, opts = {}){
     uiBox(){
       const r = canvas.getBoundingClientRect();
       const pd = padRect(view.uiH);
+      // 칼전은 배치할 아이템이 없어 팔레트가 비어 있다.
+      // 빈 배열에서 sl[0]을 읽어 화면이 통째로 죽었었다 — 패드 전체를 기준으로 잡는다
       const sl = paletteSlots(view.uiH);
-      const x0 = Math.min(...sl.map(v => v.x)), x1 = Math.max(...sl.map(v => v.x + v.w));
-      const top = pd.y + 1, bottom = sl[0].y - 2;
+      const x0 = sl.length ? Math.min(...sl.map(v => v.x)) : pd.x;
+      const x1 = sl.length ? Math.max(...sl.map(v => v.x + v.w)) : pd.x + pd.w * 0.5;
+      const top = pd.y + 1, bottom = (sl.length ? sl[0].y : pd.y + pd.h) - 2;
       const k = view.scale;
       return {
         left: r.left + x0 * k,

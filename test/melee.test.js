@@ -60,6 +60,19 @@ console.log('스폰');
   assert(s.p.every(p => cellUsable(col(p), row(p))), '전부 쓸 수 있는 칸에서 시작');
 }
 
+console.log('빈 팔레트에서 UI 계산이 죽지 않는다');
+{
+  // 칼전은 팔레트가 비어 있는데 uiBox가 sl[0].y를 읽어 화면이 통째로 죽었었다
+  const { padRect, paletteSlots, throwSlots, stickGeom } = await import('../src/game/layout.js');
+  setArena(2, true);
+  const pd = padRect(86), sl = paletteSlots(86);
+  assert(sl.length === 0 && throwSlots(86).length === 0, '칼전은 팔레트·투척이 비어 있다');
+  const x0 = sl.length ? Math.min(...sl.map(v => v.x)) : pd.x;
+  const bottom = (sl.length ? sl[0].y : pd.y + pd.h) - 2;
+  assert(Number.isFinite(x0) && Number.isFinite(bottom), '빈 배열에서도 UI 상자가 계산된다');
+  assert(Number.isFinite(stickGeom(86).cx), '스틱도 정상');
+}
+
 console.log('준비 단계 없이 바로 시작한다');
 {
   const s = newState(2, true);
