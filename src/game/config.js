@@ -179,9 +179,10 @@ const A2 = {
   pw: 12, ph: 13, bg: 'arena2', neutral: true, hc: 5, tc: [3, 7],   // 3·7열 = 팻말 사이 빈 칸
   flip: 17.04 * 2 + 11.905 * 23, quota: [3, 3, 3, 3, 3, 3, 2], cover: 3,
   bands: [[1, 1, 3, 7], [2, 20, 1, 9], [21, 21, 3, 7]],
-  // 이동 가능한 세로 범위(월드 y). 격자 밖 벽 안쪽 여유까지 포함한다.
+  // 이동 가능한 세로 범위(월드 y) = **회색 벽 라인 안쪽**.
+  // 바닥 타일은 302까지 이어지지만 그 아래는 난간·계단 그림이라 올라가면 안 된다.
   // 좌우 한계는 y마다 벽 표가 알아서 좁혀주므로 여기서 자르면 안 된다
-  yTop: 7, yBot: 302,
+  yTop: 27, yBot: 285,
   wl: WALL2_L, wr: WALL2_R
 };
 export const ARENA = { ...A1 };
@@ -246,7 +247,7 @@ export const FAST = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 28;
+export const PROTO_VER = 29;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

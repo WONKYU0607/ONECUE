@@ -111,11 +111,14 @@ assert(canPlace(si, 0, ITEM.DRUM, 3, 3), '드럼통은 별도 정원이라 놓�
 assert(coverUsed(si.items, 1) === 0, '상대 팀 한도는 따로다');
 
 console.log('아래·위 끝 (벽 그림을 따라 격자 밖까지 들어갈 수 있어야 한다)');
-assert(YMAX_S[0] > Math.round((ARENA.y0 + ARENA.ch * (ARENA.rows - 1)) * FP),
-  '아래 팀은 마지막 행보다 더 내려간다');
+// 마지막 놓을 수 있는 행(21행)보다 아래로 발을 내밀 수 있어야 한다 (울퉁불퉁한 구간)
+assert(YMAX_S[0] + PHf > Math.round((ARENA.y0 + ARENA.ch * 22) * FP),
+  '아래 팀은 21행 아래까지 내려간다');
 assert(YMIN_S[1] < Math.round((ARENA.y0 + ARENA.ch) * FP),
   '위 팀은 1행보다 더 올라간다');
-assert(YMAX_S[0] + PHf <= Math.round(ARENA.yBot * FP) + 1, '그래도 바닥 밖으로는 안 나간다');
+// 그래도 회색 벽 라인(난간·계단 그림)은 넘지 않는다
+assert(YMAX_S[0] + PHf <= Math.round(ARENA.yBot * FP) + 1, '아래 벽 라인은 안 넘는다');
+assert(YMIN_S[1] >= Math.round(ARENA.yTop * FP), '위 벽 라인도 안 넘는다');
 
 console.log('이동 범위');
 const s2 = newState(4);

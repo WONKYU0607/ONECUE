@@ -220,7 +220,9 @@ export function createRenderer(canvas){
           if (c < 0 || c >= GRID_COLS || r < 0 || r >= GRID_ROWS) continue;
           const ph = (c * 5 + r * 3);                       // 칸마다 다른 위상
           const flick = 0.88 + 0.12 * Math.sin((s.tick + ph * 7) * 0.35);
-          const w = GRID_CW * 1.05 * flick * rise, h = w * ratio;
+          // 불꽃 그림이 세로로 길다. 폭에 맞추면 1대1처럼 칸이 큰 아레나에서
+          // 높이가 두 칸을 넘는다 → **칸 높이 기준**으로 맞추고 비율은 유지
+          const h = GRID_CH * 1.25 * flick * rise, w = h / ratio;
           const box = cellBox(c, r);
           const cx = box.x + box.w / 2;
           const by = box.y + box.h;                         // 칸 아래에 발을 붙인다
