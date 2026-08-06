@@ -10,7 +10,8 @@ import { createJuice } from './juice.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { canPlace, canThrow, allPlaced, myItemAt } from './sim.js';
 import {
-  FAST, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
+  FAST, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, teamOf, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
+  ARENA, PWf, PHf, itemQuota, itemKinds,
   GRID_X0, GRID_Y0, H, cellOwner, cellX, cellY
 } from './config.js';
 import { padRect, paletteSlots } from './layout.js';
@@ -42,11 +43,11 @@ export function createGame(canvas, opts = {}){
     client.s.solo = true;
     client.pred.solo = true;
   }
-  const aiSlot = 1 - SELF.slot;
+  const aiSlot = 1 - SELF.slot;   // AI는 1대1 전용
   let aiPlan = null, nextAiPlaceAt = 0;
   // 이 종류를 정원만큼 놓았는가
   const allPlacedKind = (st, slot, k) =>
-    (st.items || []).filter(it => it.by === slot && it.k === k).length >= ITEM_DEF[k].quota;
+    (st.items || []).filter(it => it.by === slot && it.k === k).length >= itemQuota(k);
   // 재접속하면 옛 프레임을 버리고 서버 스냅샷으로 다시 맞춘다
   if (online){
     let first = true;
@@ -87,8 +88,9 @@ export function createGame(canvas, opts = {}){
   // 배치 단계 도우미 ---------------------------------------------------
   const leftCount = k => {
     const st = client.pred;
-    const used = (st.items || []).filter(it => it.by === SELF.slot && it.k === k).length;
-    return Math.max(0, ITEM_DEF[k].quota - used);
+    const myTeam = teamOf(SELF.slot, st.n || 2);
+    const used = (st.items || []).filter(it => it.by === myTeam && it.k === k).length;
+    return Math.max(0, itemQuota(k) - used);
   };
   // 화면 좌표 -> 놓을 수 있는 칸 (슬롯1이면 세로가 뒤집혀 있으므로 되돌린다)
   const okCell = (k, c, r, from) => canPlace(client.pred, SELF.slot, k, c, r, from);
@@ -103,7 +105,7 @@ export function createGame(canvas, opts = {}){
   const rawCell = wp => {
     const c = Math.floor((wp.x - GRID_X0) / GRID_CW);
     let yTop = wp.y;
-    if (SELF.slot === 1) yTop = H - wp.y;
+    if (flipped()) yTop = ARENA.flip - wp.y;
     const r = Math.floor((yTop - GRID_Y0) / GRID_CH);
     if (c < 0 || c >= GRID_COLS || r < 0 || r >= GRID_ROWS) return null;
     return { c, r };
@@ -151,24 +153,23 @@ export function createGame(canvas, opts = {}){
   function reactTo(st, dt){
     const cur = snapshot(st);
     if (!prev){ prev = cur; return; }
-    const me = SELF.slot;
+    const me = SELF.slot, n = st.n || 2;
 
     // 발사: 쿨다운이 막 채워진 순간
-    for (let i = 0; i < 2; i++){
+    for (let i = 0; i < n; i++){
       if (cur.cool[i] > prev.cool[i]){
         sfx.shot(i === me);
         const p = st.p[i];
-        const up = i === 0;
-        juice.muzzle((p.x + 6 * FP) / FP + 1, viewY(p.y / FP, i), up);
+        juice.muzzle((p.x + PWf / 2 - FP) / FP + 1, viewY(p.y / FP), i === 0);
       }
     }
     // 피격
-    for (let i = 0; i < 2; i++){
+    for (let i = 0; i < n; i++){
       if (cur.flash[i] > prev.flash[i]){
         sfx.hit(i === me);
         if (i === me){ juice.shake(1.1); buzz(12); }
         const p = st.p[i];
-        juice.spark((p.x + 7 * FP) / FP, viewY(p.y / FP, i) + 8,
+        juice.spark((p.x + PWf / 2) / FP, viewY(p.y / FP) + PHf / FP / 2,
                     'rgba(255,190,120,ALPHA)', 7, 60);
       }
     }
@@ -177,7 +178,7 @@ export function createGame(canvas, opts = {}){
       if (cur.items[i] < prev.items[i]){
         const it = st.items[i];
         const bx = cellX(it.c) + GRID_CW / 2;
-        const by = viewY(cellY(it.r), 0) + GRID_CH / 2;
+        const by = viewY(cellY(it.r)) + GRID_CH / 2;
         juice.spark(bx, by, 'rgba(200,215,240,ALPHA)', 5, 45);
         if (cur.items[i] <= 0) sfx.break_();
       }
@@ -205,7 +206,8 @@ export function createGame(canvas, opts = {}){
     prev = cur;
   }
   // 슬롯1이면 화면이 뒤집혀 있으므로 연출 좌표도 뒤집는다
-  function viewY(y, i){ return SELF.slot === 1 ? H - y - 16 : y; }
+  const flipped = () => teamOf(SELF.slot, SELF.n || 2) === 1;
+  function viewY(y){ return flipped() ? ARENA.flip - y - PHf / FP : y; }
 
   function loop(){
     if (!running) return;
@@ -226,7 +228,7 @@ export function createGame(canvas, opts = {}){
       const km = Math.hypot(kx, ky);
       vx = kx / km; vy = ky / km;
     }
-    const fvy = SELF.slot === 1 ? -vy : vy;   // 화면이 뒤집힌 쪽은 세로 입력도 반전
+    const fvy = flipped() ? -vy : vy;   // 화면이 뒤집힌 쪽은 세로 입력도 반전
     if (vx || vy) client.input(SELF.slot, vx * sp * dt, fvy * sp * dt, 0);
 
     // 연습 모드는 상대를 기다릴 필요가 없다
@@ -240,15 +242,16 @@ export function createGame(canvas, opts = {}){
     if (ai && client.pred.phase === PH_READY){
       if (!aiPlan){
         aiPlan = [];
-        for (let n = 0; n < ITEM_DEF[ITEM.WALL].quota; n++) aiPlan.push(ITEM.WALL);
-        for (let n = 0; n < ITEM_DEF[ITEM.BARR].quota; n++) aiPlan.push(ITEM.BARR);
-        for (let n = 0; n < ITEM_DEF[ITEM.DRUM].quota; n++) aiPlan.push(ITEM.DRUM);
+        // 넓은 것부터 놓는다. 좁은 걸 먼저 흩뿌리면 3칸짜리가 들어갈 자리가 없어진다
+        for (const k of itemKinds().slice().sort((a, b) => ITEM_DEF[b].cells - ITEM_DEF[a].cells)){
+          for (let n = 0; n < itemQuota(k); n++) aiPlan.push(k);
+        }
       }
       if (aiPlan.length && now >= nextAiPlaceAt){
         const k = aiPlan[0];
         const rows = [];
         for (let r = 0; r < GRID_ROWS; r++){
-          const mineSide = cellOwner(r) === aiSlot;
+          const mineSide = cellOwner(r) === teamOf(aiSlot, client.pred.n);
           if (ITEM_DEF[k].mine ? mineSide : !mineSide) rows.push(r);
         }
         // 놓을 수 있는 칸을 전부 모아서 그중에서 고른다 (무작위로 찍고 재시도하지 않는다)
@@ -338,7 +341,7 @@ export function createGame(canvas, opts = {}){
       const r = canvas.getBoundingClientRect();
       const pd = padRect(view.uiH);
       const sl = paletteSlots(view.uiH);
-      const x0 = sl[0].x, x1 = sl[sl.length - 1].x + sl[0].w;
+      const x0 = Math.min(...sl.map(v => v.x)), x1 = Math.max(...sl.map(v => v.x + v.w));
       const top = pd.y + 1, bottom = sl[0].y - 2;
       const k = view.scale;
       return {

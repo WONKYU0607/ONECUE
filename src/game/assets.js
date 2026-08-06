@@ -2,6 +2,7 @@
 // 게임 화면에 들어갈 때 배경이 늦게 뜨는 일이 없다.
 export const ASSET_SRC = {
   arena:      'assets/arena.webp',
+  arena2:     'assets/arena2.webp',   // 2대2 (9x19 얼음 맵)
   characters: 'assets/characters.png',
   items:      'assets/items.webp',
   explosion:  'assets/explosion.webp',

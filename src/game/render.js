@@ -1,31 +1,43 @@
 import {
   W, H, FP, COL, TEAMS, TEAM_OF, SELF, MAXHP, FLASH_T, VIEW, SHOW_HUD,
-  GRID_COLS, GRID_ROWS, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
+  GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO, HP_MARKS,
-  ITEM, ITEM_DEF, cellOwner, DRUM_RADIUS, EXPLO_TICKS,
+  ITEM, ITEM_DEF, cellOwner, teamOf, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
 } from './config.js';
 import { RS, computeLayout, stickGeom } from './layout.js';
 import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
 
+// 스프라이트 시트의 한 칸 크기 (원본은 14x16 고정)
 const FW = 14 * RS, FH = 16 * RS;
 
 // items.webp 안의 프레임 위치 (824x66)
 const ITEM_FRAME = {
-  wall1: { x: 0,   y: 3, w: 65, h: 63 },
-  barr1: { x: 390, y: 0, w: 65, h: 66 },
-  drum:  { x: 780, y: 3, w: 44, h: 63 }
+  wall1: { x: 0,   y: 3, w: 65,  h: 63 },
+  wall2: { x: 65,  y: 3, w: 130, h: 63 },
+  wall3: { x: 195, y: 3, w: 195, h: 63 },
+  barr1: { x: 390, y: 0, w: 65,  h: 66 },
+  barr2: { x: 455, y: 0, w: 130, h: 66 },
+  barr3: { x: 585, y: 0, w: 195, h: 66 },
+  drum:  { x: 780, y: 3, w: 44,  h: 63 }
 };
+// 시트는 1대1 칸(21.638) 기준으로 만들었다. 칸이 작아지면 같은 비율로 줄여 그린다
+const itemScale = () => GRID_CW / SHEET_CW;
 
 // 캔버스 하나에 붙는 렌더러. React는 이 객체만 만들고 정리하면 된다
 // 슬롯 1인 플레이어는 화면을 뒤집어 자기가 항상 아래쪽에 보이게 한다.
 // 아레나 배경·격자·중앙선은 상하 대칭이라 그대로 둬도 된다.
-const fy = (y, h) => SELF.slot === 1 ? H - y - h : y;
+// 각자 자기 팀이 아래쪽에 보이도록 뒤집는다
+const myTeamNow = () => teamOf(SELF.slot, SELF.n || 2);
+const flipped = () => myTeamNow() === 1;
+// 뒤집기 축은 아레나 격자의 세로 중심. 1대1은 H와 같다
+const fy = (y, h) => flipped() ? ARENA.flip - y - h : y;
 
 export function createRenderer(canvas){
   const ctx = canvas.getContext('2d');
-  const bg = getImage('arena'), sheet = getImage('characters'), items = getImage('items');
+  const sheet = getImage('characters'), items = getImage('items');
+  const bgOf = () => getImage(ARENA.bg);   // 아레나에 따라 배경이 달라진다
   const boom = getImage('explosion');
   const flashfx = getImage('flashfx');
   const throwImg = [getImage('grenade'), getImage('flash')];
@@ -55,57 +67,73 @@ export function createRenderer(canvas){
   }
   function drawBurst(x, y, team, t){     // t: 0(피격 순간) -> 1(소멸)
     const c = TEAMS[team].m;
+    const hx = ARENA.pw / 2, hy = ARENA.ph / 2;
     const r = 3 + t * 9;
     const dir = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]];
     for (let k = 0; k < dir.length; k++){
       const sz = (k % 2 === 0) ? 2 : 1;
-      px(x + 6 + dir[k][0] * r, y + 8 + dir[k][1] * r, sz, sz, c);
+      px(x + hx - 1 + dir[k][0] * r, y + hy + dir[k][1] * r, sz, sz, c);
     }
-    px(x + 5, y + 7, 4, 4, '#ffffff');
+    px(x + hx - 2, y + hy - 1, 4, 4, '#ffffff');
   }
-  function drawPlayer(p, i, xOverride, yOverride, blind = 0, tick = 0){
+  function drawPlayer(p, i, xOverride, yOverride, blind = 0, tick = 0, colorOf = null){
+    if (p.hp <= 0) return;                       // 쓰러지면 아레나에서 사라진다
     if (p.invul > 0 && (p.invul >> 2) % 2 === 0) return;
     const xw = (xOverride === undefined ? p.x : xOverride) / FP;
-    const yw = fy((yOverride === undefined ? p.y : yOverride) / FP, 16);
+    const yw = fy((yOverride === undefined ? p.y : yOverride) / FP, ARENA.ph);
     // 섬광에 당한 캐릭터는 지속 시간 내내 흰색으로 깜빡인다 (상대도 맞았는지 알 수 있게)
     const dazzled = blind > 0 && Math.floor(tick / 5) % 2 === 0;
     const hit = p.flash > 0 || dazzled;
     if (isReady(sheet)){
       // 프레임 순서: [팀0앞, 팀0뒤, 팀1앞, 팀1뒤, ...] + 8부터 피격(흰색) 버전
-      const idx = (hit ? 8 : 0) + TEAM_OF[i] * 2 + (i === SELF.slot ? 1 : 0);
+      // 색은 각자 고른 것. 내 캐릭터만 뒷모습을 쓴다
+      const col = (colorOf && colorOf[i] != null) ? colorOf[i] : TEAM_OF[i];
+      const idx = (hit ? 8 : 0) + col * 2 + (i === SELF.slot ? 1 : 0);
       // 월드 정수px가 아니라 디바이스 픽셀 단위로 반올림해야 계단이 안 생긴다
-      ctx.drawImage(sheet, idx*FW, 0, FW, FH, Math.round(xw*RS), Math.round(yw*RS), FW, FH);
+      // 2대2는 칸이 작아 캐릭터를 줄여 그린다. 원본 칸은 그대로 두고 그릴 크기만 바꾼다
+      const dw = ARENA.pw * RS, dh = ARENA.ph * RS;
+      ctx.drawImage(sheet, idx*FW, 0, FW, FH, Math.round(xw*RS), Math.round(yw*RS), dw, dh);
     }
-    if (hit) drawBurst(xw, yw, TEAM_OF[i], 1 - p.flash / FLASH_T);
+    if (hit) drawBurst(xw, yw, (colorOf && colorOf[i] != null) ? colorOf[i] : TEAM_OF[i], 1 - p.flash / FLASH_T);
   }
   function drawPanel(s, stick){
     px(0, H, W, uiH, '#0d0d16');
     px(0, H, W, 0.6, 'rgba(78,201,240,0.55)');
 
-    // 상단 바: 내 HP(왼쪽) / 상대 HP(오른쪽) / 가운데 남은 시간
-    const my = SELF.slot, op = 1 - SELF.slot;
-    const BW = 62, BH = 5, BY = H + 4.5;
+    // 상단 바: 우리 팀(왼쪽) / 상대 팀(오른쪽) / 가운데 남은 시간
+    const n = s.p.length;
+    const myTeam = teamOf(SELF.slot, n);
+    const mine = [], foes = [];
+    for (let i = 0; i < n; i++) (teamOf(i, n) === myTeam ? mine : foes).push(i);
+
+    const per = mine.length;
+    const BH = 5, BY = H + 4.5;
+    const BW = per > 1 ? 30 : 62;                 // 두 명이면 반씩 나눠 쓴다
+    const gap = 2;
     const bar = (x, hp, team, rightAlign) => {
       px(x, BY, BW, BH, 'rgba(255,255,255,0.10)');
       const pct = Math.max(0, Math.round(hp / MAXHP * 100));
       const w = BW * Math.max(0, hp) / MAXHP;
-      px(rightAlign ? x + BW - w : x, BY, w, BH, TEAMS[team].m);
+      px(rightAlign ? x + BW - w : x, BY, w, BH, hp > 0 ? TEAMS[team].m : 'rgba(255,255,255,0.06)');
       for (let i = 1; i < HP_MARKS; i++) px(x + BW * i / HP_MARKS, BY, 0.4, BH, 'rgba(13,13,22,0.85)');
-      // 남은 체력을 숫자로도 보여준다. 막대 위에 얹되 어두운 테두리로 대비를 준다
-      ctx.font = 'bold ' + (5 * RS) + 'px monospace';
+      ctx.font = 'bold ' + ((per > 1 ? 4 : 5) * RS) + 'px monospace';
       ctx.textAlign = rightAlign ? 'left' : 'right';
       ctx.textBaseline = 'middle';
-      const tx = (rightAlign ? x + 2.5 : x + BW - 2.5) * RS;
+      const tx = (rightAlign ? x + 2 : x + BW - 2) * RS;
       const ty = (BY + BH / 2 + 0.2) * RS;
       ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(8,8,14,0.9)';
       ctx.strokeText(pct + '%', tx, ty);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = hp > 0 ? '#ffffff' : '#7a7a95';
       ctx.fillText(pct + '%', tx, ty);
       ctx.textBaseline = 'alphabetic';
       ctx.textAlign = 'left';
     };
-    bar(4, s.p[my].hp, TEAM_OF[my], false);
-    bar(W - 4 - BW, s.p[op].hp, TEAM_OF[op], true);
+    // 내가 항상 맨 왼쪽에 오도록 정렬한다
+    mine.sort((a, b) => (a === SELF.slot ? -1 : b === SELF.slot ? 1 : a - b));
+    const colOf = slot => (s.color && s.color[slot] != null) ? s.color[slot] : TEAM_OF[slot];
+    mine.forEach((slot, i) => bar(4 + i * (BW + gap), s.p[slot].hp, colOf(slot), false));
+    foes.forEach((slot, i) =>
+      bar(W - 4 - BW - i * (BW + gap), s.p[slot].hp, colOf(slot), true));
 
     ctx.font = 'bold ' + (8 * RS) + 'px monospace'; ctx.textAlign = 'center';
     if (s.phase === PH_PLAY){
@@ -136,7 +164,7 @@ export function createRenderer(canvas){
   // 칸 좌표 -> 화면 사각형 (슬롯1이면 세로 반전)
   function cellBox(c, r, cells = 1){
     const x = cellX(c), yTop = cellY(r);
-    const y = SELF.slot === 1 ? H - yTop - GRID_CH : yTop;
+    const y = flipped() ? ARENA.flip - yTop - GRID_CH : yTop;
     return { x, y, w: GRID_CW * cells, h: GRID_CH };
   }
   function drawItems(s){
@@ -147,19 +175,21 @@ export function createRenderer(canvas){
     for (const it of ordered){
       if (it.hp <= 0) continue;
       // 상대가 뭘 어디에 깔았는지는 시작 전엔 안 보인다 (벽·바리케이트·드럼통 모두)
-      if (it.by !== SELF.slot && s.phase !== PH_PLAY) continue;
+      if (it.by !== myTeamNow() && s.phase !== PH_PLAY) continue;   // by는 팀 번호
       const def = ITEM_DEF[it.k];
       const f = ITEM_FRAME[def.key];
       const box = cellBox(it.c, it.r, def.cells);
       // 옮기는 중인 아이템은 원래 자리에서 흐리게 보여준다
-      const moving = s.moveFrom && it.by === SELF.slot && it.k === s.moveFrom.k &&
+      const moving = s.moveFrom && it.by === myTeamNow() && it.k === s.moveFrom.k &&
                      it.c === s.moveFrom.c && it.r === s.moveFrom.r;
       ctx.globalAlpha = moving ? 0.3 : 1;
-      const dw = f.w / RS, dh = f.h / RS;
+      const sc = itemScale();
+      const dw = f.w / RS * sc, dh = f.h / RS * sc;
       const dx = box.x + (box.w - dw) / 2;          // 칸 가로 중앙
       const dy = box.y + box.h - dh;               // 칸 아래 정렬
       ctx.drawImage(items, f.x, f.y, f.w, f.h,
-                    Math.round(dx * RS), Math.round(dy * RS), f.w, f.h);
+                    Math.round(dx * RS), Math.round(dy * RS),
+                    Math.round(dw * RS), Math.round(dh * RS));
       ctx.globalAlpha = 1;
       // 남은 내구도
       if (def.hp > 1){
@@ -243,15 +273,24 @@ export function createRenderer(canvas){
   }
 
   // 섬광: 당한 쪽 화면에서 상대 진영만 가린다
+  // 섬광: 당한 쪽 화면에서 상대 진영을 가린다.
+  // '가리는 정도'는 게임 규칙이라 어느 쪽이든 완전히 가려야 하고,
+  // 설정으로 고르는 건 '얼마나 눈부신가'뿐이다
   function drawBlind(s, softMode){
     const t = (s.blind || [0,0])[SELF.slot];
     if (!t) return;
-    const k = t > BLIND_TICKS - BLIND_FULL ? 1 : t / (BLIND_TICKS - BLIND_FULL);
+    const total = Math.max(1, s.blindMax || BLIND_TICKS);
+    const fade = Math.max(1, total - BLIND_FULL);
+    const k = t > fade ? 1 : t / fade;                 // 1 -> 0으로 걷힘
+
     // 각자 자기가 아래쪽에 보이므로 상대 진영은 항상 화면 위 절반
+    const cover = Math.min(1, k * 1.35);               // 거의 끝까지 불투명하게 유지
     if (softMode){
-      px(0, 0, W, H / 2, `rgba(200,210,230,${(0.55 * k).toFixed(3)})`);
+      // 눈부심만 줄인다. 흰색 대신 차분한 회색이고, 켜질 때도 부드럽게 올라온다
+      const on = Math.min(1, (total - t) / 10);        // 0.17초에 걸쳐 덮인다
+      px(0, 0, W, H / 2, `rgba(168,176,192,${(cover * on).toFixed(3)})`);
     } else {
-      px(0, 0, W, H / 2, `rgba(255,255,255,${(0.95 * k).toFixed(3)})`);
+      px(0, 0, W, H / 2, `rgba(255,255,255,${cover.toFixed(3)})`);
     }
   }
 
@@ -293,7 +332,7 @@ export function createRenderer(canvas){
     for (let r = 0; r < GRID_ROWS; r++){
       for (let c = 0; c < GRID_COLS; c++){
         // 끌고 있을 땐 실제 배치 규칙으로 판정한다 (드럼통 중앙선 금지 등)
-        const usable = k < 0 ? cellOwner(r) === SELF.slot : (ok ? ok(k, c, r, drag.from) : false);
+        const usable = k < 0 ? cellOwner(r) === myTeamNow() : (ok ? ok(k, c, r, drag.from) : false);
         if (!usable) continue;
         const box = cellBox(c, r);
         px(box.x + 0.6, box.y + 0.6, box.w - 1.2, box.h - 1.2,
@@ -306,7 +345,7 @@ export function createRenderer(canvas){
       px(box.x, box.y, 1, box.h, '#4ec9f0'); px(box.x + box.w - 1, box.y, 1, box.h, '#4ec9f0');
     }
   }
-  // 팔레트: 스틱 왼쪽 아이콘 3개 + 남은 개수
+  // 팔레트: 스틱 반대쪽 아이템 아이콘 + 남은 개수 (종류 수는 아레나에 따라 다름)
   function drawPalette(s, uiH2, left, drag){
     if (s.phase !== PH_READY) return;
     for (const sl of paletteSlots(uiH2)){
@@ -338,10 +377,13 @@ export function createRenderer(canvas){
     // 끌고 있는 아이콘
     if (drag && drag.on && drag.k >= 0){
       const f = ITEM_FRAME[ITEM_DEF[drag.k].key];
-      const dw = f.w / RS, dh = f.h / RS;
+      // 끌고 있는 그림도 실제로 놓일 크기와 같게 (2·3칸짜리가 손가락 밑에서 커 보이면 안 맞는다)
+      const sc = itemScale();
+      const dw = f.w / RS * sc, dh = f.h / RS * sc;
       ctx.globalAlpha = 0.85;
       ctx.drawImage(items, f.x, f.y, f.w, f.h,
-        Math.round((drag.x - dw / 2) * RS), Math.round((drag.y - dh / 2) * RS), f.w, f.h);
+        Math.round((drag.x - dw / 2) * RS), Math.round((drag.y - dh / 2) * RS),
+        Math.round(dw * RS), Math.round(dh * RS));
       ctx.globalAlpha = 1;
     }
   }
@@ -359,17 +401,26 @@ export function createRenderer(canvas){
   }
 
   function draw(s, dbg, a, cl, stick, drag, left, ok, extra = {}){
+    setArena(s && s.n ? s.n : 2);   // 격자·캐릭터 크기를 이 판에 맞춘다
     const j = extra.juice;
     const sh = j ? j.offset() : { x: 0, y: 0 };
     ctx.save();
     ctx.translate(Math.round(sh.x * RS), Math.round(sh.y * RS));   // 아레나만 흔든다
+    const bg = bgOf();
     if (isReady(bg)) ctx.drawImage(bg, 0, 0, W * RS, H * RS);
     else px(0, 0, W, H, COL.bg);
     if (VIEW.grid){
       for (let c = 0; c <= GRID_COLS; c++) px(cellX(c), GRID_Y0, 0.4, GRID_CH*GRID_ROWS, 'rgba(255,255,255,0.14)');
       for (let r = 0; r <= GRID_ROWS; r++) px(GRID_X0, cellY(r), GRID_CW*GRID_COLS, 0.4, 'rgba(255,255,255,0.14)');
     }
-    px(8, H/2 - 1, W - 16, 2, '#ffffff');            // 진영 경계 (정확히 절반)
+    // 진영 경계. 1대1은 정확히 절반, 2대2는 가운데 중립 행이 경계 역할을 한다
+    if (ARENA.neutral){
+      px(GRID_X0, cellY(GRID_MIDROW), GRID_CW * GRID_COLS, GRID_CH, 'rgba(255,255,255,0.07)');
+      px(8, cellY(GRID_MIDROW) - 1, W - 16, 1.5, 'rgba(255,255,255,0.75)');
+      px(8, cellY(GRID_MIDROW + 1) - 0.5, W - 16, 1.5, 'rgba(255,255,255,0.75)');
+    } else {
+      px(8, H/2 - 1, W - 16, 2, '#ffffff');
+    }
     drawPlacing(s, cl, drag, ok);
     s.moveFrom = (drag && drag.on && drag.from) ? { ...drag.from, k: drag.k } : null;
     drawItems(s);
@@ -379,8 +430,11 @@ export function createRenderer(canvas){
       px(c.x/FP, cy2, c.w/FP, c.h/FP, c.hp > 2 ? COL.cover : COL.cover2);
       px(c.x/FP, cy2, c.w/FP, 2, '#7676a0');
     }
-    for (const b of s.bullets) px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5, TEAMS[TEAM_OF[b.o]].m);
-    for (let i = 0; i < 2; i++) drawPlayer(s.p[i], i, cl.rx[i], cl.ry[i], (s.blind || [0,0])[i], s.tick);
+    for (const b of s.bullets)
+      px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5,
+         TEAMS[(s.color && s.color[b.o] != null) ? s.color[b.o] : TEAM_OF[b.o]].m);
+    for (let i = 0; i < s.p.length; i++)
+      drawPlayer(s.p[i], i, cl.rx[i], cl.ry[i], (s.blind || [])[i] || 0, s.tick, s.color);
     drawProjectiles(s, a);
     drawFx(s);
     if (j) drawJuice(j);
@@ -409,7 +463,7 @@ export function createRenderer(canvas){
     if (s.phase === PH_OVER){
       px(0, H/2-26, W, 26, 'rgba(0,0,0,0.75)');
       ctx.font = 'bold ' + (12*RS) + 'px monospace';
-      const meWin = s.winner === SELF.slot + 1;
+      const meWin = s.winner === myTeamNow() + 1;
       ctx.fillStyle = s.winner === 0 ? COL.txt : (meWin ? '#4ec9f0' : '#f0645a');
       ctx.fillText(s.winner === 0 ? 'DRAW' : (meWin ? 'YOU WIN' : 'YOU LOSE'), W/2*RS, (H/2 - 8)*RS);
       ctx.font = (8*RS) + 'px monospace';

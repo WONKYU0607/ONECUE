@@ -1,4 +1,4 @@
-import { W, H, TUNE, FAST, FAST_MUL, HAND } from './config.js';
+import { W, H, TUNE, FAST, FAST_MUL, HAND, itemKinds } from './config.js';
 
 // 감도 값은 튜닝 패널에서 실시간으로 바꾼다
 const dead = () => TUNE.dead.v;   // 중심 근처는 무시
@@ -31,15 +31,30 @@ function side(pd, total){
   return Math.max(4, Math.min(pd.x + pd.w - total - 4, cx - total / 2));
 }
 
-// 배치 팔레트: 스틱 반대쪽에 아이콘 3개
+// 배치 팔레트: 스틱 반대쪽에 아이템 아이콘. 종류 수는 아레나에 따라 다르다
+// (1대1 3개 / 2대2 7개). 5개부터는 두 줄로 접는다
 export function paletteSlots(uiH){
   const pd = padRect(uiH);
-  const n = 3, size = Math.min(pd.h - 6, 26);
-  const gap = 5;
-  const total = n * size + (n - 1) * gap;
+  const kinds = itemKinds();
+  const n = kinds.length;
+  const rows = n > 4 ? 2 : 1;
+  const per = Math.ceil(n / rows);
+  const gap = n > 4 ? 4 : 5;
+  const free = pd.w - 2 * 40;                       // 스틱이 차지하는 폭을 뺀 나머지
+  const size = Math.min(
+    (pd.h - 6 - (rows - 1) * gap) / rows,
+    (free - (per - 1) * gap) / per,
+    26
+  );
+  const total = per * size + (per - 1) * gap;
   const x0 = side(pd, total);
-  const y = pd.y + (pd.h - size) / 2;
-  return Array.from({ length: n }, (_, i) => ({ k: i, x: x0 + i * (size + gap), y, w: size, h: size }));
+  const y0 = pd.y + (pd.h - (rows * size + (rows - 1) * gap)) / 2;
+  return kinds.map((k, i) => ({
+    k,
+    x: x0 + (i % per) * (size + gap),
+    y: y0 + Math.floor(i / per) * (size + gap),
+    w: size, h: size
+  }));
 }
 
 // 전투 중 투척 버튼. 배치 팔레트와 같은 줄, 2칸
