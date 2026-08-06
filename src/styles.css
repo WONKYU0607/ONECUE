@@ -111,6 +111,9 @@ font:20px/1 monospace;letter-spacing:6px;text-align:center;padding:0 8px}
 .roomcode strong{font:bold 40px monospace;letter-spacing:10px;color:#8fd8ff}
 .link-note .sub{display:block;margin-top:4px;font-size:10px;color:#9a9ab0;letter-spacing:0}
 .panelbtn.place.off{border-color:#3a3a52;color:#6a6a85;cursor:default}
+/* 설치 완료 다음 단계. 앞 버튼(주황)과 확실히 구분되게 파랑 */
+.panelbtn.place.go{color:#8fd8ff;border-color:#4ec9f0}
+.panelbtn.place.go:active{background:#4ec9f0;color:#12121c}
 .hint.record{margin:10px 0 0;letter-spacing:1px}
 .stage.done .st{color:#4ec9f0}
 .stage.done .no{color:#8fd8ff}
@@ -144,3 +147,8 @@ font:15px/1 monospace;cursor:pointer;opacity:.55}
 .swatch{width:38px;height:38px;border:2px solid #2a2a40;cursor:pointer;padding:0}
 .swatch.on{border-color:#e8e8f0;box-shadow:0 0 0 2px rgba(232,232,240,.35)}
 .swatch.off{opacity:.25;cursor:default}
+
+/* AI 스테이지: 1대1 / 2대2 고르기 */
+.mode-row{display:flex;gap:8px;justify-content:center;margin:0 0 10px}
+.menu-btn.mode{flex:0 0 96px;align-items:center;justify-content:center;padding:8px 0}
+.menu-btn.mode.on{border-color:#4ec9f0;color:#8fd8ff}

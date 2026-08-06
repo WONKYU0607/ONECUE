@@ -170,7 +170,7 @@ const A1 = {
 //   가운데(3~7열)는 세로 21칸(10+중립1+10), 바깥(1·2·8·9열)은 19칸(9+1+9)
 const A2 = {
   cols: 11, rows: 23, x0: 18.73, cw: 12.878, y0: 17.04, ch: 11.905, mid: 11,
-  pw: 8, ph: 9, bg: 'arena2', neutral: true, hc: 5, tc: [3, 7],   // 3·7열 = 팻말 사이 빈 칸
+  pw: 10, ph: 11, bg: 'arena2', neutral: true, hc: 5, tc: [3, 7],   // 3·7열 = 팻말 사이 빈 칸
   flip: 17.04 * 2 + 11.905 * 23, quota: [3, 3, 3, 3, 3, 3, 2], cover: 3,
   bands: [[1, 1, 3, 7], [2, 20, 1, 9], [21, 21, 3, 7]],
   wl: WALL2_L, wr: WALL2_R
@@ -249,7 +249,7 @@ export const FAST = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 23;
+export const PROTO_VER = 24;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

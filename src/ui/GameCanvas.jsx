@@ -117,7 +117,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
       )}
       {/* 2단계: 전원이 눌러야 시작한다 */}
       {placing && ready.cnt?.meDone && !ready.me && (
-        <button className="panelbtn place ui-overlay" style={boxStyle}
+        <button className="panelbtn place go ui-overlay" style={boxStyle}
                 onClick={() => gameRef.current?.go()}>
           준비완료
         </button>

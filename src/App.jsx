@@ -46,9 +46,9 @@ export default function App(){
     setSession({ kind: 'practice' });
     setScreen('game');
   }, []);
-  const startAi   = useCallback(stage => {
+  const startAi   = useCallback((stage, n = 2) => {
     SELF.slot = 0;                       // AI전은 항상 내가 아래쪽
-    setSession({ kind: 'ai', stage });
+    setSession({ kind: 'ai', stage, n });
     setScreen('game');
   }, []);
   const toGame    = useCallback(() => setScreen('game'), []);

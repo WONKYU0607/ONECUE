@@ -26,7 +26,7 @@ assert(cellOwner(6) === 1 && cellOwner(7) === 0, '1대1은 중립 행이 없다'
 console.log('2대2 아레나');
 const s = newState(4);
 assert(GRID_COLS === 11 && GRID_ROWS === 23 && GRID_MIDROW === 11, '격자 11x23, 중립 행 11');
-assert(PWf === 8 * FP && PHf === 9 * FP, '캐릭터 8x9로 축소');
+assert(PWf === 10 * FP && PHf === 11 * FP, '캐릭터 10x11로 축소');
 assert(ARENA.bg === 'arena2' && ARENA.neutral === true, '배경 arena2 · 중립 행 있음');
 assert(cellOwner(10) === 1 && cellOwner(11) === -1 && cellOwner(12) === 0, '11행은 아무도 못 쓰는 중립');
 assert(ROW_MIN[0] === 12 && ROW_MAX[0] === 21 && ROW_MIN[1] === 1 && ROW_MAX[1] === 10,

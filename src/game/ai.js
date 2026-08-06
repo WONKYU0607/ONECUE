@@ -1,8 +1,22 @@
 import {
-  FP, WALL_L, WALL_R, wallIdx, YMIN_S, YMAX_S, PH_PLAY, THROW,
+  FP, WALL_L, WALL_R, wallIdx, PH_PLAY, THROW,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CW, GRID_CH, GRID_X0, GRID_Y0,
-  FLY_TICKS, FUSE_TICKS, cellX, cellY
+  FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX
 } from './config.js';
+
+// 노릴 상대. 2대2에서는 살아 있는 적 중 가로로 가장 가까운 쪽을 본다.
+// (1대1이면 결과가 예전과 같은 그 한 명)
+function foeOf(s, me){
+  const mt = teamOf(me, s.n), my = s.p[me];
+  let best = null, bd = Infinity;
+  for (let i = 0; i < s.n; i++){
+    const q = s.p[i];
+    if (!q || q.hp <= 0 || teamOf(i, s.n) === mt) continue;
+    const d = Math.abs(q.x - my.x);
+    if (d < bd){ bd = d; best = q; }
+  }
+  return best;
+}
 
 // 단계별 AI. 값이 클수록 잘한다.
 //  react   : 위협을 알아채고 움직이기까지 걸리는 시간(ms). 낮을수록 잘 피함
@@ -54,7 +68,8 @@ export function createAI(stage = 1){
   // 어느 x에 서 있으면 안전한지 훑어서 가장 좋은 자리를 고른다.
   // 상대 x를 그냥 따라가면 상대가 쏜 총알 정면으로 걸어들어가게 된다.
   function planX(s, me){
-    const my = s.p[me], foe = s.p[1 - me];
+    const my = s.p[me], foe = foeOf(s, me);
+    if (!foe) return my.x;                       // 적이 전부 죽었으면 제자리
     const wi = wallIdx(my.y);
     const lo = WALL_L[wi], hi = WALL_R[wi];
     const foeCx = foe.x + HALF, myCy = my.y + MID;
@@ -98,7 +113,8 @@ export function createAI(stage = 1){
     // s: 현재 상태, me: AI 슬롯, dt: 초, now: ms
     think(s, me, dt, now){
       if (s.phase !== PH_PLAY){ targetX = null; aimKind = -1; return { vx: 0, vy: 0 }; }
-      const my = s.p[me], foe = s.p[1 - me];
+      const my = s.p[me], foe = foeOf(s, me);
+      if (!foe) return { vx: 0, vy: 0 };
       const myCx = my.x + HALF;
 
       // react가 짧을수록 자주 다시 판단한다 = 반응이 빠르다
@@ -116,8 +132,9 @@ export function createAI(stage = 1){
       // 앞뒤: push가 클수록 중앙선 쪽에 붙는다. 약간의 어슬렁거림 추가
       wanderT -= dt;
       if (wanderT <= 0){ wander = Math.random() * 2 - 1; wanderT = 1.2 + Math.random() * 1.2; }
-      const lo = YMIN_S[me], hi = YMAX_S[me];
-      const want = me === 0 ? hi - (hi - lo) * p.push : lo + (hi - lo) * p.push;
+      const mt = teamOf(me, s.n);
+      const lo = teamYMin(mt), hi = teamYMax(mt);
+      const want = mt === 0 ? hi - (hi - lo) * p.push : lo + (hi - lo) * p.push;
       let vy = Math.max(-1, Math.min(1, (want - my.y) / (24 * FP) + wander * 0.25));
 
       // ---- 투척: 상대가 있을 자리를 예측해 조준한다 ----
@@ -157,8 +174,10 @@ export function createAI(stage = 1){
         const giveUp = now - aimSince > p.thrGap * 1.6;
         if (Math.abs(gap) <= 0.55 || giveUp){
           const foeRowIdx = ((foe.y + MID) / FP - GRID_Y0) / GRID_CH;
-          const near = me === 0 ? GRID_MIDROW - 1 : GRID_MIDROW;
-          const far  = me === 0 ? 0 : GRID_ROWS - 1;
+          // 중앙선 건너 첫 칸 ~ 상대 맨 뒷줄 (중립 행이 있으면 건너뛴다)
+          const mt2 = teamOf(me, s.n);
+          const near = mt2 === 0 ? ROW_MAX[1] : ROW_MIN[0];
+          const far  = mt2 === 0 ? ROW_MIN[1] : ROW_MAX[0];
           const ch = (foeRowIdx - near) / (far - near) + aimErrR;
           thr = { k: aimKind, ch: Math.round(Math.max(0, Math.min(1, ch)) * 100) };
           if (aimKind === THROW.FLASH) blindUntil = now + 2600;

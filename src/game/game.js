@@ -32,10 +32,17 @@ export function createGame(canvas, opts = {}){
   // 그러면 화면은 멀쩡해 보이는데 상대에게 아무것도 전달되지 않는다
   if (session.kind === 'pvp' && !online) onLink({ self: 'noconn' });
   const net = online || new Loopback();
-  const server = online ? null : new Server(net);
-  // 온라인이면 내 슬롯만, 로컬(AI·디버그)이면 둘 다 이 클라가 입력을 넣는다
-  const client = new Client(net, online ? [SELF.slot] : [0, 1]);
-  const ai = (!online && session.kind === 'ai') ? createAI(session.stage || 1) : null;
+  // 로컬 AI전은 2인/4인을 고를 수 있다. 4인이면 나 말고 셋이 AI
+  const nLocal = (!online && session.n === 4) ? 4 : 2;
+  if (!online){ SELF.slot = 0; SELF.n = nLocal; }
+  const server = online ? null : new Server(net, nLocal);
+  const all = Array.from({ length: nLocal }, (_, i) => i);
+  // 온라인이면 내 슬롯만, 로컬(AI·디버그)이면 전원 이 클라가 입력을 넣는다
+  const client = new Client(net, online ? [SELF.slot] : all);
+  // AI는 슬롯마다 따로 만든다 (각자 상태를 들고 있다)
+  const aiSlots = (!online && session.kind === 'ai') ? all.filter(i => i !== SELF.slot) : [];
+  const ais = new Map(aiSlots.map(i => [i, createAI(session.stage || 1)]));
+  const ai = ais.get(aiSlots[0]) || null;   // 1대1 호환
   const practice = !online && session.kind === 'practice';
   if (practice){
     // 상대도 총알도 승패도 없다. 이동·배치·투척만 자유롭게 해보는 모드
@@ -43,13 +50,21 @@ export function createGame(canvas, opts = {}){
     client.s.solo = true;
     client.pred.solo = true;
   }
-  const aiSlot = 1 - SELF.slot;   // AI는 1대1 전용
-  let aiPlan = null, nextAiPlaceAt = 0;
+  // 아이템은 팀 소유라 팀마다 한 명만 놓는다. 사람이 있는 팀은 사람이 놓는다
+  const placerOf = new Map();
+  for (const i of aiSlots){
+    const t = teamOf(i, nLocal);
+    if (t === teamOf(SELF.slot, nLocal)) continue;      // 내 팀은 내가 놓는다
+    if (!placerOf.has(t)) placerOf.set(t, i);
+  }
+  const aiPlans = new Map();      // 슬롯 -> 남은 배치 계획
+  const aiNextAt = new Map();     // 슬롯 -> 다음 배치를 보낼 시각
   // 이 종류를 정원만큼 놓았는가
-  const allPlacedKind = (st, slot, k) =>
+  // 아이템은 팀 소유라 팀 번호로 센다
+  const allPlacedKind = (st, team, k) =>
     isCover(k)
-      ? coverUsed(st.items, slot) >= coverBudget()
-      : (st.items || []).filter(it => it.by === slot && it.k === k).length >= itemQuota(k);
+      ? coverUsed(st.items, team) >= coverBudget()
+      : (st.items || []).filter(it => it.by === team && it.k === k).length >= itemQuota(k);
   // 재접속하면 옛 프레임을 버리고 서버 스냅샷으로 다시 맞춘다
   if (online){
     let first = true;
@@ -241,57 +256,61 @@ export function createGame(canvas, opts = {}){
     }
 
     // AI도 배치 단계를 거친다.
-    // 대기 중인 배치 요청 자리는 하나뿐이라 한 프레임에 여러 개를 보내면 마지막만 남는다.
+    // 대기 중인 배치 요청 자리는 슬롯마다 하나뿐이라 한 프레임에 여러 개를 보내면 마지막만 남는다.
     // 그래서 한 번에 하나씩, 확정된 걸 보고 다음 것을 보낸다.
-    if (ai && client.pred.phase === PH_READY){
-      if (!aiPlan){
-        aiPlan = [];
-        // 넓은 것부터 놓는다. 좁은 걸 먼저 흩뿌리면 3칸짜리가 들어갈 자리가 없어진다
-        const wide = itemKinds().slice().sort((a, b) => ITEM_DEF[b].cells - ITEM_DEF[a].cells);
-        let budget = coverBudget();
-        for (const k of wide){
-          if (isCover(k)){
-            for (let n = 0; n < Math.min(itemQuota(k), budget); n++){ aiPlan.push(k); budget--; }
+    if (aiSlots.length && client.pred.phase === PH_READY){
+      for (const slot of aiSlots){
+        const team = teamOf(slot, client.pred.n);
+        const isPlacer = placerOf.get(team) === slot;
+        if (isPlacer && !aiPlans.has(slot)){
+          const plan = [];
+          // 넓은 것부터 놓는다. 좁은 걸 먼저 흩뿌리면 3칸짜리가 들어갈 자리가 없어진다
+          const wide = itemKinds().slice().sort((a, b) => ITEM_DEF[b].cells - ITEM_DEF[a].cells);
+          let budget = coverBudget();
+          for (const k of wide){
+            if (isCover(k)){
+              for (let n = 0; n < Math.min(itemQuota(k), budget); n++){ plan.push(k); budget--; }
+            } else {
+              for (let n = 0; n < itemQuota(k); n++) plan.push(k);
+            }
+          }
+          aiPlans.set(slot, plan);
+        }
+        const plan = aiPlans.get(slot);
+        if (plan && plan.length && now >= (aiNextAt.get(slot) || 0)){
+          const k = plan[0];
+          const spots = [];
+          for (let r = 0; r < GRID_ROWS; r++){
+            const mineSide = cellOwner(r) === team;
+            if (ITEM_DEF[k].mine ? !mineSide : mineSide) continue;
+            for (let c = 0; c < GRID_COLS; c++){
+              if (canPlace(client.pred, slot, k, c, r)) spots.push({ c, r });
+            }
+          }
+          if (spots.length){
+            const spot = spots[Math.floor(Math.random() * spots.length)];
+            client.place(slot, k, spot.c, spot.r);
+            aiNextAt.set(slot, now + 260);      // 확정될 시간을 준다
           } else {
-            for (let n = 0; n < itemQuota(k); n++) aiPlan.push(k);
+            plan.shift();                       // 놓을 데가 없으면 건너뛴다
           }
+          if (plan.length && allPlacedKind(client.s, team, k)) plan.shift();
         }
-      }
-      if (aiPlan.length && now >= nextAiPlaceAt){
-        const k = aiPlan[0];
-        const rows = [];
-        for (let r = 0; r < GRID_ROWS; r++){
-          const mineSide = cellOwner(r) === teamOf(aiSlot, client.pred.n);
-          if (ITEM_DEF[k].mine ? mineSide : !mineSide) rows.push(r);
+        // 팀 몫이 다 놓였으면 준비까지 누른다 (놓는 사람이 아니어도)
+        if ((!plan || !plan.length) && !client.pred.ready[slot] && allPlaced(client.s, slot)){
+          client.setReady(slot); client.setGo(slot);
         }
-        // 놓을 수 있는 칸을 전부 모아서 그중에서 고른다 (무작위로 찍고 재시도하지 않는다)
-        const spots = [];
-        for (const r of rows){
-          for (let c = 0; c < GRID_COLS; c++){
-            if (canPlace(client.pred, aiSlot, k, c, r)) spots.push({ c, r });
-          }
-        }
-        if (spots.length){
-          const spot = spots[Math.floor(Math.random() * spots.length)];
-          client.place(aiSlot, k, spot.c, spot.r);
-          nextAiPlaceAt = now + 260;          // 확정될 시간을 준다
-        } else {
-          aiPlan.shift();                     // 놓을 데가 없으면 건너뛴다
-        }
-        // 확정된 개수가 계획만큼 늘었으면 다음 것으로
-        if (aiPlan.length && allPlacedKind(client.s, aiSlot, k)) aiPlan.shift();
-      }
-      if (!aiPlan.length && !client.pred.ready[aiSlot] && allPlaced(client.s, aiSlot)){
-        client.setReady(aiSlot); client.setGo(aiSlot);
       }
     }
-    if (ai && client.pred.phase !== PH_READY){ aiPlan = null; }
+    if (aiSlots.length && client.pred.phase !== PH_READY) aiPlans.clear();
 
     // AI는 사람과 완전히 같은 입력 경로를 탄다 (서버가 판정하는 건 동일)
-    if (ai){
-      const a = ai.think(client.pred, aiSlot, dt, now);
-      if (a.vx || a.vy) client.input(aiSlot, a.vx * sp * dt, a.vy * sp * dt, 0);
-      if (a.thr && canThrow(client.pred, aiSlot, a.thr.k)) client.throwItem(aiSlot, a.thr.k, a.thr.ch);
+    for (const slot of aiSlots){
+      const brain = ais.get(slot);
+      if (!brain || client.pred.p[slot]?.hp <= 0) continue;   // 죽은 AI는 가만히 있는다
+      const a = brain.think(client.pred, slot, dt, now);
+      if (a.vx || a.vy) client.input(slot, a.vx * sp * dt, a.vy * sp * dt, 0);
+      if (a.thr && canThrow(client.pred, slot, a.thr.k)) client.throwItem(slot, a.thr.k, a.thr.ch);
     }
 
     // 유실 대비 재전송
