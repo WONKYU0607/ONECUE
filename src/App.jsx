@@ -38,7 +38,7 @@ export default function App(){
     disconnect();
     // kind는 게임 종류(pvp/ai), mode는 접속 방식(queue/create/join).
     // 예전엔 둘 다 mode라 펼치기에서 덮어써져 온라인인지 판정이 깨졌다
-    setSession({ kind: 'pvp', ...opt });      // opt: {mode:'queue'|'create'|'join', code}
+    setSession({ kind: 'pvp', ...opt });      // opt: {mode:'queue'|'create'|'join', code, n, melee}
     setScreen('matching');
   }, []);
   const startPractice = useCallback(() => {

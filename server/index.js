@@ -14,7 +14,10 @@ const GRACE_MS = 30_000;         // 끊긴 사람의 자리를 잡아두는 시�
 let nextRoomId = 1;
 const rooms = new Map();         // id -> Room
 const codes = new Map();         // 코드 -> Room (친구방)
-const waiting = [];              // 매칭 대기열 (소켓)
+const waiting = new Map();       // '인원수:모드' -> 대기 소켓 목록. 섞이면 안 된다
+const qkey = (n, melee) => `${n}:${melee ? 'm' : 's'}`;
+const queueOf = k => { if (!waiting.has(k)) waiting.set(k, []); return waiting.get(k); };
+const waitingCount = () => [...waiting.values()].reduce((a, q) => a + q.length, 0);
 
 // 헷갈리는 글자 없이 숫자 4자리
 function newCode(){
@@ -26,10 +29,11 @@ function newCode(){
 }
 
 class Room {
-  constructor(id, code = null, n = 2){
+  constructor(id, code = null, n = 2, melee = false){
     this.id = id;
     this.code = code;
     this.n = n;
+    this.melee = melee;          // 칼전 방인가 (총격전과 규칙이 다르다)
     // 자리마다 세션 id를 기억한다. 소켓이 끊겨도 sid가 남아 있으면 그 자리는 예약 상태
     this.seats = Array.from({ length: n }, () => ({ sid: null, ws: null, goneAt: 0 }));
     this.emptyAt = 0;
@@ -42,7 +46,7 @@ class Room {
     this.server = new Server({
       serverSend: (msg, pid) => this.send(msg, pid),
       toServer: null
-    }, n);
+    }, n, melee);
   }
   send(msg, pid){
     const raw = JSON.stringify(msg);
@@ -99,7 +103,7 @@ class Room {
   waitJoin(ws, sid, back = false){
     this.pending.set(sid, 0);
     this.waitingList.push(ws);
-    ws.send(JSON.stringify({ t: 'hello', pid: -1, room: this.id, n: this.n, back, ver: PROTO_VER }));
+    ws.send(JSON.stringify({ t: 'hello', pid: -1, room: this.id, n: this.n, melee: this.melee, back, ver: PROTO_VER }));
     this.sendLobby();
   }
   join(ws, sid, team){
@@ -118,7 +122,7 @@ class Room {
     ws.roomId = this.id; ws.slot = slot;
     this.emptyAt = 0;
 
-    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, n: this.n, back: reconnected, ver: PROTO_VER }));
+    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, n: this.n, melee: this.melee, back: reconnected, ver: PROTO_VER }));
     // 방은 이미 돌고 있으므로 현재 상태를 먼저 보내 시작점을 맞춘다
     this.snapshotTo(slot);
     if (reconnected) this.send({ t: 'peer', slot, state: 'back' });
@@ -199,7 +203,7 @@ const http = createServer((req, res) => {
       socks,
       pid: process.pid,            // 서버가 두 벌 돌고 있는지 확인용
       uptime: Math.round(process.uptime()),
-      waiting: waiting.length,
+      waiting: waitingCount(),
       players: wss ? wss.clients.size : 0,
       rooms: detail
     }));
@@ -214,17 +218,27 @@ http.listen(PORT, () => console.log(`듀얼 서버 대기중 :${PORT}`));
 // 대기열: 새로 들어온 사람은 방에 바로 앉히지 않는다.
 // 방에 빈 자리가 있다고 바로 넣으면, 상대가 재접속 대기 중인(예약석) 방에 앉아
 // 오지 않을 사람을 기다리게 된다. 둘이 모였을 때만 방을 만든다.
-function pairUp(){
-  while (waiting.length >= 2){
-    const a = waiting.shift(), b = waiting.shift();
-    if (a.readyState !== 1){ if (b.readyState === 1) waiting.unshift(b); continue; }
-    if (b.readyState !== 1){ waiting.unshift(a); continue; }
-    const room = new Room(nextRoomId++);
+function pairUp(key){
+  const q = queueOf(key);
+  const [nStr, mode] = key.split(':');
+  const n = +nStr, melee = mode === 'm';
+  while (q.length >= n){
+    const picked = [];
+    while (picked.length < n && q.length){
+      const ws = q.shift();
+      if (ws.readyState === 1) picked.push(ws); // 끊긴 소켓은 버린다
+    }
+    if (picked.length < n){ q.unshift(...picked); return; }
+    const room = new Room(nextRoomId++, null, n, melee);
     rooms.set(room.id, room);
-    room.join(a, a.sid);
-    room.join(b, b.sid);
-    a.room = b.room = room;
-    console.log(`매칭: room ${room.id} (대기 ${waiting.length}명, 방 ${rooms.size}개)`);
+    for (const ws of picked){ ws.room = room; }
+    if (n > 2){
+      // 2대2는 팀을 직접 골라야 하므로 자리를 바로 주지 않는다
+      for (const ws of picked) room.waitJoin(ws, ws.sid);
+    } else {
+      for (const ws of picked) room.join(ws, ws.sid);
+    }
+    console.log(`매칭: room ${room.id} ${key} (대기 ${waitingCount()}명, 방 ${rooms.size}개)`);
   }
 }
 
@@ -237,6 +251,8 @@ wss.on('connection', (ws, req) => {
   const mode = q.get('mode') || 'queue';      // queue | create | join
   const code = (q.get('code') || '').trim();
   const resume = q.get('resume') === '1';    // 끊겼다 자동으로 다시 붙는 경우에만 true
+  const want = q.get('n') === '4' ? 4 : 2;   // 원하는 인원수
+  const melee = q.get('melee') === '1';      // 칼전인가
   ws.sid = sid;
 
   // 예약석 복귀는 '자동 재접속'일 때만. 사용자가 직접 매칭/방만들기를 눌렀는데
@@ -259,8 +275,7 @@ wss.on('connection', (ws, req) => {
     console.log(`복귀: room ${back.id} slot ${ws.slot ?? -1} sid ${sid.slice(0, 8)}`);
   } else if (mode === 'create'){
     // 친구방 만들기: 코드를 발급하고 상대가 들어올 때까지 혼자 기다린다
-    const want = q.get('n') === '4' ? 4 : 2;
-    const room = new Room(nextRoomId++, newCode(), want);
+    const room = new Room(nextRoomId++, newCode(), want, melee);
     rooms.set(room.id, room);
     codes.set(room.code, room);
     ws.room = room;
@@ -269,7 +284,7 @@ wss.on('connection', (ws, req) => {
     } else {
       room.join(ws, sid);
     }
-    ws.send(JSON.stringify({ t: 'room', code: room.code, n: room.n }));
+    ws.send(JSON.stringify({ t: 'room', code: room.code, n: room.n, melee: room.melee }));
     console.log(`방 개설: ${room.code} ${room.n}인 (room ${room.id})`);
   } else if (mode === 'join'){
     const room = codes.get(code);
@@ -285,13 +300,18 @@ wss.on('connection', (ws, req) => {
     console.log(`방 입장: ${code} (room ${room.id})`);
   } else {
     // 같은 sid가 이미 대기 중이면 옛 소켓을 정리
-    for (let i = waiting.length - 1; i >= 0; i--){
-      if (waiting[i].sid === sid){ waiting[i].close(); waiting.splice(i, 1); }
+    for (const q of waiting.values()){
+      for (let i = q.length - 1; i >= 0; i--){
+        if (q[i].sid === sid){ q[i].close(); q.splice(i, 1); }
+      }
     }
     ws.room = null;
-    waiting.push(ws);
-    ws.send(JSON.stringify({ t: 'queued', ahead: waiting.length - 1 }));
-    pairUp();
+    const key = qkey(want, melee);          // 인원수·모드가 같은 사람끼리만 붙인다
+    ws.qkey = key;
+    const q = queueOf(key);
+    q.push(ws);
+    ws.send(JSON.stringify({ t: 'queued', ahead: q.length - 1 }));
+    pairUp(key);
   }
 
   ws.on('message', raw => {
@@ -331,8 +351,9 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
-    const i = waiting.indexOf(ws);
-    if (i >= 0){ waiting.splice(i, 1); return; }
+    const q = ws.qkey ? queueOf(ws.qkey) : null;
+    const i = q ? q.indexOf(ws) : -1;
+    if (i >= 0){ q.splice(i, 1); return; }
     if (ws.room && (ws.slot === undefined || ws.slot < 0)){
       const j = ws.room.waitingList.indexOf(ws);
       if (j >= 0) ws.room.waitingList.splice(j, 1);

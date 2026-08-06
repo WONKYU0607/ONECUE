@@ -14,7 +14,7 @@ import { paletteSlots, throwSlots } from './layout.js';
 // 스프라이트 시트의 한 칸 크기 (원본은 14x16 고정)
 const FW = 14 * RS, FH = 16 * RS;
 // 칼전 시트 규격 (melee.json)
-const MELEE_FW = 312, MELEE_FH = 190, MELEE_BODY_H = 180;
+const MELEE_FW = 484, MELEE_FH = 192, MELEE_BODY_H = 190;
 // 시트 열: 앞대기 앞공격 뒤대기 뒤공격 좌대기 좌공격 우대기 우공격
 // 화면이 뒤집힌 팀은 위·아래가 바뀌므로 그때만 앞뒤를 맞바꾼다
 const MELEE_COL = { 0: 2, 1: 0, 2: 4, 3: 6 };        // face -> 대기 열

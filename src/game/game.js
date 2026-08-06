@@ -34,7 +34,8 @@ export function createGame(canvas, opts = {}){
   const net = online || new Loopback();
   // 로컬 AI전은 2인/4인을 고를 수 있다. 4인이면 나 말고 셋이 AI
   const nLocal = (!online && session.n === 4) ? 4 : 2;
-  const isMelee = session.kind === 'melee';        // 칼전 (총알·아이템 없음)
+  // 칼전 여부: 로컬은 session, 온라인은 서버가 hello로 알려준 값
+  const isMelee = session.kind === 'melee' || (online ? !!SELF.melee : !!session.melee);
   if (!online){ SELF.slot = 0; SELF.n = nLocal; }
   const server = online ? null : new Server(net, nLocal, isMelee);
   const all = Array.from({ length: nLocal }, (_, i) => i);

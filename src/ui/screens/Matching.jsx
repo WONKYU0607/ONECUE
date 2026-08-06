@@ -31,6 +31,7 @@ export default function Matching({ session, onCancel, onMatched }){
       mode: session?.mode || 'queue',      // queue | create | join
       code: session?.code || '',
       n: session?.n || 2,
+      melee: !!session?.melee,
       onCode: c => { if (alive.current) setCode(c); },
       onLobby: l => { if (alive.current) setLobby(prev => ({ ...prev, ...l })); },
       onStage: (s, i, n) => {

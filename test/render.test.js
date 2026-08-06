@@ -93,7 +93,7 @@ console.log('우리 팀은 뒷모습, 상대 팀은 앞모습');
       s.phase = PH_PLAY;
       const fc = drawOnce(s, slot);
       // 캐릭터 그리기: 총격전은 원본 14x16, 칼전은 310x184
-      const SW = m.melee ? 312 : 14 * 3, SH = m.melee ? 190 : 16 * 3;
+      const SW = m.melee ? 484 : 14 * 3, SH = m.melee ? 192 : 16 * 3;
       const chars = fc.calls.filter(c => c.name === 'drawImage' && c.args[2] === SW && c.args[3] === SH);
       assert(chars.length === m.n, `${m.name} 슬롯${slot} — 캐릭터 ${m.n}명을 그린다 (${chars.length})`);
       // 뒷모습 프레임: 총격전은 idx가 홀수, 칼전은 열 2·3
