@@ -73,4 +73,46 @@ console.log('대각선도 같다');
   assert(r.over === 0, '대각선도 cap 안 넘김');
 }
 
+console.log('내 캐릭터와 상대 캐릭터가 비슷하게 매끄럽다');
+{
+  // 예측 상태는 렌더 프레임당 0·1·2틱씩 불규칙하게 전진한다.
+  // 내 캐릭터를 거기 그대로 붙이면 0 → 2틱 → 0 으로 덜컹거리는데
+  // 상대는 따라가기 필터가 펴줘서 혼자 매끄럽다 → "상대가 더 빨라 보인다"
+  const { makeNetGame } = await import('./harness.js');
+  const { PH_PLAY, WALL_L, wallIdx } = await import('../src/game/config.js');
+  const g = makeNetGame(60);
+  const keep = { slot: SELF.slot, n: SELF.n };
+  SELF.slot = 0; SELF.n = 2;
+  for (const st of [g.server.s, g.client.s, g.client.pred]) st.phase = PH_PLAY;
+  for (let f = 0; f < 240; f++) g.frame();            // 접속·스냅샷 안정화
+  const step = 150 / 60;
+  const rec = [[], []];
+  for (let cyc = 0; cyc < 5; cyc++){
+    for (const st of [g.server.s, g.client.s, g.client.pred])
+      for (const p of st.p) p.x = WALL_L[wallIdx(p.y)] + 2 * FP;
+    for (let f = 0; f < 40; f++){
+      g.client.input(0, step, 0, 0); g.client.input(1, step, 0, 0);
+      g.frame();
+      if (f >= 8 && g.client.rx){ rec[0].push(g.client.rx[0]); rec[1].push(g.client.rx[1]); }
+    }
+  }
+  const ratio = h => {
+    const v = [];
+    for (let i = 1; i < h.length; i++){ const d = (h[i] - h[i - 1]) / FP; if (d > -1 && d < 30) v.push(d); }
+    const avg = v.reduce((a, b) => a + b, 0) / v.length;
+    return Math.max(...v) / avg;
+  };
+  const me = ratio(rec[0]), foe = ratio(rec[1]);
+  SELF.slot = keep.slot; SELF.n = keep.n;
+  assert(me < 1.1, `내 캐릭터가 튀지 않는다 (최대/평균 ${me.toFixed(3)})`);
+  assert(foe < 1.1, `상대도 튀지 않는다 (${foe.toFixed(3)})`);
+  // 계수가 다르면 매끄러움이 달라져 한쪽이 빨라 보인다 = 불공정.
+  // 같은 필터를 같은 계수로 걸어 **완전히 같은 값**이 나와야 한다
+  assert(Math.abs(me - foe) < 0.02, `나와 상대가 똑같이 보인다 (나 ${me.toFixed(3)} / 상대 ${foe.toFixed(3)})`);
+  // 뒤처짐이 없어야 한다. 화면 위치가 예측 위치를 alpha만큼만 앞서거나 같아야 함
+  const lagMe = Math.abs(g.client.pred.p[0].x - g.client.rx[0]) / FP;
+  const lagFoe = Math.abs(g.client.pred.p[1].x - g.client.rx[1]) / FP;
+  assert(lagMe < 3 && lagFoe < 3, `뒤처짐이 없다 (나 ${lagMe.toFixed(2)}px / 상대 ${lagFoe.toFixed(2)}px)`);
+}
+
 console.log('pace.test.js 통과');

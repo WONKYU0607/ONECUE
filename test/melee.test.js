@@ -60,6 +60,22 @@ console.log('스폰');
   assert(s.p.every(p => cellUsable(col(p), row(p))), '전부 쓸 수 있는 칸에서 시작');
 }
 
+console.log('준비 단계 없이 바로 시작한다');
+{
+  const s = newState(2, true);
+  const { PH_COUNT } = await import('../src/game/config.js');
+  step(s, IN(2));
+  assert(s.ready.every(Boolean) && s.phase === PH_COUNT, '한 틱 만에 카운트다운으로 (준비 버튼 없음)');
+  for (let t = 0; t < 400 && s.phase !== PH_PLAY; t++) step(s, IN(2));
+  assert(s.phase === PH_PLAY, '전투까지 자동으로 넘어간다');
+}
+{
+  const s = newState(4, true);
+  const { PH_COUNT } = await import('../src/game/config.js');
+  step(s, IN(4));
+  assert(s.phase === PH_COUNT, '2대2도 마찬가지');
+}
+
 console.log('설치할 아이템이 없다');
 {
   const s = newState(2, true);

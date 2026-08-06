@@ -405,12 +405,6 @@ export function createGame(canvas, opts = {}){
     answerFast(ok){ ok ? sfx.ready() : sfx.deny(); client.answerFast(SELF.slot, ok); },
     ready(){ sfx.ready(); wantDone = true; nextDoneAt = 0; client.setReady(SELF.slot); },
     go(){ sfx.ready(); wantGo = true; nextGoAt = 0; client.setGo(SELF.slot); },
-    // 칼전은 배치할 아이템이 없어 한 번에 준비까지 간다
-    meleeReady(){
-      sfx.ready();
-      wantDone = true; nextDoneAt = 0; wantGo = true; nextGoAt = 0;
-      client.setReady(SELF.slot); client.setGo(SELF.slot);
-    },
     isMelee(){ return !!client.pred.melee; },
     isReady(){ return !!(client.pred.ready || [])[SELF.slot]; },
     // 서버가 실제로 확정한 준비 상태 (예측이 아닌 것). 문제 진단용

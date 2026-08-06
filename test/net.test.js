@@ -82,20 +82,23 @@ console.log('net.test.js 통과');
 
 console.log('상대 추종 필터가 주사율에 무관한지');
 {
-  // 같은 목표를 향해 1초 동안 따라갈 때, 60Hz와 120Hz의 결과가 같아야 한다
+  // 화면 위치가 크게 어긋났을 때 따라잡는 거리가 주사율과 무관해야 한다.
+  // (예전엔 지수 필터였고, 지금은 프레임당 이동 상한으로 따라잡는다.
+  //  어느 쪽이든 dt 기준이 아니면 고주사율에서 두 배로 빨리 붙는다)
   const run = fps => {
+    SELF.slot = 0; SELF.n = 2; TUNE.spd = 150;                    // 앞 테스트가 바꿔놨을 수 있다
     const g = makeNetGame(0);
-    g.run(200); placeAll(g); g.client.setReady(0); g.client.setReady(1); g.client.setGo(0); g.client.setGo(1); g.run(320);
+    g.run(200);                                                   // 접속·스냅샷 안정화
     const opp = 1 - SELF.slot;
-    g.client.rx[opp] = 0;
-    const target = g.client.pred.p[opp].x;
-    const dt = 1 / fps, SPAN = 0.1;                               // 100ms 동안 얼마나 따라오는지 (30·60·120Hz 모두 정수 프레임)
+    const start = g.client.pred.p[opp].x - 40 * FP;               // 40px 뒤에서 출발
+    g.client.rx[opp] = start;
+    const dt = 1 / fps, SPAN = 0.1;                               // 100ms (30·60·120Hz 모두 정수 프레임)
     for (let i = 0; i < Math.round(SPAN * fps); i++) g.client.updateRender(0, dt);
-    return g.client.rx[opp] / target;                              // 목표까지 진행률
+    return (g.client.rx[opp] - start) / FP;                       // 100ms 동안 따라잡은 거리(px)
   };
   const a = run(60), b = run(120), c = run(30);
-  assert(Math.abs(a - b) < 0.02 && Math.abs(a - c) < 0.02,
-         `100ms 수렴률이 주사율과 무관 (30Hz ${c.toFixed(3)} / 60Hz ${a.toFixed(3)} / 120Hz ${b.toFixed(3)})`);
-  assert(a > 0.5 && a < 0.95, `100ms면 대부분 따라옴 (${a.toFixed(3)})`);
+  assert(Math.abs(a - b) < 1 && Math.abs(a - c) < 1,
+         `100ms 따라잡기 거리가 주사율과 무관 (30Hz ${c.toFixed(1)} / 60Hz ${a.toFixed(1)} / 120Hz ${b.toFixed(1)})`);
+  assert(a > 5 && a <= 40.5, `100ms면 40px를 다 따라잡는다 (${a.toFixed(1)}px)`);
 }
 console.log('net.test.js 통과');

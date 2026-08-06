@@ -24,34 +24,43 @@ console.log('배치 규칙');
 
   step(s, IN({ place: { k: ITEM.WALL, c: 2, r: myRow(0) } }, {}));
   assert(s.items.length === 1, '배치 반영');
-  assert(!canPlace(s, 0, ITEM.WALL, 3, myRow(0)), `벽은 ${ITEM_DEF[ITEM.WALL].quota}개까지만`);
+  assert(!canPlace(s, 0, ITEM.WALL, 3, myRow(0)), '1대1은 벽이 한 개뿐');
   assert(!canPlace(s, 0, ITEM.BARR, 2, myRow(0)), '같은 칸에 겹쳐 놓을 수 없다');
   assert(canPlace(s, 0, ITEM.BARR, 3, myRow(0)), '다른 칸에는 바리케이트 가능');
 }
 
-console.log('아이템을 전부 놓아야 설치 완료할 수 있다');
+console.log('몇 개를 놓았든 설치 완료를 누를 수 있다');
 {
+  // 엄폐물을 아예 안 깔고 싶은 사람도 있으므로 정원을 강제하지 않는다
   const s = newState();
-  const mine = GRID_ROWS - 2, foe = foeRow(0);
-  step(s, IN({ ready: 1 }, { ready: 1 }));
-  assert(!s.done[0] && !s.done[1], '하나도 안 놓으면 설치 완료가 안 된다');
-  assert(!allPlaced(s, 0), 'allPlaced는 false');
-
-  step(s, IN({ place: { k: ITEM.WALL, c: 1, r: mine } }, {}));
-  step(s, IN({ place: { k: ITEM.BARR, c: 2, r: mine } }, {}));
+  const mine = GRID_ROWS - 2;
   step(s, IN({ ready: 1 }, {}));
-  assert(!s.done[0], '드럼통을 안 놓으면 아직 설치 완료 불가');
+  assert(s.done[0], '하나도 안 놓아도 설치 완료');
+  assert(!allPlaced(s, 0), '다 놓지는 않은 상태 그대로');
+  assert(!s.done[1], '안 누른 쪽은 그대로');
 
-  step(s, IN({ place: { k: ITEM.DRUM, c: 1, r: foe } }, {}));
-  step(s, IN({ place: { k: ITEM.DRUM, c: 3, r: foe } }, {}));
-  assert(allPlaced(s, 0), '전부 놓으면 allPlaced true');
-  step(s, IN({ ready: 1 }, {}));
-  assert(s.done[0], '이제 설치 완료 가능');
   // 준비완료는 설치를 끝낸 사람만 누를 수 있는 두 번째 단계
   assert(!s.ready[0], '설치만 끝냈다고 준비까지 되진 않는다');
   step(s, IN({ go: 1 }, { go: 1 }));
   assert(s.ready[0] && !s.ready[1], '설치를 끝낸 쪽만 준비완료가 된다');
   assert(s.phase === PH_READY, '상대가 아직이면 시작 안 함');
+
+  // 설치 완료만으로는 시작하지 않는다. 준비완료가 따로 있어야 파란 버튼이 뜬다
+  const g = newState();
+  step(g, IN({ ready: 1 }, { ready: 1 }));
+  assert(g.done[0] && g.done[1], '양쪽 설치 완료');
+  assert(!g.ready[0] && !g.ready[1] && g.phase === PH_READY, '그것만으로는 시작 안 함');
+  step(g, IN({ go: 1 }, {}));
+  assert(g.ready[0] && !g.ready[1] && g.phase === PH_READY, '한쪽만 준비완료면 대기');
+  step(g, IN({}, { go: 1 }));
+  assert(g.ready[0] && g.ready[1] && g.phase !== PH_READY, '양쪽 다 누르면 시작');
+
+  // 하나만 깔고 완료해도 된다
+  const t = newState();
+  step(t, IN({ place: { k: ITEM.WALL, c: 1, r: mine } }, {}));
+  step(t, IN({ ready: 1, go: 1 }, {}));
+  assert(t.done[0] && t.ready[0], '한 개만 깔고도 준비 완료');
+  assert(t.items.length === 1, '깐 것만 남는다');
 }
 
 console.log('놓은 아이템을 다른 칸으로 옮길 수 있다');
@@ -59,13 +68,16 @@ console.log('놓은 아이템을 다른 칸으로 옮길 수 있다');
   const s = newState();
   const mine = GRID_ROWS - 2;
   step(s, IN({ place: { k: ITEM.WALL, c: 1, r: mine } }, {}));
-  assert(s.items.length === 1 && s.items[0].c === 1, '처음 위치');
-  assert(!canPlace(s, 0, ITEM.WALL, 4, mine), '옮기기가 아니면 개수 초과로 거절');
+  step(s, IN({ place: { k: ITEM.BARR, c: 3, r: mine } }, {}));   // 한도(2개)를 다 쓴다
+  const wallAt = c => (s.items || []).find(it => it.k === ITEM.WALL && it.c === c);
+  assert(s.items.length === 2 && wallAt(1), '처음 위치');
+  assert(!canPlace(s, 0, ITEM.WALL, 5, mine), '옮기기가 아니면 개수 초과로 거절');
+  assert(canPlace(s, 0, ITEM.WALL, 4, mine, { c: 1, r: mine }), '옮기기면 허용');
   assert(canPlace(s, 0, ITEM.WALL, 4, mine, { c: 1, r: mine }), '옮기기면 허용');
 
   step(s, IN({ place: { k: ITEM.WALL, c: 4, r: mine, from: { c: 1, r: mine } } }, {}));
-  assert(s.items.length === 1, '개수는 그대로');
-  assert(s.items[0].c === 4, `새 위치로 옮겨짐 (c=${s.items[0].c})`);
+  assert(s.items.length === 2, '개수는 그대로');
+  assert(wallAt(4) && !wallAt(1), '새 위치로 옮겨짐');
   assert(myItemAt(s, 0, 4, mine), '새 자리에서 찾힌다');
   assert(!myItemAt(s, 0, 1, mine), '옛 자리는 비었다');
 

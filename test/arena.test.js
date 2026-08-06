@@ -81,9 +81,9 @@ assert(!canPlace(a, 0, ITEM.DRUM, 0, 6) && !canPlace(a, 1, ITEM.DRUM, 0, 7),
 
 console.log('아이템 종류');
 setArena(2);
-assert(itemKinds().length === 3, '1대1은 예전 그대로 3종');
-assert(itemQuota(ITEM.WALL2) === 0 && itemQuota(ITEM.DRUM) === 2, '1대1엔 2칸 벽이 없고 드럼통 2개');
-assert(coverBudget() === 2, '1대1은 예전대로 벽1 + 바리1');
+assert(itemKinds().length === 3, '1대1은 1칸 벽·바리 + 드럼통 3종');
+assert(itemQuota(ITEM.WALL2) === 0 && itemQuota(ITEM.DRUM) === 2, '1대1엔 2·3칸이 없다');
+assert(coverBudget() === 2, '1대1 엄폐물 합계 2개');
 setArena(4);
 assert(itemKinds().length === 7, '2대2는 7종 (벽 1·2·3칸, 바리케이트 1·2·3칸, 드럼통)');
 assert(coverBudget() === 3, '엄폐물은 조합 자유, 합계 3개');

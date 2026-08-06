@@ -180,7 +180,7 @@ export const WALL2_R = '148,148,148,148,148,148,148,148,148,148,148,148,148,148,
 const A1 = {
   cols: 6, rows: 14, x0: 24.9, cw: 21.638, y0: 0, ch: 22.214, mid: 7,
   pw: 14, ph: 16, bg: 'arena', neutral: false, hc: 3, tc: [1, 4],
-  flip: H, quota: [2, 2, 2, 2, 2, 2, 2], cover: 2,   // 엄폐물은 조합 자유, 합계 2개
+  flip: H, quota: [1, 0, 0, 1, 0, 0, 2], cover: 2,   // 1대1은 1칸 벽·바리 하나씩 (합계 2개)
   bands: [[0, 13, 0, 5]],
   wl: WALL1_L, wr: WALL1_R
 };

@@ -428,6 +428,8 @@ export function step(s, inp){
       // 2단계 준비완료: 설치를 끝낸 사람만. 전원이 눌러야 시작한다
       if (q.go && s.done[i]) s.ready[i] = true;
     }
+    // 칼전은 배치할 것도 고를 것도 없다. 준비 단계를 건너뛰고 바로 카운트다운으로 간다
+    if (s.melee) for (let i = 0; i < s.n; i++){ s.done[i] = true; s.ready[i] = true; }
     // 전원이 준비완료를 눌러야 시작한다 (START 버튼 없음).
     // 연습 모드는 상대가 없으므로 한쪽만 완료하면 시작한다
     const allReady = s.solo ? s.ready.some(Boolean) : s.ready.every(Boolean);

@@ -108,13 +108,6 @@ export default function GameCanvas({ session, onExit, onFinish }){
         </div>
       )}
 
-      {/* 칼전은 배치할 게 없어 준비 버튼 하나만 */}
-      {placing && ready.melee && !ready.me && (
-        <button className="panelbtn place go ui-overlay" style={boxStyle}
-                onClick={() => gameRef.current?.meleeReady()}>
-          준비 완료
-        </button>
-      )}
       {/* 1단계: 아이템을 다 놓아야 설치 완료 */}
       {placing && !ready.melee && !ready.cnt?.meDone && (
         <button className="panelbtn place ui-overlay" style={boxStyle}

@@ -276,8 +276,8 @@ export class Client {
     this.pend = [ blank(), blank(), blank(), blank() ];   // 최대 4명
     this.sent = [];                    // 아직 서버가 확정하지 않은 내 입력
     this.pred = newState();            // 예측 상태 (화면에 그리는 것)
-    this.rx = null; this.ry = null;    // 렌더 위치 (상대는 따라가기 필터)
-    this.prevMy = 0; this.prevMyY = 0; // 내 캐릭터 틱 보간용
+    this.rx = null; this.ry = null;    // 렌더 위치 (전원 같은 필터)
+    this.nextPos = null;               // 다음 틱 위치 (서브틱 보간용)
     this.lastInp = null;
     this.tickAt = CLOCK.now();
     this.desync = 0; this.pendingSnap = null;
@@ -407,10 +407,7 @@ export class Client {
     }
     const target = this.nextInputTick - 1;
     const p = cloneState(this.s);
-    let prevMy = p.p[SELF.slot].x, prevMyY = p.p[SELF.slot].y;
-    let guard = 0;
-    while (p.tick < target && guard++ < 40){
-      const t = p.tick + 1;
+    const inputsFor = t => {
       const n = p.n || 2;
       const inp = Array.from({ length: n }, () => ({ dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 }));
       if (this.lastInp && t - this.s.tick <= EXTRAP_MAX){   // 남들은 마지막 입력으로 외삽
@@ -420,11 +417,20 @@ export class Client {
         }
       }
       for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, ready:e.ready, go:e.go, place:e.place, thr:e.thr, fastReq:e.fastReq, fastAns:e.fastAns };
-      prevMy = p.p[SELF.slot].x; prevMyY = p.p[SELF.slot].y;
-      step(p, inp);
+      return inp;
+    };
+    let guard = 0;
+    while (p.tick < target && guard++ < 40){
+      step(p, inputsFor(p.tick + 1));
     }
-    this.prevMy = prevMy; this.prevMyY = prevMyY;
     this.pred = p;
+    // 화면은 '지금'이 두 틱 사이 어디쯤인지(alpha)로 그린다.
+    // 그러려면 **다음 틱 상태**가 있어야 한다. 한 틱 더 굴려서 들고 있는다.
+    // 이게 없으면 목표가 프레임당 0·1·2틱씩 튀어 덜컹거리고,
+    // 그걸 필터로 펴면 이번엔 뒤처짐이 생긴다. 한 틱 앞을 보면 둘 다 없다
+    const nx = cloneState(p);
+    step(nx, inputsFor(nx.tick + 1));
+    this.nextPos = nx.p.map(q => [q.x, q.y]);
     this.seedRender(p);
   }
   // 렌더 위치를 아직 안 만들었으면 지금 상태로 채운다.
@@ -440,17 +446,34 @@ export class Client {
   // dt 기준 지수 감쇠로 바꿔야 주사율과 무관하게 같은 시간에 같은 만큼 수렴한다.
   updateRender(a, dt = 1 / 60){
     if (!this.rx || !this.pred.p[SELF.slot]) return;
-    const k = 1 - Math.exp(-FOLLOW_RATE * Math.min(dt, 0.1));
+    const cap = 2 * (this.pred.maxStep || stepCap()) * (this.pred.fast ? FAST_MUL : 1);
     for (let i = 0; i < this.pred.p.length; i++){        // 2대2는 네 명 다 보정해야 한다
-      if (this.rx[i] === undefined){ this.rx[i] = this.pred.p[i].x; this.ry[i] = this.pred.p[i].y; }
-      const tx = this.pred.p[i].x, ty = this.pred.p[i].y;
-      if (i === SELF.slot){
-        this.rx[i] = lerp(this.prevMy, tx, a);
-        this.ry[i] = lerp(this.prevMyY, ty, a);
-      } else {
-        this.rx[i] += (tx - this.rx[i]) * k;
-        this.ry[i] += (ty - this.ry[i]) * k;
+      if (this.rx[i] === undefined){
+        this.rx[i] = this.pred.p[i].x; this.ry[i] = this.pred.p[i].y;
       }
+      // 예측 상태는 렌더 프레임당 0·1·2틱씩 불규칙하게 전진한다.
+      // 내 캐릭터를 그 값에 그대로 붙이면 0 → 2틱 → 0 으로 덜컹거리고(측정: 평균의 2배),
+      // 상대는 따라가기 필터가 그걸 펴줘서 혼자 매끄럽다.
+      // 그래서 **내 쪽이 느리고 무겁게, 상대가 빨라 보인다** — 양쪽이 서로 그렇게 느낀다.
+      // 내 캐릭터도 같은 필터로 펴되, 조작 반응이 죽지 않게 훨씬 빠른 계수를 쓴다
+      // 나와 상대를 **완전히 같은 식으로** 그린다. 계수가 다르면 매끄러움이 달라져
+      // 한쪽이 더 빨라 보이고, 그건 곧 불공정이다.
+      //
+      // 전방 보정(속도를 더해 뒤처짐을 없애는 방식)도 재봤는데, 목표가 0·1·2틱씩
+      // 불규칙하게 오다 보니 속도 추정이 흔들려 오히려 튐이 커졌다(1.09 → 1.74). 안 씀
+      // 나도 상대도 완전히 같은 식. 현재 틱과 다음 틱 사이를 alpha로 보간한다.
+      // 뒤처짐 0, 프레임당 이동량 일정, 분기 없음 = 구조적으로 공평
+      const nx = this.nextPos && this.nextPos[i];
+      let gx = nx ? lerp(this.pred.p[i].x, nx[0], a) : this.pred.p[i].x;
+      let gy = nx ? lerp(this.pred.p[i].y, nx[1], a) : this.pred.p[i].y;
+      // 늦게 온 입력으로 과거가 바뀌면 목표가 확 움직인다. 그 순간에도 화면이
+      // 순간이동하지 않도록 **한 프레임 이동량에 상한**을 둔다(따라잡기는 다음 프레임에).
+      // 상한은 실제 최고 속도의 두 배 — 평소엔 절대 안 걸리고 보정 때만 걸린다
+      const lim = cap * Math.max(1, dt * 60);
+      const ddx = gx - this.rx[i], ddy = gy - this.ry[i];
+      const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+      if (dd > lim){ gx = this.rx[i] + ddx * lim / dd; gy = this.ry[i] + ddy * lim / dd; }
+      this.rx[i] = gx; this.ry[i] = gy;
     }
   }
   setCfg(cfg){ this.net.clientSend({ t:'cfg', cfg }); }
