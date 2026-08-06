@@ -18,9 +18,13 @@ export default function PvpMenu({ onBack, onStart }){
           <span className="t">랜덤 매칭</span>
           <span className="d">아무나 만나서 바로 시작</span>
         </button>
-        <button className="menu-btn" onClick={() => onStart({ mode: 'create' })}>
-          <span className="t">방 만들기</span>
-          <span className="d">코드를 받아 친구에게 알려주기</span>
+        <button className="menu-btn" onClick={() => onStart({ mode: 'create', n: 2 })}>
+          <span className="t">방 만들기 · 1대1</span>
+          <span className="d">코드를 받아 친구 한 명에게</span>
+        </button>
+        <button className="menu-btn" onClick={() => onStart({ mode: 'create', n: 4 })}>
+          <span className="t">방 만들기 · 2대2</span>
+          <span className="d">네 명이 모여야 시작. 먼저 온 둘이 한 팀</span>
         </button>
 
         <div className="code-row">

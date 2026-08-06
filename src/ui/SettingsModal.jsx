@@ -7,7 +7,7 @@ const ROWS = [
   ['sound',    '효과음'],
   ['vibrate',  '진동'],
   ['leftStick', '스틱을 왼쪽에'],
-  ['softFlash', '화면 효과 줄이기'],
+  ['softFlash', '섬광 눈부심 줄이기'],
   ['showGrid', '바닥 격자 (디버그)']
 ];
 

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { connectAndWait, disconnect, serverUrl } from '../../net/connection.js';
+import { connectAndWait, disconnect, serverUrl, pickTeam } from '../../net/connection.js';
+import { TEAMS } from '../../game/config.js';
 
 const LABEL = {
+  team:       '팀을 고르세요',
   waking:     '서버를 깨우는 중…',
   connecting: '서버에 연결하는 중…',
   retrying:   '서버를 깨우는 중…',
@@ -16,6 +18,8 @@ export default function Matching({ session, onCancel, onMatched }){
   const [tries, setTries] = useState([0, 0]);
   const [code, setCode] = useState('');
   const [err, setErr] = useState('');
+  const [lobby, setLobby] = useState(null);
+  const [color, setColor] = useState(0);
   const [sec, setSec] = useState(0);
   const alive = useRef(true);
 
@@ -26,7 +30,9 @@ export default function Matching({ session, onCancel, onMatched }){
     connectAndWait({
       mode: session?.mode || 'queue',      // queue | create | join
       code: session?.code || '',
+      n: session?.n || 2,
       onCode: c => { if (alive.current) setCode(c); },
+      onLobby: l => { if (alive.current) setLobby(prev => ({ ...prev, ...l })); },
       onStage: (s, i, n) => {
         if (!alive.current) return;
         setStage(s);
@@ -53,10 +59,50 @@ export default function Matching({ session, onCancel, onMatched }){
         <div className="roomcode">
           <span className="lbl">방 코드</span>
           <strong>{code}</strong>
-          <span className="hint">친구에게 알려주면 이 코드로 들어온다</span>
+          <span className="hint">
+            친구에게 알려주면 이 코드로 들어온다
+            {session?.n === 4 ? ' (네 명 필요)' : ''}
+          </span>
         </div>
       )}
 
+      {lobby && stage === 'team' && (
+        <>
+          <p className="hint">캐릭터 색</p>
+          <div className="colorpick">
+            {[0, 1, 2, 3].map(c => {
+              const taken = (lobby.taken || []).includes(c) && lobby.myColor !== c;
+              const on = lobby.myColor != null ? lobby.myColor === c : color === c;
+              return (
+                <button key={c}
+                  className={'swatch' + (on ? ' on' : '') + (taken ? ' off' : '')}
+                  disabled={taken || lobby.myColor != null}
+                  style={{ background: TEAMS[c].m }}
+                  onClick={() => setColor(c)}
+                  aria-label={'색 ' + (c + 1)} />
+              );
+            })}
+          </div>
+          <div className="teampick">
+            {[0, 1].map(t => {
+              const cnt = lobby.teams ? lobby.teams[t] : 0;
+              const need = lobby.need || 2;
+              const mine = lobby.mine === t;
+              const full = cnt >= need;
+              return (
+                <button key={t}
+                  className={'menu-btn teambtn' + (mine ? ' primary' : '') + (full && !mine ? ' off' : '')}
+                  disabled={(full && !mine) || lobby.mine != null}
+                  onClick={() => pickTeam(t, color)}>
+                  <span className="t">{t === 0 ? 'A 팀' : 'B 팀'}</span>
+                  <span className="d">{cnt} / {need}{mine ? ' · 내 팀' : ''}</span>
+                </button>
+              );
+            })}
+          </div>
+          {lobby.mine != null && <p className="hint">나머지 인원을 기다리는 중</p>}
+        </>
+      )}
       {stage !== 'error' && <p className="hint">{sec}초</p>}
 
       {waking && (

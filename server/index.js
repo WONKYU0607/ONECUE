@@ -25,24 +25,23 @@ function newCode(){
 }
 
 class Room {
-  constructor(id, code = null){
+  constructor(id, code = null, n = 2){
     this.id = id;
     this.code = code;
+    this.n = n;
     // 자리마다 세션 id를 기억한다. 소켓이 끊겨도 sid가 남아 있으면 그 자리는 예약 상태
-    this.seats = [
-      { sid: null, ws: null, goneAt: 0 },
-      { sid: null, ws: null, goneAt: 0 }
-    ];
+    this.seats = Array.from({ length: n }, () => ({ sid: null, ws: null, goneAt: 0 }));
     this.emptyAt = 0;
+    this.waitingList = [];      // 아직 팀을 안 고른 사람들
     // Server는 net.serverSend(msg, pid?)만 쓴다. pid를 주면 그 슬롯에게만 보낸다.
     this.server = new Server({
       serverSend: (msg, pid) => this.send(msg, pid),
       toServer: null
-    });
+    }, n);
   }
   send(msg, pid){
     const raw = JSON.stringify(msg);
-    const targets = pid === undefined ? [0, 1] : [pid];
+    const targets = pid === undefined ? this.seats.map((_, i) => i) : [pid];
     for (const i of targets){
       const ws = this.seats[i].ws;
       if (ws && ws.readyState === 1) ws.send(raw);
@@ -56,11 +55,43 @@ class Room {
   // 새 사람이 앉을 수 있는 자리 (예약된 자리는 제외)
   freeSeat(){ return this.seats.findIndex(x => !x.sid); }
   get full(){ return this.seats.every(x => !!x.sid); }
+  // 팀별 슬롯 범위 (앞 절반 = 팀0 = 아래 진영)
+  teamRange(team){
+    const per = this.n / 2;
+    return team === 0 ? [0, per - 1] : [per, this.n - 1];
+  }
+  freeSeatIn(team){
+    const [a, b] = this.teamRange(team);
+    for (let i = a; i <= b; i++) if (!this.seats[i].sid) return i;
+    return -1;
+  }
+  colorTaken(c){ return this.seats.some((st, i) => st.sid && this.server.s.color[i] === c); }
+  freeColor(){
+    for (let c = 0; c < 4; c++) if (!this.colorTaken(c)) return c;
+    return 0;
+  }
+  teamCounts(){
+    const c = [0, 0];
+    this.seats.forEach((x, i) => { if (x.sid) c[i < this.n / 2 ? 0 : 1]++; });
+    return c;
+  }
+  // 팀 선택 중인 사람들에게 현재 인원 구성을 알린다
+  sendLobby(){
+    const c = this.teamCounts();
+    const taken = [0, 1, 2, 3].filter(c => this.colorTaken(c));
+    const raw = { t: 'lobby', teams: c, need: this.n / 2, taken };
+    for (const ws of this.waitingList) if (ws.readyState === 1) ws.send(JSON.stringify(raw));
+    for (const st of this.seats) if (st.ws && st.ws.readyState === 1){
+      st.ws.send(JSON.stringify({ ...raw, mine: st.ws.slot < this.n / 2 ? 0 : 1,
+        myColor: this.server.s.color[st.ws.slot] }));
+    }
+  }
   dispose(){ if (this.code) codes.delete(this.code); }
 
-  join(ws, sid){
+  join(ws, sid, team){
     const back = this.seatOf(sid);
-    const slot = back >= 0 ? back : this.freeSeat();
+    const slot = back >= 0 ? back
+               : (team === undefined ? this.freeSeat() : this.freeSeatIn(team));
     if (slot < 0) return -1;
 
     const seat = this.seats[slot];
@@ -71,12 +102,12 @@ class Room {
     ws.roomId = this.id; ws.slot = slot;
     this.emptyAt = 0;
 
-    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, back: reconnected, ver: PROTO_VER }));
+    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, n: this.n, back: reconnected, ver: PROTO_VER }));
     // 방은 이미 돌고 있으므로 현재 상태를 먼저 보내 시작점을 맞춘다
     this.snapshotTo(slot);
-    this.send({ t: 'peer', slot: 1 - slot, state: this.seats[1 - slot].ws ? 'here' : 'gone' }, slot);
-    if (reconnected) this.send({ t: 'peer', slot, state: 'back' }, 1 - slot);
-    else if (this.seats[0].ws && this.seats[1].ws) this.send({ t: 'go' });
+    if (reconnected) this.send({ t: 'peer', slot, state: 'back' });
+    else if (this.seats.every(x => x.ws)) this.send({ t: 'go' });
+    else this.sendLobby();
     return slot;
   }
 
@@ -85,7 +116,7 @@ class Room {
     const seat = this.seats[slot];
     seat.ws = null;
     seat.goneAt = Date.now();
-    this.send({ t: 'peer', slot, state: 'gone', grace: GRACE_MS }, 1 - slot);
+    this.send({ t: 'peer', slot, state: 'gone', grace: GRACE_MS });
     if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
   }
 
@@ -94,7 +125,8 @@ class Room {
   quit(slot){
     const seat = this.seats[slot];
     seat.sid = null; seat.ws = null; seat.goneAt = 0;
-    this.send({ t: 'peer', slot, state: 'left' }, 1 - slot);
+    this.server.s.color[slot] = slot;        // 색을 다시 고를 수 있게
+    this.send({ t: 'peer', slot, state: 'left' });
     if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
   }
 
@@ -104,7 +136,7 @@ class Room {
       const seat = this.seats[i];
       if (seat.sid && !seat.ws && now - seat.goneAt > GRACE_MS){
         seat.sid = null; seat.goneAt = 0;
-        this.send({ t: 'peer', slot: i, state: 'left' }, 1 - i);
+        this.send({ t: 'peer', slot: i, state: 'left' });
       }
     }
   }
@@ -121,6 +153,7 @@ const http = createServer((req, res) => {
     const detail = [...rooms.values()].map(r => ({
       id: r.id,
       code: r.code || null,
+      n: r.n,
       seats: r.seats.map(x => (x.ws ? 'on' : x.sid ? 'held' : 'empty')),
       ready: r.server.s.ready,
       items: (r.server.s.items || []).length,
@@ -198,19 +231,33 @@ wss.on('connection', (ws, req) => {
     console.log(`복귀: room ${back.id} slot ${ws.slot} sid ${sid.slice(0, 8)}`);
   } else if (mode === 'create'){
     // 친구방 만들기: 코드를 발급하고 상대가 들어올 때까지 혼자 기다린다
-    const room = new Room(nextRoomId++, newCode());
+    const want = q.get('n') === '4' ? 4 : 2;
+    const room = new Room(nextRoomId++, newCode(), want);
     rooms.set(room.id, room);
     codes.set(room.code, room);
     ws.room = room;
-    room.join(ws, sid);
-    ws.send(JSON.stringify({ t: 'room', code: room.code }));
-    console.log(`방 개설: ${room.code} (room ${room.id})`);
+    if (want > 2){
+      room.waitingList.push(ws);
+      ws.send(JSON.stringify({ t: 'hello', pid: -1, room: room.id, n: room.n, ver: PROTO_VER }));
+      room.sendLobby();
+    } else {
+      room.join(ws, sid);
+    }
+    ws.send(JSON.stringify({ t: 'room', code: room.code, n: room.n }));
+    console.log(`방 개설: ${room.code} ${room.n}인 (room ${room.id})`);
   } else if (mode === 'join'){
     const room = codes.get(code);
     if (!room){ ws.send(JSON.stringify({ t: 'joinfail', reason: 'notfound' })); ws.close(); return; }
     if (room.full){ ws.send(JSON.stringify({ t: 'joinfail', reason: 'full' })); ws.close(); return; }
     ws.room = room;
-    room.join(ws, sid);
+    if (room.n > 2){
+      // 2대2는 팀을 직접 고른다. 고를 때까지는 자리를 주지 않는다
+      room.waitingList.push(ws);
+      ws.send(JSON.stringify({ t: 'hello', pid: -1, room: room.id, n: room.n, ver: PROTO_VER }));
+      room.sendLobby();
+    } else {
+      room.join(ws, sid);
+    }
     console.log(`방 입장: ${code} (room ${room.id})`);
   } else {
     // 같은 sid가 이미 대기 중이면 옛 소켓을 정리
@@ -225,13 +272,35 @@ wss.on('connection', (ws, req) => {
 
   ws.on('message', raw => {
     let m; try { m = JSON.parse(raw); } catch { return; }
+    if (m.t === 'team' && ws.room && ws.room.n > 2){
+      const room = ws.room, team = m.team === 1 ? 1 : 0;
+      if (ws.slot === undefined || ws.slot < 0){
+        const seat = room.freeSeatIn(team);
+        if (seat < 0){ ws.send(JSON.stringify({ t: 'teamfull', team })); return; }
+        // 색은 겹치면 안 된다. 원하는 색이 이미 쓰이면 남은 색을 준다
+        let color = Number.isInteger(m.color) ? m.color : room.freeColor();
+        if (color < 0 || color > 3 || room.colorTaken(color)){
+          if (Number.isInteger(m.color)) ws.send(JSON.stringify({ t: 'colortaken', color: m.color }));
+          color = room.freeColor();
+        }
+        const i = room.waitingList.indexOf(ws);
+        if (i >= 0) room.waitingList.splice(i, 1);
+        room.join(ws, ws.sid, team);
+        room.server.s.color[ws.slot] = color;
+        // 색은 시뮬 상태에 들어 있으므로, 바뀐 상태를 전원에게 다시 알린다
+        room.send({ t: 's', tick: room.server.s.tick, st: JSON.parse(JSON.stringify(room.server.s)) });
+        console.log(`팀 선택: room ${room.id} slot ${ws.slot} (팀 ${team}, 색 ${color})`);
+      }
+      return;
+    }
     if (m.t === 'bye'){
-      if (ws.room) ws.room.quit(ws.slot);
+      if (ws.room && ws.slot >= 0) ws.room.quit(ws.slot);
+      else if (ws.room){ const i = ws.room.waitingList.indexOf(ws); if (i >= 0) ws.room.waitingList.splice(i, 1); ws.room.sendLobby(); }
       else { const i = waiting.indexOf(ws); if (i >= 0) waiting.splice(i, 1); }
       ws.close();
       return;
     }
-    if (!ws.room) return;                       // 아직 대기열이면 입력은 버린다
+    if (!ws.room || ws.slot === undefined || ws.slot < 0) return;   // 자리가 없으면 입력은 버린다
     // pid는 절대 클라이언트 말을 믿지 않는다 (남의 캐릭터를 조작할 수 있으므로)
     m.pid = ws.slot;
     ws.room.server.onMsg(m);
@@ -240,6 +309,12 @@ wss.on('connection', (ws, req) => {
   ws.on('close', () => {
     const i = waiting.indexOf(ws);
     if (i >= 0){ waiting.splice(i, 1); return; }
+    if (ws.room && (ws.slot === undefined || ws.slot < 0)){
+      const j = ws.room.waitingList.indexOf(ws);
+      if (j >= 0) ws.room.waitingList.splice(j, 1);
+      ws.room.sendLobby();
+      return;
+    }
     const room = ws.room;
     if (room && room.seats[ws.slot].ws === ws){
       room.leave(ws.slot);

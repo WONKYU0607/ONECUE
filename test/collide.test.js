@@ -27,7 +27,7 @@ console.log('벽은 캐릭터를 막는다');
   for (let i = 0; i < 40; i++){ s.p[0].hp = MAXHP; step(s, IN({ dy: -Math.round(9 * FP) }, {})); }
   assert(s.p[0].y > wr.y + wr.h - FP, `벽을 못 넘는다 (y ${(s.p[0].y/FP).toFixed(1)} / 벽 아래 ${((wr.y+wr.h)/FP).toFixed(1)})`);
   assert(s.p[0].y < y0, '벽 앞까지는 다가간다');
-  assert(!blocked(s, s.p[0].x, s.p[0].y), '멈춘 자리는 벽과 안 겹친다');
+  assert(!blocked(s, s.p[0].x, s.p[0].y, 0), '멈춘 자리는 벽과 안 겹친다');
 
   // 벽에 붙은 채로 옆으로는 움직여진다
   const x1 = s.p[0].x;

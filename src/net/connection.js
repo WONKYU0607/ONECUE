@@ -11,6 +11,7 @@ const GAP_MS = 4000;
 const SID_KEY = 'duel.sid';
 
 let conn = null;          // { transport, slot, room }
+let pending = null;       // 매칭 중인 연결 (팀 선택용)
 
 export const serverUrl = BASE;
 export function getConnection(){ return conn; }
@@ -25,17 +26,24 @@ export function getSid(){
       sid = (crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now());
       localStorage.setItem(SID_KEY, sid);
     }
-    return sid;
+    // 탭마다 다른 사람으로 취급해야 한 컴퓨터에서 여러 명으로 테스트할 수 있다.
+    // 탭 안에서는 유지되므로 새로고침 후 재접속은 그대로 된다
+    let tab = sessionStorage.getItem(SID_KEY + '.tab');
+    if (!tab){
+      tab = String(Math.random()).slice(2, 8);
+      sessionStorage.setItem(SID_KEY + '.tab', tab);
+    }
+    return sid + '-' + tab;
   } catch {
     return String(Math.random()).slice(2) + Date.now();   // 저장소가 막힌 환경
   }
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const wsUrl = (mode = 'queue', code = '', resume = false) =>
+const wsUrl = (mode = 'queue', code = '', resume = false, n = 2) =>
   BASE + '?sid=' + encodeURIComponent(getSid()) +
   '&mode=' + mode + (code ? '&code=' + encodeURIComponent(code) : '') +
-  (resume ? '&resume=1' : '');
+  (n === 4 ? '&n=4' : '') + (resume ? '&resume=1' : '');
 
 // 잠든 서버는 HTTP 요청으로도 깨어난다. 소켓보다 먼저 두드려 둔다.
 // 시간 제한이 없으면 잠든 서버가 요청을 붙잡고 있는 동안 화면이 멈춘 것처럼 보인다.
@@ -66,7 +74,7 @@ function openOnce(transport){
 
 // 접속해서 상대가 들어올 때까지 기다린다. onStage로 진행 상황을 알린다.
 // mode: 'queue'(랜덤) | 'create'(방 만들기) | 'join'(코드 입장)
-export async function connectAndWait({ onStage, onCode, mode = 'queue', code = '' } = {}){
+export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue', code = '', n = 2 } = {}){
   // 깨우기를 여러 번 두드린다. 한 번에 응답이 없어도 화면이 멈추지 않게 진행 상황을 알린다
   let health = null;
   for (let i = 0; i < 4 && !health; i++){
@@ -81,11 +89,12 @@ export async function connectAndWait({ onStage, onCode, mode = 'queue', code = '
   let transport = null;
   for (let i = 0; i < TRIES; i++){
     onStage?.(i === 0 ? 'connecting' : 'retrying', i + 1, TRIES);
-    transport = new WsTransport(wsUrl(mode, code));
+    transport = new WsTransport(wsUrl(mode, code, false, n));
     try { await openOnce(transport); break; }
     catch { transport.close(); transport = null; await sleep(GAP_MS); }
   }
   if (!transport) throw new Error('서버에 연결할 수 없다');
+  pending = transport;   // 팀 선택 메시지를 보낼 통로
 
   return new Promise((resolve, reject) => {
     let slot = -1, room = -1, settled = false;
@@ -98,7 +107,7 @@ export async function connectAndWait({ onStage, onCode, mode = 'queue', code = '
       transport.auto = true;                // 이제부터 끊기면 자동으로 다시 붙는다
       // 자동 재접속은 '복귀'로 표시해야 서버가 원래 자리로 되돌려준다.
       // 반대로 사용자가 직접 새 매칭을 시작할 땐 이 표시가 없어야 새 방을 받는다
-      transport.url = wsUrl(mode, code, true);
+      transport.url = wsUrl(mode, code, true, n);
       conn = { transport, slot, room };
       onStage?.('matched');
       resolve(conn);
@@ -114,9 +123,17 @@ export async function connectAndWait({ onStage, onCode, mode = 'queue', code = '
           return;
         }
         slot = m.pid; room = m.room;
-        SELF.slot = slot;                   // 내 슬롯은 서버가 정한다
+        SELF.slot = slot;                   // 내 슬롯과 인원수는 서버가 정한다
+        SELF.n = m.n || 2;
         onStage?.('waiting');
         if (m.back) done();                 // 재접속이면 서버가 go를 다시 보내지 않는다
+      } else if (m.t === 'lobby'){
+        onLobby?.(m);                       // 팀별 인원 현황
+        onStage?.('team');
+      } else if (m.t === 'teamfull'){
+        onLobby?.({ full: m.team });
+      } else if (m.t === 'colortaken'){
+        onLobby?.({ colorFail: m.color });
       } else if (m.t === 'room'){
         onCode?.(m.code);
         onStage?.('hosting');
@@ -134,6 +151,11 @@ export async function connectAndWait({ onStage, onCode, mode = 'queue', code = '
 }
 
 // 사용자가 직접 나갈 때. 서버에 알려서 자리를 즉시 비운다
+// 2대2 방에서 팀을 고른다
+export function pickTeam(team, color){
+  if (pending) pending.clientSend({ t: 'team', team, color });
+}
+
 export function disconnect(){
   if (!conn) return;
   try { conn.transport.clientSend({ t: 'bye' }); } catch { /* 이미 끊겼으면 무시 */ }

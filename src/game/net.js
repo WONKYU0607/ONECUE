@@ -61,6 +61,7 @@ import {
   PWf,
   RENDER_MAXJUMP,
   ROUND_TICKS,
+  ROUND_TICKS_4,
   ROW_MAX,
   ROW_MIN,
   SELF,
@@ -93,6 +94,9 @@ import {
   lerp,
   spdMult,
   stepCap,
+  teamOf,
+  teamYMax,
+  teamYMin,
   wallIdx
 } from './config.js';
 import {
@@ -189,10 +193,11 @@ export class WsTransport {
 
 // ================= SERVER (authoritative) =================
 export class Server {
-  constructor(net){
+  constructor(net, n = 2){
     this.net = net;
-    this.s = newState();
-    this.inbox = new Map();     // tick -> [in0, in1]
+    this.n = n;
+    this.s = newState(n);
+    this.inbox = new Map();     // tick -> 슬롯별 입력
     this.rtt = [0, 0];
     this.delay = MIN_DELAY;     // 양 플레이어에게 동일 적용되는 공통 입력 지연
     this.extra = 0;             // 지각 입력 발생 시 즉시 늘리는 여유분
@@ -227,7 +232,7 @@ export class Server {
       return;
     }
     let f = this.inbox.get(m.tick);
-    if (!f){ f = [null, null]; this.inbox.set(m.tick, f); }
+    if (!f){ f = Array(this.n).fill(null); this.inbox.set(m.tick, f); }
     f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, ready: m.ready ? 1 : 0, place: m.place || null, thr: m.thr || null, fastReq: m.fastReq|0, fastAns: m.fastAns|0 };
   }
   recalcDelay(){
@@ -242,8 +247,8 @@ export class Server {
     let guard = 0;
     while (this.s.tick < want && guard++ < 8){
       const t = this.s.tick + 1;
-      const f = this.inbox.get(t) || [null, null];
-      const inp = [ f[0] || NOIN, f[1] || NOIN ];   // 미도착 입력은 무입력 처리
+      const f = this.inbox.get(t) || [];
+      const inp = Array.from({ length: this.n }, (_, i) => f[i] || NOIN);   // 미도착 입력은 무입력
       this.inbox.delete(t);
       if (this.pendingCfg){ Object.assign(this.s, this.pendingCfg); this.pendingCfg = null; }
       step(this.s, inp);
@@ -271,7 +276,7 @@ export class Client {
     this.rtt = -1; this.pings = new Map(); this.pingId = 1; this.lastPing = -1e9;
     this.svTick = 0; this.svAt = CLOCK.now();
     const blank = () => ({ dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 });
-    this.pend = [ blank(), blank() ];
+    this.pend = [ blank(), blank(), blank(), blank() ];   // 최대 4명
     this.sent = [];                    // 아직 서버가 확정하지 않은 내 입력
     this.pred = newState();            // 예측 상태 (화면에 그리는 것)
     this.rx = null; this.ry = null;    // 렌더 위치 (상대는 따라가기 필터)
@@ -389,8 +394,8 @@ export class Client {
     let guard = 0;
     while (p.tick < target && guard++ < 40){
       const t = p.tick + 1;
-      const inp = [ { dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 },
-                    { dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 } ];
+      const n = this.pred.n || 2;
+      const inp = Array.from({ length: n }, () => ({ dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 }));
       if (this.lastInp && t - this.s.tick <= EXTRAP_MAX){   // 상대는 마지막 입력으로 외삽
         for (let k = 0; k < 2; k++){ inp[k].dx = this.lastInp[k].dx; inp[k].dy = this.lastInp[k].dy; }
       }
