@@ -133,6 +133,7 @@ export function normalizeState(st){
   if (typeof st.fastBy !== 'number') st.fastBy = 0;
   if (!Array.isArray(st.proj)) st.proj = [];
   if (!Array.isArray(st.fire)) st.fire = [];
+  if (!Array.isArray(st.off)) st.off = Array(st.n || 2).fill(false);
   if (!Array.isArray(st.blind)) st.blind = [0, 0];
   if (typeof st.blindMax !== 'number') st.blindMax = 0;
   if (!Array.isArray(st.ammo)) st.ammo = st.p.map(() => THROW_DEF.map(d => d.count));
@@ -169,6 +170,7 @@ export function newState(n = 2){
     items: newItems(),          // 배치된 엄폐물·폭탄 (by = 팀 번호)
     fx: [],
     proj: [],
+    off: Array(n).fill(false),   // 연결 끊김. 그 자리에 멈춰 서서 계속 맞는다
     fire: [],                   // 화염병 불꽃 [{c, r, t}]. 4초간 3x3이 탄다
     blind: Array(n).fill(0),
     blindMax: 0,
@@ -339,6 +341,22 @@ export function throwRow(slot, charge, n = 2){
   const far  = tm === 0 ? ROW_MIN[1] : ROW_MAX[0];
   return Math.round(near + (far - near) * ch);
 }
+// 연결 끊김 표시. 1대1은 나간 사람이 지고, 2대2는 그대로 두고 계속 굴린다
+// (한 명 끊겼다고 나머지 셋의 판을 망치는 게 더 이상하다는 판단)
+export function setOff(s, slot, v){
+  setArena(s.n);
+  if (!Array.isArray(s.off)) s.off = Array(s.n).fill(false);
+  s.off[slot] = !!v;
+}
+// 자리를 완전히 뜬 경우 (직접 나감 / 유예 시간 초과)
+export function forfeit(s, slot){
+  setArena(s.n);
+  setOff(s, slot, true);
+  if (s.n > 2) return;                       // 2대2는 계속 진행
+  if (s.phase === PH_OVER || s.solo) return;
+  s.over = true; s.phase = PH_OVER;
+  s.winner = teamOf(slot, s.n) === 0 ? 2 : 1;
+}
 export function canThrow(s, slot, k){
   setArena(s.n);
   if (s.phase !== PH_PLAY) return false;
@@ -412,6 +430,7 @@ export function step(s, inp){
       s.p = n.p; s.bullets = n.bullets; s.covers = n.covers;
       s.items = n.items; s.ready = n.ready; s.fx = n.fx;
       s.proj = n.proj; s.blind = n.blind; s.ammo = n.ammo; s.fire = n.fire;
+      // s.off는 그대로 둔다 — 재대전해도 여전히 끊겨 있는 사람은 끊긴 것
       s.fast = false; s.fastBy = 0;                          // 2배속은 그 판 한정
       s.maxStep = ms; s.bulletV = bv; s.coolT = ct;
       s.phase = n.phase; s.timer = n.timer; s.over = false; s.winner = 0; s.clock = 0;
@@ -421,7 +440,7 @@ export function step(s, inp){
 
   // 이동은 전투 중에만 (카운트다운 동안 고정)
   for (let i = 0; i < s.n; i++){
-    const p = s.p[i], q = inp[i] || NOIN;
+    const p = s.p[i], q = s.off[i] ? NOIN : (inp[i] || NOIN);
     if (s.phase === PH_PLAY){
       // 자유 이동. dx/dy 는 이동량(고정소수점)
       let dx = q.dx | 0, dy = q.dy | 0;
@@ -652,6 +671,7 @@ export function checksum(s){
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;
   for (const fr of s.fire) h = (h*31 + fr.c*7 + fr.r*13 + fr.t) | 0;
+  for (let i = 0; i < s.n; i++) h = (h*31 + (s.off[i] ? i + 3 : 0)) | 0;
   for (let i = 0; i < s.n; i++){
     h = (h*31 + s.blind[i] * (i + 1)) | 0;
     for (let k = 0; k < s.ammo[i].length; k++) h = (h*31 + s.ammo[i][k] * (7 + k*4)) | 0;

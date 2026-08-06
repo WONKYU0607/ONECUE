@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { Server } from '../src/game/net.js';
 import { PROTO_VER } from '../src/game/config.js';
+import { forfeit, setOff } from '../src/game/sim.js';
 
 const PORT = process.env.PORT || 8080;
 const TICK_MS = 1000 / 60;
@@ -33,6 +34,10 @@ class Room {
     this.seats = Array.from({ length: n }, () => ({ sid: null, ws: null, goneAt: 0 }));
     this.emptyAt = 0;
     this.waitingList = [];      // 아직 팀을 안 고른 사람들
+    // 팀을 고르기 전에는 자리가 없어서 sid를 남길 데가 없다.
+    // 그 상태로 끊기면 방장이 새 방·새 코드를 받아 나머지가 옛 방에 갇힌다.
+    // 그래서 **방에 들어온 순간부터** sid를 여기 적어두고 유예 시간 동안 지킨다
+    this.pending = new Map();   // sid -> goneAt(0이면 아직 접속 중)
     // Server는 net.serverSend(msg, pid?)만 쓴다. pid를 주면 그 슬롯에게만 보낸다.
     this.server = new Server({
       serverSend: (msg, pid) => this.send(msg, pid),
@@ -52,9 +57,11 @@ class Room {
   }
   // 이 sid가 예약해 둔 자리 (재접속용)
   seatOf(sid){ return sid ? this.seats.findIndex(x => x.sid === sid) : -1; }
+  // 자리에 앉았든 팀 고르는 중이든, 이 방에 속한 사람인가
+  holds(sid){ return !!sid && (this.seatOf(sid) >= 0 || this.pending.has(sid)); }
   // 새 사람이 앉을 수 있는 자리 (예약된 자리는 제외)
   freeSeat(){ return this.seats.findIndex(x => !x.sid); }
-  get full(){ return this.seats.every(x => !!x.sid); }
+  get full(){ return this.seats.every(x => !!x.sid) || this.seats.filter(x => !x.sid).length <= this.pending.size; }
   // 팀별 슬롯 범위 (앞 절반 = 팀0 = 아래 진영)
   teamRange(team){
     const per = this.n / 2;
@@ -88,6 +95,13 @@ class Room {
   }
   dispose(){ if (this.code) codes.delete(this.code); }
 
+  // 팀 선택 대기줄에 넣는다. 돌아온 사람이면 hello에 back을 실어 화면이 알아채게 한다
+  waitJoin(ws, sid, back = false){
+    this.pending.set(sid, 0);
+    this.waitingList.push(ws);
+    ws.send(JSON.stringify({ t: 'hello', pid: -1, room: this.id, n: this.n, back, ver: PROTO_VER }));
+    this.sendLobby();
+  }
   join(ws, sid, team){
     const back = this.seatOf(sid);
     const slot = back >= 0 ? back
@@ -99,6 +113,8 @@ class Room {
     if (seat.ws && seat.ws !== ws) seat.ws.close();   // 같은 sid로 중복 접속하면 옛 소켓을 끊는다
 
     seat.sid = sid; seat.ws = ws; seat.goneAt = 0;
+    this.pending.delete(sid);                 // 자리를 받았으니 대기 기록은 필요 없다
+    setOff(this.server.s, slot, false);       // 돌아왔으면 표시를 지운다
     ws.roomId = this.id; ws.slot = slot;
     this.emptyAt = 0;
 
@@ -116,6 +132,7 @@ class Room {
     const seat = this.seats[slot];
     seat.ws = null;
     seat.goneAt = Date.now();
+    setOff(this.server.s, slot, true);        // 그 자리에 멈춰 선다. 화면엔 끊김 표시
     this.send({ t: 'peer', slot, state: 'gone', grace: GRACE_MS });
     if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
   }
@@ -124,7 +141,9 @@ class Room {
   // 이걸 구분 안 하면 다시 매칭을 눌러도 옛 방의 예약석으로 돌아가 상대를 못 만난다
   quit(slot){
     const seat = this.seats[slot];
+    this.pending.delete(seat.sid);
     seat.sid = null; seat.ws = null; seat.goneAt = 0;
+    forfeit(this.server.s, slot);             // 1대1은 나간 사람 패배, 2대2는 계속 진행
     this.server.s.color[slot] = slot;        // 색을 다시 고를 수 있게
     this.send({ t: 'peer', slot, state: 'left' });
     if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
@@ -132,10 +151,14 @@ class Room {
 
   // 유예 시간이 지난 자리는 비운다
   sweep(now){
-    for (let i = 0; i < 2; i++){
+    for (const [sid, goneAt] of this.pending){
+      if (goneAt && now - goneAt > GRACE_MS) this.pending.delete(sid);
+    }
+    for (let i = 0; i < this.n; i++){          // 2명 고정이었음. 2대2에서 3·4번이 영영 안 정리됨
       const seat = this.seats[i];
       if (seat.sid && !seat.ws && now - seat.goneAt > GRACE_MS){
         seat.sid = null; seat.goneAt = 0;
+        forfeit(this.server.s, i);             // 유예 시간이 지나면 완전히 나간 것으로
         this.send({ t: 'peer', slot: i, state: 'left' });
       }
     }
@@ -218,17 +241,22 @@ wss.on('connection', (ws, req) => {
 
   // 예약석 복귀는 '자동 재접속'일 때만. 사용자가 직접 매칭/방만들기를 눌렀는데
   // 옛 방으로 되돌리면, 아무도 없는 방에 혼자 들어가 상대를 영영 기다리게 된다
-  const held = [...rooms.values()].find(r => r.seatOf(sid) >= 0);
+  const held = [...rooms.values()].find(r => r.holds(sid));
   if (held && !resume){
     const slot = held.seatOf(sid);
-    held.quit(slot);                          // 새로 시작하겠다는 뜻이므로 옛 자리를 비운다
+    if (slot >= 0) held.quit(slot);           // 새로 시작하겠다는 뜻이므로 옛 자리를 비운다
+    else held.pending.delete(sid);
     console.log(`옛 자리 정리: room ${held.id} slot ${slot}`);
   }
   const back = resume ? held : null;
   if (back){
     ws.room = back;
-    back.join(ws, sid);
-    console.log(`복귀: room ${back.id} slot ${ws.slot} sid ${sid.slice(0, 8)}`);
+    if (back.seatOf(sid) >= 0){
+      back.join(ws, sid);                     // 자리가 있으면 원래 슬롯으로
+    } else {
+      back.waitJoin(ws, sid, true);           // 팀 고르던 중이었으면 같은 방에서 다시 고른다
+    }
+    console.log(`복귀: room ${back.id} slot ${ws.slot ?? -1} sid ${sid.slice(0, 8)}`);
   } else if (mode === 'create'){
     // 친구방 만들기: 코드를 발급하고 상대가 들어올 때까지 혼자 기다린다
     const want = q.get('n') === '4' ? 4 : 2;
@@ -237,9 +265,7 @@ wss.on('connection', (ws, req) => {
     codes.set(room.code, room);
     ws.room = room;
     if (want > 2){
-      room.waitingList.push(ws);
-      ws.send(JSON.stringify({ t: 'hello', pid: -1, room: room.id, n: room.n, ver: PROTO_VER }));
-      room.sendLobby();
+      room.waitJoin(ws, sid);
     } else {
       room.join(ws, sid);
     }
@@ -252,9 +278,7 @@ wss.on('connection', (ws, req) => {
     ws.room = room;
     if (room.n > 2){
       // 2대2는 팀을 직접 고른다. 고를 때까지는 자리를 주지 않는다
-      room.waitingList.push(ws);
-      ws.send(JSON.stringify({ t: 'hello', pid: -1, room: room.id, n: room.n, ver: PROTO_VER }));
-      room.sendLobby();
+      room.waitJoin(ws, sid);
     } else {
       room.join(ws, sid);
     }
@@ -312,6 +336,9 @@ wss.on('connection', (ws, req) => {
     if (ws.room && (ws.slot === undefined || ws.slot < 0)){
       const j = ws.room.waitingList.indexOf(ws);
       if (j >= 0) ws.room.waitingList.splice(j, 1);
+      // 팀 고르는 중에 끊긴 것. 자리는 없지만 sid는 유예 시간 동안 지켜서
+      // 다시 붙으면 같은 방으로 돌아오게 한다 (방장이면 방이 통째로 흩어진다)
+      if (ws.room.pending.has(ws.sid)) ws.room.pending.set(ws.sid, Date.now());
       ws.room.sendLobby();
       return;
     }

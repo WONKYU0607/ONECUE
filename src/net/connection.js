@@ -125,8 +125,12 @@ export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue',
         slot = m.pid; room = m.room;
         SELF.slot = slot;                   // 내 슬롯과 인원수는 서버가 정한다
         SELF.n = m.n || 2;
+        // 방에 들어온 순간부터 자동 재접속을 켠다. 2대2는 팀을 고르기 전엔 자리가 없어서
+        // done()까지 기다리면 팀 선택 중 끊겼을 때 아예 안 돌아온다
+        transport.auto = true;
+        transport.url = wsUrl(mode, code, true, n);
         onStage?.('waiting');
-        if (m.back) done();                 // 재접속이면 서버가 go를 다시 보내지 않는다
+        if (m.back && m.pid >= 0) done();    // 자리까지 돌려받은 재접속. 서버가 go를 다시 보내지 않는다
       } else if (m.t === 'lobby'){
         onLobby?.(m);                       // 팀별 인원 현황
         onStage?.('team');

@@ -206,6 +206,28 @@ export function createRenderer(canvas){
   // 폭발 연출: 피해 범위(3x3)의 칸마다 하나씩 터진다.
   // 가운데에 큰 것 하나만 그리면 버섯구름이 위로만 솟아 아래쪽 칸이 비어 보인다.
   // 화염병 불꽃: 3x3 칸마다 하나씩. 칸마다 위상을 어긋나게 해서 같이 흔들리지 않게 한다
+  // 연결이 끊긴 캐릭터 머리 위에 표시. 0.5초 주기로 깜빡인다
+  function drawOffline(s, rx, ry){
+    if (!s.off) return;
+    if (Math.floor(s.tick / 18) % 2) return;              // 깜빡임
+    for (let i = 0; i < s.p.length; i++){
+      if (!s.off[i] || s.p[i].hp <= 0) continue;
+      const p = s.p[i];
+      const xw = (rx[i] === undefined ? p.x : rx[i]) / FP;
+      const yw = fy((ry[i] === undefined ? p.y : ry[i]) / FP, ARENA.ph);
+      const cx = xw + ARENA.pw / 2;
+      const by = yw - 1.5;                                 // 머리 바로 위
+      const w = 7, h = 7;
+      px(cx - w / 2, by - h, w, h, 'rgba(10,10,18,0.85)');
+      px(cx - w / 2, by - h, w, 0.7, '#ff5a5a');
+      px(cx - w / 2, by - 0.7, w, 0.7, '#ff5a5a');
+      px(cx - w / 2, by - h, 0.7, h, '#ff5a5a');
+      px(cx + w / 2 - 0.7, by - h, 0.7, h, '#ff5a5a');
+      // 끊어진 선: 가운데가 비어 있는 두 토막
+      px(cx - 2.2, by - h / 2 - 0.5, 1.6, 1.2, '#ffffff');
+      px(cx + 0.6, by - h / 2 - 0.5, 1.6, 1.2, '#ffffff');
+    }
+  }
   function drawFire(s){
     if (!s.fire || !s.fire.length || !isReady(fireImg)) return;
     const ratio = fireImg.naturalHeight / fireImg.naturalWidth;
@@ -493,6 +515,7 @@ export function createRenderer(canvas){
     const rx = cl.rx || [], ry = cl.ry || [];
     for (let i = 0; i < s.p.length; i++)
       drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, s.color);
+    drawOffline(s, rx, ry);
     drawProjectiles(s, a);
     drawFire(s);
     drawFx(s);
