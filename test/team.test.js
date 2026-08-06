@@ -1,7 +1,7 @@
 import { newState, step, canPlace, allPlaced, blocked, itemRect } from '../src/game/sim.js';
 import {
   FP, MAXHP, ITEM, ITEM_DEF, PH_PLAY, PH_OVER, CD_TICKS, BULLET_DAMAGE,
-  ROUND_TICKS, ROUND_TICKS_4, GRID_ROWS, teamOf, cellOwner
+  ROUND_TICKS, ROUND_TICKS_4, GRID_ROWS, GRID_MIDROW, teamOf, cellOwner
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 
@@ -57,7 +57,7 @@ console.log('아군 오사 없음');
 console.log('장애물은 팀 단위');
 {
   const s = newState(4);
-  const mine = GRID_ROWS - 2;
+  const mine = GRID_MIDROW + 2;   // 내 진영 안쪽. 맨 앞뒤 행은 바깥 열이 벽이라 피한다
   const a = IN(4); a[0] = mk({ place: { k: ITEM.WALL, c: 2, r: mine } });
   step(s, a);
   assert(s.items.length === 1 && s.items[0].by === 0, '팀 번호로 기록된다');

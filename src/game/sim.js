@@ -83,6 +83,7 @@ import {
   YMIN_S,
   bulletFP,
   cellOwner,
+  cellUsable,
   setArena,
   itemQuota,
   itemKinds,
@@ -118,7 +119,8 @@ export function normalizeState(st){
   if (!Array.isArray(st.items)) st.items = [];
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
-  if (!Array.isArray(st.ready)) st.ready = [false, false];
+  if (!Array.isArray(st.ready)) st.ready = Array(st.n || 2).fill(false);
+  if (!Array.isArray(st.done)) st.done = Array(st.n || 2).fill(false);
   if (!Array.isArray(st.color)) st.color = [0, 1, 2, 3].slice(0, st.p ? st.p.length : 2);
   if (typeof st.solo !== 'boolean') st.solo = false;
   if (typeof st.fast !== 'boolean') st.fast = false;
@@ -163,7 +165,8 @@ export function newState(n = 2){
     blind: Array(n).fill(0),
     blindMax: 0,
     ammo: players.map(() => [THROW_DEF[0].count, THROW_DEF[1].count]),
-    ready: Array(n).fill(false),
+    done: Array(n).fill(false),      // 아이템 배치를 끝냈는가 (설치 완료)
+    ready: Array(n).fill(false),     // 준비완료까지 눌렀는가 — 전원이 눌러야 시작
     color: Array.from({ length: n }, (_, i) => i),   // 슬롯별 캐릭터 색 (0~3)
     solo: false,
     fast: false,
@@ -176,7 +179,7 @@ export function newState(n = 2){
   };
 }
 
-export const NOIN = { dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 };
+export const NOIN = { dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 };
 export function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
 
 export function overlap(ax,ay,aw,ah,bx,by,bw,bh){
@@ -225,6 +228,8 @@ export function canPlace(s, slot, k, c, r, from){
   if (!def) return false;
   if (s.phase !== PH_READY) return false;
   if (c < 0 || c + def.cells > GRID_COLS || r < 0 || r >= GRID_ROWS) return false;
+  // 벽으로 덮인 칸에는 못 놓는다 (아레나가 사각형이 아니다)
+  for (let k = 0; k < def.cells; k++) if (!cellUsable(c + k, r)) return false;
   // 내 영역/상대 영역 판정 (cellOwner: 위 절반=1, 아래 절반=0)
   const owner = cellOwner(r);
   if (owner < 0) return false;                      // 가운데 중립 행은 비워둔다
@@ -375,10 +380,15 @@ export function step(s, inp){
         if (q.fastAns === 1) s.fast = true;
         s.fastBy = 0;
       }
-      // 아이템을 전부 놓아야 완료할 수 있다. 안 그러면 한쪽이 먼저 눌러 바로 시작돼버린다
-      if (q.ready && (s.solo || allPlaced(s, i))) s.ready[i] = true;
+      // 1단계 설치 완료: 아이템을 전부 놓아야 누를 수 있다
+      if (q.ready && (s.solo || allPlaced(s, i))){
+        s.done[i] = true;
+        if (s.solo) s.ready[i] = true;              // 연습은 상대가 없으니 바로 준비까지
+      }
+      // 2단계 준비완료: 설치를 끝낸 사람만. 전원이 눌러야 시작한다
+      if (q.go && s.done[i]) s.ready[i] = true;
     }
-    // 둘 다 설치를 끝내면 바로 시작한다 (START 버튼 없음).
+    // 전원이 준비완료를 눌러야 시작한다 (START 버튼 없음).
     // 연습 모드는 상대가 없으므로 한쪽만 완료하면 시작한다
     const allReady = s.solo ? s.ready.some(Boolean) : s.ready.every(Boolean);
     if (allReady){
@@ -593,7 +603,7 @@ export function checksum(s){
   for (const c of s.covers) h = (h*31 + c.hp) | 0;
   for (const it of s.items) h = (h*31 + it.k*7 + it.c*13 + it.r*29 + it.hp*3 + it.by) | 0;
   // 인원수만큼 전부 넣어야 한다. 두 명만 보면 3·4번 슬롯이 어긋나도 못 잡는다
-  for (let i = 0; i < s.n; i++) h = (h*31 + (s.ready[i] ? i + 1 : 0)) | 0;
+  for (let i = 0; i < s.n; i++) h = (h*31 + (s.ready[i] ? i + 1 : 0) + (s.done[i] ? 17 : 0)) | 0;
   h = (h*31 + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16) | 0;
   for (const c of (s.color || [])) h = (h*31 + c) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;

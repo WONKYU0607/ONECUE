@@ -230,7 +230,7 @@ export class Server {
     }
     let f = this.inbox.get(m.tick);
     if (!f){ f = Array(this.n).fill(null); this.inbox.set(m.tick, f); }
-    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, ready: m.ready ? 1 : 0, place: m.place || null, thr: m.thr || null, fastReq: m.fastReq|0, fastAns: m.fastAns|0 };
+    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, ready: m.ready ? 1 : 0, go: m.go ? 1 : 0, place: m.place || null, thr: m.thr || null, fastReq: m.fastReq|0, fastAns: m.fastAns|0 };
   }
   recalcDelay(){
     const worst = Math.max(...this.rtt.map(v => v || 0));     // 가장 느린 사람 기준 = 전원 동일 지연
@@ -272,7 +272,7 @@ export class Client {
     this.delay = MIN_DELAY;
     this.rtt = -1; this.pings = new Map(); this.pingId = 1; this.lastPing = -1e9;
     this.svTick = 0; this.svAt = CLOCK.now();
-    const blank = () => ({ dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 });
+    const blank = () => ({ dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 });
     this.pend = [ blank(), blank(), blank(), blank() ];   // 최대 4명
     this.sent = [];                    // 아직 서버가 확정하지 않은 내 입력
     this.pred = newState();            // 예측 상태 (화면에 그리는 것)
@@ -353,10 +353,10 @@ export class Client {
       this.tickAt = now;
       for (const pid of this.controlled){
         const q = this.pend[pid];
-        this.net.clientSend({ t:'in', pid, tick:t, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns });
+        this.net.clientSend({ t:'in', pid, tick:t, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns });
         this.stats.sentIn++;
-        this.sent.push({ tick:t, pid, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns });
-        q.dx = 0; q.dy = 0; q.fire = 0; q.ready = 0; q.place = null; q.thr = null; q.fastReq = 0; q.fastAns = 0;
+        this.sent.push({ tick:t, pid, dx:q.dx, dy:q.dy, fire:q.fire, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns });
+        q.dx = 0; q.dy = 0; q.fire = 0; q.ready = 0; q.go = 0; q.place = null; q.thr = null; q.fastReq = 0; q.fastAns = 0;
       }
     }
   }
@@ -387,7 +387,10 @@ export class Client {
   predict(){
     // 스냅샷을 받기 전에는 확정 상태가 아직 2인용 기본값이라 슬롯 2·3이 없다.
     // 그대로 진행하면 p[SELF.slot]이 undefined라 루프가 죽고 화면이 통째로 검게 남는다
-    if (!this.s.p || !this.s.p[SELF.slot]) return;
+    if (!this.s.p || !this.s.p[SELF.slot]){
+      this.seedRender(this.pred);      // 렌더 위치는 미리 채워둔다 (draw가 먼저 돌 수 있다)
+      return;
+    }
     const target = this.nextInputTick - 1;
     const p = cloneState(this.s);
     let prevMy = p.p[SELF.slot].x, prevMyY = p.p[SELF.slot].y;
@@ -395,20 +398,27 @@ export class Client {
     while (p.tick < target && guard++ < 40){
       const t = p.tick + 1;
       const n = this.pred.n || 2;
-      const inp = Array.from({ length: n }, () => ({ dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0 }));
+      const inp = Array.from({ length: n }, () => ({ dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 }));
       if (this.lastInp && t - this.s.tick <= EXTRAP_MAX){   // 남들은 마지막 입력으로 외삽
         for (let k = 0; k < n; k++){
           const li = this.lastInp[k];
           if (li){ inp[k].dx = li.dx; inp[k].dy = li.dy; }
         }
       }
-      for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, ready:e.ready, place:e.place, thr:e.thr, fastReq:e.fastReq, fastAns:e.fastAns };
+      for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, ready:e.ready, go:e.go, place:e.place, thr:e.thr, fastReq:e.fastReq, fastAns:e.fastAns };
       prevMy = p.p[SELF.slot].x; prevMyY = p.p[SELF.slot].y;
       step(p, inp);
     }
     this.prevMy = prevMy; this.prevMyY = prevMyY;
     this.pred = p;
-    if (!this.rx){ this.rx = p.p.map(q => q.x); this.ry = p.p.map(q => q.y); }
+    this.seedRender(p);
+  }
+  // 렌더 위치를 아직 안 만들었으면 지금 상태로 채운다.
+  // draw가 첫 predict보다 먼저 돌 수 있어서, null인 채로 두면 렌더가 죽는다
+  seedRender(st){
+    if (this.rx || !st || !st.p) return;
+    this.rx = st.p.map(q => q.x);
+    this.ry = st.p.map(q => q.y);
   }
   // 내 캐릭터는 틱 보간(지연 0), 상대는 따라가기 필터로 부드럽게.
   // 필터 계수를 프레임당 고정값으로 두면 주사율에 따라 수렴 속도가 달라진다
@@ -449,6 +459,11 @@ export class Client {
   answerFast(pid, ok){
     if (!this.controlled.includes(pid)) return;
     this.pend[pid].fastAns = ok ? 1 : 2;
+  }
+  // 준비완료(2단계). 설치 완료를 누른 사람만 서버가 받아준다
+  setGo(pid){
+    if (!this.controlled.includes(pid)) return;
+    this.pend[pid].go = 1;
   }
   setReady(pid){
     if (!this.controlled.includes(pid)) return;

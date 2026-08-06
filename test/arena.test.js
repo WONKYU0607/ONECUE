@@ -4,6 +4,7 @@
 import { newState, step, canPlace, checksum, NOIN } from '../src/game/sim.js';
 import {
   FP, H, ITEM, ITEM_DEF, PH_PLAY, teamOf, setArena, ARENA, itemQuota, itemKinds, coverBudget, coverUsed,
+  rowCols, cellUsable,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CH, GRID_Y0,
   PWf, PHf, WALL_L, YMIN_S, YMAX_S, ROW_MIN, ROW_MAX, cellOwner, wallIdx
 } from '../src/game/config.js';
@@ -24,31 +25,49 @@ assert(cellOwner(6) === 1 && cellOwner(7) === 0, '1대1은 중립 행이 없다'
 
 console.log('2대2 아레나');
 const s = newState(4);
-assert(GRID_COLS === 9 && GRID_ROWS === 19 && GRID_MIDROW === 9, '격자 9x19, 중립 행 9');
-assert(PWf === 11 * FP && PHf === 12 * FP, '캐릭터 11x12로 축소');
+assert(GRID_COLS === 11 && GRID_ROWS === 23 && GRID_MIDROW === 11, '격자 11x23, 중립 행 11');
+assert(PWf === 8 * FP && PHf === 9 * FP, '캐릭터 8x9로 축소');
 assert(ARENA.bg === 'arena2' && ARENA.neutral === true, '배경 arena2 · 중립 행 있음');
-assert(cellOwner(8) === 1 && cellOwner(9) === -1 && cellOwner(10) === 0, '9행은 아무도 못 쓰는 중립');
-assert(ROW_MIN[0] === 10 && ROW_MAX[0] === 18 && ROW_MIN[1] === 0 && ROW_MAX[1] === 8,
-  '팀별 9칸씩, 가운데 한 칸은 비어 있다');
+assert(cellOwner(10) === 1 && cellOwner(11) === -1 && cellOwner(12) === 0, '11행은 아무도 못 쓰는 중립');
+assert(ROW_MIN[0] === 12 && ROW_MAX[0] === 21 && ROW_MIN[1] === 1 && ROW_MAX[1] === 10,
+  '맨 앞뒤 벽 행을 뺀 범위');
+
+console.log('벽으로 덮인 칸 (아레나가 사각형이 아니다)');
+assert(rowCols(0) === null && rowCols(22) === null, '0행·22행은 통째로 벽');
+assert(JSON.stringify(rowCols(1)) === '[3,7]' && JSON.stringify(rowCols(21)) === '[3,7]',
+  '1행·21행은 가운데 3~7열만');
+assert(JSON.stringify(rowCols(11)) === '[1,9]', '가운데 행은 1~9열');
+assert(!cellUsable(0, 11) && !cellUsable(10, 11), '양끝 열은 벽');
+// 가로 9칸 / 가운데 세로 21칸 / 바깥 세로 19칸
+let wide = 0, tall = 0, side = 0;
+for (let c = 0; c < GRID_COLS; c++){
+  let n = 0;
+  for (let r = 0; r < GRID_ROWS; r++) if (cellUsable(c, r)) n++;
+  if (n) wide++;
+  if (n === 21) tall++;
+  if (n === 19) side++;
+}
+assert(wide === 9, '쓸 수 있는 열이 9개');
+assert(tall === 5 && side === 4, '가운데 5열은 21칸(10+1+10), 바깥 4열은 19칸(9+1+9)');
 
 console.log('스폰');
 const rowOf = p => Math.round((p.y / FP - GRID_Y0 - (GRID_CH - PHf / FP) / 2) / GRID_CH);
-assert(rowOf(s.p[0]) === 18 && rowOf(s.p[1]) === 18, '아래 팀 둘 다 맨 뒷줄');
-assert(rowOf(s.p[2]) === 0 && rowOf(s.p[3]) === 0, '위 팀 둘 다 맨 뒷줄');
+assert(rowOf(s.p[0]) === 21 && rowOf(s.p[1]) === 21, '아래 팀 둘 다 맨 뒷줄');
+assert(rowOf(s.p[2]) === 1 && rowOf(s.p[3]) === 1, '위 팀 둘 다 맨 뒷줄');
 assert(s.p[0].x !== s.p[1].x && s.p[2].x !== s.p[3].x, '같은 팀은 가로로 떨어져 선다');
 const colOfP = p => Math.round((p.x / FP - ARENA.x0 - (ARENA.cw - ARENA.pw) / 2) / ARENA.cw);
-assert(colOfP(s.p[0]) === 3 && colOfP(s.p[1]) === 5, '팻말을 피해 3·5열에 선다');
-assert(colOfP(s.p[2]) === 3 && colOfP(s.p[3]) === 5, '위 팀도 같은 열 (아레나가 좌우 대칭)');
+assert(colOfP(s.p[0]) === 3 && colOfP(s.p[1]) === 7, '팻말을 피해 3·7열에 선다');
+assert(colOfP(s.p[2]) === 3 && colOfP(s.p[3]) === 7, '위 팀도 같은 열 (아레나가 좌우 대칭)');
 assert(s.p.every(p => p.x >= WALL_L[wallIdx(p.y)]), '전원 벽 안쪽에서 시작');
 
 console.log('배치 규칙');
-assert(!canPlace(s, 0, ITEM.WALL, 0, GRID_MIDROW), '중립 행에 벽 못 놓음');
-assert(!canPlace(s, 0, ITEM.DRUM, 0, GRID_MIDROW), '중립 행에 드럼통 못 놓음');
-assert(!canPlace(s, 0, ITEM.WALL, 0, 0), '내 벽을 상대 진영에 못 놓음');
-assert(canPlace(s, 0, ITEM.WALL, 0, GRID_ROWS - 1), '내 진영엔 벽을 놓을 수 있음');
+assert(!canPlace(s, 0, ITEM.WALL, 1, GRID_MIDROW), '중립 행에 벽 못 놓음');
+assert(!canPlace(s, 0, ITEM.DRUM, 1, GRID_MIDROW), '중립 행에 드럼통 못 놓음');
+assert(!canPlace(s, 0, ITEM.WALL, 3, 2), '내 벽을 상대 진영에 못 놓음');
+assert(canPlace(s, 0, ITEM.WALL, 1, ROW_MAX[0] - 1), '내 진영엔 벽을 놓을 수 있음');
 // 중립 행이 완충이라 2대2는 맨 앞줄까지 드럼통을 심어도 자폭하지 않는다
-assert(canPlace(s, 0, ITEM.DRUM, 0, GRID_MIDROW - 1), '아래 팀이 상대 맨 앞줄에 드럼통');
-assert(canPlace(s, 2, ITEM.DRUM, 0, GRID_MIDROW + 1), '위 팀이 상대 맨 앞줄에 드럼통');
+assert(canPlace(s, 0, ITEM.DRUM, 1, GRID_MIDROW - 1), '아래 팀이 상대 맨 앞줄에 드럼통');
+assert(canPlace(s, 2, ITEM.DRUM, 1, GRID_MIDROW + 1), '위 팀이 상대 맨 앞줄에 드럼통');
 // 1대1은 예전대로 중앙선에 붙은 칸이 막혀 있어야 한다
 assert(!canPlace(a, 0, ITEM.DRUM, 0, 6) && !canPlace(a, 1, ITEM.DRUM, 0, 7),
   '1대1은 중앙선 붙은 칸에 드럼통 금지');
@@ -65,9 +84,9 @@ assert(ITEM_DEF[ITEM.WALL3].cells === 3 && ITEM_DEF[ITEM.BARR2].cells === 2, '�
 
 console.log('여러 칸짜리 배치');
 const si = newState(4);
-const backRow = GRID_ROWS - 1;
-assert(canPlace(si, 0, ITEM.WALL3, 6, backRow), '9열 아레나에서 3칸 벽은 6열까지');
-assert(!canPlace(si, 0, ITEM.WALL3, 7, backRow), '7열부터는 아레나 밖으로 나간다');
+const backRow = ROW_MAX[0] - 1;                 // 2~20행 = 1~9열 전부 사용 가능
+assert(canPlace(si, 0, ITEM.WALL3, 7, backRow), '3칸 벽은 7열까지 (9열이 끝)');
+assert(!canPlace(si, 0, ITEM.WALL3, 8, backRow), '8열부터는 벽 열을 침범한다');
 si.items.push({ k: ITEM.WALL3, c: 3, r: backRow, by: 0, hp: ITEM_DEF[ITEM.WALL3].hp });
 assert(!canPlace(si, 0, ITEM.BARR, 4, backRow), '3칸 벽 한가운데엔 못 겹친다');
 assert(!canPlace(si, 0, ITEM.BARR2, 2, backRow), '걸치기만 해도 막힌다');
@@ -77,11 +96,11 @@ const { allPlaced } = await import('../src/game/sim.js');
 assert(!allPlaced(si, 0), '아직 다 안 놓았으면 준비 불가');
 
 console.log('엄폐물 합계 한도');
-si.items.push({ k: ITEM.BARR2, c: 0, r: backRow - 1, by: 0, hp: 3 });
+si.items.push({ k: ITEM.BARR2, c: 1, r: backRow - 1, by: 0, hp: 3 });
 si.items.push({ k: ITEM.WALL, c: 7, r: backRow - 1, by: 0, hp: 5 });
 assert(coverUsed(si.items, 0) === 3, '3칸 벽 + 2칸 바리 + 1칸 벽 = 3개');
-assert(!canPlace(si, 0, ITEM.WALL, 0, backRow - 2), '한도를 다 쓰면 폭에 상관없이 못 놓는다');
-assert(canPlace(si, 0, ITEM.DRUM, 0, 0), '드럼통은 별도 정원이라 놓을 수 있다');
+assert(!canPlace(si, 0, ITEM.WALL, 1, backRow - 2), '한도를 다 쓰면 폭에 상관없이 못 놓는다');
+assert(canPlace(si, 0, ITEM.DRUM, 3, 3), '드럼통은 별도 정원이라 놓을 수 있다');
 assert(coverUsed(si.items, 1) === 0, '상대 팀 한도는 따로다');
 
 console.log('이동 범위');
@@ -148,6 +167,8 @@ console.log('스냅샷 전 예측 (슬롯 2·3이 검은 화면으로 죽던 자
   // 확정 상태가 아직 2인용 기본값인 채로 프레임이 돌아도 죽으면 안 된다
   try { cl.predict(); cl.updateRender(0.5, 1 / 60); } catch { threw = true; }
   assert(!threw, '스냅샷 전이라도 예측이 죽지 않는다');
+  // draw가 첫 예측보다 먼저 돌 수 있다. 렌더 위치가 null이면 렌더가 통째로 죽는다
+  assert(Array.isArray(cl.rx) && Array.isArray(cl.ry), '예측을 못 돌려도 렌더 위치는 준비된다');
   // 스냅샷이 오면 네 명 다 예측·보정된다
   cl.s = newState(4); cl.pred = newState(4);
   cl.predict(); cl.updateRender(0.5, 1 / 60);

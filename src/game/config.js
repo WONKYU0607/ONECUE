@@ -156,17 +156,36 @@ export const WALL2_R = '133,133,133,133,133,133,133,133,134,135,136,137,138,139,
 // 현재 아레나. setArena(n)이 인원수에 맞춰 바꾸고, 위 격자 상수를 전부 여기에 맞춘다.
 // 서버는 방을 여러 개 동시에 굴리므로 1대1 방과 2대2 방이 섞일 수 있다.
 // 그래서 sim의 진입점마다 setArena(s.n)을 먼저 불러 현재 방 기준으로 맞춘다.
+// bands = [행 시작, 행 끝, 열 시작, 열 끝]. 여기 안 든 칸은 전부 벽이다.
+// 2대2 아레나는 네 모서리와 좌우 끝 열이 벽 그림에 물려 있어 사각형이 아니다
 const A1 = {
   cols: 6, rows: 14, x0: 24.9, cw: 21.638, y0: 0, ch: 22.214, mid: 7,
   pw: 14, ph: 16, bg: 'arena', neutral: false, hc: 3, tc: [1, 4],
-  flip: H, quota: [1, 0, 0, 1, 0, 0, 2], cover: 2, wl: WALL1_L, wr: WALL1_R
+  flip: H, quota: [1, 0, 0, 1, 0, 0, 2], cover: 2,
+  bands: [[0, 13, 0, 5]],
+  wl: WALL1_L, wr: WALL1_R
 };
+// 배경 타일에 맞춘 실측값. 전체는 11 x 23이지만 쓸 수 있는 칸은
+//   1행·21행: 3~7열 / 2~20행: 1~9열   → 가로 9칸,
+//   가운데(3~7열)는 세로 21칸(10+중립1+10), 바깥(1·2·8·9열)은 19칸(9+1+9)
 const A2 = {
-  cols: 9, rows: 19, x0: 12.013, cw: 17.31, y0: 7.59, ch: 15.45, mid: 9,
-  pw: 11, ph: 12, bg: 'arena2', neutral: true, hc: 4, tc: [3, 5],   // 3·5열 = 아래 팻말 사이 빈 칸
-  flip: 7.59 * 2 + 15.45 * 19, quota: [3, 3, 3, 3, 3, 3, 2], cover: 3, wl: WALL2_L, wr: WALL2_R
+  cols: 11, rows: 23, x0: 18.73, cw: 12.878, y0: 17.04, ch: 11.905, mid: 11,
+  pw: 8, ph: 9, bg: 'arena2', neutral: true, hc: 5, tc: [3, 7],   // 3·7열 = 팻말 사이 빈 칸
+  flip: 17.04 * 2 + 11.905 * 23, quota: [3, 3, 3, 3, 3, 3, 2], cover: 3,
+  bands: [[1, 1, 3, 7], [2, 20, 1, 9], [21, 21, 3, 7]],
+  wl: WALL2_L, wr: WALL2_R
 };
 export const ARENA = { ...A1 };
+
+// 이 행에서 쓸 수 있는 열 범위 (없으면 null = 통째로 벽)
+export const rowCols = r => {
+  for (const [r0, r1, c0, c1] of ARENA.bands) if (r >= r0 && r <= r1) return [c0, c1];
+  return null;
+};
+export const cellUsable = (c, r) => {
+  const b = rowCols(r);
+  return !!b && c >= b[0] && c <= b[1];
+};
 
 export function setArena(n){
   const a = n > 2 ? A2 : A1;
@@ -176,16 +195,36 @@ export function setArena(n){
   GRID_X0 = a.x0; GRID_CW = a.cw; GRID_Y0 = a.y0; GRID_CH = a.ch;
   PWf = Math.round(a.pw * FP); PHf = Math.round(a.ph * FP);
   BOFF = Math.round((PWf - BWf) / 2);
-  WALL_L = a.wl; WALL_R = a.wr;
+  // 벽 그림 한계와 밴드(모서리·양끝 열) 중 더 좁은 쪽을 쓴다.
+  // 이렇게 합쳐두면 이동·충돌 코드는 예전처럼 표만 보면 된다
+  if (a.bands.length === 1 && a.bands[0][2] === 0 && a.bands[0][3] === a.cols - 1){
+    WALL_L = a.wl; WALL_R = a.wr;                  // 1대1은 사각형이라 그대로
+  } else {
+    const L = a.wl.slice(), R = a.wr.slice();
+    for (let i = 0; i < L.length; i++){
+      const r = Math.floor((i - a.y0) / a.ch);
+      let b = null;
+      for (const [r0, r1, c0, c1] of a.bands) if (r >= r0 && r <= r1){ b = [c0, c1]; break; }
+      if (!b){ L[i] = R[i] = 0; continue; }         // 그 높이는 통째로 벽
+      const lo = Math.round((a.x0 + a.cw * b[0]) * FP);
+      const hi = Math.round((a.x0 + a.cw * (b[1] + 1) - a.pw) * FP);
+      L[i] = Math.max(L[i], lo);
+      R[i] = Math.max(L[i], Math.min(R[i], hi));
+    }
+    WALL_L = L; WALL_R = R;
+  }
   HOME_COL = a.hc; TEAM_COLS = a.tc;
-  // 중립 행이 있으면 아래 팀은 그 다음 행부터 (가운데 한 칸은 아무도 못 들어간다)
+  // 중립 행이 있으면 아래 팀은 그 다음 행부터 (가운데 한 칸은 아무도 못 들어간다).
+  // 맨 앞뒤 행이 통째로 벽인 경우가 있어 밴드에서 실제 첫·끝 행을 가져온다
   const lo0 = a.mid + (a.neutral ? 1 : 0);
-  ROW_MIN = [lo0, 0];
-  ROW_MAX = [a.rows - 1, a.mid - 1];
+  const firstRow = Math.min(...a.bands.map(b => b[0]));
+  const lastRow  = Math.max(...a.bands.map(b => b[1]));
+  ROW_MIN = [lo0, firstRow];
+  ROW_MAX = [lastRow, a.mid - 1];
   if (a.neutral){
     const cy = r => a.y0 + a.ch * r;
-    YMIN_S = [ Math.round(cy(lo0) * FP), Math.round(cy(0) * FP) ];
-    YMAX_S = [ Math.round((cy(a.rows) - a.ph) * FP), Math.round((cy(a.mid) - a.ph) * FP) ];
+    YMIN_S = [ Math.round(cy(lo0) * FP), Math.round(cy(firstRow) * FP) ];
+    YMAX_S = [ Math.round((cy(lastRow + 1) - a.ph) * FP), Math.round((cy(a.mid) - a.ph) * FP) ];
   } else {
     // 1대1은 기존 값을 그대로 쓴다. 격자에서 다시 계산하면 1FP 어긋나 결정론이 깨진다
     YMIN_S = [ Math.round(H / 2 * FP), 0 ];
@@ -210,7 +249,7 @@ export const FAST = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 21;
+export const PROTO_VER = 23;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

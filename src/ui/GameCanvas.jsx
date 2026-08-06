@@ -21,8 +21,10 @@ export default function GameCanvas({ session, onExit, onFinish }){
     const iv = setInterval(() => {
       const g = gameRef.current; if (!g) return;
       const info = getRoomInfo();
+      const cnt = g.readyCount();
       setReady({
         me: g.isReady(), peer: g.peerReady(), srv: g.confirmedReady(), all: g.allPlaced(),
+        cnt,
         fast: g.fastState(), canFast: g.canFast(),
         room: info ? info.room : null, slot: g.mySlot(), net: g.netStats()
       });
@@ -105,19 +107,27 @@ export default function GameCanvas({ session, onExit, onFinish }){
         </div>
       )}
 
-      {placing && !ready.me && (
+      {/* 1단계: 아이템을 다 놓아야 설치 완료 */}
+      {placing && !ready.cnt?.meDone && (
         <button className={'panelbtn place ui-overlay' + (ready.all ? '' : ' off')} style={boxStyle}
                 disabled={!ready.all}
                 onClick={() => gameRef.current?.ready()}>
           {ready.all ? '설치 완료' : '아이템을 모두 배치'}
         </button>
       )}
+      {/* 2단계: 전원이 눌러야 시작한다 */}
+      {placing && ready.cnt?.meDone && !ready.me && (
+        <button className="panelbtn place ui-overlay" style={boxStyle}
+                onClick={() => gameRef.current?.go()}>
+          준비완료
+        </button>
+      )}
       {placing && ready.me && !ready.peer && (
         <div className="link-note ui-overlay">
-          상대가 설치하는 중…
+          {ready.cnt ? `다른 사람 기다리는 중… 준비 ${ready.cnt.go}/${ready.cnt.n}` : '다른 사람 기다리는 중…'}
           {SHOW_NETINFO && ready.srv && (
             <span className="sub">
-              서버 확정 · 나 {ready.srv.me ? 'O' : 'X'} / 상대 {ready.srv.peer ? 'O' : 'X'}
+              서버 확정 · 나 {ready.srv.me ? 'O' : 'X'} / 나머지 {ready.srv.peer ? 'O' : 'X'}
               {ready.room != null && <><br />방 {ready.room} · 내 자리 {ready.slot}</>}
               {ready.net && (
                 <><br />
@@ -136,7 +146,9 @@ export default function GameCanvas({ session, onExit, onFinish }){
         <div className="link-note ui-overlay">곧 시작한다…</div>
       )}
       {placing && !ready.me && ready.peer && (
-        <div className="link-note ui-overlay">상대 설치 완료 · 나를 기다리는 중</div>
+        <div className="link-note ui-overlay">
+          {ready.cnt ? `나만 남았다 · 준비 ${ready.cnt.go}/${ready.cnt.n}` : '나를 기다리는 중'}
+        </div>
       )}
       <TunePanel gameRef={gameRef} />
     </div>

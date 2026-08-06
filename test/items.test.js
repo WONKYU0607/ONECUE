@@ -5,7 +5,7 @@ import {
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 
-const mk = (o = {}) => ({ dx:0, dy:0, fire:0, ready:0, place:null, ...o });
+const mk = (o = {}) => ({ dx:0, dy:0, fire:0, ready:0, go:0, place:null, ...o });
 const IN = (a, b) => [mk(a), mk(b)];
 const myRow = slot => { for (let r = 0; r < GRID_ROWS; r++) if (cellOwner(r) === slot) return r; };
 const foeRow = slot => { for (let r = 0; r < GRID_ROWS; r++) if (cellOwner(r) !== slot) return r; };
@@ -34,19 +34,23 @@ console.log('아이템을 전부 놓아야 설치 완료할 수 있다');
   const s = newState();
   const mine = GRID_ROWS - 2, foe = foeRow(0);
   step(s, IN({ ready: 1 }, { ready: 1 }));
-  assert(!s.ready[0] && !s.ready[1], '하나도 안 놓으면 완료가 안 된다');
+  assert(!s.done[0] && !s.done[1], '하나도 안 놓으면 설치 완료가 안 된다');
   assert(!allPlaced(s, 0), 'allPlaced는 false');
 
   step(s, IN({ place: { k: ITEM.WALL, c: 1, r: mine } }, {}));
   step(s, IN({ place: { k: ITEM.BARR, c: 2, r: mine } }, {}));
   step(s, IN({ ready: 1 }, {}));
-  assert(!s.ready[0], '드럼통을 안 놓으면 아직 완료 불가');
+  assert(!s.done[0], '드럼통을 안 놓으면 아직 설치 완료 불가');
 
   step(s, IN({ place: { k: ITEM.DRUM, c: 1, r: foe } }, {}));
   step(s, IN({ place: { k: ITEM.DRUM, c: 3, r: foe } }, {}));
   assert(allPlaced(s, 0), '전부 놓으면 allPlaced true');
   step(s, IN({ ready: 1 }, {}));
-  assert(s.ready[0], '이제 완료 가능');
+  assert(s.done[0], '이제 설치 완료 가능');
+  // 준비완료는 설치를 끝낸 사람만 누를 수 있는 두 번째 단계
+  assert(!s.ready[0], '설치만 끝냈다고 준비까지 되진 않는다');
+  step(s, IN({ go: 1 }, { go: 1 }));
+  assert(s.ready[0] && !s.ready[1], '설치를 끝낸 쪽만 준비완료가 된다');
   assert(s.phase === PH_READY, '상대가 아직이면 시작 안 함');
 }
 
@@ -80,7 +84,7 @@ console.log('벽이 총알을 막는가');
       const r = GRID_ROWS - 3;
       if (cellOwner(r) === 0) step(s, IN({ place: { k: ITEM.WALL, c: col, r } }, {}));
     }
-    s.ready = [true, true];
+    s.done = [true, true]; s.ready = [true, true];
     step(s, IN({}, {}));
     for (let i = 0; i < CD_TICKS; i++) step(s, IN({}, {}));
     let hits = 0;
@@ -99,7 +103,7 @@ console.log('벽이 총알을 막는가');
   const s2 = newState();
   const col = Math.floor((s2.p[0].x / FP - 24.9) / 21.638);
   step(s2, IN({ place: { k: ITEM.WALL, c: col, r: GRID_ROWS - 3 } }, {}));
-  s2.ready = [true, true]; step(s2, IN({}, {}));
+  s2.done = [true, true]; s2.ready = [true, true]; step(s2, IN({}, {}));
   for (let i = 0; i < CD_TICKS + 400; i++){ s2.p[0].hp = s2.p[1].hp = MAXHP; step(s2, IN({}, {})); }
   assert(s2.items[0].hp < ITEM_DEF[ITEM.WALL].hp, `벽이 총알을 맞아 닳음 (${s2.items[0].hp}/${ITEM_DEF[ITEM.WALL].hp})`);
 }
@@ -114,7 +118,7 @@ console.log('드럼통');
   assert(!canPlace(s, 0, ITEM.DRUM, 5, r), '3개째는 안 됨');
 
   const drum = s.items[0];
-  s.ready = [true, true];
+  s.done = [true, true]; s.ready = [true, true];
   step(s, IN({}, {}));
   for (let i = 0; i < CD_TICKS; i++) step(s, IN({}, {}));
 
@@ -142,7 +146,7 @@ console.log('드럼통');
   const s2 = newState();
   const r2 = foeRow(0);
   step(s2, IN({ place: { k: ITEM.DRUM, c: 0, r: r2 } }, {}));
-  s2.ready = [true, true]; step(s2, IN({}, {}));
+  s2.done = [true, true]; s2.ready = [true, true]; step(s2, IN({}, {}));
   for (let i = 0; i < CD_TICKS; i++) step(s2, IN({}, {}));
   const d2 = itemRect(s2.items[0]);
   s2.coolT = 1e6; s2.p[0].cool = s2.p[1].cool = 1e6;                        // 자동 발사 배제
@@ -163,7 +167,7 @@ console.log('폭발 연출');
   const s = newState();
   const r = foeRow(0);
   step(s, IN({ place: { k: ITEM.DRUM, c: 3, r } }, {}));
-  s.ready = [true, true]; step(s, IN({}, {}));
+  s.done = [true, true]; s.ready = [true, true]; step(s, IN({}, {}));
   for (let i = 0; i < CD_TICKS; i++) step(s, IN({}, {}));
   assert(s.fx.length === 0, '평소엔 연출 없음');
 
@@ -186,7 +190,7 @@ console.log('드럼통은 심은 사람만 터뜨릴 수 있다');
   const s = newState();
   const r = foeRow(0);
   step(s, IN({ place: { k: ITEM.DRUM, c: 3, r } }, {}));   // 슬롯0이 슬롯1 영역에 심음
-  s.ready = [true, true]; step(s, IN({}, {}));
+  s.done = [true, true]; s.ready = [true, true]; step(s, IN({}, {}));
   for (let i = 0; i < CD_TICKS; i++) step(s, IN({}, {}));
   const drum = s.items[0];
   const rect = itemRect(drum);
@@ -212,7 +216,7 @@ console.log('아이템은 영역 주인이 아닌 쪽 총알에만 반응');
   const s = newState();
   const mine = myRow(0), foe = foeRow(0);
   step(s, IN({ place: { k: ITEM.WALL, c: 3, r: mine } }, {}));
-  s.ready = [true, true]; step(s, IN({}, {}));
+  s.done = [true, true]; s.ready = [true, true]; step(s, IN({}, {}));
   for (let i = 0; i < CD_TICKS; i++) step(s, IN({}, {}));
   s.coolT = 1e6; s.p[0].cool = s.p[1].cool = 1e6;
 
@@ -255,7 +259,7 @@ console.log('겹친 칸은 벽이 부서진 뒤에야 드럼통이 터진다');
   const mine = GRID_ROWS - 2;
   step(s, IN({ place: { k: ITEM.WALL, c: 3, r: mine } }, {}));
   step(s, IN({}, { place: { k: ITEM.DRUM, c: 3, r: mine } }));
-  s.ready = [true, true];
+  s.done = [true, true]; s.ready = [true, true];
   for (let i = 0; i < CD_TICKS + 2; i++) step(s, IN({}, {}));
   s.coolT = 1e6; s.p[0].cool = s.p[1].cool = 1e6;
 

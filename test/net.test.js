@@ -18,7 +18,7 @@ console.log('예측 정확도 (편도 지연별)');
 for (const lat of [0, 60, 150, 300]){
   const g = makeNetGame(lat);
   g.run(420);                                    // 워밍업
-  placeAll(g); g.client.setReady(0); g.client.setReady(1); g.run(10);
+  placeAll(g); g.client.setReady(0); g.client.setReady(1); g.client.setGo(0); g.client.setGo(1); g.run(10);
   g.client.input(SELF.slot, 0, 0, 1);              // START
   g.run(320);
   const rec = new Map(); let worst = 0, n = 0;
@@ -42,7 +42,7 @@ console.log('페이즈가 서버에서 클라로 전파되는지');
   const g = makeNetGame(60);
   g.run(180);
   assert(g.server.s.phase === g.client.s.phase, '대기 상태 일치');
-  placeAll(g); g.client.setReady(0); g.client.setReady(1); g.run(10);
+  placeAll(g); g.client.setReady(0); g.client.setReady(1); g.client.setGo(0); g.client.setGo(1); g.run(10);
   g.client.input(SELF.slot, 0, 0, 1);
   g.run(40);
   assert(g.server.s.phase === PH_COUNT && g.client.s.phase === PH_COUNT, 'START 후 양쪽 카운트다운');
@@ -54,7 +54,7 @@ console.log('페이즈가 서버에서 클라로 전파되는지');
 console.log('튜닝값이 서버 확정 후 클라로 전파되는지');
 {
   const g = makeNetGame(60);
-  g.run(200); placeAll(g); g.client.setReady(0); g.client.setReady(1); g.run(320);
+  g.run(200); placeAll(g); g.client.setReady(0); g.client.setReady(1); g.client.setGo(0); g.client.setGo(1); g.run(320);
   for (const [k, v] of [['spd', 1.0], ['bul', 400], ['rate', 0.2], ['spd', 0.35]]){
     TUNE[k].v = v;
     g.client.setCfg({ maxStep: stepCap(), bulletV: bulletFP(), coolT: coolTicks() });
@@ -69,7 +69,7 @@ console.log('튜닝값이 서버 확정 후 클라로 전파되는지');
 console.log('넷 경로에서도 벽을 안 넘는지');
 {
   const g = makeNetGame(60);
-  g.run(200); placeAll(g); g.client.setReady(0); g.client.setReady(1); g.run(320);
+  g.run(200); placeAll(g); g.client.setReady(0); g.client.setReady(1); g.client.setGo(0); g.client.setGo(1); g.run(320);
   let bad = 0;
   g.run(900, () => {
     g.client.input(SELF.slot, -99, (Math.random() - 0.5) * 40, 0);
@@ -85,7 +85,7 @@ console.log('상대 추종 필터가 주사율에 무관한지');
   // 같은 목표를 향해 1초 동안 따라갈 때, 60Hz와 120Hz의 결과가 같아야 한다
   const run = fps => {
     const g = makeNetGame(0);
-    g.run(200); placeAll(g); g.client.setReady(0); g.client.setReady(1); g.run(320);
+    g.run(200); placeAll(g); g.client.setReady(0); g.client.setReady(1); g.client.setGo(0); g.client.setGo(1); g.run(320);
     const opp = 1 - SELF.slot;
     g.client.rx[opp] = 0;
     const target = g.client.pred.p[opp].x;

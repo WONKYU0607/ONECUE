@@ -110,7 +110,7 @@ for (const slot of [0, 2]){                       // 팀마다 한 명이 팀 �
 }
 assert(cs[0].s.items.length === need * 2, `팀별 ${need}개씩 총 ${need * 2}개 (${cs[0].s.items.length})`);
 
-cs.forEach((c, i) => c.setReady(i));
+cs.forEach((c, i) => { c.setReady(i); c.setGo(i); });   // 설치 완료 → 준비완료 두 단계
 await sleep(900);
 assert(cs.every(c => c.s.ready.every(Boolean)), '전원 준비 완료');
 assert(cs[0].s.phase !== 0, '전원 준비되면 카운트다운 시작');

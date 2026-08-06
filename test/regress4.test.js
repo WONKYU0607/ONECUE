@@ -1,7 +1,7 @@
 // 1대1에서 겪었던 오류들이 2대2에서 되살아나지 않는지 확인한다
 import { newState, step, checksum, normalizeState, cloneState } from '../src/game/sim.js';
 import {
-  FP, MAXHP, PH_PLAY, CD_TICKS, PROTO_VER, teamOf, coolTicks, ITEM, GRID_ROWS, cellOwner
+  FP, MAXHP, PH_PLAY, CD_TICKS, PROTO_VER, teamOf, coolTicks, ITEM, GRID_ROWS, GRID_MIDROW, cellOwner
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 
@@ -80,7 +80,7 @@ console.log('4) 옛 서버 상태를 받아도 안 죽는다');
 console.log('5) 아이템 소유는 슬롯이 아니라 팀');
 {
   const s = newState(4);
-  const mine = GRID_ROWS - 2;
+  const mine = GRID_MIDROW + 2;   // 내 진영 안쪽. 맨 앞뒤 행은 바깥 열이 벽이라 피한다
   step(s, IN(4, { 1: { place: { k: ITEM.WALL, c: 2, r: mine } } }));
   assert(s.items[0].by === teamOf(1, 4), `슬롯1이 놓아도 팀 번호로 기록 (by=${s.items[0].by})`);
   assert(s.items[0].by === 0, '슬롯0·1은 같은 팀');

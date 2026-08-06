@@ -76,7 +76,7 @@ for (const [c, slot] of [[ca, 0], [cb, 1]]){
   c.place(slot, ITEM.DRUM, 2, foeRow2(slot)); await sleep(120);
 }
 await sleep(400);
-ca.setReady(0); cb.setReady(1);
+ca.setReady(0); cb.setReady(1); ca.setGo(0); cb.setGo(1);
 await sleep(400);
 ca.input(0, 0, 0, 1);
 await sleep(500);

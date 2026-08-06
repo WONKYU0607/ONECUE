@@ -237,7 +237,7 @@ export function createGame(canvas, opts = {}){
 
     // 연습 모드는 상대를 기다릴 필요가 없다
     if (practice && client.pred.phase === PH_READY && !client.pred.ready[1 - SELF.slot]){
-      client.setReady(1 - SELF.slot);
+      client.setReady(1 - SELF.slot); client.setGo(1 - SELF.slot);
     }
 
     // AI도 배치 단계를 거친다.
@@ -282,7 +282,7 @@ export function createGame(canvas, opts = {}){
         if (aiPlan.length && allPlacedKind(client.s, aiSlot, k)) aiPlan.shift();
       }
       if (!aiPlan.length && !client.pred.ready[aiSlot] && allPlaced(client.s, aiSlot)){
-        client.setReady(aiSlot);
+        client.setReady(aiSlot); client.setGo(aiSlot);
       }
     }
     if (ai && client.pred.phase !== PH_READY){ aiPlan = null; }
@@ -297,7 +297,7 @@ export function createGame(canvas, opts = {}){
     // 유실 대비 재전송
     if (wantReady){
       if (client.s.ready?.[SELF.slot]) wantReady = false;
-      else if (now >= nextReadyAt){ client.setReady(SELF.slot); nextReadyAt = now + 250; }
+      else if (now >= nextReadyAt){ client.setReady(SELF.slot); client.setGo(SELF.slot); nextReadyAt = now + 250; }
     }
     if (pendPlace){
       const done = (client.s.items || []).some(
@@ -370,11 +370,14 @@ export function createGame(canvas, opts = {}){
     requestFast(){ sfx.place(); client.requestFast(SELF.slot); },
     answerFast(ok){ ok ? sfx.ready() : sfx.deny(); client.answerFast(SELF.slot, ok); },
     ready(){ sfx.ready(); wantReady = true; nextReadyAt = 0; client.setReady(SELF.slot); },
+    go(){ sfx.ready(); client.setGo(SELF.slot); },
     isReady(){ return !!(client.pred.ready || [])[SELF.slot]; },
     // 서버가 실제로 확정한 준비 상태 (예측이 아닌 것). 문제 진단용
     confirmedReady(){
-      const r = client.s.ready || [];
-      return { me: !!r[SELF.slot], peer: !!r[1 - SELF.slot], tick: client.s.tick, drops: client.desync };
+      const r = client.s.ready || [], n = client.s.n || 2;
+      const others = [];
+      for (let i = 0; i < n; i++) if (i !== SELF.slot) others.push(!!r[i]);
+      return { me: !!r[SELF.slot], peer: others.every(Boolean), tick: client.s.tick, drops: client.desync };
     },
     mySlot(){ return SELF.slot; },
     // 클라 쪽 계기판: 무엇을 받았고 보냈는지. 서버 /health와 짝을 이룬다
@@ -388,7 +391,19 @@ export function createGame(canvas, opts = {}){
         nit: client.nextInputTick, ctick: client.s.tick
       };
     },
-    peerReady(){ return !!(client.pred.ready || [])[1 - SELF.slot]; },
+    // 나 말고 전원이 준비완료를 눌렀는가 + 몇 명이 눌렀는지 (2대2는 "상대" 하나가 아니다)
+    peerReady(){
+      const r = client.pred.ready || [], n = client.pred.n || 2;
+      for (let i = 0; i < n; i++) if (i !== SELF.slot && !r[i]) return false;
+      return true;
+    },
+    readyCount(){
+      const st = client.pred, n = st.n || 2;
+      const r = st.ready || [], d = st.done || [];
+      let go = 0, placed = 0;
+      for (let i = 0; i < n; i++){ if (r[i]) go++; if (d[i]) placed++; }
+      return { go, placed, n, meDone: !!d[SELF.slot], meGo: !!r[SELF.slot] };
+    },
     applyCfg,
     // 튜닝값 한 칸 조절 (UI 버튼용)
     bump(k, dir){
