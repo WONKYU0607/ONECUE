@@ -114,11 +114,17 @@ export const DRUM_RADIUS = 1;         // 폭발 범위: 주변 한 칸
 export const EXPLO_TICKS = 34;        // 폭발 이펙트 지속 (틱)
 
 // 던지는 아이템: 0=수류탄 1=섬광탄. 누르는 시간이 곧 사거리
-export const THROW = { NADE: 0, FLASH: 1 };
+export const THROW = { NADE: 0, FLASH: 1, MOLO: 2 };
 export const THROW_DEF = [
   { key: 'grenade', name: '수류탄', count: 3 },
-  { key: 'flash',   name: '섬광탄', count: 3 }
+  { key: 'flash',   name: '섬광탄', count: 3 },
+  { key: 'molotov', name: '화염병', count: 1 }    // 한 판에 한 번
 ];
+// 화염병: 착탄한 칸 + 주변 한 칸(3x3)이 4초간 탄다. 그 안에 서 있으면 주기적으로 피해
+export const FIRE_TICKS = 240;          // 4초
+export const FIRE_RADIUS = 1;           // 3x3
+export const FIRE_DMG_EVERY = 36;       // 0.6초마다 1 (끝까지 버티면 6)
+export const FIRE_DAMAGE = 1;
 export const CHARGE_MAX_MS = 1000;    // 최대로 눌렀을 때 상대 맨 뒷줄
 export const FLY_TICKS  = 60;         // 날아가는 시간 (1초)
 export const FUSE_TICKS = 30;         // 착탄 후 폭발까지 (0.5초)
@@ -173,6 +179,9 @@ const A2 = {
   pw: 12, ph: 13, bg: 'arena2', neutral: true, hc: 5, tc: [3, 7],   // 3·7열 = 팻말 사이 빈 칸
   flip: 17.04 * 2 + 11.905 * 23, quota: [3, 3, 3, 3, 3, 3, 2], cover: 3,
   bands: [[1, 1, 3, 7], [2, 20, 1, 9], [21, 21, 3, 7]],
+  // 이동 가능한 세로 범위(월드 y). 격자 밖 벽 안쪽 여유까지 포함한다.
+  // 좌우 한계는 y마다 벽 표가 알아서 좁혀주므로 여기서 자르면 안 된다
+  yTop: 7, yBot: 302,
   wl: WALL2_L, wr: WALL2_R
 };
 export const ARENA = { ...A1 };
@@ -209,8 +218,10 @@ export function setArena(n){
   ROW_MAX = [lastRow, a.mid - 1];
   if (a.neutral){
     const cy = r => a.y0 + a.ch * r;
-    YMIN_S = [ Math.round(cy(lo0) * FP), Math.round(cy(firstRow) * FP) ];
-    YMAX_S = [ Math.round((cy(lastRow + 1) - a.ph) * FP), Math.round((cy(a.mid) - a.ph) * FP) ];
+    // 위아래 끝은 격자가 아니라 바닥 끝까지. 가운데는 중립 행이 경계
+    YMIN_S = [ Math.round(cy(lo0) * FP), Math.round((a.yTop ?? cy(firstRow)) * FP) ];
+    YMAX_S = [ Math.round(((a.yBot ?? cy(lastRow + 1)) - a.ph) * FP),
+               Math.round((cy(a.mid) - a.ph) * FP) ];
   } else {
     // 1대1은 기존 값을 그대로 쓴다. 격자에서 다시 계산하면 1FP 어긋나 결정론이 깨진다
     YMIN_S = [ Math.round(H / 2 * FP), 0 ];
@@ -235,7 +246,7 @@ export const FAST = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 26;
+export const PROTO_VER = 28;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

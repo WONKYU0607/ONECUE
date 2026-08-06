@@ -8,7 +8,9 @@ export const ASSET_SRC = {
   explosion:  'assets/explosion.webp',
   grenade:    'assets/grenade.webp',
   flash:      'assets/flash.webp',
-  flashfx:    'assets/flashfx.webp'
+  flashfx:    'assets/flashfx.webp',
+  molotov:    'assets/molotov.webp',   // 화염병 아이콘
+  fire:       'assets/fire.webp'       // 화염병 불꽃 (칸마다 하나씩 그린다)
 };
 
 const cache = {};

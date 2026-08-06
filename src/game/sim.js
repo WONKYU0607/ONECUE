@@ -72,6 +72,10 @@ import {
   TEAM_OF,
   THROW,
   THROW_DEF,
+  FIRE_TICKS,
+  FIRE_RADIUS,
+  FIRE_DMG_EVERY,
+  FIRE_DAMAGE,
   TICK_HZ,
   TICK_MS,
   TUNE,
@@ -126,9 +130,10 @@ export function normalizeState(st){
   if (typeof st.fast !== 'boolean') st.fast = false;
   if (typeof st.fastBy !== 'number') st.fastBy = 0;
   if (!Array.isArray(st.proj)) st.proj = [];
+  if (!Array.isArray(st.fire)) st.fire = [];
   if (!Array.isArray(st.blind)) st.blind = [0, 0];
   if (typeof st.blindMax !== 'number') st.blindMax = 0;
-  if (!Array.isArray(st.ammo)) st.ammo = [[3, 3], [3, 3]];
+  if (!Array.isArray(st.ammo)) st.ammo = st.p.map(() => THROW_DEF.map(d => d.count));
   if (typeof st.clock !== 'number') st.clock = 0;
   return st;
 }
@@ -162,9 +167,10 @@ export function newState(n = 2){
     items: newItems(),          // 배치된 엄폐물·폭탄 (by = 팀 번호)
     fx: [],
     proj: [],
+    fire: [],                   // 화염병 불꽃 [{c, r, t}]. 4초간 3x3이 탄다
     blind: Array(n).fill(0),
     blindMax: 0,
-    ammo: players.map(() => [THROW_DEF[0].count, THROW_DEF[1].count]),
+    ammo: players.map(() => THROW_DEF.map(d => d.count)),
     done: Array(n).fill(false),      // 아이템 배치를 끝냈는가 (설치 완료)
     ready: Array(n).fill(false),     // 준비완료까지 눌렀는가 — 전원이 눌러야 시작
     color: Array.from({ length: n }, (_, i) => i),   // 슬롯별 캐릭터 색 (0~3)
@@ -403,7 +409,7 @@ export function step(s, inp){
       n.tick = t; n.phase = PH_READY; n.timer = 0;
       s.p = n.p; s.bullets = n.bullets; s.covers = n.covers;
       s.items = n.items; s.ready = n.ready; s.fx = n.fx;
-      s.proj = n.proj; s.blind = n.blind; s.ammo = n.ammo;
+      s.proj = n.proj; s.blind = n.blind; s.ammo = n.ammo; s.fire = n.fire;
       s.fast = false; s.fastBy = 0;                          // 2배속은 그 판 한정
       s.maxStep = ms; s.bulletV = bv; s.coolT = ct;
       s.phase = n.phase; s.timer = n.timer; s.over = false; s.winner = 0; s.clock = 0;
@@ -486,6 +492,13 @@ export function step(s, inp){
     const pr = s.proj[i];
     if (pr.t > 0){
       if (--pr.t === 0 && pr.k === THROW.NADE) pr.fuse = FUSE_TICKS;
+      if (pr.t === 0 && pr.k === THROW.MOLO){
+        // 깨지면서 3x3에 불이 붙는다. 폭발 피해는 없고 지속 피해만
+        s.fire.push({ c: pr.c, r: pr.r1, t: FIRE_TICKS });
+        s.fx.push({ c: pr.c, r: pr.r1, t: EXPLO_TICKS });
+        s.proj.splice(i, 1);
+        continue;
+      }
       if (pr.t === 0 && pr.k === THROW.FLASH){
         // 3x3 안에 있어야 맞는다 (수류탄과 같은 범위 판정)
         const x0 = Math.round(cellX(pr.c - FLASH_RADIUS) * FP);
@@ -514,6 +527,25 @@ export function step(s, inp){
       blast(s, pr.c, pr.r1, NADE_RADIUS, NADE_DAMAGE, NADE_CENTER_DAMAGE);
       s.proj.splice(i, 1);
     }
+  }
+  // 화염병 불꽃: 수명을 깎고, 주기마다 그 안에 있는 사람에게 피해
+  for (let i = s.fire.length - 1; i >= 0; i--){
+    const fr = s.fire[i];
+    if (fr.t % FIRE_DMG_EVERY === 0 && !DEBUG_INF_HP){
+      const x0 = Math.round(cellX(fr.c - FIRE_RADIUS) * FP);
+      const x1 = Math.round(cellX(fr.c + FIRE_RADIUS + 1) * FP);
+      const y0 = Math.round(cellY(fr.r - FIRE_RADIUS) * FP);
+      const y1 = Math.round(cellY(fr.r + FIRE_RADIUS + 1) * FP);
+      for (let v = 0; v < s.n; v++){
+        const t = s.p[v];
+        if (t.hp <= 0) continue;
+        if (!overlap(t.x, t.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
+        const was = t.hp;
+        t.hp -= FIRE_DAMAGE; t.flash = FLASH_T;
+        if (was > 0 && t.hp <= 0) killFx(s, t);
+      }
+    }
+    if (--fr.t <= 0) s.fire.splice(i, 1);
   }
   for (let i = 0; i < s.n; i++) if (s.blind[i] > 0) s.blind[i]--;
 
@@ -614,9 +646,10 @@ export function checksum(s){
   for (const c of (s.color || [])) h = (h*31 + c) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;
+  for (const fr of s.fire) h = (h*31 + fr.c*7 + fr.r*13 + fr.t) | 0;
   for (let i = 0; i < s.n; i++){
     h = (h*31 + s.blind[i] * (i + 1)) | 0;
-    h = (h*31 + s.ammo[i][0] * 7 + s.ammo[i][1] * 11) | 0;
+    for (let k = 0; k < s.ammo[i].length; k++) h = (h*31 + s.ammo[i][k] * (7 + k*4)) | 0;
   }
   return h | 0;
 }

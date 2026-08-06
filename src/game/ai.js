@@ -154,8 +154,11 @@ export function createAI(stage = 1){
         if (aimKind < 0){
           // 섬광에 걸린 동안이면 수류탄을 잇는다 (눈이 먼 사이엔 피하기 어렵다)
           const chase = now < blindUntil && Math.random() < p.combo;
+          // 화염병은 한 개뿐이라 가끔만. 나머지는 예전대로
+          const roll = Math.random();
           aimKind = chase ? THROW.NADE
-                          : (Math.random() < 0.45 + p.combo * 0.25 ? THROW.FLASH : THROW.NADE);
+                          : roll < 0.15 ? THROW.MOLO
+                          : (roll < 0.55 + p.combo * 0.25 ? THROW.FLASH : THROW.NADE);
           aimErrC = (Math.random() * 2 - 1) * p.aimErr;         // 이번 투척의 조준 오차
           aimErrR = (Math.random() * 2 - 1) * p.chargeErr;
           aimSince = now;

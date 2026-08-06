@@ -1,4 +1,4 @@
-import { W, H, TUNE, FAST, FAST_MUL, HAND, itemKinds } from './config.js';
+import { W, H, TUNE, FAST, FAST_MUL, HAND, itemKinds, THROW_DEF } from './config.js';
 
 // 감도 값은 튜닝 패널에서 실시간으로 바꾼다
 const dead = () => TUNE.dead.v;   // 중심 근처는 무시
@@ -60,11 +60,14 @@ export function paletteSlots(uiH){
 // 전투 중 투척 버튼. 배치 팔레트와 같은 줄, 2칸
 export function throwSlots(uiH){
   const pd = padRect(uiH);
-  const size = Math.min(pd.h - 6, 30), gap = 6;
-  const total = 2 * size + gap;
+  const n = THROW_DEF.length;
+  const gap = 6;
+  const free = pd.w - 2 * 40;                       // 스틱이 차지하는 폭을 뺀 나머지
+  const size = Math.min(pd.h - 6, (free - (n - 1) * gap) / n, 30);
+  const total = n * size + (n - 1) * gap;
   const x0 = side(pd, total);
   const y = pd.y + (pd.h - size) / 2;
-  return [0, 1].map(i => ({ k: i, x: x0 + i * (size + gap), y, w: size, h: size }));
+  return THROW_DEF.map((_, i) => ({ k: i, x: x0 + i * (size + gap), y, w: size, h: size }));
 }
 
 export function stickGeom(uiH){

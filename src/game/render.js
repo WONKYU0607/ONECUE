@@ -3,6 +3,7 @@ import {
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO, HP_MARKS,
   ITEM, ITEM_DEF, cellOwner, teamOf, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
+  FIRE_TICKS, FIRE_RADIUS,
   WALL_L, WALL_R, wallIdx, PWf,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
 } from './config.js';
@@ -41,7 +42,8 @@ export function createRenderer(canvas){
   const bgOf = () => getImage(ARENA.bg);   // 아레나에 따라 배경이 달라진다
   const boom = getImage('explosion');
   const flashfx = getImage('flashfx');
-  const throwImg = [getImage('grenade'), getImage('flash')];
+  const throwImg = THROW_DEF.map(d => getImage(d.key));
+  const fireImg = getImage('fire');
 
   let uiH = 86, totalH = H + uiH, scale = 1;
 
@@ -107,21 +109,24 @@ export function createRenderer(canvas){
     const mine = [], foes = [];
     for (let i = 0; i < n; i++) (teamOf(i, n) === myTeam ? mine : foes).push(i);
 
-    const per = mine.length;
-    const BH = 5, BY = H + 4.5;
-    const BW = per > 1 ? 30 : 62;                 // 두 명이면 반씩 나눠 쓴다
-    const gap = 2;
-    const bar = (x, hp, team, rightAlign) => {
-      px(x, BY, BW, BH, 'rgba(255,255,255,0.10)');
+    // 2대2는 한 줄에 네 개를 욱여넣으면 좁고 글자와 겹친다.
+    // 우리 팀 한 줄 / 상대 팀 한 줄로 나눠 그린다
+    const two = mine.length > 1;
+    const BH = two ? 4 : 5;
+    const rowGap = 1.5;
+    const BY0 = H + (two ? 2.5 : 4.5);
+    const BW = 62, gap = 2;
+    const bar = (x, y, h, hp, team, rightAlign) => {
+      px(x, y, BW, h, 'rgba(255,255,255,0.10)');
       const pct = Math.max(0, Math.round(hp / MAXHP * 100));
       const w = BW * Math.max(0, hp) / MAXHP;
-      px(rightAlign ? x + BW - w : x, BY, w, BH, hp > 0 ? TEAMS[team].m : 'rgba(255,255,255,0.06)');
-      for (let i = 1; i < HP_MARKS; i++) px(x + BW * i / HP_MARKS, BY, 0.4, BH, 'rgba(13,13,22,0.85)');
-      ctx.font = 'bold ' + ((per > 1 ? 4 : 5) * RS) + 'px monospace';
+      px(rightAlign ? x + BW - w : x, y, w, h, hp > 0 ? TEAMS[team].m : 'rgba(255,255,255,0.06)');
+      for (let i = 1; i < HP_MARKS; i++) px(x + BW * i / HP_MARKS, y, 0.4, h, 'rgba(13,13,22,0.85)');
+      ctx.font = 'bold ' + ((two ? 3.6 : 5) * RS) + 'px monospace';
       ctx.textAlign = rightAlign ? 'left' : 'right';
       ctx.textBaseline = 'middle';
       const tx = (rightAlign ? x + 2 : x + BW - 2) * RS;
-      const ty = (BY + BH / 2 + 0.2) * RS;
+      const ty = (y + h / 2 + 0.2) * RS;
       ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(8,8,14,0.9)';
       ctx.strokeText(pct + '%', tx, ty);
       ctx.fillStyle = hp > 0 ? '#ffffff' : '#7a7a95';
@@ -129,25 +134,19 @@ export function createRenderer(canvas){
       ctx.textBaseline = 'alphabetic';
       ctx.textAlign = 'left';
     };
-    // 내가 항상 맨 왼쪽에 오도록 정렬한다
+    // 내가 항상 맨 위(1대1이면 맨 왼쪽)에 오도록 정렬한다
     mine.sort((a, b) => (a === SELF.slot ? -1 : b === SELF.slot ? 1 : a - b));
     const colOf = slot => (s.color && s.color[slot] != null) ? s.color[slot] : TEAM_OF[slot];
-    mine.forEach((slot, i) => bar(4 + i * (BW + gap), s.p[slot].hp, colOf(slot), false));
+    mine.forEach((slot, i) => bar(4, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), false));
     foes.forEach((slot, i) =>
-      bar(W - 4 - BW - i * (BW + gap), s.p[slot].hp, colOf(slot), true));
+      bar(W - 4 - BW, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), true));
 
     ctx.font = 'bold ' + (8 * RS) + 'px monospace'; ctx.textAlign = 'center';
     if (s.phase === PH_PLAY){
       const left = Math.ceil(s.clock / 60);
       ctx.fillStyle = left <= 10 ? '#f0645a' : '#e8e8f0';   // 10초 남으면 빨갛게
       ctx.fillText(String(left).padStart(2, '0'), W / 2 * RS, (H + 9.5) * RS);
-    } else {
-      ctx.font = (7 * RS) + 'px monospace';
-      ctx.fillStyle = COL.dim;
-      const label = s.phase === PH_READY ? 'PLACE YOUR ITEMS'
-                  : s.phase === PH_COUNT ? 'GET READY' : 'ROUND OVER';
-      ctx.fillText(label, W / 2 * RS, (H + 9.5) * RS);
-    }
+    }   // 전투 중이 아니면 가운데는 비워둔다 (안내 문구는 화면 위 버튼·배너로 충분)
     ctx.textAlign = 'left';
 
     const g = stickGeom(uiH);
@@ -206,6 +205,34 @@ export function createRenderer(canvas){
   }
   // 폭발 연출: 피해 범위(3x3)의 칸마다 하나씩 터진다.
   // 가운데에 큰 것 하나만 그리면 버섯구름이 위로만 솟아 아래쪽 칸이 비어 보인다.
+  // 화염병 불꽃: 3x3 칸마다 하나씩. 칸마다 위상을 어긋나게 해서 같이 흔들리지 않게 한다
+  function drawFire(s){
+    if (!s.fire || !s.fire.length || !isReady(fireImg)) return;
+    const ratio = fireImg.naturalHeight / fireImg.naturalWidth;
+    for (const fr of s.fire){
+      // 붙을 때 확 커지고, 꺼질 때 잦아든다
+      const age = FIRE_TICKS - fr.t;
+      const rise = Math.min(1, age / 14);
+      const fade = Math.min(1, fr.t / 30);
+      for (let dr = -FIRE_RADIUS; dr <= FIRE_RADIUS; dr++){
+        for (let dc = -FIRE_RADIUS; dc <= FIRE_RADIUS; dc++){
+          const c = fr.c + dc, r = fr.r + dr;
+          if (c < 0 || c >= GRID_COLS || r < 0 || r >= GRID_ROWS) continue;
+          const ph = (c * 5 + r * 3);                       // 칸마다 다른 위상
+          const flick = 0.88 + 0.12 * Math.sin((s.tick + ph * 7) * 0.35);
+          const w = GRID_CW * 1.05 * flick * rise, h = w * ratio;
+          const box = cellBox(c, r);
+          const cx = box.x + box.w / 2;
+          const by = box.y + box.h;                         // 칸 아래에 발을 붙인다
+          ctx.globalAlpha = fade * (0.85 + 0.15 * flick);
+          ctx.drawImage(fireImg,
+            Math.round((cx - w / 2) * RS), Math.round((by - h) * RS),
+            Math.round(w * RS), Math.round(h * RS));
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
   function drawFx(s){
     if (!s.fx || !s.fx.length) return;
     for (const f of s.fx){
@@ -465,6 +492,7 @@ export function createRenderer(canvas){
     for (let i = 0; i < s.p.length; i++)
       drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, s.color);
     drawProjectiles(s, a);
+    drawFire(s);
     drawFx(s);
     if (j) drawJuice(j);
     ctx.restore();
