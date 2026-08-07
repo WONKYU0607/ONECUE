@@ -138,6 +138,8 @@ export function normalizeState(st){
   if (typeof st.solo !== 'boolean') st.solo = false;
   if (typeof st.fast !== 'boolean') st.fast = false;
   if (typeof st.fastBy !== 'number') st.fastBy = 0;
+  st.bare = !!st.bare;
+  if (typeof st.bareBy !== 'number') st.bareBy = 0;
   if (!Array.isArray(st.proj)) st.proj = [];
   if (!Array.isArray(st.fire)) st.fire = [];
   if (!Array.isArray(st.off)) st.off = Array(st.n || 2).fill(false);
@@ -202,6 +204,8 @@ export function newState(n = 2, melee = false){
     solo: false,
     fast: false,
     fastBy: 0,
+    bare: false,                // 노템전: 엄폐물·투척물 없이 기본 공격만
+    bareBy: 0,                  // 신청한 사람 (슬롯+1, 0이면 없음)
     phase: PH_READY, timer: 0, clock: 0,
     maxStep: stepCap(),
     bulletV: bulletFP(),
@@ -211,7 +215,7 @@ export function newState(n = 2, melee = false){
 }
 
 export const FACE_OPP = [1, 0, 3, 2];   // 마주 보는 방향 (위↔아래, 왼↔오른)
-export const NOIN = { dx:0, dy:0, fire:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 };
+export const NOIN = { dx:0, dy:0, fire:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0 };
 export function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
 
 export function overlap(ax,ay,aw,ah,bx,by,bw,bh){
@@ -259,6 +263,7 @@ export function canPlace(s, slot, k, c, r, from){
   const def = ITEM_DEF[k];
   if (!def) return false;
   if (s.phase !== PH_READY) return false;
+  if (s.bare) return false;                            // 노템전은 아무것도 못 놓는다
   if (c < 0 || c + def.cells > GRID_COLS || r < 0 || r >= GRID_ROWS) return false;
   // 벽으로 덮인 칸에는 못 놓는다 (아레나가 사각형이 아니다)
   for (let k = 0; k < def.cells; k++) if (!cellUsable(c + k, r)) return false;
@@ -388,6 +393,7 @@ export function forfeit(s, slot){
 export function canThrow(s, slot, k){
   setArena(s.n, s.melee);
   if (s.phase !== PH_PLAY) return false;
+  if (s.bare) return false;                            // 노템전은 투척물이 없다
   if (!s.p[slot] || s.p[slot].hp <= 0) return false;   // 죽으면 관전. 던지기도 안 된다
   if (s.off[slot]) return false;                       // 끊긴 사람도 마찬가지
   if (!THROW_DEF[k]) return false;
@@ -418,6 +424,26 @@ export function step(s, inp){
   s.tick++;
 
   // 대기/종료 화면: START 입력(fire)으로만 카운트다운 시작
+  // 2배속 대결: 한쪽이 신청하고 상대가 수락해야 켜진다.
+  // 칼전은 배치 단계가 없어 카운트다운 중에도 받아야 한다 (아래에서 카운트를 멈춘다)
+  if (s.phase === PH_READY || s.phase === PH_COUNT){
+    for (let i = 0; i < s.n; i++){
+      const q = s.off[i] ? NOIN : (inp[i] || NOIN);
+      if (q.fastReq && !s.fast && !s.fastBy) s.fastBy = i + 1;
+      if (q.fastAns && s.fastBy && s.fastBy !== i + 1){
+        if (q.fastAns === 1) s.fast = true;
+        s.fastBy = 0;
+      }
+      // 노템전. 칼전은 원래 아이템이 없으니 해당 없음
+      if (!s.melee){
+        if (q.bareReq && !s.bare && !s.bareBy) s.bareBy = i + 1;
+        if (q.bareAns && s.bareBy && s.bareBy !== i + 1){
+          if (q.bareAns === 1){ s.bare = true; s.items = []; }   // 이미 깔아둔 것도 치운다
+          s.bareBy = 0;
+        }
+      }
+    }
+  }
   if (s.phase === PH_READY){
     for (let i = 0; i < s.n; i++){
       const q = inp[i] || NOIN;
@@ -429,12 +455,6 @@ export function step(s, inp){
           if (idx >= 0) s.items.splice(idx, 1);
         }
         s.items.push({ k: pl.k, c: pl.c, r: pl.r, by: teamOf(i, s.n), hp: ITEM_DEF[pl.k].hp });
-      }
-      // 2배속 대결: 한쪽이 신청하고 상대가 수락해야 켜진다
-      if (q.fastReq && !s.fast && !s.fastBy) s.fastBy = i + 1;
-      if (q.fastAns && s.fastBy && s.fastBy !== i + 1){
-        if (q.fastAns === 1) s.fast = true;
-        s.fastBy = 0;
       }
       // 1단계 설치 완료: 몇 개를 놓았든 누를 수 있다.
       // 엄폐물을 아예 안 깔고 싶은 사람도 있어서 정원을 채우도록 강제하지 않는다
@@ -465,6 +485,7 @@ export function step(s, inp){
       s.proj = n.proj; s.blind = n.blind; s.ammo = n.ammo; s.fire = n.fire;
       // s.off는 그대로 둔다 — 재대전해도 여전히 끊겨 있는 사람은 끊긴 것
       s.fast = false; s.fastBy = 0;                          // 2배속은 그 판 한정
+      s.bare = false; s.bareBy = 0;                          // 노템전도 그 판 한정
       s.maxStep = ms; s.bulletV = bv; s.coolT = ct;
       s.phase = n.phase; s.timer = n.timer; s.over = false; s.winner = 0; s.clock = 0;
     }
@@ -528,6 +549,8 @@ export function step(s, inp){
   }
 
   if (s.phase === PH_COUNT){
+    // 답을 기다리는 동안엔 카운트를 멈춘다. 안 그러면 3초 안에 못 누른다
+    if (s.fastBy > 0) return;
     if (--s.timer <= 0){ s.phase = PH_PLAY; s.timer = 0; s.clock = s.n > 2 ? ROUND_TICKS_4 : ROUND_TICKS; }
     return;
   }
@@ -591,6 +614,14 @@ export function step(s, inp){
   }
   // 칼전: 휘두르기 모션과 판정. 앞으로 한 칸을 때린다
   if (s.melee && s.phase === PH_PLAY){
+    // 2배속이면 칼·방패 관련 시간도 전부 절반. 이동만 빨라지면 2배속이 아니다
+    const fm = s.fast ? FAST_MUL : 1;
+    const atkT = Math.max(2, Math.round(ATK_TICKS / fm));
+    const atkH = Math.max(1, Math.round(ATK_HIT / fm));
+    const mCool = Math.max(1, Math.round(MELEE_COOL / fm));
+    const shT = Math.max(1, Math.round(SHIELD_TICKS / fm));
+    const shC = Math.max(1, Math.round(SHIELD_COOL / fm));
+    const stT = Math.max(1, Math.round(STUN_TICKS / fm));
     for (let i = 0; i < s.n; i++){
       const p = s.p[i], q = s.off[i] ? NOIN : (inp[i] || NOIN);
       if (p.cool > 0) p.cool--;
@@ -602,15 +633,15 @@ export function step(s, inp){
       // 방패: 누르면 0.5초간 방어 자세. 기절 중엔 못 든다.
       // 드는 순간 **휘두르던 칼은 취소된다** — 막는 동안은 공격을 포기하는 게 대가
       if (q.sh && p.shield === 0 && p.shCool === 0 && p.stun === 0){
-        p.shield = SHIELD_TICKS; p.shCool = SHIELD_COOL; p.atk = 0;
+        p.shield = shT; p.shCool = shC; p.atk = 0;
       }
       // 자동 공격. 칼전은 스틱만으로 조작한다
       if (p.stun > 0){ p.atk = 0; continue; }       // 굳은 동안은 못 휘두른다
       if (p.shield > 0) continue;                   // 방패를 든 동안은 공격이 안 나간다
-      if (p.atk === 0 && p.cool === 0){ p.atk = ATK_TICKS; p.cool = MELEE_COOL; }
+      if (p.atk === 0 && p.cool === 0){ p.atk = atkT; p.cool = mCool; }
       if (p.atk > 0){
         p.atk--;
-        if (p.atk === ATK_TICKS - ATK_HIT){          // 모션 중간에 한 번만 판정
+        if (p.atk === atkT - atkH){                 // 모션 중간에 한 번만 판정
           // 판정 상자는 **바라보는 쪽 한 칸**. 좌우로도 벨 수 있다
           const cwF = Math.round(GRID_CW * FP), chF = Math.round(GRID_CH * FP);
           let hx = p.x, hy = p.y, hw = PWf, hh = PHf;
@@ -625,7 +656,7 @@ export function step(s, inp){
             if (!overlap(t.x, t.y, PWf, PHf, hx, hy, hw, hh)) continue;
             // 방패로 막았는가 — **마주 보고 있을 때만** 막힌다. 등 뒤는 못 막는다
             if (t.shield > 0 && t.face === FACE_OPP[p.face]){
-              p.stun = STUN_TICKS; p.atk = 0;        // 막은 쪽이 아니라 휘두른 쪽이 굳는다
+              p.stun = stT; p.atk = 0;               // 막은 쪽이 아니라 휘두른 쪽이 굳는다
               t.blocked = (t.blocked || 0) + 1;      // 연출용 (막은 순간 표시)
               continue;
             }
@@ -752,7 +783,7 @@ export function checksum(s){
   for (const it of s.items) h = (h*31 + it.k*7 + it.c*13 + it.r*29 + it.hp*3 + it.by) | 0;
   // 인원수만큼 전부 넣어야 한다. 두 명만 보면 3·4번 슬롯이 어긋나도 못 잡는다
   for (let i = 0; i < s.n; i++) h = (h*31 + (s.ready[i] ? i + 1 : 0) + (s.done[i] ? 17 : 0)) | 0;
-  h = (h*31 + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16) | 0;
+  h = (h*31 + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16 + (s.bare ? 32 : 0) + s.bareBy*64) | 0;
   for (const c of (s.color || [])) h = (h*31 + c) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;

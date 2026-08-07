@@ -1,11 +1,11 @@
-import { newState, step, canPlace, itemRect, allPlaced, myItemAt } from '../src/game/sim.js';
+import { newState, step, canPlace, canThrow, itemRect, allPlaced, myItemAt } from '../src/game/sim.js';
 import {
   FP, ITEM, ITEM_DEF, PH_READY, PH_PLAY, PH_OVER, CD_TICKS, GRID_ROWS, GRID_COLS,
-  cellOwner, MAXHP, DRUM_DAMAGE, DRUM_RADIUS, GRID_MIDROW, EXPLO_TICKS
+  cellOwner, MAXHP, DRUM_DAMAGE, DRUM_RADIUS, GRID_MIDROW, EXPLO_TICKS, THROW
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 
-const mk = (o = {}) => ({ dx:0, dy:0, fire:0, ready:0, go:0, place:null, ...o });
+const mk = (o = {}) => ({ dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0, ...o });
 const IN = (a, b) => [mk(a), mk(b)];
 const myRow = slot => { for (let r = 0; r < GRID_ROWS; r++) if (cellOwner(r) === slot) return r; };
 const foeRow = slot => { for (let r = 0; r < GRID_ROWS; r++) if (cellOwner(r) !== slot) return r; };
@@ -61,6 +61,34 @@ console.log('몇 개를 놓았든 설치 완료를 누를 수 있다');
   step(t, IN({ ready: 1, go: 1 }, {}));
   assert(t.done[0] && t.ready[0], '한 개만 깔고도 준비 완료');
   assert(t.items.length === 1, '깐 것만 남는다');
+}
+
+console.log('노템전이면 아무것도 못 놓고 못 던진다');
+{
+  const s = newState();
+  const mine = GRID_ROWS - 2;
+  step(s, IN({ place: { k: ITEM.WALL, c: 1, r: mine } }, {}));
+  assert(s.items.length === 1, '먼저 하나 깔아둔다');
+  // 한쪽이 신청하고 상대가 수락해야 켜진다
+  step(s, IN({ bareReq: 1 }, {}));
+  assert(s.bareBy === 1, '신청이 들어간다');
+  step(s, IN({}, { bareAns: 1 }));
+  assert(s.bare === true && s.bareBy === 0, '수락하면 켜진다');
+  assert(s.items.length === 0, '이미 깔아둔 것도 치운다');
+  assert(!canPlace(s, 0, ITEM.WALL, 3, mine), '더는 못 놓는다');
+  step(s, IN({ place: { k: ITEM.DRUM, c: 2, r: foeRow(0) } }, {}));
+  assert(s.items.length === 0, '드럼통도 안 놓인다');
+  // 전투에 들어가도 투척 불가
+  step(s, IN({ ready: 1, go: 1 }, { ready: 1, go: 1 }));
+  for (let t = 0; t < 400 && s.phase !== PH_PLAY; t++) step(s, IN({}, {}));
+  assert(s.phase === PH_PLAY, '전투 시작');
+  assert(!canThrow(s, 0, THROW.NADE) && !canThrow(s, 0, THROW.MOLO), '투척물도 못 쓴다');
+  const q = IN({ thr: { k: THROW.NADE, ch: 50 } }, {});
+  step(s, q);
+  assert(s.proj.length === 0, '던져도 안 나간다');
+  // 기본 공격은 그대로
+  for (let t = 0; t < 120; t++) step(s, IN({}, {}));
+  assert(s.bullets.length > 0, '총알은 정상적으로 나간다');
 }
 
 console.log('놓은 아이템을 다른 칸으로 옮길 수 있다');

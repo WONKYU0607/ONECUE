@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createGame } from '../game/game.js';
-import { PH_READY, SHOW_NETINFO } from '../game/config.js';
+import { PH_READY, PH_COUNT, SHOW_NETINFO } from '../game/config.js';
 import TunePanel from './TunePanel.jsx';
 import { getConnection, disconnect, getRoomInfo } from '../net/connection.js';
 import { getSettings } from '../state/settings.js';
@@ -27,6 +27,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
         me: g.isReady(), peer: g.peerReady(), srv: g.confirmedReady(), all: g.allPlaced(),
         cnt, melee,
         fast: g.fastState(), canFast: g.canFast(),
+        bare: g.bareState(), canBare: g.canBare(),
         room: info ? info.room : null, slot: g.mySlot(), net: g.netStats()
       });
     }, 200);
@@ -65,6 +66,8 @@ export default function GameCanvas({ session, onExit, onFinish }){
   }, [session, onFinish]);
 
   const placing = phase === PH_READY;
+  // 2배속 신청 UI는 칼전(카운트다운 중)에서도 떠야 한다
+  const preGame = phase === PH_READY || phase === PH_COUNT;
 
   return (
     <div className="game-root">
@@ -84,18 +87,39 @@ export default function GameCanvas({ session, onExit, onFinish }){
         <div className="link-note ui-overlay">상대가 나갔다</div>
       )}
 
-      {placing && ready.fast?.on && (
+      {preGame && ready.fast?.on && (
         <div className="link-note ui-overlay fast">2배속 대결</div>
       )}
-      {placing && ready.canFast && !ready.fast?.by && (
+      {preGame && ready.bare?.on && (
+        <div className="link-note ui-overlay fast">노템전</div>
+      )}
+      {preGame && ready.canBare && !ready.bare?.by && !ready.fast?.by && (
+        <button className="fastbtn ui-overlay bare" onClick={() => gameRef.current?.requestBare()}>
+          노템전 신청
+        </button>
+      )}
+      {preGame && ready.bare?.by > 0 && ready.bare?.mine && (
+        <div className="link-note ui-overlay">노템전 신청함 · 상대 응답을 기다리는 중</div>
+      )}
+      {preGame && ready.bare?.by > 0 && !ready.bare?.mine && (
+        <div className="ask ui-overlay">
+          <p className="ask-t">상대방이 노템전을 신청했습니다.</p>
+          <p className="ask-d">엄폐물·투척물 없이 기본 공격으로만 겨룹니다.</p>
+          <div className="ask-row">
+            <button className="menu-btn ghost" onClick={() => gameRef.current?.answerBare(false)}>거절</button>
+            <button className="menu-btn primary" onClick={() => gameRef.current?.answerBare(true)}>수락</button>
+          </div>
+        </div>
+      )}
+      {preGame && ready.canFast && !ready.fast?.by && !ready.bare?.by && (
         <button className="fastbtn ui-overlay" onClick={() => gameRef.current?.requestFast()}>
           2배속 신청
         </button>
       )}
-      {placing && ready.fast?.by > 0 && ready.fast?.mine && (
+      {preGame && ready.fast?.by > 0 && ready.fast?.mine && (
         <div className="link-note ui-overlay">2배속 신청함 · 상대 응답을 기다리는 중</div>
       )}
-      {placing && ready.fast?.by > 0 && !ready.fast?.mine && (
+      {preGame && ready.fast?.by > 0 && !ready.fast?.mine && (
         <div className="modal-back">
           <div className="modal ask">
             <p className="ask-t">상대방이 2배속 대결을 신청했습니다.</p>

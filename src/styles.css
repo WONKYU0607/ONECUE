@@ -112,7 +112,8 @@ font:20px/1 monospace;letter-spacing:6px;text-align:center;padding:0 8px}
 .link-note .sub{display:block;margin-top:4px;font-size:10px;color:#9a9ab0;letter-spacing:0}
 .panelbtn.place.off{border-color:#3a3a52;color:#6a6a85;cursor:default}
 /* 설치 완료 다음 단계. 앞 버튼(주황)과 확실히 구분되게 파랑 */
-.panelbtn.place.go{color:#8fd8ff;border-color:#4ec9f0}
+.panelbtn.place.go{color:#8fd8ff;border-color:#4ec9f0;background:rgba(78,201,240,0.12);
+  box-shadow:0 0 0 1px rgba(78,201,240,0.35),0 0 12px rgba(78,201,240,0.25)}
 .panelbtn.place.go:active{background:#4ec9f0;color:#12121c}
 .hint.record{margin:10px 0 0;letter-spacing:1px}
 .stage.done .st{color:#4ec9f0}
@@ -129,6 +130,9 @@ padding:8px 16px;background:rgba(18,18,28,.92);border:2px solid #8f6ef0;color:#c
 font:bold 13px monospace;letter-spacing:2px;cursor:pointer}
 .fastbtn:active{background:#8f6ef0;color:#12121c}
 .link-note.fast{border-color:#8f6ef0;color:#c3adff}
+/* 노템전은 2배속과 색을 갈라서 뭘 신청받았는지 바로 알게 한다 */
+.fastbtn.bare{top:110px;border-color:#f0a81e;color:#f0c86e}
+.fastbtn.bare:active{background:#f0a81e;color:#12121c}
 .modal.ask{width:min(340px,88vw);padding:18px 16px}
 .ask-t{font:bold 14px/1.6 monospace;color:#e8e8f0;margin:0 0 6px}
 .ask-d{font:12px/1.6 monospace;color:#9a9ab0;margin:0 0 14px}

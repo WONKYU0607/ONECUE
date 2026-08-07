@@ -356,6 +356,38 @@ console.log('방패로 막으면 상대가 굳는다');
   }
 }
 
+console.log('2배속');
+{
+  const { PH_COUNT, FAST_MUL, SHIELD_TICKS, STUN_TICKS } = await import('../src/game/config.js');
+  // 칼전은 배치 단계가 없으니 카운트다운 중에 신청·수락한다
+  const s = newState(2, true);
+  step(s, IN(2));
+  assert(s.phase === PH_COUNT, '바로 카운트다운');
+  const q = IN(2); q[0].fastReq = 1;
+  step(s, q);
+  assert(s.fastBy === 1, '신청이 들어간다');
+  const t0 = s.timer;
+  for (let t = 0; t < 30; t++) step(s, IN(2));
+  assert(s.timer === t0, '답을 기다리는 동안 카운트가 멈춘다');
+  const q2 = IN(2); q2[1].fastAns = 1;
+  step(s, q2);
+  assert(s.fast === true && s.fastBy === 0, '수락하면 켜진다');
+  for (let t = 0; t < 400 && s.phase !== PH_PLAY; t++) step(s, IN(2));
+  assert(s.phase === PH_PLAY, '수락 뒤 카운트가 다시 흐른다');
+
+  // 칼·방패 수치도 절반이어야 한다 (이동만 빨라지면 2배속이 아니다)
+  s.p[0].x = Math.round(90 * FP); s.p[0].y = Math.round(150 * FP); s.p[0].face = 0;
+  s.p[1].x = s.p[0].x; s.p[1].y = s.p[0].y - Math.round(GRID_CH * FP); s.p[1].face = 1;
+  s.p[0].atk = 0; s.p[0].cool = 0;
+  step(s, IN(2));
+  assert(s.p[0].atk === Math.round(ATK_TICKS / FAST_MUL) - 1, `휘두르는 시간이 절반 (${s.p[0].atk + 1})`);
+  const q3 = IN(2); q3[1].sh = 1;
+  step(s, q3);
+  assert(s.p[1].shield === Math.round(SHIELD_TICKS / FAST_MUL), '방패도 절반');
+  for (let t = 0; t < ATK_TICKS + 4; t++) step(s, IN(2));
+  assert(s.p[0].stun > 0 && s.p[0].stun <= Math.round(STUN_TICKS / FAST_MUL), '기절도 절반');
+}
+
 console.log('죽어도 폭발 연출이 없다');
 {
   const s = newState(2, true);

@@ -1,4 +1,4 @@
-import { W, H, TUNE, FAST, FAST_MUL, HAND, itemKinds, THROW_DEF, ARENA } from './config.js';
+import { W, H, TUNE, FAST, FAST_MUL, HAND, itemKinds, THROW_DEF, ARENA, BARE } from './config.js';
 
 // 감도 값은 튜닝 패널에서 실시간으로 바꾼다
 const dead = () => TUNE.dead.v;   // 중심 근처는 무시
@@ -79,7 +79,7 @@ export function paletteSlots(uiH){
 
 // 전투 중 투척 버튼. 배치 팔레트와 같은 줄, 2칸
 export function throwSlots(uiH){
-  if (ARENA.melee) return [];        // 칼전은 투척물이 없다
+  if (ARENA.melee || BARE.on) return [];   // 칼전·노템전은 투척물이 없다
   const pd = padRect(uiH);
   const n = THROW_DEF.length;
   const gap = 6;

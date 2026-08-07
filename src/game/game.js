@@ -10,7 +10,7 @@ import { createJuice } from './juice.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { canPlace, canThrow, allPlaced, myItemAt, newState } from './sim.js';
 import {
-  FAST, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, teamOf, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
+  FAST, BARE, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, teamOf, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
   ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed,
   GRID_X0, GRID_Y0, H, cellOwner, cellX, cellY
 } from './config.js';
@@ -374,6 +374,7 @@ export function createGame(canvas, opts = {}){
     const a = client.alpha(now);
     input.tick(now, CHARGE_MAX_MS);
     FAST.on = !!client.pred.fast;      // 입력 곡선이 이 값을 본다
+    BARE.on = !!client.pred.bare;     // 팔레트·투척 슬롯이 이 값을 본다
     juice.update(dt);
     reactTo(client.pred, dt);
     client.updateRender(a, dt);
@@ -412,11 +413,27 @@ export function createGame(canvas, opts = {}){
       };
     },
     // 2배속 대결 (PVP 전용)
-    canFast(){ return !!online && client.pred.phase === PH_READY && !client.pred.fast; },
+    // 칼전은 배치 단계가 없어 카운트다운 중에 신청한다 (그동안 카운트는 멈춘다)
+    canFast(){
+      const ph = client.pred.phase;
+      return !!online && !client.pred.fast && (ph === PH_READY || ph === PH_COUNT);
+    },
     fastState(){
       const st = client.pred;
       return { on: !!st.fast, by: st.fastBy | 0, mine: st.fastBy === SELF.slot + 1 };
     },
+    // 노템전 (총격전 전용. 칼전은 원래 아이템이 없다)
+    canBare(){
+      const st = client.pred;
+      return !!online && !st.melee && !st.bare
+        && (st.phase === PH_READY || st.phase === PH_COUNT);
+    },
+    bareState(){
+      const st = client.pred;
+      return { on: !!st.bare, by: st.bareBy | 0, mine: st.bareBy === SELF.slot + 1 };
+    },
+    requestBare(){ sfx.place(); client.requestBare(SELF.slot); },
+    answerBare(ok){ ok ? sfx.ready() : sfx.deny(); client.answerBare(SELF.slot, ok); },
     requestFast(){ sfx.place(); client.requestFast(SELF.slot); },
     answerFast(ok){ ok ? sfx.ready() : sfx.deny(); client.answerFast(SELF.slot, ok); },
     ready(){ sfx.ready(); wantDone = true; nextDoneAt = 0; client.setReady(SELF.slot); },
