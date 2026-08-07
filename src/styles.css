@@ -25,7 +25,9 @@ font:bold 20px/1 monospace;letter-spacing:2px;cursor:pointer}
 justify-content:center;gap:18px;color:#e8e8f0;font-family:monospace;padding:24px}
 .screen.center{justify-content:center}
 .screen.list{justify-content:flex-start;padding:0}
-.logo{font-size:44px;letter-spacing:8px;color:#8fd8ff;text-shadow:0 0 18px rgba(78,201,240,.45)}
+/* 한글 네 글자라 자간 8px은 너무 벌어진다. 좁히고 크기는 화면 폭에 맞춘다 */
+.logo{font-size:min(46px,13vw);letter-spacing:3px;color:#8fd8ff;
+  text-shadow:0 0 18px rgba(78,201,240,.45);white-space:nowrap}
 .logo.win{color:#4ec9f0}.logo.lose{color:#f0645a}.logo.draw{color:#e8e8f0}
 .hint{font-size:12px;color:#7a7a95;letter-spacing:2px}
 .big{font-size:16px;letter-spacing:2px}
@@ -156,3 +158,29 @@ font:15px/1 monospace;cursor:pointer;opacity:.55}
 .mode-row{display:flex;gap:8px;justify-content:center;margin:0 0 10px}
 .menu-btn.mode{flex:0 0 96px;align-items:center;justify-content:center;padding:8px 0}
 .menu-btn.mode.on{border-color:#4ec9f0;color:#8fd8ff}
+
+/* ── 진입창 ─────────────────────────────────────────────── */
+/* 표지 그림이 화면을 꽉 채운다. 폰은 그림보다 세로로 길어서 cover로 채우고
+   **위쪽을 기준으로** 잘라야 제목이 안 잘린다 (아래는 바닥 타일이라 잘려도 됨) */
+.screen.splash{
+  background-size:cover; background-position:center top; background-repeat:no-repeat;
+  background-color:#0d0d16;
+  display:flex; align-items:flex-end; justify-content:center;
+  padding:0 0 max(38px, env(safe-area-inset-bottom, 0px)); cursor:default;
+}
+.screen.splash.ready{cursor:pointer}
+.splash-foot{width:min(320px,80vw); text-align:center;
+  /* 그림 위에 글씨를 올리므로 뒤를 살짝 어둡게 깔아 가독성을 준다 */
+  padding:14px 10px; border-radius:10px;
+  background:radial-gradient(ellipse at center, rgba(8,8,14,.72), rgba(8,8,14,0) 72%)}
+/* 깜빡임: 완전히 사라지지 않게 0.35까지만 내린다. 다 꺼지면 눌러야 하는지 헷갈림 */
+.splash .tap{
+  margin:0; font:bold 17px/1.4 monospace; letter-spacing:3px; color:#ffe9a8;
+  text-shadow:0 0 12px rgba(255,190,80,.55), 0 2px 4px rgba(0,0,0,.9);
+  animation:tapblink 1.15s ease-in-out infinite;
+}
+@keyframes tapblink{0%,100%{opacity:1}50%{opacity:.35}}
+/* 눈이 불편한 사람에겐 깜빡임을 끈다 (앱 심사에서도 보는 항목) */
+@media (prefers-reduced-motion: reduce){
+  .splash .tap{animation:none; opacity:1}
+}
