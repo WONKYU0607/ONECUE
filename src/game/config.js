@@ -40,11 +40,15 @@ export const TUNE = {
   spd:  { v:170, min:30,  max:900,  inc:1,    fmt:v => v + '/s' },   // px/초를 직접 다룬다
   bul:  { v:204, min:60,  max:600,  inc:12,   fmt:v => v + '/s' },
   rate: { v:0.45, min:0.1, max:2.0,  inc:0.05, fmt:v => v.toFixed(2) + 's' },
-  curve:{ v:2.0, min:1.0, max:3.0,  inc:0.1,  fmt:v => 'x' + v.toFixed(1) },
-  // 아래 셋은 스틱 감도. 시뮬과 무관한 클라 전용 값이다
-  sat:  { v:0.46, min:0.30, max:1.0, inc:0.02, fmt:v => Math.round(v*100) + '%' },
+  curve:{ v:1.5, min:1.0, max:3.0,  inc:0.1,  fmt:v => 'x' + v.toFixed(1) },
+  // 아래 셋은 스틱 감도. 시뮬과 무관한 클라 전용 값이다.
+  // 예전 값(0.15 / 0.46 / x2.0)은 **속도가 변하는 구간이 실제 화면에서 21px뿐**이었다.
+  // 엄지 접촉면이 35~45px이라 조절 구간이 손가락보다 좁아 미세 조정이 불가능했다.
+  // 죽은 구간 15%는 물리 스틱의 드리프트 대비 값인데 터치는 드리프트가 없다.
+  // 지금 값은 구간을 53px로 넓힌 것 (최고 속도는 그대로, 거기까지 가는 길이 길어짐)
+  sat:  { v:0.85, min:0.30, max:1.0, inc:0.02, fmt:v => Math.round(v*100) + '%' },
   rad:  { v:31,  min:16,  max:44,   inc:1,    fmt:v => v + 'px' },
-  dead: { v:0.15, min:0.02, max:0.4, inc:0.01, fmt:v => Math.round(v*100) + '%' }   // 스틱 반응 곡선(클라 전용)
+  dead: { v:0.06, min:0.02, max:0.4, inc:0.01, fmt:v => Math.round(v*100) + '%' }   // 스틱 반응 곡선(클라 전용)
 };
 export const spdMult   = () => TUNE.spd.v / 600;   // BASE_MAX_STEP(=600px/s)에 대한 비율
 export const bulletFP  = () => Math.max(1, Math.round(TUNE.bul.v / 60 * FP));
@@ -303,7 +307,7 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 45;
+export const PROTO_VER = 46;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

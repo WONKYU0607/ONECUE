@@ -64,8 +64,8 @@ justify-content:center;gap:18px;color:#e8e8f0;font-family:monospace;padding:8px}
 .menu{display:flex;flex-direction:column;gap:12px;
   width:min(320px, calc(100% - 8px));}
 .menu-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;
-gap:3px;padding:14px 16px;cursor:pointer;color:#d6eeff;font-family:monospace;text-align:center;
-background:transparent;
+gap:3px;padding:10px 14px;min-height:72px;cursor:pointer;color:#d6eeff;font-family:monospace;
+text-align:center;background:transparent;
 /* 배경과 같은 틀을 얇게. 버튼마다 이미지를 따로 만들 필요가 없다 */
 border-style:solid; border-width:15px 17px;
 border-color:#1b2b3a;                   /* 틀 이미지를 못 받았을 때의 모습 */
@@ -81,9 +81,10 @@ border-image:var(--frame) 86 fill stretch}
 color:#8fd8ff;font:19px/1 monospace;cursor:pointer}
 .icon-btn:active{background:#4ec9f0;color:#12121c}
 /* 금속 틀 테두리(가로 44 / 세로 46) 안쪽으로. 밖에 두면 테두리에 걸린다 */
-.top-right{position:absolute;right:52px;top:56px;z-index:30}
-.top-right2{position:absolute;right:100px;top:56px;z-index:30}
-.top-left{position:absolute;left:52px;top:56px;z-index:30}
+/* 틀 안쪽(테두리 다음) 기준. 오른쪽 위 모서리 바로 밑에 붙인다 */
+.top-right{position:absolute;right:6px;top:6px;z-index:30}
+.top-right2{position:absolute;right:52px;top:6px;z-index:30}
+.top-left{position:absolute;left:6px;top:6px;z-index:30}
 
 /* ---------- 진입창 ---------- */
 .bar{width:min(260px,70vw);height:4px;background:#1b1b2a;overflow:hidden}

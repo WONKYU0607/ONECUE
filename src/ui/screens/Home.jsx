@@ -8,15 +8,12 @@ export default function Home({ onPvp, onAi, onPractice, onSettings, onHelp }){
       <div className="menu">
         <button className="menu-btn primary" onClick={onPvp}>
           <span className="t">PVP</span>
-          <span className="d">총격전 · 칼전, 실시간 대전</span>
         </button>
         <button className="menu-btn" onClick={onAi}>
           <span className="t">AI 모드</span>
-          <span className="d">단계별 AI와 대결</span>
         </button>
         <button className="menu-btn" onClick={onPractice}>
           <span className="t">연습 모드</span>
-          <span className="d">상대 없이 배치·이동·투척 익히기</span>
         </button>
       </div>
 
