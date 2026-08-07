@@ -48,7 +48,7 @@ export function uiBoxRect(uiH){
   const x1 = sl.length ? Math.max(...sl.map(v => v.x + v.w)) : pd.x + pd.w * 0.5;
   const top = pd.y + 1;
   const bottom = (sl.length ? sl[0].y : pd.y + pd.h) - 2;
-  return { x, y: top, w: x1 - x, h: Math.max(6, bottom - top) };
+  return { x, y: top, w: x1 - x, h: Math.max(18, bottom - top) };   // 너무 납작하면 글씨가 안 보인다
 }
 
 // 배치 팔레트: 스틱 반대쪽에 아이템 아이콘. 종류 수는 아레나에 따라 다르다
@@ -61,14 +61,18 @@ export function paletteSlots(uiH){
   const per = Math.ceil(n / rows);
   const gap = n > 4 ? 4 : 5;
   const free = pd.w - 2 * 40;                       // 스틱이 차지하는 폭을 뺀 나머지
+  // 두 줄이면 위쪽에 준비 버튼 자리를 남겨야 한다(2대2에서 버튼이 11px로 찌그러졌었음)
+  const head = rows > 1 ? 20 : 0;
   const size = Math.min(
-    (pd.h - 6 - (rows - 1) * gap) / rows,
+    (pd.h - 6 - head - (rows - 1) * gap) / rows,
     (free - (per - 1) * gap) / per,
     26
   );
   const total = per * size + (per - 1) * gap;
   const x0 = side(pd, total);
-  const y0 = pd.y + (pd.h - (rows * size + (rows - 1) * gap)) / 2;
+  const blockH = rows * size + (rows - 1) * gap;
+  // 한 줄이면 가운데, 두 줄이면 **아래로 붙여** 위 공간을 버튼에 준다
+  const y0 = rows > 1 ? pd.y + pd.h - 3 - blockH : pd.y + (pd.h - blockH) / 2;
   return kinds.map((k, i) => ({
     k,
     x: x0 + (i % per) * (size + gap),

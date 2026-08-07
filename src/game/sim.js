@@ -142,6 +142,7 @@ export function normalizeState(st){
   st.bare = !!st.bare;
   if (typeof st.bareBy !== 'number') st.bareBy = 0;
   for (const k of ['fastT', 'bareT']) if (typeof st[k] !== 'number') st[k] = 0;
+  if (!Array.isArray(st.negOk)) st.negOk = [];
   if (!Array.isArray(st.proj)) st.proj = [];
   if (!Array.isArray(st.fire)) st.fire = [];
   if (!Array.isArray(st.off)) st.off = Array(st.n || 2).fill(false);
@@ -210,6 +211,7 @@ export function newState(n = 2, melee = false){
     bareBy: 0,                  // 신청한 사람 (슬롯+1, 0이면 없음)
     fastT: 0,                   // 신청 응답 제한 시간 (틱). 0이 되면 저절로 취소
     bareT: 0,
+    negOk: [],                  // 이번 신청에 수락한 슬롯들 (상대 팀 전원이 모여야 켜진다)
     phase: PH_READY, timer: 0, clock: 0,
     maxStep: stepCap(),
     bulletV: bulletFP(),
@@ -431,25 +433,41 @@ export function step(s, inp){
   // 2배속 대결: 한쪽이 신청하고 상대가 수락해야 켜진다.
   // 칼전은 배치 단계가 없어 카운트다운 중에도 받아야 한다 (아래에서 카운트를 멈춘다)
   if (s.phase === PH_READY || s.phase === PH_COUNT){
+    // 2대2는 **상대 팀 전원**이 수락해야 켜진다. 한 명만 눌러서 팀 규칙이 바뀌면 안 된다
+    const foesOf = by => {
+      const t = teamOf(by - 1, s.n);
+      const out = [];
+      for (let v = 0; v < s.n; v++) if (teamOf(v, s.n) !== t) out.push(v);
+      return out;
+    };
     for (let i = 0; i < s.n; i++){
       const q = s.off[i] ? NOIN : (inp[i] || NOIN);
-      if (q.fastReq && !s.fast && !s.fastBy && !s.bareBy){ s.fastBy = i + 1; s.fastT = NEG_TICKS; }
-      if (q.fastAns && s.fastBy && s.fastBy !== i + 1){
-        if (q.fastAns === 1) s.fast = true;
-        s.fastBy = 0; s.fastT = 0;
+      const pending = s.fastBy || s.bareBy;
+      if (q.fastReq && !s.fast && !pending){ s.fastBy = i + 1; s.fastT = NEG_TICKS; s.negOk = []; }
+      if (q.bareReq && !s.bare && !s.melee && !pending){ s.bareBy = i + 1; s.bareT = NEG_TICKS; s.negOk = []; }
+
+      const by = s.fastBy || s.bareBy;
+      if (!q.fastAns && !q.bareAns) continue;
+      if (!by || by === i + 1) continue;
+      if (teamOf(i, s.n) === teamOf(by - 1, s.n)) continue;   // 같은 팀은 답할 게 없다
+      const ans = s.fastBy ? q.fastAns : q.bareAns;
+      if (!ans) continue;
+      if (ans !== 1){                                        // 한 명이라도 거절하면 끝
+        s.fastBy = 0; s.bareBy = 0; s.fastT = 0; s.bareT = 0; s.negOk = [];
+        continue;
       }
-      // 노템전. 칼전은 원래 아이템이 없으니 해당 없음
-      if (!s.melee){
-        if (q.bareReq && !s.bare && !s.bareBy && !s.fastBy){ s.bareBy = i + 1; s.bareT = NEG_TICKS; }
-        if (q.bareAns && s.bareBy && s.bareBy !== i + 1){
-          if (q.bareAns === 1){ s.bare = true; s.items = []; }   // 이미 깔아둔 것도 치운다
-          s.bareBy = 0; s.bareT = 0;
-        }
+      if (!s.negOk.includes(i)) s.negOk.push(i);
+      // 끊긴 사람은 못 누르므로 답할 수 있는 사람만 센다
+      const need = foesOf(by).filter(v => !s.off[v]);
+      if (need.every(v => s.negOk.includes(v))){
+        if (s.fastBy) s.fast = true;
+        else { s.bare = true; s.items = []; }                 // 이미 깔아둔 것도 치운다
+        s.fastBy = 0; s.bareBy = 0; s.fastT = 0; s.bareT = 0; s.negOk = [];
       }
     }
     // 제한 시간이 지나면 거절한 것으로 보고 창을 닫는다
-    if (s.fastBy && --s.fastT <= 0){ s.fastBy = 0; s.fastT = 0; }
-    if (s.bareBy && --s.bareT <= 0){ s.bareBy = 0; s.bareT = 0; }
+    if (s.fastBy && --s.fastT <= 0){ s.fastBy = 0; s.fastT = 0; s.negOk = []; }
+    if (s.bareBy && --s.bareT <= 0){ s.bareBy = 0; s.bareT = 0; s.negOk = []; }
   }
   if (s.phase === PH_READY){
     for (let i = 0; i < s.n; i++){
@@ -472,8 +490,10 @@ export function step(s, inp){
       // 2단계 준비완료: 설치를 끝낸 사람만. 전원이 눌러야 시작한다
       if (q.go && s.done[i]) s.ready[i] = true;
     }
-    // 칼전은 배치할 것도 고를 것도 없다. 준비 단계를 건너뛰고 바로 카운트다운으로 간다
+    // 칼전은 배치할 것도 고를 것도 없다. 준비 단계를 통째로 건너뛴다
     if (s.melee) for (let i = 0; i < s.n; i++){ s.done[i] = true; s.ready[i] = true; }
+    // 노템전은 놓을 게 없으므로 **설치 완료를 건너뛰고 준비완료만** 남긴다
+    else if (s.bare) for (let i = 0; i < s.n; i++) s.done[i] = true;
     // 전원이 준비완료를 눌러야 시작한다 (START 버튼 없음).
     // 연습 모드는 상대가 없으므로 한쪽만 완료하면 시작한다
     const allReady = s.solo ? s.ready.some(Boolean) : s.ready.every(Boolean);
@@ -791,7 +811,7 @@ export function checksum(s){
   for (const it of s.items) h = (h*31 + it.k*7 + it.c*13 + it.r*29 + it.hp*3 + it.by) | 0;
   // 인원수만큼 전부 넣어야 한다. 두 명만 보면 3·4번 슬롯이 어긋나도 못 잡는다
   for (let i = 0; i < s.n; i++) h = (h*31 + (s.ready[i] ? i + 1 : 0) + (s.done[i] ? 17 : 0)) | 0;
-  h = (h*31 + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16 + (s.bare ? 32 : 0) + s.bareBy*64 + s.fastT*3 + s.bareT*5) | 0;
+  h = (h*31 + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16 + (s.bare ? 32 : 0) + s.bareBy*64 + s.fastT*3 + s.bareT*5 + s.negOk.length*13) | 0;
   for (const c of (s.color || [])) h = (h*31 + c) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;

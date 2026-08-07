@@ -15,6 +15,7 @@ import {
   GRID_X0, GRID_Y0, H, cellOwner, cellX, cellY
 } from './config.js';
 import { padRect, paletteSlots, uiBoxRect } from './layout.js';
+import { uiPrompt } from './ui-state.js';
 import { CHARGE_MAX_MS, PH_PLAY, THROW } from './config.js';
 
 // 게임 한 판을 만들고 rAF 루프를 돌린다.
@@ -413,31 +414,17 @@ export function createGame(canvas, opts = {}){
       };
     },
     // 2배속 대결 (PVP 전용)
-    // 칼전은 배치 단계가 없어 카운트다운 중에 신청한다 (그동안 카운트는 멈춘다)
-    canFast(){
-      const ph = client.pred.phase;
-      return !!online && !client.pred.fast && (ph === PH_READY || ph === PH_COUNT);
+    // 전투 전 화면에 무엇을 띄울지는 순수 함수 하나가 정한다 (테스트가 지킨다)
+    prompt(){ return uiPrompt(client.pred, SELF.slot, !!online); },
+    // 신청·응답은 종류를 인자로 받아 한 갈래로 처리한다 (두 벌로 나뉘면 한쪽만 틀린다)
+    request(kind){
+      sfx.place();
+      if (kind === 'bare') client.requestBare(SELF.slot); else client.requestFast(SELF.slot);
     },
-    fastState(){
-      const st = client.pred;
-      return { on: !!st.fast, by: st.fastBy | 0, mine: st.fastBy === SELF.slot + 1,
-               sec: Math.max(0, Math.ceil((st.fastT | 0) / 60)) };
+    answer(kind, ok){
+      ok ? sfx.ready() : sfx.deny();
+      if (kind === 'bare') client.answerBare(SELF.slot, ok); else client.answerFast(SELF.slot, ok);
     },
-    // 노템전 (총격전 전용. 칼전은 원래 아이템이 없다)
-    canBare(){
-      const st = client.pred;
-      return !!online && !st.melee && !st.bare
-        && (st.phase === PH_READY || st.phase === PH_COUNT);
-    },
-    bareState(){
-      const st = client.pred;
-      return { on: !!st.bare, by: st.bareBy | 0, mine: st.bareBy === SELF.slot + 1,
-               sec: Math.max(0, Math.ceil((st.bareT | 0) / 60)) };
-    },
-    requestBare(){ sfx.place(); client.requestBare(SELF.slot); },
-    answerBare(ok){ ok ? sfx.ready() : sfx.deny(); client.answerBare(SELF.slot, ok); },
-    requestFast(){ sfx.place(); client.requestFast(SELF.slot); },
-    answerFast(ok){ ok ? sfx.ready() : sfx.deny(); client.answerFast(SELF.slot, ok); },
     ready(){ sfx.ready(); wantDone = true; nextDoneAt = 0; client.setReady(SELF.slot); },
     go(){ sfx.ready(); wantGo = true; nextGoAt = 0; client.setGo(SELF.slot); },
     isMelee(){ return !!client.pred.melee; },

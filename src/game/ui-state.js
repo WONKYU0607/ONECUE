@@ -1,0 +1,67 @@
+// 전투 전(배치·카운트다운) 화면에 무엇을 띄울지 정하는 **순수 함수**.
+//
+// 예전엔 이 판단이 JSX 조건문에 흩어져 있었다. 시뮬·넷코드는 테스트가 지키는데
+// React 화면은 아무것도 안 지켜서, 시뮬이 멀쩡한데 화면만 안 뜨는 버그가 두 번 났다:
+//   - 노템전 수락 창을 2배속과 다른 마크업으로 써서 화면에 안 뜸
+//   - 상태 갱신 루프가 PH_READY에서만 돌아 칼전(카운트다운)에선 버튼이 안 뜸
+// 여기로 옮기면 평범한 상태 객체만 있으면 검사할 수 있다. JSX는 받은 대로 그리기만 한다.
+import { PH_READY, PH_COUNT, teamOf } from './config.js';
+
+export const NEG_LABEL = {
+  fast: {
+    title: '상대방이 2배속 대결을 신청했습니다.',
+    desc: '이동·총알 속도·발사 간격이 두 배가 됩니다.',
+    btn: '2배속 신청',
+    on: '2배속 대결',
+    wait: '2배속 신청함'
+  },
+  bare: {
+    title: '상대방이 노템전을 신청했습니다.',
+    desc: '엄폐물·투척물 없이 기본 공격으로만 겨룹니다.',
+    btn: '노템전 신청',
+    on: '노템전',
+    wait: '노템전 신청함'
+  }
+};
+
+// st: 예측 상태, slot: 내 슬롯, online: 온라인 대전인가
+// 반환값
+//   pre     전투 전 단계인가 (아니면 나머지는 전부 비어 있다)
+//   banner  이미 켜진 모드 ['fast','bare']
+//   ask     상대가 신청해서 내가 답해야 하는 것 {kind, sec}
+//   waiting 내가 신청하고 기다리는 것 {kind, sec}
+//   offer   지금 누를 수 있는 신청 버튼 ['fast','bare']
+export function uiPrompt(st, slot, online){
+  const none = { pre: false, banner: [], ask: null, waiting: null, offer: [] };
+  if (!st || !st.p) return none;
+  const pre = st.phase === PH_READY || st.phase === PH_COUNT;
+  if (!pre) return none;
+
+  const sec = t => Math.max(0, Math.ceil((t | 0) / 60));
+  const banner = [];
+  if (st.fast) banner.push('fast');
+  if (st.bare) banner.push('bare');
+
+  // 신청은 한 번에 하나만 오간다 (시뮬에서도 막혀 있다)
+  let ask = null, waiting = null;
+  const pending = st.fastBy ? { kind: 'fast', by: st.fastBy, sec: sec(st.fastT) }
+                : st.bareBy ? { kind: 'bare', by: st.bareBy, sec: sec(st.bareT) }
+                : null;
+  if (pending){
+    const n = st.n || 2;
+    const mine = teamOf(slot, n) === teamOf(pending.by - 1, n);
+    const okd = (st.negOk || []).includes(slot);
+    // 신청한 팀은 기다리기만 하고, 상대 팀은 각자 답한다.
+    // 2대2는 **둘 다** 눌러야 하므로 이미 누른 사람은 대기 표시로 바꾼다
+    if (mine || okd) waiting = { kind: pending.kind, sec: pending.sec, mine };
+    else ask = { kind: pending.kind, sec: pending.sec };
+  }
+
+  // 신청 버튼은 온라인에서만, 이미 켜졌거나 뭔가 오가는 중이면 숨긴다
+  const offer = [];
+  if (online && !pending){
+    if (!st.fast) offer.push('fast');
+    if (!st.bare && !st.melee) offer.push('bare');   // 칼전은 원래 아이템이 없다
+  }
+  return { pre: true, banner, ask, waiting, offer };
+}

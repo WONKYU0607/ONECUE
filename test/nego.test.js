@@ -10,7 +10,7 @@ import { Server, Client, setClock } from '../src/game/net.js';
 import { SELF, PH_READY, PH_COUNT, PH_PLAY, ITEM, GRID_ROWS } from '../src/game/config.js';
 import { assert } from './harness.js';
 
-function world(melee){
+function world(melee, n = 2){
   let now = 0; const q = []; const OW = 30;
   setClock({ now: () => now, delay: (fn, d) => q.push([now + d, fn]) });
   let srv = null; const cs = [];
@@ -18,20 +18,21 @@ function world(melee){
     clientSend(m){ q.push([now + OW, () => srv.onMsg({ ...m, pid })]); },
     serverSend(){}, close(){}
   });
+  const all = Array.from({ length: n }, (_, i) => i);
   srv = new Server({
     clientSend(){}, close(){},
     serverSend(m, pid){
-      for (const i of (pid === undefined ? [0, 1] : [pid]))
+      for (const i of (pid === undefined ? all : [pid]))
         q.push([now + OW, () => cs[i] && cs[i].onMsg(JSON.parse(JSON.stringify(m)))]);
     }
-  }, 2, melee);
-  for (let i = 0; i < 2; i++) cs.push(new Client(netFor(i), [i]));
+  }, n, melee);
+  for (let i = 0; i < n; i++) cs.push(new Client(netFor(i), [i]));
   const frame = () => {
-    for (let i = 0; i < 2; i++){ SELF.slot = i; SELF.n = 2; cs[i].ping(now); cs[i].sendInputs(now); }
+    for (let i = 0; i < n; i++){ SELF.slot = i; SELF.n = n; cs[i].ping(now); cs[i].sendInputs(now); }
     srv.update(now); now += 1000 / 60;
     q.sort((a, b) => a[0] - b[0]);
     while (q.length && q[0][0] <= now) q.shift()[1]();
-    for (let i = 0; i < 2; i++){ SELF.slot = i; SELF.n = 2; cs[i].applyFrames(); cs[i].predict(); }
+    for (let i = 0; i < n; i++){ SELF.slot = i; SELF.n = n; cs[i].applyFrames(); cs[i].predict(); }
   };
   const run = n => { for (let f = 0; f < n; f++) frame(); };
   return { srv, cs, frame, run };
@@ -107,7 +108,29 @@ console.log('칼전 2배속 — 카운트다운 중에 신청한다');
   assert(w.srv.s.phase === PH_PLAY, '수락 뒤 카운트가 다시 흘러 전투 시작');
 }
 
-console.log('5초 안에 답하지 않으면 저절로 사라진다');
+console.log('노템전이 켜지면 설치 완료를 건너뛴다');
+{
+  const w = world(false);
+  w.run(200);
+  SELF.slot = 0; SELF.n = 2;
+  w.cs[0].requestBare(0);
+  w.run(20);
+  SELF.slot = 1;
+  w.cs[1].answerBare(1, true);
+  w.run(20);
+  assert(w.srv.s.bare === true, '켜진다');
+  assert(w.srv.s.done.every(Boolean), '**설치 완료가 자동으로 끝난 상태** (준비완료만 남는다)');
+  assert(!w.srv.s.ready.some(Boolean), '준비완료는 아직 아니다');
+  // 준비완료를 양쪽 다 눌러야 시작
+  SELF.slot = 0; w.cs[0].setGo(0);
+  w.run(20);
+  assert(w.srv.s.phase === PH_READY, '한쪽만 누르면 대기');
+  SELF.slot = 1; w.cs[1].setGo(1);
+  w.run(30);
+  assert(w.srv.s.phase !== PH_READY, '둘 다 누르면 시작');
+}
+
+console.log('10초 안에 답하지 않으면 저절로 사라진다');
 {
   const { NEG_TICKS } = await import('../src/game/config.js');
   const w = world(false);
@@ -122,7 +145,7 @@ console.log('5초 안에 답하지 않으면 저절로 사라진다');
   assert(w.cs[1].pred.bareBy === 0, '상대 화면에서도 사라진다');
 }
 
-console.log('칼전은 답이 없어도 5초 뒤 시작한다');
+console.log('칼전은 답이 없어도 제한 시간 뒤 시작한다');
 {
   const { NEG_TICKS } = await import('../src/game/config.js');
   const w = world(true);
@@ -154,4 +177,54 @@ console.log('신청을 안 하면 칼전은 바로 시작한다');
 }
 
 SELF.slot = keep.slot; SELF.n = keep.n;
+console.log('2대2 노템전 — 상대 팀 두 명이 다 수락해야 켜진다');
+{
+  const { teamOf } = await import('../src/game/config.js');
+  const w = world(false, 4);
+  w.run(240);
+  SELF.slot = 0; SELF.n = 4;
+  w.cs[0].requestBare(0);
+  w.run(20);
+  const foes = [0, 1, 2, 3].filter(v => teamOf(v, 4) !== teamOf(0, 4));
+  assert(foes.length === 2, '상대 팀은 두 명 (' + foes.join(',') + ')');
+  for (const v of foes){
+    SELF.slot = v;
+    assert(w.cs[v].pred.bareBy === 1, `슬롯${v}에게 신청이 간다`);
+  }
+  const mate = [1, 2, 3].find(v => teamOf(v, 4) === teamOf(0, 4));
+  assert(w.cs[mate].pred.bareBy === 1, '팀원도 진행 상황은 본다');
+
+  // 한 명만 수락해서는 안 켜진다
+  SELF.slot = foes[0]; w.cs[foes[0]].answerBare(foes[0], true);
+  w.run(30);
+  assert(w.srv.s.bare === false, '**한 명만 수락하면 안 켜진다**');
+  assert(w.srv.s.bareBy === 1, '신청은 그대로 살아 있다');
+
+  // 팀원이 눌러도 소용없다
+  SELF.slot = mate; w.cs[mate].answerBare(mate, true);
+  w.run(30);
+  assert(w.srv.s.bare === false, '같은 팀이 눌러도 안 켜진다');
+
+  SELF.slot = foes[1]; w.cs[foes[1]].answerBare(foes[1], true);
+  w.run(30);
+  assert(w.srv.s.bare === true, '둘 다 수락하면 켜진다');
+  assert(w.srv.s.done.every(Boolean), '네 명 다 설치 완료를 건너뛴다');
+}
+
+console.log('2대2 — 한 명이 거절하면 즉시 끝난다');
+{
+  const { teamOf } = await import('../src/game/config.js');
+  const w = world(false, 4);
+  w.run(240);
+  SELF.slot = 0; SELF.n = 4;
+  w.cs[0].requestBare(0);
+  w.run(20);
+  const foes = [0, 1, 2, 3].filter(v => teamOf(v, 4) !== teamOf(0, 4));
+  SELF.slot = foes[0]; w.cs[foes[0]].answerBare(foes[0], true);
+  w.run(20);
+  SELF.slot = foes[1]; w.cs[foes[1]].answerBare(foes[1], false);
+  w.run(30);
+  assert(w.srv.s.bare === false && w.srv.s.bareBy === 0, '한 명 거절로 취소된다');
+}
+
 console.log('nego.test.js 통과');

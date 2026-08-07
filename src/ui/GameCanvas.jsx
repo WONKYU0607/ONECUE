@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createGame } from '../game/game.js';
-import { PH_READY, PH_COUNT, SHOW_NETINFO } from '../game/config.js';
+import { PH_READY, SHOW_NETINFO } from '../game/config.js';
+import { NEG_LABEL } from '../game/ui-state.js';
 import TunePanel from './TunePanel.jsx';
 import { getConnection, disconnect, getRoomInfo } from '../net/connection.js';
 import { getSettings } from '../state/settings.js';
@@ -15,11 +16,10 @@ export default function GameCanvas({ session, onExit, onFinish }){
   const [ready, setReady] = useState({ me: false, peer: false });
   const [box, setBox] = useState(null);   // 버튼을 놓을 자리 (아이템 칸 위 여백)
 
-  // 배치 단계와 **카운트다운** 모두에서 확인해야 한다.
-  // 칼전은 배치 단계를 건너뛰어 바로 카운트다운으로 가므로,
-  // PH_READY에서만 돌리면 2배속 신청 버튼이 아예 뜨지 않는다
+  // **페이즈로 거르지 않는다.** 예전엔 PH_READY에서만 돌려서, 배치 단계를 건너뛰는
+  // 칼전은 신청 버튼이 아예 안 떴다. 무엇을 띄울지는 prompt()가 정하므로
+  // 여기서는 그냥 계속 확인만 하면 된다 (100ms 폴링은 부담이 없다)
   useEffect(() => {
-    if (phase !== PH_READY && phase !== PH_COUNT){ setReady({ me: false, peer: false }); return; }
     const iv = setInterval(() => {
       const g = gameRef.current; if (!g) return;
       const info = getRoomInfo();
@@ -28,13 +28,12 @@ export default function GameCanvas({ session, onExit, onFinish }){
       setReady({
         me: g.isReady(), peer: g.peerReady(), srv: g.confirmedReady(), all: g.allPlaced(),
         cnt, melee,
-        fast: g.fastState(), canFast: g.canFast(),
-        bare: g.bareState(), canBare: g.canBare(),
+        prompt: g.prompt(),
         room: info ? info.room : null, slot: g.mySlot(), net: g.netStats()
       });
     }, 100);   // 남은 초를 표시하므로 조금 더 자주
     return () => clearInterval(iv);
-  }, [phase]);
+  }, []);
 
   // 버튼 자리는 캔버스 크기·패널 높이에 따라 달라진다
   useEffect(() => {
@@ -48,7 +47,8 @@ export default function GameCanvas({ session, onExit, onFinish }){
   const boxStyle = box ? {
     left: box.left + 'px', top: box.top + 'px',
     width: box.width + 'px', height: box.height + 'px',
-    fontSize: Math.max(9, Math.round(box.height * 0.42)) + 'px'
+    // 2대2는 상자가 낮아 예전 비율(0.42)이면 글씨가 10px까지 줄었다
+    fontSize: Math.max(15, Math.round(box.height * 0.5)) + 'px'
   } : { display: 'none' };
 
   useEffect(() => {
@@ -69,7 +69,6 @@ export default function GameCanvas({ session, onExit, onFinish }){
 
   const placing = phase === PH_READY;
   // 2배속 신청 UI는 칼전(카운트다운 중)에서도 떠야 한다
-  const preGame = phase === PH_READY || phase === PH_COUNT;
 
   return (
     <div className="game-root">
@@ -89,50 +88,33 @@ export default function GameCanvas({ session, onExit, onFinish }){
         <div className="link-note ui-overlay">상대가 나갔다</div>
       )}
 
-      {preGame && ready.fast?.on && (
-        <div className="link-note ui-overlay fast">2배속 대결</div>
-      )}
-      {preGame && ready.bare?.on && (
-        <div className="link-note ui-overlay fast">노템전</div>
-      )}
-      {preGame && ready.canBare && !ready.bare?.by && !ready.fast?.by && (
-        <button className="fastbtn ui-overlay bare" onClick={() => gameRef.current?.requestBare()}>
-          노템전 신청
+      {/* 전투 전 안내·신청은 prompt() 하나가 정한다. 종류마다 마크업을 따로 쓰면
+           한쪽만 틀리게 되므로(실제로 그래서 노템전 창이 안 떴다) 한 갈래로 그린다 */}
+      {(ready.prompt?.banner || []).map(k => (
+        <div key={k} className="link-note ui-overlay fast">{NEG_LABEL[k].on}</div>
+      ))}
+      {(ready.prompt?.offer || []).map((k, i) => (
+        <button key={k} className={'fastbtn ui-overlay' + (i ? ' bare' : '')}
+                onClick={() => gameRef.current?.request(k)}>
+          {NEG_LABEL[k].btn}
         </button>
-      )}
-      {preGame && ready.bare?.by > 0 && ready.bare?.mine && (
-        <div className="link-note ui-overlay">노템전 신청함 · 상대 응답 대기 {ready.bare.sec}</div>
-      )}
-      {preGame && ready.bare?.by > 0 && !ready.bare?.mine && (
-        <div className="modal-back">
-          <div className="modal ask">
-            <p className="ask-t">상대방이 노템전을 신청했습니다.</p>
-            <p className="ask-d">엄폐물·투척물 없이 기본 공격으로만 겨룹니다.</p>
-            <p className="ask-d">{ready.bare.sec}초 안에 답하지 않으면 그냥 진행됩니다.</p>
-            <div className="ask-row">
-              <button className="menu-btn ghost" onClick={() => gameRef.current?.answerBare(false)}>거절</button>
-              <button className="menu-btn primary" onClick={() => gameRef.current?.answerBare(true)}>수락</button>
-            </div>
-          </div>
+      ))}
+      {ready.prompt?.waiting && (
+        <div className="link-note ui-overlay">
+          {NEG_LABEL[ready.prompt.waiting.kind].wait} · 상대 응답 대기 {ready.prompt.waiting.sec}
         </div>
       )}
-      {preGame && ready.canFast && !ready.fast?.by && !ready.bare?.by && (
-        <button className="fastbtn ui-overlay" onClick={() => gameRef.current?.requestFast()}>
-          2배속 신청
-        </button>
-      )}
-      {preGame && ready.fast?.by > 0 && ready.fast?.mine && (
-        <div className="link-note ui-overlay">2배속 신청함 · 상대 응답 대기 {ready.fast.sec}</div>
-      )}
-      {preGame && ready.fast?.by > 0 && !ready.fast?.mine && (
+      {ready.prompt?.ask && (
         <div className="modal-back">
           <div className="modal ask">
-            <p className="ask-t">상대방이 2배속 대결을 신청했습니다.</p>
-            <p className="ask-d">이동·총알 속도·발사 간격이 두 배가 됩니다.</p>
-            <p className="ask-d">{ready.fast.sec}초 안에 답하지 않으면 그냥 진행됩니다.</p>
+            <p className="ask-t">{NEG_LABEL[ready.prompt.ask.kind].title}</p>
+            <p className="ask-d">{NEG_LABEL[ready.prompt.ask.kind].desc}</p>
+            <p className="ask-d">{ready.prompt.ask.sec}초 안에 답하지 않으면 그냥 진행됩니다.</p>
             <div className="ask-row">
-              <button className="menu-btn ghost" onClick={() => gameRef.current?.answerFast(false)}>거절</button>
-              <button className="menu-btn primary" onClick={() => gameRef.current?.answerFast(true)}>수락</button>
+              <button className="menu-btn ghost"
+                      onClick={() => gameRef.current?.answer(ready.prompt.ask.kind, false)}>거절</button>
+              <button className="menu-btn primary"
+                      onClick={() => gameRef.current?.answer(ready.prompt.ask.kind, true)}>수락</button>
             </div>
           </div>
         </div>

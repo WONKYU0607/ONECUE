@@ -293,9 +293,9 @@ export const SELF = { melee: false, slot: 0, n: 2 };
 // **sim.js 규칙이 바뀔 때마다 반드시 올릴 것.** 안 올리면 서버가 뒤처져도 검사를 통과해
 // 화면이 조용히 멈추고 원인을 짐작해야 한다 (자동 시작 규칙을 넣고도 안 올려서 겪음)
 export const FAST_MUL = 2;            // 2배속 대결 배수
-// 신청은 5초 안에 답해야 한다. 안 그러면 저절로 사라지고 기본 모드로 진행.
+// 신청은 10초 안에 답해야 한다. 안 그러면 저절로 사라지고 기본 모드로 진행.
 // (답을 기다리는 동안 카운트다운이 멈추므로 상한이 없으면 판이 영영 시작되지 않는다)
-export const NEG_TICKS = 300;
+export const NEG_TICKS = 600;   // 10초
 // 클라 전용 입력 곡선에도 2배속을 반영하기 위한 표식 (게임 루프가 갱신)
 export const FAST = { on: false };
 // 노템전 여부. 시뮬은 s.bare를 보고, 화면·입력 쪽은 이 플래그를 본다(FAST와 같은 방식)
@@ -303,7 +303,7 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 44;
+export const PROTO_VER = 45;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;
