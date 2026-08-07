@@ -420,7 +420,8 @@ export function createGame(canvas, opts = {}){
     },
     fastState(){
       const st = client.pred;
-      return { on: !!st.fast, by: st.fastBy | 0, mine: st.fastBy === SELF.slot + 1 };
+      return { on: !!st.fast, by: st.fastBy | 0, mine: st.fastBy === SELF.slot + 1,
+               sec: Math.max(0, Math.ceil((st.fastT | 0) / 60)) };
     },
     // 노템전 (총격전 전용. 칼전은 원래 아이템이 없다)
     canBare(){
@@ -430,7 +431,8 @@ export function createGame(canvas, opts = {}){
     },
     bareState(){
       const st = client.pred;
-      return { on: !!st.bare, by: st.bareBy | 0, mine: st.bareBy === SELF.slot + 1 };
+      return { on: !!st.bare, by: st.bareBy | 0, mine: st.bareBy === SELF.slot + 1,
+               sec: Math.max(0, Math.ceil((st.bareT | 0) / 60)) };
     },
     requestBare(){ sfx.place(); client.requestBare(SELF.slot); },
     answerBare(ok){ ok ? sfx.ready() : sfx.deny(); client.answerBare(SELF.slot, ok); },

@@ -20,6 +20,7 @@ import {
   EXTRAP_MAX,
   FAST,
   FAST_MUL,
+  NEG_TICKS,
   FLASH_RADIUS,
   FLASH_T,
   FLY_TICKS,
@@ -140,6 +141,7 @@ export function normalizeState(st){
   if (typeof st.fastBy !== 'number') st.fastBy = 0;
   st.bare = !!st.bare;
   if (typeof st.bareBy !== 'number') st.bareBy = 0;
+  for (const k of ['fastT', 'bareT']) if (typeof st[k] !== 'number') st[k] = 0;
   if (!Array.isArray(st.proj)) st.proj = [];
   if (!Array.isArray(st.fire)) st.fire = [];
   if (!Array.isArray(st.off)) st.off = Array(st.n || 2).fill(false);
@@ -206,6 +208,8 @@ export function newState(n = 2, melee = false){
     fastBy: 0,
     bare: false,                // 노템전: 엄폐물·투척물 없이 기본 공격만
     bareBy: 0,                  // 신청한 사람 (슬롯+1, 0이면 없음)
+    fastT: 0,                   // 신청 응답 제한 시간 (틱). 0이 되면 저절로 취소
+    bareT: 0,
     phase: PH_READY, timer: 0, clock: 0,
     maxStep: stepCap(),
     bulletV: bulletFP(),
@@ -429,20 +433,23 @@ export function step(s, inp){
   if (s.phase === PH_READY || s.phase === PH_COUNT){
     for (let i = 0; i < s.n; i++){
       const q = s.off[i] ? NOIN : (inp[i] || NOIN);
-      if (q.fastReq && !s.fast && !s.fastBy) s.fastBy = i + 1;
+      if (q.fastReq && !s.fast && !s.fastBy && !s.bareBy){ s.fastBy = i + 1; s.fastT = NEG_TICKS; }
       if (q.fastAns && s.fastBy && s.fastBy !== i + 1){
         if (q.fastAns === 1) s.fast = true;
-        s.fastBy = 0;
+        s.fastBy = 0; s.fastT = 0;
       }
       // 노템전. 칼전은 원래 아이템이 없으니 해당 없음
       if (!s.melee){
-        if (q.bareReq && !s.bare && !s.bareBy) s.bareBy = i + 1;
+        if (q.bareReq && !s.bare && !s.bareBy && !s.fastBy){ s.bareBy = i + 1; s.bareT = NEG_TICKS; }
         if (q.bareAns && s.bareBy && s.bareBy !== i + 1){
           if (q.bareAns === 1){ s.bare = true; s.items = []; }   // 이미 깔아둔 것도 치운다
-          s.bareBy = 0;
+          s.bareBy = 0; s.bareT = 0;
         }
       }
     }
+    // 제한 시간이 지나면 거절한 것으로 보고 창을 닫는다
+    if (s.fastBy && --s.fastT <= 0){ s.fastBy = 0; s.fastT = 0; }
+    if (s.bareBy && --s.bareT <= 0){ s.bareBy = 0; s.bareT = 0; }
   }
   if (s.phase === PH_READY){
     for (let i = 0; i < s.n; i++){
@@ -485,7 +492,7 @@ export function step(s, inp){
       s.proj = n.proj; s.blind = n.blind; s.ammo = n.ammo; s.fire = n.fire;
       // s.off는 그대로 둔다 — 재대전해도 여전히 끊겨 있는 사람은 끊긴 것
       s.fast = false; s.fastBy = 0;                          // 2배속은 그 판 한정
-      s.bare = false; s.bareBy = 0;                          // 노템전도 그 판 한정
+      s.bare = false; s.bareBy = 0; s.fastT = 0; s.bareT = 0;   // 노템전도 그 판 한정
       s.maxStep = ms; s.bulletV = bv; s.coolT = ct;
       s.phase = n.phase; s.timer = n.timer; s.over = false; s.winner = 0; s.clock = 0;
     }
@@ -549,8 +556,9 @@ export function step(s, inp){
   }
 
   if (s.phase === PH_COUNT){
-    // 답을 기다리는 동안엔 카운트를 멈춘다. 안 그러면 3초 안에 못 누른다
-    if (s.fastBy > 0) return;
+    // 답을 기다리는 동안엔 카운트를 멈춘다. 안 그러면 3초 안에 못 누른다.
+    // 제한 시간(5초)이 있어 영영 멈추지는 않는다
+    if (s.fastBy > 0 || s.bareBy > 0) return;
     if (--s.timer <= 0){ s.phase = PH_PLAY; s.timer = 0; s.clock = s.n > 2 ? ROUND_TICKS_4 : ROUND_TICKS; }
     return;
   }
@@ -783,7 +791,7 @@ export function checksum(s){
   for (const it of s.items) h = (h*31 + it.k*7 + it.c*13 + it.r*29 + it.hp*3 + it.by) | 0;
   // 인원수만큼 전부 넣어야 한다. 두 명만 보면 3·4번 슬롯이 어긋나도 못 잡는다
   for (let i = 0; i < s.n; i++) h = (h*31 + (s.ready[i] ? i + 1 : 0) + (s.done[i] ? 17 : 0)) | 0;
-  h = (h*31 + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16 + (s.bare ? 32 : 0) + s.bareBy*64) | 0;
+  h = (h*31 + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16 + (s.bare ? 32 : 0) + s.bareBy*64 + s.fastT*3 + s.bareT*5) | 0;
   for (const c of (s.color || [])) h = (h*31 + c) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;

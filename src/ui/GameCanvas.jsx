@@ -15,9 +15,11 @@ export default function GameCanvas({ session, onExit, onFinish }){
   const [ready, setReady] = useState({ me: false, peer: false });
   const [box, setBox] = useState(null);   // 버튼을 놓을 자리 (아이템 칸 위 여백)
 
-  // 배치 단계에선 준비 상태를 자주 확인해야 버튼이 제때 바뀐다
+  // 배치 단계와 **카운트다운** 모두에서 확인해야 한다.
+  // 칼전은 배치 단계를 건너뛰어 바로 카운트다운으로 가므로,
+  // PH_READY에서만 돌리면 2배속 신청 버튼이 아예 뜨지 않는다
   useEffect(() => {
-    if (phase !== PH_READY){ setReady({ me: false, peer: false }); return; }
+    if (phase !== PH_READY && phase !== PH_COUNT){ setReady({ me: false, peer: false }); return; }
     const iv = setInterval(() => {
       const g = gameRef.current; if (!g) return;
       const info = getRoomInfo();
@@ -30,7 +32,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
         bare: g.bareState(), canBare: g.canBare(),
         room: info ? info.room : null, slot: g.mySlot(), net: g.netStats()
       });
-    }, 200);
+    }, 100);   // 남은 초를 표시하므로 조금 더 자주
     return () => clearInterval(iv);
   }, [phase]);
 
@@ -99,15 +101,18 @@ export default function GameCanvas({ session, onExit, onFinish }){
         </button>
       )}
       {preGame && ready.bare?.by > 0 && ready.bare?.mine && (
-        <div className="link-note ui-overlay">노템전 신청함 · 상대 응답을 기다리는 중</div>
+        <div className="link-note ui-overlay">노템전 신청함 · 상대 응답 대기 {ready.bare.sec}</div>
       )}
       {preGame && ready.bare?.by > 0 && !ready.bare?.mine && (
-        <div className="ask ui-overlay">
-          <p className="ask-t">상대방이 노템전을 신청했습니다.</p>
-          <p className="ask-d">엄폐물·투척물 없이 기본 공격으로만 겨룹니다.</p>
-          <div className="ask-row">
-            <button className="menu-btn ghost" onClick={() => gameRef.current?.answerBare(false)}>거절</button>
-            <button className="menu-btn primary" onClick={() => gameRef.current?.answerBare(true)}>수락</button>
+        <div className="modal-back">
+          <div className="modal ask">
+            <p className="ask-t">상대방이 노템전을 신청했습니다.</p>
+            <p className="ask-d">엄폐물·투척물 없이 기본 공격으로만 겨룹니다.</p>
+            <p className="ask-d">{ready.bare.sec}초 안에 답하지 않으면 그냥 진행됩니다.</p>
+            <div className="ask-row">
+              <button className="menu-btn ghost" onClick={() => gameRef.current?.answerBare(false)}>거절</button>
+              <button className="menu-btn primary" onClick={() => gameRef.current?.answerBare(true)}>수락</button>
+            </div>
           </div>
         </div>
       )}
@@ -117,13 +122,14 @@ export default function GameCanvas({ session, onExit, onFinish }){
         </button>
       )}
       {preGame && ready.fast?.by > 0 && ready.fast?.mine && (
-        <div className="link-note ui-overlay">2배속 신청함 · 상대 응답을 기다리는 중</div>
+        <div className="link-note ui-overlay">2배속 신청함 · 상대 응답 대기 {ready.fast.sec}</div>
       )}
       {preGame && ready.fast?.by > 0 && !ready.fast?.mine && (
         <div className="modal-back">
           <div className="modal ask">
             <p className="ask-t">상대방이 2배속 대결을 신청했습니다.</p>
             <p className="ask-d">이동·총알 속도·발사 간격이 두 배가 됩니다.</p>
+            <p className="ask-d">{ready.fast.sec}초 안에 답하지 않으면 그냥 진행됩니다.</p>
             <div className="ask-row">
               <button className="menu-btn ghost" onClick={() => gameRef.current?.answerFast(false)}>거절</button>
               <button className="menu-btn primary" onClick={() => gameRef.current?.answerFast(true)}>수락</button>
