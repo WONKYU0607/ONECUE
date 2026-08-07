@@ -75,7 +75,7 @@ export default function App(){
       {screen === 'splash'   && <Splash onDone={() => { goHome(); goHomeFirst(); }} />}
       {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={startPractice} onMelee={startMelee}
                                      onSettings={() => setShowSettings(true)} onHelp={() => setShowHelp(true)} />}
-      {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} />}
+      {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} onMelee={startMelee} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toGame} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome} onFinish={onFinish} />}

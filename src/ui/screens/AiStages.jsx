@@ -3,15 +3,56 @@ import { AI_STAGES } from '../../game/ai.js';
 import { isUnlocked, isCleared, getProgress } from '../../state/progress.js';
 
 // AI 모드 스테이지 선택. 앞 단계를 깨야 다음이 열린다
-export default function AiStages({ onBack, onStart }){
+export default function AiStages({ onBack, onStart, onMelee }){
   // 2대2는 나 말고 셋이 AI. 탭 네 개를 띄우지 않고 팀전을 확인할 수 있다
   const [n, setN] = useState(2);
+  // 한 화면에 다 깔지 않고 모드를 먼저 고르게 한다 (PVP와 같은 흐름)
+  const [mode, setMode] = useState(null);     // null | 'gun' | 'melee'
   const p = getProgress();
-  return (
+
+  if (mode === null) return (
     <div className="screen list">
       <header className="bar-top">
         <button className="icon-btn" onClick={onBack} aria-label="뒤로">‹</button>
         <span className="title">AI 모드</span>
+        <span className="spacer" />
+      </header>
+      <div className="menu wide-menu">
+        <button className="menu-btn primary" onClick={() => setMode('gun')}>
+          <span className="t">총격전</span>
+          <span className="d">단계별 AI와 대결</span>
+        </button>
+        <button className="menu-btn" onClick={() => setMode('melee')}>
+          <span className="t">칼전</span>
+          <span className="d">근접전 AI와 대결</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  if (mode === 'melee') return (
+    <div className="screen list">
+      <header className="bar-top">
+        <button className="icon-btn" onClick={() => setMode(null)} aria-label="뒤로">‹</button>
+        <span className="title">AI 모드 · 칼전</span>
+        <span className="spacer" />
+      </header>
+      <div className="menu wide-menu">
+        <button className="menu-btn primary" onClick={() => onMelee(2)}>
+          <span className="t">1 vs 1</span>
+        </button>
+        <button className="menu-btn" onClick={() => onMelee(4)}>
+          <span className="t">2 vs 2</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="screen list">
+      <header className="bar-top">
+        <button className="icon-btn" onClick={() => setMode(null)} aria-label="뒤로">‹</button>
+        <span className="title">AI 모드 · 총격전</span>
         <span className="spacer" />
       </header>
 

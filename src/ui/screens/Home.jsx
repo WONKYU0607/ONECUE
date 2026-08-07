@@ -1,5 +1,5 @@
 // 첫 화면: 모드 선택 + 설정
-export default function Home({ onPvp, onAi, onPractice, onMelee, onSettings, onHelp }){
+export default function Home({ onPvp, onAi, onPractice, onSettings, onHelp }){
   return (
     <div className="screen home">
       <button className="icon-btn top-right" onClick={onSettings} aria-label="설정">⚙</button>
@@ -10,19 +10,11 @@ export default function Home({ onPvp, onAi, onPractice, onMelee, onSettings, onH
       <div className="menu">
         <button className="menu-btn primary" onClick={onPvp}>
           <span className="t">PVP</span>
-          <span className="d">실시간 1대1 대전</span>
+          <span className="d">총격전 · 칼전, 실시간 대전</span>
         </button>
         <button className="menu-btn" onClick={onAi}>
           <span className="t">AI 모드</span>
           <span className="d">단계별 AI와 대결</span>
-        </button>
-        <button className="menu-btn" onClick={() => onMelee(2)}>
-          <span className="t">칼전</span>
-          <span className="d">근접 1대1</span>
-        </button>
-        <button className="menu-btn" onClick={() => onMelee(4)}>
-          <span className="t">칼전 2대2</span>
-          <span className="d">근접 팀전</span>
         </button>
         <button className="menu-btn" onClick={onPractice}>
           <span className="t">연습 모드</span>
