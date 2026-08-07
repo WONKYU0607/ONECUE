@@ -21,9 +21,18 @@ font:bold 20px/1 monospace;letter-spacing:2px;cursor:pointer}
 #root{height:100%}
 
 /* ---------- 화면 공통 ---------- */
+/* 폰에서는 화면을 꽉 채우고, PC처럼 가로가 넓으면 **게임 캔버스와 같은 폭**으로 묶는다.
+   게임은 늘 폰 비율로 그려지는데 메뉴만 풀스크린이면 들어갈 때마다 크기가 널뛴다.
+   캔버스 실측: 1917x950에서 466px, 1280x800에서 392px → 대략 높이의 0.455배 */
 .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
 justify-content:center;gap:18px;color:#e8e8f0;font-family:monospace;padding:24px}
 .screen.center{justify-content:center}
+@media (min-aspect-ratio: 3/5){
+  .screen{
+    left:50%; right:auto; transform:translateX(-50%);
+    width:min(100vw, calc(100vh * 0.455));
+  }
+}
 .screen.list{justify-content:flex-start;padding:0}
 /* 한글 네 글자라 자간 8px은 너무 벌어진다. 좁히고 크기는 화면 폭에 맞춘다 */
 .logo{font-size:min(46px,13vw);letter-spacing:3px;color:#8fd8ff;
@@ -165,7 +174,9 @@ font:15px/1 monospace;cursor:pointer;opacity:.55}
 .screen.splash{
   background-size:cover; background-position:center top; background-repeat:no-repeat;
   background-color:#0d0d16;
-  display:flex; align-items:flex-end; justify-content:center;
+  /* .screen 이 flex-direction:column 이라 **세로가 justify, 가로가 align** 이다.
+     이걸 반대로 써서 문구가 아래가 아니라 오른쪽 가운데로 갔었다 */
+  display:flex; align-items:center; justify-content:flex-end;
   padding:0 0 max(38px, env(safe-area-inset-bottom, 0px)); cursor:default;
 }
 .screen.splash.ready{cursor:pointer}
