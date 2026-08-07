@@ -5,8 +5,6 @@ export default function Home({ onPvp, onAi, onPractice, onSettings, onHelp }){
       <button className="icon-btn top-right" onClick={onSettings} aria-label="설정">⚙</button>
       <button className="icon-btn top-right2" onClick={onHelp} aria-label="조작 방법">?</button>
 
-      <h1 className="logo">총칼대전</h1>
-
       <div className="menu">
         <button className="menu-btn primary" onClick={onPvp}>
           <span className="t">PVP</span>
