@@ -38,6 +38,7 @@ justify-content:center;gap:18px;color:#e8e8f0;font-family:monospace;padding:8px}
    그래서 화면 크기가 달라져도 이미지 한 장이면 된다 */
 .screen:not(.splash){
   border-style:solid; border-width:var(--fy) var(--fx);
+  border-color:#0a0c12;                 /* 틀 이미지를 못 받았을 때의 모습 */
   border-image:var(--frame) 86 fill stretch;
   background:#0a0c12;
 }
@@ -67,6 +68,7 @@ gap:3px;padding:14px 16px;cursor:pointer;color:#d6eeff;font-family:monospace;tex
 background:transparent;
 /* 배경과 같은 틀을 얇게. 버튼마다 이미지를 따로 만들 필요가 없다 */
 border-style:solid; border-width:15px 17px;
+border-color:#1b2b3a;                   /* 틀 이미지를 못 받았을 때의 모습 */
 border-image:var(--frame) 86 fill stretch}
 .menu-btn .t{font-size:18px;letter-spacing:3px}
 .menu-btn .d{font-size:11px;color:#7e9eb6}
