@@ -283,6 +283,79 @@ console.log('AI가 붙어서 때린다 (공격은 자동, AI는 자리만 잡는
   assert(s.p.some(p => p.hp < MAXHP), '실제로 맞는다 ' + s.p.map(p => p.hp).join('/'));
 }
 
+console.log('방패로 막으면 상대가 굳는다');
+{
+  const { SHIELD_TICKS, SHIELD_COOL, STUN_TICKS } = await import('../src/game/config.js');
+  const setup = () => {
+    const s = newState(2, true);
+    s.phase = PH_PLAY;
+    s.p[0].x = Math.round(90 * FP); s.p[0].y = Math.round(150 * FP);
+    s.p[0].face = 0;                                   // 슬롯0이 위를 보고 친다
+    s.p[1].x = s.p[0].x;
+    s.p[1].y = s.p[0].y - Math.round(GRID_CH * FP);
+    s.p[1].face = 1;                                   // 슬롯1은 아래(마주 봄)
+    return s;
+  };
+  // 막았을 때
+  {
+    const s = setup();
+    const q = IN(2); q[1].sh = 1;
+    step(s, q);
+    assert(s.p[1].shield === SHIELD_TICKS, '방패가 올라간다');
+    assert(s.p[1].shCool === SHIELD_COOL, '쿨다운이 돈다');
+    const hp0 = s.p[1].hp;
+    for (let t = 0; t < ATK_TICKS + 4; t++) step(s, IN(2));
+    assert(s.p[1].hp === hp0, '피해를 안 입는다');
+    assert(s.p[0].stun > 0, '휘두른 쪽이 굳는다 (' + s.p[0].stun + '틱)');
+    assert(s.p[0].stun <= STUN_TICKS, '1초를 안 넘는다');
+  }
+  // 굳은 동안은 못 움직이고 못 친다
+  {
+    const s = setup();
+    s.p[0].stun = STUN_TICKS;
+    const x0 = s.p[0].x, hp1 = s.p[1].hp;
+    const q = IN(2); q[0].dx = stepCap();
+    for (let t = 0; t < 30; t++) step(s, q);
+    assert(s.p[0].x === x0, '굳으면 못 움직인다');
+    assert(s.p[1].hp === hp1, '굳으면 못 친다');
+    for (let t = 0; t < STUN_TICKS; t++) step(s, IN(2));
+    assert(s.p[0].stun === 0, '1초 뒤 풀린다');
+  }
+  // 등 뒤는 못 막는다
+  {
+    const s = setup();
+    s.p[1].face = 0;                                   // 같은 방향을 봄 = 등 뒤로 맞음
+    const q = IN(2); q[1].sh = 1;
+    step(s, q);
+    const hp0 = s.p[1].hp;
+    for (let t = 0; t < ATK_TICKS + 4; t++) step(s, IN(2));
+    assert(hp0 - s.p[1].hp === MELEE_DAMAGE, '등 뒤는 방패로 못 막는다');
+    assert(s.p[0].stun === 0, '막힌 게 아니니 안 굳는다');
+  }
+  // 쿨다운 중엔 못 든다
+  {
+    const s = setup();
+    const q = IN(2); q[1].sh = 1;
+    step(s, q);
+    for (let t = 0; t < SHIELD_TICKS + 2; t++) step(s, IN(2));
+    assert(s.p[1].shield === 0 && s.p[1].shCool > 0, '방패가 내려가고 쿨이 남는다');
+    step(s, q);
+    assert(s.p[1].shield === 0, '쿨 중엔 다시 못 든다');
+  }
+  // 방패를 드는 동안은 공격이 멈춘다 (그게 대가)
+  {
+    const s = setup();
+    const q = IN(2); q[0].sh = 1;
+    step(s, q);
+    assert(s.p[0].shield > 0 && s.p[0].atk === 0, '방패를 들면 휘두르던 칼이 취소된다');
+    const hp1 = s.p[1].hp;
+    for (let t = 0; t < SHIELD_TICKS; t++) step(s, IN(2));
+    assert(s.p[1].hp === hp1, '방패를 든 동안은 상대가 안 맞는다');
+    for (let t = 0; t < ATK_TICKS + 4; t++) step(s, IN(2));
+    assert(s.p[1].hp < hp1, '방패가 내려가면 다시 공격이 나간다');
+  }
+}
+
 console.log('죽어도 폭발 연출이 없다');
 {
   const s = newState(2, true);

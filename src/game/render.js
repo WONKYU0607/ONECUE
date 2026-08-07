@@ -3,11 +3,11 @@ import {
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO, HP_MARKS,
   ITEM, ITEM_DEF, cellOwner, teamOf, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
-  FIRE_TICKS, FIRE_RADIUS,
+  FIRE_TICKS, FIRE_RADIUS, SHIELD_TICKS, SHIELD_COOL, STUN_TICKS,
   WALL_L, WALL_R, wallIdx, PWf,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
 } from './config.js';
-import { RS, computeLayout, stickGeom } from './layout.js';
+import { RS, computeLayout, stickGeom, shieldBtn } from './layout.js';
 import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
 
@@ -111,6 +111,31 @@ export function createRenderer(canvas){
         Math.round((xw + ARENA.pw / 2 - dw / 2) * RS), Math.round((yw + ARENA.ph - dh) * RS),
         Math.round(dw * RS), Math.round(dh * RS));
       ctx.filter = 'none';
+      // 방패를 든 동안: 바라보는 쪽에 빛나는 호를 그린다 (시트에 방패 프레임이 없다)
+      if (p.shield > 0){
+        const cx = xw + ARENA.pw / 2, cy = yw + ARENA.ph / 2;
+        const r = ARENA.pw * 0.85;
+        const ang = [-Math.PI / 2, Math.PI / 2, Math.PI, 0][face];
+        const fade = Math.min(1, p.shield / 6);
+        ctx.save();
+        ctx.globalAlpha = 0.85 * fade;
+        ctx.beginPath();
+        ctx.arc(cx * RS, cy * RS, r * RS, ang - 0.9, ang + 0.9);
+        ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 2.2 * RS; ctx.stroke();
+        ctx.globalAlpha = 0.35 * fade;
+        ctx.beginPath();
+        ctx.arc(cx * RS, cy * RS, (r - 1.6) * RS, ang - 0.9, ang + 0.9);
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2 * RS; ctx.stroke();
+        ctx.restore();
+      }
+      // 기절: 머리 위에서 점 세 개가 돈다
+      if (p.stun > 0){
+        const cx = xw + ARENA.pw / 2, top = yw - 2;
+        for (let k = 0; k < 3; k++){
+          const a2 = (tick * 0.13) + k * (Math.PI * 2 / 3);
+          circle(cx + Math.cos(a2) * 4.2, top + Math.sin(a2) * 1.6, 0.9, '#ffd34d');
+        }
+      }
     } else if (isReady(sheet)){
       // 프레임 순서: [팀0앞, 팀0뒤, 팀1앞, 팀1뒤, ...] + 8부터 피격(흰색) 버전
       // 색은 각자 고른 것. 내 캐릭터만 뒷모습을 쓴다
@@ -378,6 +403,31 @@ export function createRenderer(canvas){
   }
 
   // 전투 중 투척 버튼 (배치 팔레트와 같은 자리)
+  // 칼전 방패 버튼
+  function drawShieldBtn(s, uiH2){
+    const b = shieldBtn(uiH2);
+    const me = s.p[SELF.slot];
+    const up = me && me.shield > 0;
+    const ready2 = me && me.hp > 0 && (me.shCool || 0) === 0 && (me.stun || 0) === 0;
+    px(b.x, b.y, b.w, b.h, up ? 'rgba(159,232,255,0.30)'
+                          : ready2 ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)');
+    const c = up ? '#9fe8ff' : ready2 ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
+    px(b.x, b.y, b.w, 1, c); px(b.x, b.y + b.h - 1, b.w, 1, c);
+    px(b.x, b.y, 1, b.h, c); px(b.x + b.w - 1, b.y, 1, b.h, c);
+    // 방패 모양 (오각형)
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2, w2 = b.w * 0.3, h2 = b.h * 0.34;
+    ctx.beginPath();
+    ctx.moveTo((cx - w2) * RS, (cy - h2) * RS);
+    ctx.lineTo((cx + w2) * RS, (cy - h2) * RS);
+    ctx.lineTo((cx + w2) * RS, (cy + h2 * 0.3) * RS);
+    ctx.lineTo(cx * RS, (cy + h2) * RS);
+    ctx.lineTo((cx - w2) * RS, (cy + h2 * 0.3) * RS);
+    ctx.closePath();
+    ctx.fillStyle = up ? '#9fe8ff' : ready2 ? '#d8d8e8' : '#6a6a85';
+    ctx.fill();
+    if (me && (me.shCool || 0) > 0)
+      px(b.x + 1, b.y + b.h - 3, (b.w - 2) * (1 - me.shCool / SHIELD_COOL), 1.6, '#9fe8ff');
+  }
   function drawThrowPad(s, uiH2, ammo, charge){
     if (s.phase !== PH_PLAY) return;
     for (const sl of throwSlots(uiH2)){
@@ -537,9 +587,15 @@ export function createRenderer(canvas){
       px(c.x/FP, cy2, c.w/FP, c.h/FP, c.hp > 2 ? COL.cover : COL.cover2);
       px(c.x/FP, cy2, c.w/FP, 2, '#7676a0');
     }
-    for (const b of s.bullets)
-      px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5,
+    // 총알은 **쏜 사람이 그려진 시간축**에 맞춰 그린다.
+    // 상대는 확정 기록을 따라 조금 과거로 그려지는데 총알만 현재로 그리면
+    // 상대 몸에서 한참 앞선 자리에서 총알이 튀어나온다
+    const back = Math.max(0, (cl.pred ? cl.pred.tick : s.tick) - (cl.rt ?? s.tick));
+    for (const b of s.bullets){
+      const lag = b.o === SELF.slot ? 0 : back;
+      px(b.x/FP, fy((b.y + b.vy * (a - lag))/FP, 5), 2, 5,
          TEAMS[(s.color && s.color[b.o] != null) ? s.color[b.o] : TEAM_OF[b.o]].m);
+    }
     // 렌더 위치 배열은 첫 예측이 끝나야 생긴다. 없으면 보정 없이 확정 위치로 그린다
     const rx = cl.rx || [], ry = cl.ry || [];
     for (let i = 0; i < s.p.length; i++)
@@ -553,6 +609,7 @@ export function createRenderer(canvas){
     drawPanel(s, stick);
     if (left) drawPalette(s, uiH, left, drag);
     if (extra.ammo) drawThrowPad(s, uiH, extra.ammo, extra.charge);
+    if (ARENA.melee) drawShieldBtn(s, uiH);
     drawBlind(s, extra.softFlash);
     if (SHOW_HUD){
       ctx.font = (8*RS) + 'px monospace'; ctx.textAlign = 'left';

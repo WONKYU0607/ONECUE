@@ -31,6 +31,13 @@ function side(pd, total){
   return Math.max(4, Math.min(pd.x + pd.w - total - 4, cx - total / 2));
 }
 
+// 칼전 방패 버튼: 스틱 반대쪽. 스와이프와 확실히 떨어뜨린다
+export function shieldBtn(uiH){
+  const pd = padRect(uiH);
+  const size = Math.min(pd.h - 8, 46);
+  return { x: pd.x + 8, y: pd.y + (pd.h - size) / 2, w: size, h: size };
+}
+
 // 화면 위에 겹쳐 띄우는 버튼·배너가 차지할 자리 (월드 좌표).
 // 팔레트 위쪽을 쓰되, 칼전처럼 팔레트가 비어 있으면 패드 전체를 기준으로 잡는다.
 // (예전엔 game.js가 sl[0].y를 그냥 읽어 칼전에서 화면이 통째로 죽었다)

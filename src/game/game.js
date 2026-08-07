@@ -158,7 +158,8 @@ export function createGame(canvas, opts = {}){
     },
     canThrowNow: () => client.pred.phase === PH_PLAY,
     ammo: ammoLeft,
-    onThrow: (k, ch) => { if (canThrow(client.pred, SELF.slot, k)) client.throwItem(SELF.slot, k, ch); }
+    onThrow: (k, ch) => { if (canThrow(client.pred, SELF.slot, k)) client.throwItem(SELF.slot, k, ch); },
+    onShield: () => { sfx.ready?.(); client.raiseShield(SELF.slot); }
   });
 
   const doResize = () => view.resize(innerWidth, innerHeight);
@@ -179,6 +180,15 @@ export function createGame(canvas, opts = {}){
   let wantGo = false, nextGoAt = 0;
   let pendPlace = null, nextPlaceAt = 0;
 
+  // 연출은 **화면에 그려진 위치**에 붙여야 한다. 시뮬 위치를 쓰면
+  // 상대는 30px쯤 뒤에 그려지므로 총구 불빛이 엉뚱한 데서 터진다
+  function drawnAt(i, st){
+    const rx = client.rx, ry = client.ry;
+    const x = (rx && rx[i] !== undefined) ? rx[i] : st.p[i].x;
+    const y = (ry && ry[i] !== undefined) ? ry[i] : st.p[i].y;
+    return { x, y };
+  }
+
   // 지난 프레임과 비교해 무슨 일이 일어났는지 알아내고 소리·연출을 낸다
   function reactTo(st, dt){
     const cur = snapshot(st);
@@ -188,19 +198,24 @@ export function createGame(canvas, opts = {}){
     // 발사: 쿨다운이 막 채워진 순간
     for (let i = 0; i < n; i++){
       if (cur.cool[i] > prev.cool[i]){
+        // 칼전은 총이 아니다. 소리도 불빛도 다르게
+        if (st.melee){ sfx.slash(i === me); continue; }
         sfx.shot(i === me);
-        // 칼전은 총구 불빛이 없다 (총 쏘는 것처럼 보인다는 지적)
-        if (st.melee) continue;
-        const p = st.p[i];
-        juice.muzzle((p.x + PWf / 2 - FP) / FP + 1, viewY(p.y / FP), i === 0);
+        const p = drawnAt(i, st);
+        juice.muzzle((p.x + PWf / 2 - FP) / FP + 1, viewY(p.y / FP), teamOf(i, n) === 0);
       }
     }
     // 피격
     for (let i = 0; i < n; i++){
       if (cur.flash[i] > prev.flash[i]){
-        sfx.hit(i === me);
+        if (st.melee) sfx.slashHit(i === me); else sfx.hit(i === me);
+        // 맞았을 때는 총격전·칼전 공통 (예전 그대로)
         if (i === me){ juice.shake(1.1); buzz(12); }
-        const p = st.p[i];
+        // **때렸을 때는 칼전에서만 진동.** 총격전은 손대지 않는다.
+        // 화면 흔들림은 안 넣는다 — 자동 공격이라 초당 2번 맞히므로
+        // 붙어 있는 내내 화면이 요동쳐 멀미가 난다
+        else if (st.melee && st.p[i].hitBy === me) buzz(7);
+        const p = drawnAt(i, st);
         juice.spark((p.x + PWf / 2) / FP, viewY(p.y / FP) + PHf / FP / 2,
                     'rgba(255,190,120,ALPHA)', 7, 60);
       }
@@ -325,6 +340,7 @@ export function createGame(canvas, opts = {}){
       const a = brain.think(client.pred, slot, dt, now);
       if (a.vx || a.vy) client.input(slot, a.vx * sp * dt, a.vy * sp * dt, 0);
       if (a.thr && canThrow(client.pred, slot, a.thr.k)) client.throwItem(slot, a.thr.k, a.thr.ch);
+      if (a.sh) client.raiseShield(slot);
     }
 
     // 유실 대비 재전송

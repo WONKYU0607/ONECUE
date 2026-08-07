@@ -1,5 +1,5 @@
-import { NET } from './config.js';
-import { stickVector, inStickZone, paletteSlots, throwSlots } from './layout.js';
+import { NET, ARENA } from './config.js';
+import { stickVector, inStickZone, paletteSlots, throwSlots, shieldBtn } from './layout.js';
 import { unlockAudio } from './audio.js';
 
 // 스틱 상태와 눌린 키를 들고 있다가 루프가 매 프레임 읽어간다.
@@ -47,6 +47,13 @@ export function attachInput(canvas, view, opts = {}){
 
     // 전투 중: 투척 버튼을 누르면 차징 시작
     if (opts.canThrowNow?.()){
+      if (ARENA.melee){
+        const b = shieldBtn(view.uiH);
+        if (wp.x >= b.x && wp.x <= b.x + b.w && wp.y >= b.y && wp.y <= b.y + b.h){
+          opts.onShield?.();
+          return;
+        }
+      }
       for (const sl of throwSlots(view.uiH)){
         if (wp.x >= sl.x && wp.x <= sl.x + sl.w && wp.y >= sl.y && wp.y <= sl.y + sl.h){
           if ((opts.ammo?.(sl.k) ?? 0) <= 0) return;

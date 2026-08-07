@@ -72,6 +72,9 @@ import {
   TEAM_OF,
   THROW,
   THROW_DEF,
+  SHIELD_TICKS,
+  SHIELD_COOL,
+  STUN_TICKS,
   MELEE_DAMAGE,
   ATK_TICKS,
   ATK_HIT,
@@ -140,6 +143,10 @@ export function normalizeState(st){
   if (!Array.isArray(st.off)) st.off = Array(st.n || 2).fill(false);
   for (let i = 0; i < (st.p || []).length; i++)
     if (typeof st.p[i].face !== 'number') st.p[i].face = teamOf(i, st.n || 2) === 0 ? 0 : 1;
+  for (const q of (st.p || [])){
+    if (typeof q.hitBy !== 'number') q.hitBy = -1;
+    for (const k of ['shield', 'shCool', 'stun']) if (typeof q[k] !== 'number') q[k] = 0;
+  }
   st.melee = !!st.melee;
   if (!Array.isArray(st.blind)) st.blind = [0, 0];
   if (typeof st.blindMax !== 'number') st.blindMax = 0;
@@ -167,6 +174,10 @@ export function newState(n = 2, melee = false){
       y: team === 0 ? homeYFP(ROW_MAX[0]) : homeYFP(ROW_MIN[1]),
       hp: MAXHP, cool: 0, invul: 0, flash: 0,
       atk: 0,                     // 칼 휘두르는 모션 남은 틱
+      hitBy: -1,                  // 마지막으로 나를 때린 슬롯 (-1 = 없음·불 같은 무주체)
+      shield: 0,                  // 방패를 든 남은 틱
+      shCool: 0,                  // 방패 쿨다운
+      stun: 0,                    // 막혀서 굳은 남은 틱
       face: team === 0 ? 0 : 1    // 0=위 1=아래 2=왼 3=오른. 이동 방향을 따라간다
     });
   }
@@ -199,7 +210,8 @@ export function newState(n = 2, melee = false){
   };
 }
 
-export const NOIN = { dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 };
+export const FACE_OPP = [1, 0, 3, 2];   // 마주 보는 방향 (위↔아래, 왼↔오른)
+export const NOIN = { dx:0, dy:0, fire:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0 };
 export function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
 
 export function overlap(ax,ay,aw,ah,bx,by,bw,bh){
@@ -314,7 +326,7 @@ function killFx(s, p){
   });
 }
 
-export function blast(s, c, r, rad, dmg, centerDmg){
+export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
   setArena(s.n, s.melee);
   const x0 = Math.round(cellX(c - rad) * FP);
   const x1 = Math.round(cellX(c + rad + 1) * FP);
@@ -324,7 +336,7 @@ export function blast(s, c, r, rad, dmg, centerDmg){
     const p = s.p[i];
     if (!overlap(p.x, p.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
     if (p.invul > 0) continue;
-    p.invul = INVUL_T; p.flash = FLASH_T;
+    p.invul = INVUL_T; p.flash = FLASH_T; p.hitBy = by;
     if (!DEBUG_INF_HP){
       const d = (centerDmg && atCenter(s, i, c, r)) ? centerDmg : dmg;
       const was = p.hp;
@@ -337,8 +349,8 @@ export function blast(s, c, r, rad, dmg, centerDmg){
   s.fx.push({ c, r, t: EXPLO_TICKS, k: 0 });   // k=0: 폭발
 }
 
-function explode(s, it){
-  blast(s, it.c, it.r, DRUM_RADIUS, DRUM_DAMAGE);
+function explode(s, it, by = -1){
+  blast(s, it.c, it.r, DRUM_RADIUS, DRUM_DAMAGE, undefined, by);
   it.hp = 0;
 }
 
@@ -461,9 +473,9 @@ export function step(s, inp){
 
   // 이동은 전투 중에만 (카운트다운 동안 고정)
   for (let i = 0; i < s.n; i++){
-    const p = s.p[i], q = s.off[i] ? NOIN : (inp[i] || NOIN);
+    const p = s.p[i], q = (s.off[i] || p.stun > 0) ? NOIN : (inp[i] || NOIN);
     if (s.phase === PH_PLAY){
-      // 자유 이동. dx/dy 는 이동량(고정소수점)
+      // 자유 이동. dx/dy 는 이동량(고정소수점). 기절 중엔 입력이 통째로 무시된다
       let dx = q.dx | 0, dy = q.dy | 0;
       const cap = s.maxStep * (s.fast ? FAST_MUL : 1), len2 = dx*dx + dy*dy;
       if (len2 > cap*cap){                     // 대각선이 빨라지지 않도록 벡터 길이로 제한
@@ -573,19 +585,28 @@ export function step(s, inp){
       continue;
     }
     if (pr.fuse > 0 && --pr.fuse === 0){
-      blast(s, pr.c, pr.r1, NADE_RADIUS, NADE_DAMAGE, NADE_CENTER_DAMAGE);
+      blast(s, pr.c, pr.r1, NADE_RADIUS, NADE_DAMAGE, NADE_CENTER_DAMAGE, pr.by);
       s.proj.splice(i, 1);
     }
   }
   // 칼전: 휘두르기 모션과 판정. 앞으로 한 칸을 때린다
   if (s.melee && s.phase === PH_PLAY){
     for (let i = 0; i < s.n; i++){
-      const p = s.p[i];
+      const p = s.p[i], q = s.off[i] ? NOIN : (inp[i] || NOIN);
       if (p.cool > 0) p.cool--;
-      if (p.hp <= 0){ p.atk = 0; continue; }
-      // 자동 공격. 총격전의 자동 발사와 같은 구조로, 칼전은 스틱만으로 조작한다
-      // (수동으로 되돌리려면 여기에 입력 조건만 다시 붙이면 된다)
-      if (s.off[i]) continue;                       // 끊긴 사람은 안 휘두른다
+      if (p.shield > 0) p.shield--;
+      if (p.shCool > 0) p.shCool--;
+      if (p.stun > 0) p.stun--;
+      if (p.hp <= 0){ p.atk = 0; p.shield = 0; p.stun = 0; continue; }
+      if (s.off[i]) continue;                       // 끊긴 사람은 아무것도 안 한다
+      // 방패: 누르면 0.5초간 방어 자세. 기절 중엔 못 든다.
+      // 드는 순간 **휘두르던 칼은 취소된다** — 막는 동안은 공격을 포기하는 게 대가
+      if (q.sh && p.shield === 0 && p.shCool === 0 && p.stun === 0){
+        p.shield = SHIELD_TICKS; p.shCool = SHIELD_COOL; p.atk = 0;
+      }
+      // 자동 공격. 칼전은 스틱만으로 조작한다
+      if (p.stun > 0){ p.atk = 0; continue; }       // 굳은 동안은 못 휘두른다
+      if (p.shield > 0) continue;                   // 방패를 든 동안은 공격이 안 나간다
       if (p.atk === 0 && p.cool === 0){ p.atk = ATK_TICKS; p.cool = MELEE_COOL; }
       if (p.atk > 0){
         p.atk--;
@@ -602,9 +623,15 @@ export function step(s, inp){
             const t = s.p[v];
             if (t.hp <= 0) continue;
             if (!overlap(t.x, t.y, PWf, PHf, hx, hy, hw, hh)) continue;
+            // 방패로 막았는가 — **마주 보고 있을 때만** 막힌다. 등 뒤는 못 막는다
+            if (t.shield > 0 && t.face === FACE_OPP[p.face]){
+              p.stun = STUN_TICKS; p.atk = 0;        // 막은 쪽이 아니라 휘두른 쪽이 굳는다
+              t.blocked = (t.blocked || 0) + 1;      // 연출용 (막은 순간 표시)
+              continue;
+            }
             const was = t.hp;
             if (!DEBUG_INF_HP) t.hp -= MELEE_DAMAGE;
-            t.flash = FLASH_T;
+            t.flash = FLASH_T; t.hitBy = i;
             if (was > 0 && t.hp <= 0) killFx(s, t);
           }
         }
@@ -624,7 +651,7 @@ export function step(s, inp){
         if (t.hp <= 0) continue;
         if (!overlap(t.x, t.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
         const was = t.hp;
-        t.hp -= FIRE_DAMAGE; t.flash = FLASH_T;
+        t.hp -= FIRE_DAMAGE; t.flash = FLASH_T; t.hitBy = -1;
         if (was > 0 && t.hp <= 0) killFx(s, t);
       }
     }
@@ -667,7 +694,7 @@ export function step(s, inp){
       //  - 상대 영역의 드럼통: 내 총알만 터뜨린다 (당한 쪽은 미리 못 없앤다)
       if (teamOf(b.o, s.n) !== cellOwner(it.r)){
         it.hp--;
-        if (it.k === ITEM.DRUM && it.hp <= 0) explode(s, it);
+        if (it.k === ITEM.DRUM && it.hp <= 0) explode(s, it, b.o);
       }
       gone = true; break;
     }
@@ -684,7 +711,7 @@ export function step(s, inp){
         if (!overlap(b.x,b.y,BWf,BHf, t.x,t.y,PWf,PHf)) continue;
         gone = true;
         if (t.invul === 0){
-          t.invul = INVUL_T; t.flash = FLASH_T;
+          t.invul = INVUL_T; t.flash = FLASH_T; t.hitBy = b.o;
           if (!DEBUG_INF_HP){
             t.hp -= BULLET_DAMAGE;
             if (t.hp <= 0) killFx(s, t);
@@ -730,7 +757,9 @@ export function checksum(s){
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;
   for (const fr of s.fire) h = (h*31 + fr.c*7 + fr.r*13 + fr.t) | 0;
-  for (let i = 0; i < s.n; i++) h = (h*31 + (s.off[i] ? i + 3 : 0) + (s.p[i].atk || 0) * 5 + (s.p[i].face || 0) * 3) | 0;
+  for (let i = 0; i < s.n; i++){ const q = s.p[i];
+    h = (h*31 + (s.off[i] ? i + 3 : 0) + (q.atk || 0) * 5 + (q.face || 0) * 3 + (q.hitBy + 1) * 9
+         + (q.shield || 0) * 7 + (q.stun || 0) * 11 + (q.shCool || 0)) | 0; }
   for (let i = 0; i < s.n; i++){
     h = (h*31 + s.blind[i] * (i + 1)) | 0;
     for (let k = 0; k < s.ammo[i].length; k++) h = (h*31 + s.ammo[i][k] * (7 + k*4)) | 0;

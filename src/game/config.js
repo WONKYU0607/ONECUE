@@ -126,6 +126,11 @@ export const ATK_TICKS = 18;            // 휘두르는 모션 길이 (0.3초)
 export const ATK_HIT = 12;              // 이 틱에 판정 (모션 중간)
 export const MELEE_COOL = 30;           // 다음 공격까지 0.5초
 export const MELEE_REACH = 1;           // 앞으로 한 칸
+// 방패: 누르면 0.5초간 방어 자세. 그 사이 상대 칼을 막으면 상대가 1초 기절한다.
+// 공격은 방패를 들고 있어도 그대로 나간다(사용자 확정)
+export const SHIELD_TICKS = 30;         // 방패를 드는 시간 0.5초
+export const SHIELD_COOL = 72;          // 누른 시점부터 1.2초 (없으면 계속 들고 있을 수 있다)
+export const STUN_TICKS = 60;           // 막힌 쪽이 굳는 시간 1초
 
 // 화염병: 착탄한 칸 + 주변 한 칸(3x3)이 4초간 탄다. 그 안에 서 있으면 주기적으로 피해
 export const FIRE_TICKS = 240;          // 4초
@@ -293,7 +298,7 @@ export const FAST = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 39;
+export const PROTO_VER = 41;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

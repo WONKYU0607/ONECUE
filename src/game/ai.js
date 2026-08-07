@@ -1,7 +1,7 @@
 import {
   FP, WALL_L, WALL_R, wallIdx, PH_PLAY, THROW,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CW, GRID_CH, GRID_X0, GRID_Y0,
-  FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX, PHf, PWf
+  ATK_TICKS, ATK_HIT, FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX, PHf, PWf
 } from './config.js';
 
 // 노릴 상대. 2대2에서는 살아 있는 적 중 가로로 가장 가까운 쪽을 본다.
@@ -121,13 +121,18 @@ export function createAI(stage = 1){
         // 좌우로도 벨 수 있으므로, 세로·가로 중 더 가까운 축으로 붙는다
         const reach = GRID_CH * FP;
         const dxc = foe.x - my.x, dyc = foe.y - my.y;
-        const sideways = Math.abs(dxc) > Math.abs(dyc) * 1.3;
-        if (sideways){
-          const want2 = (my.cool > 0 && (my.atk || 0) === 0) ? reach * 1.4 : reach * 0.5;
+        // 상대가 곧 칼을 휘두르면 방패를 든다. 단계가 높을수록 잘 읽는다
+        // (판정이 모션 중간에 나오므로 그 전에 눌러야 막힌다)
+        const foeSwing = (foe.atk || 0) > 0 && (foe.atk || 0) > ATK_TICKS - ATK_HIT;
+        const guard = foeSwing && my.shCool === 0 && Math.random() < p.aim * 0.5;
+        // 세로·가로 중 더 가까운 축으로 붙는다
+        if (Math.abs(dxc) > Math.abs(dyc) * 1.3){
+          const swinging2 = (my.atk || 0) > 0;
+          const want2 = (my.cool > 0 && !swinging2) ? reach * 1.4 : reach * 0.5;
           const gapX = Math.abs(dxc) - PWf;
           const vx2 = gapX > want2 ? Math.sign(dxc) : (gapX < want2 - reach * 0.3 ? -Math.sign(dxc) : 0);
           const vy2 = Math.abs(dyc) < PHf * 0.5 ? 0 : Math.sign(dyc);
-          return { vx: vx2 * p.speed, vy: vy2 * p.speed };
+          return { vx: vx2 * p.speed, vy: vy2 * p.speed, sh: guard ? 1 : 0 };
         }
         const up = dyc < 0;                               // 상대가 위에 있으면 위를 본다
         const gap = up ? my.y - (foe.y + PHf) : foe.y - (my.y + PHf);
@@ -142,7 +147,7 @@ export function createAI(stage = 1){
         else if (gap > want + reach * 0.15) vy = up ? -1 : 1;
         else if (gap < want - reach * 0.15) vy = up ? 1 : -1;
         const vx = Math.abs(dxc) < PWf * 0.35 ? 0 : Math.sign(dxc);
-        return { vx: vx * p.speed, vy: vy * p.speed };
+        return { vx: vx * p.speed, vy: vy * p.speed, sh: guard ? 1 : 0 };
       }
 
       const myCx = my.x + HALF;

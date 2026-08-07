@@ -104,6 +104,21 @@ export const sfx = {
            type:'triangle', space:0.3, attack:0.002 });                  // 이게 '뿅'
     body({ t0:0.004, dur:0.07, vol:0.10*v, f0: mine ? 620 : 460, f1:150, space:0.2 });
   },
+  // 칼 휘두르기: 공기를 가르는 '쉭'. 총소리와 달리 음정 없이 잡음만으로 만든다.
+  // 대역폭 좁은 잡음의 중심 주파수를 위에서 아래로 쓸어내리면 휘두르는 궤적처럼 들린다
+  slash(mine){
+    const v = mine ? 1 : 0.5;
+    hiss({ dur:0.13, vol:0.26*v, type:'bandpass', f0:5200, f1:900, q:2.2, space:0.25 });
+    hiss({ t0:0.012, dur:0.09, vol:0.14*v, type:'highpass', f0:6500, f1:2600 });
+    body({ t0:0.02, dur:0.06, vol:0.05*v, f0:320, f1:140 });   // 손잡이 쪽 무게감만 살짝
+  },
+  // 칼이 실제로 맞았을 때: 쇳소리가 얹힌 타격음
+  slashHit(mine){
+    const v = mine ? 1 : 0.6;
+    hiss({ dur:0.05, vol:0.26*v, type:'bandpass', f0:3400, f1:1400, q:3 });
+    body({ dur:0.10, vol:0.20*v, f0: mine ? 240 : 300, f1:90, space:0.3 });
+    body({ t0:0.006, dur:0.22, vol:0.09*v, f0:2100, f1:1500, type:'triangle', space:0.4 });
+  },
   // 피격: 둔탁한 충격 + 여운
   hit(mine){
     const v = mine ? 1 : 0.6;
