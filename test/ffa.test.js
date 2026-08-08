@@ -22,7 +22,7 @@ process.chdir(new URL('..', import.meta.url).pathname);
 const proc = spawn(process.execPath, ['server/index.js'], { env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore','ignore','inherit'] });
 await sleep(700);
 try {
-  for (const n of [3, 4]){
+  for (const n of [3, 4, 6]){
     const cs = [];
     for (let i=0;i<n;i++) cs.push(conn('ffa'+n+'_'+i, { n, melee:true, ffa:true }));
     await sleep(900);
@@ -42,6 +42,15 @@ try {
   const team = conn('t1', { n:4, melee:true });
   await sleep(500);
   assert(!team.last('hello'), '팀전 대기자가 개인전 방에 안 낀다');
+
+  // 3대3 (팀전 6인)
+  const six = [];
+  for (let i=0;i<6;i++) six.push(conn('s6_'+i, { n:6, melee:false }));
+  await sleep(1400);
+  const sh = six.map(c => c.last('hello'));
+  assert(sh.every(Boolean), '3대3: 여섯 명 모두 방에 들어간다');
+  assert(new Set(sh.map(h=>h.room)).size === 1, '3대3: 같은 방');
+  assert(sh[0].n === 6 && !sh[0].ffa, '3대3: 6인 팀전');
   console.log('ffa.test.js 통과');
 } finally {
   all.forEach(t => { try { t.ws.close(); } catch {} });

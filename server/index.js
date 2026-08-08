@@ -3,7 +3,7 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { Server } from '../src/game/net.js';
-import { PROTO_VER } from '../src/game/config.js';
+import { PROTO_VER, COLOR_COUNT } from '../src/game/config.js';
 import { forfeit, setOff } from '../src/game/sim.js';
 
 const PORT = process.env.PORT || 8080;
@@ -79,7 +79,7 @@ class Room {
   }
   colorTaken(c){ return this.seats.some((st, i) => st.sid && this.server.s.color[i] === c); }
   freeColor(){
-    for (let c = 0; c < 4; c++) if (!this.colorTaken(c)) return c;
+    for (let c = 0; c < COLOR_COUNT; c++) if (!this.colorTaken(c)) return c;
     return 0;
   }
   teamCounts(){
@@ -90,7 +90,7 @@ class Room {
   // 팀 선택 중인 사람들에게 현재 인원 구성을 알린다
   sendLobby(){
     const c = this.teamCounts();
-    const taken = [0, 1, 2, 3].filter(c => this.colorTaken(c));
+    const taken = Array.from({ length: COLOR_COUNT }, (_, c) => c).filter(c => this.colorTaken(c));
     const raw = { t: 'lobby', teams: c, need: this.n / 2, taken };
     for (const ws of this.waitingList) if (ws.readyState === 1) ws.send(JSON.stringify(raw));
     for (const st of this.seats) if (st.ws && st.ws.readyState === 1){
@@ -258,7 +258,7 @@ wss.on('connection', (ws, req) => {
   const mode = q.get('mode') || 'queue';      // queue | create | join
   const code = (q.get('code') || '').trim();
   const resume = q.get('resume') === '1';    // 끊겼다 자동으로 다시 붙는 경우에만 true
-  const want = [2, 3, 4].includes(+q.get('n')) ? +q.get('n') : 2;   // 원하는 인원수
+  const want = [2, 3, 4, 5, 6].includes(+q.get('n')) ? +q.get('n') : 2;   // 원하는 인원수
   const ffa = q.get('ffa') === '1';         // 개인전
   const wantColor = q.has('color') ? +q.get('color') : -1;   // 메뉴에서 고른 캐릭터 색
   const melee = q.get('melee') === '1';      // 칼전인가

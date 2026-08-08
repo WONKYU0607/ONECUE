@@ -42,6 +42,31 @@ console.log('보통 모드는 그대로');
   for (let i = 0; i < 120; i++) step(s, IN({}, {}));
   assert(s.bullets.length > 0, '평소엔 자동 발사된다');
 }
+console.log('칼전 연습 — 칼·방패를 익힐 수 있다');
+{
+  const { stepCap } = await import('../src/game/config.js');
+  const s = newState(2, true);
+  s.solo = true;
+  const go = IN(2); for (const q of go){ q.ready = 1; q.go = 1; }
+  step(s, go);
+  for (let t = 0; t < 600 && s.phase !== PH_PLAY; t++) step(s, IN(2));
+  assert(s.phase === PH_PLAY, '전투로 들어간다');
+  const x0 = s.p[0].x;
+  let swings = 0, shields = 0;
+  for (let k = 0; k < 600; k++){
+    const q = IN(2); q[0].dx = stepCap();
+    if (k % 90 === 0) q[0].sh = 1;
+    step(s, q);
+    if (s.p[0].atk > 0) swings++;
+    if (s.p[0].shield > 0) shields++;
+  }
+  assert(s.p[0].x > x0, '움직일 수 있다');
+  assert(swings > 100, `칼을 휘두른다 (${swings}프레임)`);
+  assert(shields > 100, `방패를 들 수 있다 (${shields}프레임)`);
+  assert(s.over === false, '연습이라 승패가 안 난다');
+  assert(s.bullets.length === 0, '칼전이라 총알이 없다');
+}
+
 console.log('practice.test.js 통과');
 
 console.log('연습 모드는 혼자서도 시작된다');
@@ -58,4 +83,29 @@ console.log('보통 모드는 여전히 양쪽 필요');
   step(s, IN({ ready: 1 }, { ready: 1 }));
   assert(s.phase === 0, '아이템 없이는 시작 안 됨');
 }
+console.log('칼전 연습 — 칼·방패를 익힐 수 있다');
+{
+  const { stepCap } = await import('../src/game/config.js');
+  const s = newState(2, true);
+  s.solo = true;
+  const go = IN(2); for (const q of go){ q.ready = 1; q.go = 1; }
+  step(s, go);
+  for (let t = 0; t < 600 && s.phase !== PH_PLAY; t++) step(s, IN(2));
+  assert(s.phase === PH_PLAY, '전투로 들어간다');
+  const x0 = s.p[0].x;
+  let swings = 0, shields = 0;
+  for (let k = 0; k < 600; k++){
+    const q = IN(2); q[0].dx = stepCap();
+    if (k % 90 === 0) q[0].sh = 1;
+    step(s, q);
+    if (s.p[0].atk > 0) swings++;
+    if (s.p[0].shield > 0) shields++;
+  }
+  assert(s.p[0].x > x0, '움직일 수 있다');
+  assert(swings > 100, `칼을 휘두른다 (${swings}프레임)`);
+  assert(shields > 100, `방패를 들 수 있다 (${shields}프레임)`);
+  assert(s.over === false, '연습이라 승패가 안 난다');
+  assert(s.bullets.length === 0, '칼전이라 총알이 없다');
+}
+
 console.log('practice.test.js 통과');

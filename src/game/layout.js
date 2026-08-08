@@ -45,13 +45,16 @@ export function shieldBtn(uiH){
 export function uiBoxRect(uiH){
   const pd = padRect(uiH);
   const sl = paletteSlots(uiH);
-  const x = sl.length ? Math.min(...sl.map(v => v.x)) : pd.x;
-  const x1 = sl.length ? Math.max(...sl.map(v => v.x + v.w)) : pd.x + pd.w * 0.5;
+  const x = sl.length ? Math.min(...sl.map(v => v.x)) : pd.x + 6;
+  // 칼전은 팔레트가 없어 자리가 남는데, 그걸 다 쓰면 버튼이 과하게 커진다
+  const x1 = sl.length ? Math.max(...sl.map(v => v.x + v.w)) : pd.x + pd.w * 0.40;
   const top = pd.y + 1;
   // 팔레트가 있으면 그 위, 없으면(칼전) 방패 버튼 위. 예전엔 패드 전체를 먹어
   // 칼전 준비완료 버튼이 69px로 거대했다
   const bottom = sl.length ? sl[0].y - 2 : shieldBtn(uiH).y - 3;
-  return { x, y: top, w: x1 - x, h: Math.max(18, bottom - top) };   // 너무 납작하면 글씨가 안 보인다
+  // 아래는 글씨가 안 보이는 한계, 위는 총격전과 비슷하게. 칼전이 유독 컸다
+  const h = Math.max(18, Math.min(22, bottom - top));
+  return { x, y: top, w: x1 - x, h };
 }
 
 // 배치 팔레트: 스틱 반대쪽에 아이템 아이콘. 종류 수는 아레나에 따라 다르다

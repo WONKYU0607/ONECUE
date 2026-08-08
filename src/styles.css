@@ -53,7 +53,8 @@ justify-content:center;gap:18px;color:#e8e8f0;font-family:monospace;padding:8px}
 }
 .screen.list{justify-content:flex-start;padding:0}
 /* 한글 네 글자라 자간 8px은 너무 벌어진다. 좁히고 크기는 화면 폭에 맞춘다 */
-.logo{font-size:min(46px,13vw);letter-spacing:3px;color:#8fd8ff;
+.logo{font-family:"Arial Black","Helvetica Neue",Impact,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  font-weight:900;font-size:min(46px,13vw);letter-spacing:3px;color:#8fd8ff;
   text-shadow:0 0 18px rgba(78,201,240,.45);white-space:nowrap}
 .logo.win{color:#4ec9f0}.logo.lose{color:#f0645a}.logo.draw{color:#e8e8f0}
 .hint{font-size:12px;color:#7a7a95;letter-spacing:2px}
@@ -64,14 +65,22 @@ justify-content:center;gap:18px;color:#e8e8f0;font-family:monospace;padding:8px}
 .menu{display:flex;flex-direction:column;gap:12px;
   width:min(320px, calc(100% - 8px));}
 .menu-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;
-gap:3px;padding:10px 14px;min-height:72px;cursor:pointer;color:#d6eeff;font-family:monospace;
+gap:0;padding:6px 14px;min-height:58px;cursor:pointer;color:#eaf6ff;
 text-align:center;background:transparent;
+/* 설명글을 없앴으니 한 줄에 맞춘다. 예전 72px은 틀이 헐렁해 보였다 */
 /* 배경과 같은 틀을 얇게. 버튼마다 이미지를 따로 만들 필요가 없다 */
 border-style:solid; border-width:15px 17px;
 border-color:#1b2b3a;                   /* 틀 이미지를 못 받았을 때의 모습 */
 border-image:var(--frame) 86 fill stretch}
-.menu-btn .t{font-size:18px;letter-spacing:3px}
-.menu-btn .d{font-size:11px;color:#7e9eb6}
+/* 굵고 각진 게임 느낌. 웹폰트 없이 시스템 글꼴만으로 최대한 두껍게 만든다:
+   무게 900 + 획을 한 겹 덧그리기(text-stroke) + 푸른 발광 */
+.menu-btn .t{
+  font-family:"Arial Black","Helvetica Neue",Impact,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  font-size:20px; font-weight:900; letter-spacing:2px;
+  -webkit-text-stroke:0.6px rgba(255,255,255,.55);
+  text-shadow:0 0 10px rgba(110,200,255,.45), 0 2px 3px rgba(0,0,0,.8);
+}
+.menu-btn .d{display:none}
 .menu-btn.primary{color:#eaf7ff}
 .menu-btn.primary .t{text-shadow:0 0 10px rgba(90,190,255,.55)}
 .menu-btn.ghost{color:#7e9eb6}

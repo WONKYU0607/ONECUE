@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Splash from './ui/screens/Splash.jsx';
 import Home from './ui/screens/Home.jsx';
 import AiStages from './ui/screens/AiStages.jsx';
+import PracticeMenu from './ui/screens/PracticeMenu.jsx';
 import PvpMenu from './ui/screens/PvpMenu.jsx';
 import Matching from './ui/screens/Matching.jsx';
 import Result from './ui/screens/Result.jsx';
@@ -41,9 +42,9 @@ export default function App(){
     setSession({ kind: 'pvp', ...opt });      // opt: {mode:'queue'|'create'|'join', code, n, melee}
     setScreen('matching');
   }, []);
-  const startPractice = useCallback(() => {
+  const startPractice = useCallback(opt => {
     SELF.slot = 0;
-    setSession({ kind: 'practice' });
+    setSession({ kind: 'practice', ...opt });   // opt: { melee }
     setScreen('game');
   }, []);
   const startMelee = useCallback((n = 2) => {
@@ -73,7 +74,7 @@ export default function App(){
   return (
     <>
       {screen === 'splash'   && <Splash onDone={() => { goHome(); goHomeFirst(); }} />}
-      {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={startPractice} onMelee={startMelee}
+      {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
                                      onSettings={() => setShowSettings(true)} onHelp={() => setShowHelp(true)} />}
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} onMelee={startMelee} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}

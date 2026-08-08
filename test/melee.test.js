@@ -415,7 +415,7 @@ console.log('죽어도 폭발 연출이 없다');
 console.log('개인전 — 각자 한 팀, 마지막 한 명이 승리');
 {
   const { teamCount } = await import('../src/game/config.js');
-  for (const n of [3, 4]){
+  for (const n of [3, 4, 5, 6]){
     const s = newState(n, true, true);
     assert(s.ffa === true, `${n}인 개인전 표시`);
     assert(teamCount(n) === n, `${n}인이면 팀도 ${n}개`);

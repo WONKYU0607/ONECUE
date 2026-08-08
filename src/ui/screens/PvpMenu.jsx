@@ -40,11 +40,9 @@ export default function PvpMenu({ onBack, onStart }){
           <>
             <button className="menu-btn primary" onClick={() => { setMelee(false); setStep('how'); }}>
               <span className="t">총격전</span>
-              <span className="d">엄폐물을 깔고 자동 발사로 겨룬다</span>
             </button>
             <button className="menu-btn" onClick={() => { setMelee(true); setStep('how'); }}>
               <span className="t">칼전</span>
-              <span className="d">붙어서 칼과 방패로 겨룬다</span>
             </button>
           </>
         )}
@@ -53,15 +51,12 @@ export default function PvpMenu({ onBack, onStart }){
           <>
             <button className="menu-btn primary" onClick={() => { setHow('queue'); setStep('n'); }}>
               <span className="t">랜덤 매칭</span>
-              <span className="d">아무나 만나서 바로 시작</span>
             </button>
             <button className="menu-btn" onClick={() => { setHow('create'); setStep('n'); }}>
               <span className="t">방 만들기</span>
-              <span className="d">코드를 받아 친구에게</span>
             </button>
             <button className="menu-btn" onClick={() => setStep('code')}>
               <span className="t">코드 입력</span>
-              <span className="d">친구가 만든 방에 들어가기</span>
             </button>
           </>
         )}
@@ -74,11 +69,13 @@ export default function PvpMenu({ onBack, onStart }){
             <button className="menu-btn" onClick={() => onStart({ mode: how, n: 4, melee })}>
               <span className="t">2 vs 2</span>
             </button>
+            <button className="menu-btn" onClick={() => onStart({ mode: how, n: 6, melee })}>
+              <span className="t">3 vs 3</span>
+            </button>
             {/* 개인전은 칼전에만. 총격전은 진영이 나뉘어 있어 성립하지 않는다 */}
             {melee && (
               <button className="menu-btn" onClick={() => setStep('ffa')}>
                 <span className="t">개인전</span>
-                <span className="d">각자 한 명씩, 마지막 한 명이 승리</span>
               </button>
             )}
           </>
@@ -86,12 +83,12 @@ export default function PvpMenu({ onBack, onStart }){
 
         {step === 'ffa' && (
           <>
-            <button className="menu-btn primary" onClick={() => { setPending({ mode: how, n: 3, melee, ffa: true }); setStep('color'); }}>
-              <span className="t">3인전</span>
-            </button>
-            <button className="menu-btn" onClick={() => { setPending({ mode: how, n: 4, melee, ffa: true }); setStep('color'); }}>
-              <span className="t">4인전</span>
-            </button>
+            {[3, 4, 5, 6].map((k, i) => (
+              <button key={k} className={'menu-btn' + (i === 0 ? ' primary' : '')}
+                onClick={() => { setPending({ mode: how, n: k, melee, ffa: true }); setStep('color'); }}>
+                <span className="t">{k}인전</span>
+              </button>
+            ))}
           </>
         )}
 
@@ -99,7 +96,7 @@ export default function PvpMenu({ onBack, onStart }){
           <>
             <p className="hint">캐릭터 색을 고르세요</p>
             <div className="colorpick">
-              {[0, 1, 2, 3].map(c => (
+              {[0, 1, 2, 3, 4, 5].map(c => (
                 <button key={c}
                   className={'swatch' + (color === c ? ' on' : '')}
                   style={{ background: TEAMS[c].m }}

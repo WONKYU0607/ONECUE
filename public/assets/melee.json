@@ -1,7 +1,7 @@
 {
  "frame": {
   "w": 484,
-  "h": 192
+  "h": 198
  },
  "cols": [
   "front_idle",
@@ -17,7 +17,9 @@
   "blue",
   "red",
   "green",
-  "yellow"
+  "yellow",
+  "purple",
+  "black"
  ],
  "body": {
   "w": 194,

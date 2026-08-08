@@ -5,7 +5,7 @@ import { isUnlocked, isCleared, getProgress } from '../../state/progress.js';
 // AI 모드 스테이지 선택. 앞 단계를 깨야 다음이 열린다
 export default function AiStages({ onBack, onStart, onMelee }){
   // 2대2는 나 말고 셋이 AI. 탭 네 개를 띄우지 않고 팀전을 확인할 수 있다
-  const [n, setN] = useState(2);
+  const [n, setN] = useState(2);   // 2 = 1대1, 4 = 2대2, 6 = 3대3
   // 한 화면에 다 깔지 않고 모드를 먼저 고르게 한다 (PVP와 같은 흐름)
   const [mode, setMode] = useState(null);     // null | 'gun' | 'melee'
   const p = getProgress();
@@ -20,11 +20,9 @@ export default function AiStages({ onBack, onStart, onMelee }){
       <div className="menu wide-menu">
         <button className="menu-btn primary" onClick={() => setMode('gun')}>
           <span className="t">총격전</span>
-          <span className="d">단계별 AI와 대결</span>
         </button>
         <button className="menu-btn" onClick={() => setMode('melee')}>
           <span className="t">칼전</span>
-          <span className="d">근접전 AI와 대결</span>
         </button>
       </div>
     </div>
@@ -61,6 +59,7 @@ export default function AiStages({ onBack, onStart, onMelee }){
       <div className="mode-row">
         <button className={'menu-btn mode' + (n === 2 ? ' on' : '')} onClick={() => setN(2)}>1대1</button>
         <button className={'menu-btn mode' + (n === 4 ? ' on' : '')} onClick={() => setN(4)}>2대2</button>
+        <button className={'menu-btn mode' + (n === 6 ? ' on' : '')} onClick={() => setN(6)}>3대3</button>
       </div>
       <div className="stages">
         {AI_STAGES.map((s, i) => {

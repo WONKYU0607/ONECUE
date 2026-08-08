@@ -53,7 +53,10 @@ const modes = [
   { name: '칼전 1대1', n: 2, melee: true },
   { name: '칼전 2대2', n: 4, melee: true },
   { name: '칼전 개인 3인', n: 3, melee: true, ffa: true },
-  { name: '칼전 개인 4인', n: 4, melee: true, ffa: true }
+  { name: '칼전 개인 4인', n: 4, melee: true, ffa: true },
+  { name: '칼전 개인 6인', n: 6, melee: true, ffa: true },
+  { name: '총격 3대3', n: 6, melee: false },
+  { name: '칼전 3대3', n: 6, melee: true }
 ];
 const phases = [['배치', PH_READY], ['카운트다운', PH_COUNT], ['전투', PH_PLAY], ['종료', PH_OVER]];
 
@@ -72,10 +75,10 @@ for (const m of modes){
       assert(fc.calls.length > 20,
         `${m.name} / ${pn} / 슬롯${slot} — 실제로 뭔가 그린다 (${fc.calls.length}회)`);
       // 그리는 쪽이 아레나를 되돌려놓으면 배경·격자·팔레트가 전부 딴 모드로 나온다
-      const wantBg = m.melee ? 'arena3' : (m.n === 4 ? 'arena2' : 'arena');
+      const wantBg = m.melee ? 'arena3' : (m.n >= 4 ? 'arena2' : 'arena');
       assert(ARENA.bg === wantBg,
         `${m.name} / ${pn} / 슬롯${slot} — 그린 뒤에도 아레나가 ${wantBg} (지금 ${ARENA.bg})`);
-      const wantCols = m.melee ? 10 : (m.n === 4 ? 11 : 6);
+      const wantCols = m.melee ? 10 : (m.n >= 4 ? 11 : 6);
       assert(CFG.GRID_COLS === wantCols, `${m.name} 격자 열 수 ${wantCols} (지금 ${CFG.GRID_COLS})`);
       // 화면 위 버튼·배너 자리도 계산돼야 한다 (칼전은 팔레트가 비어 있다)
       const b = uiBoxRect(86);
@@ -95,7 +98,7 @@ console.log('우리 팀은 뒷모습, 상대 팀은 앞모습');
       s.phase = PH_PLAY;
       const fc = drawOnce(s, slot);
       // 캐릭터 그리기: 총격전은 원본 14x16, 칼전은 310x184
-      const SW = m.melee ? 484 : 14 * 3, SH = m.melee ? 192 : 16 * 3;
+      const SW = m.melee ? 484 : 14 * 3, SH = m.melee ? 198 : 16 * 3;
       const chars = fc.calls.filter(c => c.name === 'drawImage' && c.args[2] === SW && c.args[3] === SH);
       assert(chars.length === m.n, `${m.name} 슬롯${slot} — 캐릭터 ${m.n}명을 그린다 (${chars.length})`);
       // 뒷모습 프레임: 총격전은 idx가 홀수, 칼전은 열 2·3

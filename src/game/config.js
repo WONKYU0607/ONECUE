@@ -77,7 +77,7 @@ export const homeYFP = r => Math.round(homeY(r) * FP);
 export const homeX = c => GRID_X0 + GRID_CW * c + (GRID_CW - PWf / FP) / 2;   // 칸 가로 중앙
 export const homeXFP = c => Math.round(homeX(c) * FP);
 export let HOME_COL = 3;                          // 1대1 시작 열 (0~5 중 가운데)
-export let TEAM_COLS = [1, 4];                    // 같은 팀 둘이 서는 열 (2대2)
+export let TEAM_COLS = [1, 4];                    // 같은 팀이 서는 열 (2대2·3대3)
 export let ROW_MIN = [GRID_MIDROW, 0];            // 팀별 이동 가능한 행 범위
 export let ROW_MAX = [GRID_ROWS - 1, GRID_MIDROW - 1];
 export const VIEW = { grid: true };          // 디버그 표시
@@ -163,9 +163,12 @@ export const TEAMS = [
   { m:'#3aa6f0', d:'#1d6ea8' },   // 0 파랑
   { m:'#f04a3a', d:'#a82a20' },   // 1 빨강
   { m:'#4ad14a', d:'#248f24' },   // 2 초록
-  { m:'#f0a81e', d:'#a86e10' }    // 3 노랑
+  { m:'#f0a81e', d:'#a86e10' },   // 3 노랑
+  { m:'#9a5cf0', d:'#5f2fa8' },   // 4 보라
+  { m:'#4a4a56', d:'#232329' }    // 5 검정
 ];
-export const TEAM_OF = [0, 1, 2, 3];     // 플레이어 슬롯 -> 컬러 (1대1 호환)
+export const COLOR_COUNT = TEAMS.length;
+export const TEAM_OF = [0, 1, 2, 3, 4, 5];     // 플레이어 슬롯 -> 컬러 (1대1 호환)
 // 2대2에서는 슬롯 0·1이 아래 팀, 2·3이 위 팀. 1대1은 0이 아래, 1이 위
 // **개인전(ffa)이면 각자가 자기 팀이다.** 팀 판정이 45곳에 흩어져 있어서
 // 함수 하나만 바꾸는 게 안전하다. ARENA를 이미 모든 시뮬 진입점에서 세팅하므로
@@ -203,7 +206,7 @@ const A1 = {
 //   가운데(3~7열)는 세로 21칸(10+중립1+10), 바깥(1·2·8·9열)은 19칸(9+1+9)
 const A2 = {
   cols: 11, rows: 23, x0: 18.73, cw: 12.878, y0: 17.04, ch: 11.905, mid: 11,
-  pw: 12, ph: 13, bg: 'arena2', neutral: true, hc: 5, tc: [3, 7],   // 3·7열 = 팻말 사이 빈 칸
+  pw: 12, ph: 13, bg: 'arena2', neutral: true, hc: 5, tc: [3, 7], tc6: [3, 5, 7],   // 3·7열 = 팻말 사이 빈 칸
   flip: 17.04 * 2 + 11.905 * 23, quota: [3, 3, 3, 3, 3, 3, 2], cover: 3,
   bands: [[1, 1, 3, 7], [2, 20, 1, 9], [21, 21, 3, 7]],
   // 이동 가능한 세로 범위(월드 y) = **회색 벽 라인 안쪽**.
@@ -221,7 +224,7 @@ export const BOT3 = '215,215,215,215,215,215,215,215,215,215,215,215,215,215,215
 // 칼전 아레나(던전). 벽이 직선이라 밴드를 그대로 이동 한계로 써도 된다(straight)
 const A3 = {
   cols: 10, rows: 22, x0: 26.76, cw: 12.580, y0: 22.54, ch: 12.236, mid: 11,
-  pw: 12, ph: 12, bg: 'arena3', neutral: false, hc: 4, tc: [3, 6],
+  pw: 12, ph: 12, bg: 'arena3', neutral: false, hc: 4, tc: [3, 6], tc6: [2, 4, 7],
   flip: 22.54 * 2 + 12.236 * 22, quota: [0, 0, 0, 0, 0, 0, 0], cover: 0,
   bands: [[0, 0, 1, 8], [1, 20, 0, 9], [21, 21, 1, 8]],
   wl: WALL3_L, wr: WALL3_R, wt: TOP3, wb: BOT3,
@@ -250,13 +253,15 @@ export const cellUsable = (c, r) => {
 export function setArena(n, melee = false, ffa = false){
   const a = melee ? A3 : (n > 2 ? A2 : A1);
   // 개인전 여부가 바뀌면 팀 판정이 통째로 달라지므로 아레나가 같아도 갱신해야 한다
-  if (ARENA.bg === a.bg && ARENA.cols === a.cols && !!ARENA.ffa === !!ffa) return ARENA;
+  // **인원수도 봐야 한다.** 2대2와 3대3은 같은 아레나지만 시작 열 수가 다르다
+  if (ARENA.bg === a.bg && ARENA.cols === a.cols && !!ARENA.ffa === !!ffa && ARENA.n === n) return ARENA;
   // 그냥 assign하면 **앞 아레나에만 있던 키가 남는다**(melee, straight, wt, wb...).
   // 칼전을 한 판 하고 총격전으로 돌아오면 ARENA.melee가 true로 남아
   // 캐릭터가 칼전 스프라이트로 그려졌다. 매번 비우고 채운다
   for (const key of Object.keys(ARENA)) delete ARENA[key];
   Object.assign(ARENA, a);
   ARENA.ffa = !!ffa;
+  ARENA.n = n;
   GRID_COLS = a.cols; GRID_ROWS = a.rows; GRID_MIDROW = a.mid;
   GRID_X0 = a.x0; GRID_CW = a.cw; GRID_Y0 = a.y0; GRID_CH = a.ch;
   PWf = Math.round(a.pw * FP); PHf = Math.round(a.ph * FP);
@@ -265,7 +270,9 @@ export function setArena(n, melee = false, ffa = false){
   // 밴드로 칸 단위로 자르면 벽 안쪽 공간에 못 들어가 움직임이 끊긴다.
   // 반대로 던전 아레나(straight)는 벽이 직선이라 밴드에서 표를 만들면 정확히 맞는다
   WALL_L = a.wl; WALL_R = a.wr;
-  HOME_COL = a.hc; TEAM_COLS = a.tc;
+  HOME_COL = a.hc;
+  // 5명 이상이면 열이 세 개 필요하다. 두 개뿐이면 개인전에서 자리가 겹친다
+  TEAM_COLS = (n >= 5 && a.tc6) ? a.tc6 : a.tc;
   // 중립 행이 있으면 아래 팀은 그 다음 행부터 (가운데 한 칸은 아무도 못 들어간다).
   // 맨 앞뒤 행이 통째로 벽인 경우가 있어 밴드에서 실제 첫·끝 행을 가져온다
   const lo0 = a.mid + (a.neutral ? 1 : 0);
@@ -314,7 +321,7 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 51;
+export const PROTO_VER = 52;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

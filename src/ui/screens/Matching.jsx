@@ -64,7 +64,7 @@ export default function Matching({ session, onCancel, onMatched }){
           <strong>{code}</strong>
           <span className="hint">
             친구에게 알려주면 이 코드로 들어온다
-            {session?.n === 4 ? ' (네 명 필요)' : ''}
+            {session?.n > 2 ? ` (${session.n}명 필요)` : ''}
           </span>
         </div>
       )}
@@ -73,7 +73,7 @@ export default function Matching({ session, onCancel, onMatched }){
         <>
           <p className="hint">캐릭터 색</p>
           <div className="colorpick">
-            {[0, 1, 2, 3].map(c => {
+            {[0, 1, 2, 3, 4, 5].map(c => {
               const taken = (lobby.taken || []).includes(c) && lobby.myColor !== c;
               const on = lobby.myColor != null ? lobby.myColor === c : color === c;
               return (
@@ -98,7 +98,6 @@ export default function Matching({ session, onCancel, onMatched }){
                   disabled={(full && !mine) || lobby.mine != null}
                   onClick={() => pickTeam(t, color)}>
                   <span className="t">{t === 0 ? 'A 팀' : 'B 팀'}</span>
-                  <span className="d">{cnt} / {need}{mine ? ' · 내 팀' : ''}</span>
                 </button>
               );
             })}

@@ -2,7 +2,7 @@ import {
   W, H, FP, COL, TEAMS, TEAM_OF, SELF, MAXHP, FLASH_T, VIEW, SHOW_HUD,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO, HP_MARKS,
-  ITEM, ITEM_DEF, cellOwner, teamOf, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
+  ITEM, ITEM_DEF, cellOwner, teamOf, COLOR_COUNT, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
   FIRE_TICKS, FIRE_RADIUS, SHIELD_TICKS, SHIELD_COOL, STUN_TICKS,
   WALL_L, WALL_R, wallIdx, PWf,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
@@ -15,7 +15,7 @@ import { paletteSlots, throwSlots } from './layout.js';
 // 스프라이트 시트의 한 칸 크기 (원본은 14x16 고정)
 const FW = 14 * RS, FH = 16 * RS;
 // 칼전 시트 규격 (melee.json)
-const MELEE_FW = 484, MELEE_FH = 192, MELEE_BODY_H = 190;
+const MELEE_FW = 484, MELEE_FH = 198, MELEE_BODY_H = 190;
 // 시트 열: 앞대기 앞공격 뒤대기 뒤공격 좌대기 좌공격 우대기 우공격
 // 화면이 뒤집힌 팀은 위·아래가 바뀌므로 그때만 앞뒤를 맞바꾼다
 const MELEE_COL = { 0: 2, 1: 0, 2: 4, 3: 6 };        // face -> 대기 열
@@ -146,7 +146,8 @@ export function createRenderer(canvas){
       // 우리 팀은 등을 보이고(위를 향해 쏨), 상대 팀은 앞을 보인다.
       // 예전엔 `i === SELF.slot`이라 2대2에서 팀원만 나를 마주 보고 서 있었다
       const mineSide = teamOf(i, SELF.n || 2) === myTeamNow();
-      const idx = (hit ? 8 : 0) + col * 2 + (mineSide ? 1 : 0);
+      // 시트는 [색x2(앞/뒤)] 6색 = 12프레임, 그 뒤에 피격 12프레임
+      const idx = (hit ? COLOR_COUNT * 2 : 0) + col * 2 + (mineSide ? 1 : 0);
       // 월드 정수px가 아니라 디바이스 픽셀 단위로 반올림해야 계단이 안 생긴다
       // 2대2는 칸이 작아 캐릭터를 줄여 그린다. 원본 칸은 그대로 두고 그릴 크기만 바꾼다
       const dw = ARENA.pw * RS, dh = ARENA.ph * RS;
