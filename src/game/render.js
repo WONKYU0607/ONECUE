@@ -8,6 +8,7 @@ import {
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
 } from './config.js';
 import { RS, computeLayout, stickGeom, shieldBtn } from './layout.js';
+import { resultFor } from './ui-state.js';
 import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
 
@@ -587,15 +588,13 @@ export function createRenderer(canvas){
       px(c.x/FP, cy2, c.w/FP, c.h/FP, c.hp > 2 ? COL.cover : COL.cover2);
       px(c.x/FP, cy2, c.w/FP, 2, '#7676a0');
     }
-    // 총알은 **쏜 사람이 그려진 시간축**에 맞춰 그린다.
-    // 상대는 확정 기록을 따라 조금 과거로 그려지는데 총알만 현재로 그리면
-    // 상대 몸에서 한참 앞선 자리에서 총알이 튀어나온다
-    const back = Math.max(0, (cl.pred ? cl.pred.tick : s.tick) - (cl.rt ?? s.tick));
-    for (const b of s.bullets){
-      const lag = b.o === SELF.slot ? 0 : back;
-      px(b.x/FP, fy((b.y + b.vy * (a - lag))/FP, 5), 2, 5,
+    // 총알은 **시뮬 시각 그대로** 그린다.
+    // 예전엔 상대 총알을 상대 몸 시간축으로 밀어 그렸는데, 그러면 총알이
+    // 표적에 닿기 전에 사라져 보였다. 지금은 서버가 쏜 사람 시점으로 되감아
+    // 판정하므로(지연 보상) 총알을 밀 이유가 없다
+    for (const b of s.bullets)
+      px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5,
          TEAMS[(s.color && s.color[b.o] != null) ? s.color[b.o] : TEAM_OF[b.o]].m);
-    }
     // 렌더 위치 배열은 첫 예측이 끝나야 생긴다. 없으면 보정 없이 확정 위치로 그린다
     const rx = cl.rx || [], ry = cl.ry || [];
     for (let i = 0; i < s.p.length; i++)
@@ -631,9 +630,10 @@ export function createRenderer(canvas){
     if (s.phase === PH_OVER){
       px(0, H/2-26, W, 26, 'rgba(0,0,0,0.75)');
       ctx.font = 'bold ' + (12*RS) + 'px monospace';
-      const meWin = s.winner === myTeamNow() + 1;
-      ctx.fillStyle = s.winner === 0 ? COL.txt : (meWin ? '#4ec9f0' : '#f0645a');
-      ctx.fillText(s.winner === 0 ? 'DRAW' : (meWin ? 'YOU WIN' : 'YOU LOSE'), W/2*RS, (H/2 - 8)*RS);
+      // 결과 판단은 한 곳에서만 (예전에 화면과 결과창이 서로 다른 답을 냈다)
+      const res = resultFor(s, SELF.slot);
+      ctx.fillStyle = res === 'draw' ? COL.txt : (res === 'win' ? '#4ec9f0' : '#f0645a');
+      ctx.fillText(res === 'draw' ? 'DRAW' : (res === 'win' ? 'YOU WIN' : 'YOU LOSE'), W/2*RS, (H/2 - 8)*RS);
       ctx.font = (8*RS) + 'px monospace';
     }
     ctx.textAlign = 'left';

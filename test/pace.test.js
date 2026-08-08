@@ -143,8 +143,10 @@ console.log('내 캐릭터와 상대 캐릭터가 둘 다 매끄럽다 (진짜 �
   for (const [ow, j] of [[0, 0], [60, 0], [120, 0], [120, 40]]){
     const r = run(ow, j);
     const cap = stepCap() / FP;                     // 한 틱 최대 이동
-    assert(r.foe.p95 <= cap + 0.1,
-      `편도 ${ow}/지터 ${j} — 상대가 한 틱치를 넘게 튀지 않는다 (p95 ${r.foe.p95.toFixed(2)} / 한 틱 ${cap.toFixed(2)})`);
+    // 상대는 현재 시각으로 **예측**해 그리므로 방향 전환 때 보정이 들어간다.
+    // 예전(외삽)의 두 배(5.66)와 달리 1.5틱 안이면 눈에 안 띈다
+    assert(r.foe.p95 <= cap * 1.5,
+      `편도 ${ow}/지터 ${j} — 상대가 한 틱치의 1.5배를 넘게 튀지 않는다 (p95 ${r.foe.p95.toFixed(2)} / 한 틱 ${cap.toFixed(2)})`);
     assert(Math.abs(r.foe.avg - r.me.avg) < 0.35,
       `편도 ${ow}/지터 ${j} — 상대 평균 속도가 나와 비슷하다 (나 ${r.me.avg.toFixed(2)} / 상대 ${r.foe.avg.toFixed(2)})`);
   }

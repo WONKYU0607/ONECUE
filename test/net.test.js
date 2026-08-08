@@ -78,6 +78,30 @@ console.log('넷 경로에서도 벽을 안 넘는지');
   });
   assert(bad === 0, '서버 상태가 벽 밖으로 안 나감');
 }
+console.log('지연 보상 — 쏜 사람이 본 대로 판정한다');
+{
+  // 상대는 확정 기록으로 그려져 화면에선 몇 틱 전 모습이다.
+  // 서버가 되감지 않고 현재 위치로 판정하면 "빗나간 것처럼 보이는데 맞는다"
+  const { LAG_HIST } = await import('../src/game/sim.js');
+  const { RENDER_BUF } = await import('../src/game/net.js');
+  const g = makeNetGame(60);
+  SELF.slot = 0; SELF.n = 2;
+  g.run(200);
+  // 위치 기록은 전투 중에만 쌓인다 (총알이 그때만 있다)
+  for (const st of [g.server.s, g.client.s, g.client.pred]) st.phase = PH_PLAY;
+  g.run(60);
+  const S = g.server.s;
+  assert(S.lag > 0, `서버가 보정 틱 수를 정한다 (${S.lag}틱)`);
+  assert(S.lag === Math.min(LAG_HIST - 1, g.server.delay + RENDER_BUF),
+    '보정 = 입력 지연 + 화면 버퍼');
+  assert(Array.isArray(S.pastP) && S.pastP.length > 1, '위치 기록이 쌓인다');
+  assert(S.pastP.length <= LAG_HIST, `기록이 무한히 늘지 않는다 (${S.pastP.length})`);
+  assert(S.pastP[0].length === S.n, '인원수만큼 기록한다');
+  // 클라도 같은 보정값을 받아야 예측이 어긋나지 않는다
+  assert(g.client.s.lag === S.lag, `클라도 같은 보정값 (${g.client.s.lag} vs ${S.lag})`);
+
+}
+
 console.log('net.test.js 통과');
 
 console.log('상대 추종 필터가 주사율에 무관한지');
@@ -101,4 +125,28 @@ console.log('상대 추종 필터가 주사율에 무관한지');
          `100ms 따라잡기 거리가 주사율과 무관 (30Hz ${c.toFixed(1)} / 60Hz ${a.toFixed(1)} / 120Hz ${b.toFixed(1)})`);
   assert(a > 5 && a <= 40.5, `100ms면 40px를 다 따라잡는다 (${a.toFixed(1)}px)`);
 }
+console.log('지연 보상 — 쏜 사람이 본 대로 판정한다');
+{
+  // 상대는 확정 기록으로 그려져 화면에선 몇 틱 전 모습이다.
+  // 서버가 되감지 않고 현재 위치로 판정하면 "빗나간 것처럼 보이는데 맞는다"
+  const { LAG_HIST } = await import('../src/game/sim.js');
+  const { RENDER_BUF } = await import('../src/game/net.js');
+  const g = makeNetGame(60);
+  SELF.slot = 0; SELF.n = 2;
+  g.run(200);
+  // 위치 기록은 전투 중에만 쌓인다 (총알이 그때만 있다)
+  for (const st of [g.server.s, g.client.s, g.client.pred]) st.phase = PH_PLAY;
+  g.run(60);
+  const S = g.server.s;
+  assert(S.lag > 0, `서버가 보정 틱 수를 정한다 (${S.lag}틱)`);
+  assert(S.lag === Math.min(LAG_HIST - 1, g.server.delay + RENDER_BUF),
+    '보정 = 입력 지연 + 화면 버퍼');
+  assert(Array.isArray(S.pastP) && S.pastP.length > 1, '위치 기록이 쌓인다');
+  assert(S.pastP.length <= LAG_HIST, `기록이 무한히 늘지 않는다 (${S.pastP.length})`);
+  assert(S.pastP[0].length === S.n, '인원수만큼 기록한다');
+  // 클라도 같은 보정값을 받아야 예측이 어긋나지 않는다
+  assert(g.client.s.lag === S.lag, `클라도 같은 보정값 (${g.client.s.lag} vs ${S.lag})`);
+
+}
+
 console.log('net.test.js 통과');

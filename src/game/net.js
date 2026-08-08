@@ -116,8 +116,7 @@ import {
   overlap,
   step,
   throwCol,
-  throwRow
-} from './sim.js';
+  throwRow, LAG_HIST } from './sim.js';
 
 // ================= TRANSPORT (NET SEAM) =================
 // 시계 주입: 브라우저는 실제 시간, 테스트는 가상 시계를 넣어 결정론적으로 돌린다
@@ -248,8 +247,11 @@ export class Server {
       const inp = Array.from({ length: this.n }, (_, i) => f[i] || NOIN);   // 미도착 입력은 무입력
       this.inbox.delete(t);
       if (this.pendingCfg){ Object.assign(this.s, this.pendingCfg); this.pendingCfg = null; }
+      // 지연 보상은 **총격전에만**. 총격전은 상대를 과거로 그리므로 서버가 그만큼
+      // 되감아 판정해야 화면과 맞는다. 칼전은 상대도 현재로 예측해 그리니 되감으면 안 된다
+      this.s.lag = this.s.melee ? 0 : Math.min(LAG_HIST - 1, this.delay + RENDER_BUF);
       step(this.s, inp);
-      this.net.serverSend({ t:'f', tick: this.s.tick, inp, ck: checksum(this.s), d: this.delay,
+      this.net.serverSend({ t:'f', tick: this.s.tick, inp, ck: checksum(this.s), d: this.delay, lg: this.s.lag,
                           ms: this.s.maxStep, bv: this.s.bulletV, ct: this.s.coolT });
       if (this.s.tick % SNAP_EVERY === 0){
         this.net.serverSend({ t:'s', tick: this.s.tick, st: cloneState(this.s) });
@@ -260,6 +262,8 @@ export class Server {
 
 // 상대 위치 추종 속도(1/초). 60Hz에서 프레임당 0.35와 같은 수렴 속도
 const FOLLOW_RATE = 26;
+const SMOOTH_RATE = 90;   // 상대 예측 오차를 녹이는 속도 (클수록 빨리 붙는다)
+export const RENDER_BUF = 2;   // 상대를 확정 기록보다 이만큼 뒤에서 그린다 (renderTick과 같은 값)
 
 // ================= CLIENT =================
 export class Client {
@@ -386,6 +390,7 @@ export class Client {
       if (!f) break;
       this.frames.delete(this.s.tick + 1);
       this.s.maxStep = f.ms;                 // 서버 값을 그대로 사용해야 결정론 유지
+      if (typeof f.lg === 'number') this.s.lag = f.lg;   // 지연 보정도 서버 값을 따른다
       this.s.bulletV = f.bv; this.s.coolT = f.ct;
       step(this.s, f.inp);
       this.lastInp = f.inp;
@@ -450,7 +455,7 @@ export class Client {
   // 상대를 그릴 시각. 실시간으로 굴리되 확정 기록 범위 안에 잡아둔다.
   // BUF만큼 뒤에서 그려야 다음 확정 프레임이 조금 늦어도 화면이 안 끊긴다
   renderTick(dt){
-    const BUF = 2;
+    const BUF = RENDER_BUF;
     if (!this.hist.length) return this.rt;
     const newest = this.hist[this.hist.length - 1].tick;
     const oldest = this.hist[0].tick;
@@ -500,16 +505,21 @@ export class Client {
     const cap = 2 * (this.pred.maxStep || stepCap()) * (this.pred.fast ? FAST_MUL : 1);
     const rt = this.renderTick(dt);
     const mrt = this.myTick(dt);
+    // 상대를 어느 시각으로 그릴지는 **모드마다 답이 다르다** (둘 다 만족시킬 수는 없다).
+    //  - 칼전: 붙어서 싸우므로 **몸 겹침**이 치명적 → 현재로 예측해 그린다.
+    //          방향 전환 때 보정이 들어가지만 근접전에선 덜 보인다
+    //  - 총격전: 멀리 떨어져 있어 몸이 안 겹치고, 총알을 피하려면 상대 움직임이
+    //          매끄러워야 한다 → 확정 기록(과거)을 시간 보간. 명중은 서버가 되감아 판정
+    // 실측: 칼전 겹침 79%→4% (예측) / 총격전 튐 p95 2.4틱→1틱 (보간)
+    const predictFoe = !!this.pred.melee;
     for (let i = 0; i < this.pred.p.length; i++){        // 2대2는 네 명 다 보정해야 한다
       if (this.rx[i] === undefined){
         this.rx[i] = this.pred.p[i].x; this.ry[i] = this.pred.p[i].y;
       }
-      // 내 캐릭터: 예측 상태를 현재 틱~다음 틱 사이로 보간한다 (뒤처짐 0).
-      // 상대: **확정 기록 사이를 시간으로 보간**한다. 외삽하면 상대가 방향을 바꿀 때마다
-      //       틀린 쪽으로 갔다가 되돌아오면서 두 배 속도로 튀고,
-      //       그게 "상대가 훨씬 빨라 보인다"의 정체다. 예전 방식은 이 튐을 못 없앴다
       let gx, gy;
       if (i === SELF.slot){
+        // 내 캐릭터는 늘 현재. 목표 틱이 한 프레임에 2틱 뛸 때 덜컹거리지 않게
+        // 기록을 시간 보간한다 (지연 최대 1틱 = 17ms)
         const at = this.sampleAt(i, mrt, this.mhist);
         const nx = this.nextPos && this.nextPos[i];
         if (at){ gx = at[0]; gy = at[1]; }
@@ -517,14 +527,20 @@ export class Client {
           gx = nx ? lerp(this.pred.p[i].x, nx[0], a) : this.pred.p[i].x;
           gy = nx ? lerp(this.pred.p[i].y, nx[1], a) : this.pred.p[i].y;
         }
+      } else if (predictFoe){
+        // 현재로 예측하고, 틀린 만큼은 여러 프레임에 걸쳐 녹인다
+        const nx = this.nextPos && this.nextPos[i];
+        const tx = nx ? lerp(this.pred.p[i].x, nx[0], a) : this.pred.p[i].x;
+        const ty = nx ? lerp(this.pred.p[i].y, nx[1], a) : this.pred.p[i].y;
+        const k = 1 - Math.exp(-SMOOTH_RATE * Math.min(dt, 0.1));
+        gx = this.rx[i] + (tx - this.rx[i]) * k;
+        gy = this.ry[i] + (ty - this.ry[i]) * k;
       } else {
         const at = this.sampleAt(i, rt);
         gx = at ? at[0] : this.pred.p[i].x;
         gy = at ? at[1] : this.pred.p[i].y;
       }
-      // 늦게 온 입력으로 과거가 바뀌면 목표가 확 움직인다. 그 순간에도 화면이
-      // 순간이동하지 않도록 **한 프레임 이동량에 상한**을 둔다(따라잡기는 다음 프레임에).
-      // 상한은 실제 최고 속도의 두 배 — 평소엔 절대 안 걸리고 보정 때만 걸린다
+      // 보정이 들어와도 순간이동하지 않도록 한 프레임 이동량에 상한을 둔다
       const lim = cap * Math.max(1, dt * 60);
       const ddx = gx - this.rx[i], ddy = gy - this.ry[i];
       const dd = Math.sqrt(ddx * ddx + ddy * ddy);

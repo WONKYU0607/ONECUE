@@ -143,6 +143,8 @@ export function normalizeState(st){
   if (typeof st.bareBy !== 'number') st.bareBy = 0;
   for (const k of ['fastT', 'bareT']) if (typeof st[k] !== 'number') st[k] = 0;
   if (!Array.isArray(st.negOk)) st.negOk = [];
+  if (typeof st.lag !== 'number') st.lag = 0;
+  if (!Array.isArray(st.pastP)) st.pastP = [];
   if (!Array.isArray(st.proj)) st.proj = [];
   if (!Array.isArray(st.fire)) st.fire = [];
   if (!Array.isArray(st.off)) st.off = Array(st.n || 2).fill(false);
@@ -212,6 +214,8 @@ export function newState(n = 2, melee = false){
     fastT: 0,                   // 신청 응답 제한 시간 (틱). 0이 되면 저절로 취소
     bareT: 0,
     negOk: [],                  // 이번 신청에 수락한 슬롯들 (상대 팀 전원이 모여야 켜진다)
+    lag: 0,                     // 지연 보상 틱 수. 서버가 매 프레임 넣어준다
+    pastP: [],                  // 최근 위치 기록 [[x,y]x인원] x LAG_HIST. 명중을 되감아 판정한다
     phase: PH_READY, timer: 0, clock: 0,
     maxStep: stepCap(),
     bulletV: bulletFP(),
@@ -220,6 +224,7 @@ export function newState(n = 2, melee = false){
   };
 }
 
+export const LAG_HIST = 40;             // 지연 보상용 위치 기록 길이 (틱)
 export const FACE_OPP = [1, 0, 3, 2];   // 마주 보는 방향 (위↔아래, 왼↔오른)
 export const NOIN = { dx:0, dy:0, fire:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0 };
 export function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
@@ -490,10 +495,10 @@ export function step(s, inp){
       // 2단계 준비완료: 설치를 끝낸 사람만. 전원이 눌러야 시작한다
       if (q.go && s.done[i]) s.ready[i] = true;
     }
-    // 칼전은 배치할 것도 고를 것도 없다. 준비 단계를 통째로 건너뛴다
-    if (s.melee) for (let i = 0; i < s.n; i++){ s.done[i] = true; s.ready[i] = true; }
-    // 노템전은 놓을 게 없으므로 **설치 완료를 건너뛰고 준비완료만** 남긴다
-    else if (s.bare) for (let i = 0; i < s.n; i++) s.done[i] = true;
+    // 칼전·노템전은 놓을 게 없으므로 **설치 완료를 건너뛰고 준비완료만** 남긴다.
+    // 준비완료를 기다리는 동안 화면이 멈춰 있으니 2배속 신청도 시간 압박 없이 할 수 있다
+    // (예전엔 칼전이 준비 단계를 통째로 건너뛰어 신청 창이 3.77초밖에 안 떴다)
+    if (s.melee || s.bare) for (let i = 0; i < s.n; i++) s.done[i] = true;
     // 전원이 준비완료를 눌러야 시작한다 (START 버튼 없음).
     // 연습 모드는 상대가 없으므로 한쪽만 완료하면 시작한다
     const allReady = s.solo ? s.ready.some(Boolean) : s.ready.every(Boolean);
@@ -736,6 +741,11 @@ export function step(s, inp){
       o: i
     });
   }
+  // 지연 보상용 위치 기록. **총알 판정 바로 앞에서** 쌓아야 이번 틱 위치가 0번째가 된다
+  if (!Array.isArray(s.pastP)) s.pastP = [];
+  s.pastP.push(s.p.map(q => [q.x, q.y]));
+  while (s.pastP.length > LAG_HIST) s.pastP.shift();
+
   for (let k = s.bullets.length - 1; k >= 0; k--){
     const b = s.bullets[k];
     b.y += b.vy;
@@ -764,10 +774,18 @@ export function step(s, inp){
     if (!gone){
       // 상대 팀 전원을 상대로 검사한다. 아군 오사는 없다
       const myTeam = teamOf(b.o, s.n);
+      // **쏜 사람이 화면에서 본 위치로 되감아 판정한다(지연 보상).**
+      // 상대는 확정 기록으로 그려지므로 내 화면에선 s.lag 틱 전 모습이다.
+      // 되감지 않으면 "빗나간 것처럼 보이는데 맞고, 맞을 것 같은데 안 맞는다"
+      const back = Math.max(0, s.lag | 0);
+      const snap = (back > 0 && s.pastP.length > back)
+        ? s.pastP[s.pastP.length - 1 - back] : null;
       for (let i = 0; i < s.n; i++){
         const t = s.p[i];
         if (t.hp <= 0 || teamOf(i, s.n) === myTeam) continue;
-        if (!overlap(b.x,b.y,BWf,BHf, t.x,t.y,PWf,PHf)) continue;
+        const hx = snap && snap[i] ? snap[i][0] : t.x;
+        const hy = snap && snap[i] ? snap[i][1] : t.y;
+        if (!overlap(b.x,b.y,BWf,BHf, hx,hy,PWf,PHf)) continue;
         gone = true;
         if (t.invul === 0){
           t.invul = INVUL_T; t.flash = FLASH_T; t.hitBy = b.o;
