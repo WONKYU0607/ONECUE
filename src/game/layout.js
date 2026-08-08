@@ -34,8 +34,9 @@ function side(pd, total){
 // 칼전 방패 버튼: 스틱 반대쪽. 스와이프와 확실히 떨어뜨린다
 export function shieldBtn(uiH){
   const pd = padRect(uiH);
-  const size = Math.min(pd.h - 8, 46);
-  return { x: pd.x + 8, y: pd.y + (pd.h - size) / 2, w: size, h: size };
+  // 작게, 그리고 **아래로**. 위 공간은 준비완료 버튼 자리로 비운다
+  const size = Math.min(pd.h - 8, 34);
+  return { x: pd.x + 8, y: pd.y + pd.h - 4 - size, w: size, h: size };
 }
 
 // 화면 위에 겹쳐 띄우는 버튼·배너가 차지할 자리 (월드 좌표).
@@ -47,7 +48,9 @@ export function uiBoxRect(uiH){
   const x = sl.length ? Math.min(...sl.map(v => v.x)) : pd.x;
   const x1 = sl.length ? Math.max(...sl.map(v => v.x + v.w)) : pd.x + pd.w * 0.5;
   const top = pd.y + 1;
-  const bottom = (sl.length ? sl[0].y : pd.y + pd.h) - 2;
+  // 팔레트가 있으면 그 위, 없으면(칼전) 방패 버튼 위. 예전엔 패드 전체를 먹어
+  // 칼전 준비완료 버튼이 69px로 거대했다
+  const bottom = sl.length ? sl[0].y - 2 : shieldBtn(uiH).y - 3;
   return { x, y: top, w: x1 - x, h: Math.max(18, bottom - top) };   // 너무 납작하면 글씨가 안 보인다
 }
 

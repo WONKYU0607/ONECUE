@@ -247,9 +247,9 @@ export class Server {
       const inp = Array.from({ length: this.n }, (_, i) => f[i] || NOIN);   // 미도착 입력은 무입력
       this.inbox.delete(t);
       if (this.pendingCfg){ Object.assign(this.s, this.pendingCfg); this.pendingCfg = null; }
-      // 지연 보상은 **총격전에만**. 총격전은 상대를 과거로 그리므로 서버가 그만큼
-      // 되감아 판정해야 화면과 맞는다. 칼전은 상대도 현재로 예측해 그리니 되감으면 안 된다
-      this.s.lag = this.s.melee ? 0 : Math.min(LAG_HIST - 1, this.delay + RENDER_BUF);
+      // 지연 보상은 **끈다**. 클라가 상대도 '현재'로 예측해 그리므로 서버가 되감으면
+      // 오히려 화면과 어긋난다. (상대를 과거로 그리던 시절엔 필요했다)
+      this.s.lag = 0;
       step(this.s, inp);
       this.net.serverSend({ t:'f', tick: this.s.tick, inp, ck: checksum(this.s), d: this.delay, lg: this.s.lag,
                           ms: this.s.maxStep, bv: this.s.bulletV, ct: this.s.coolT });
@@ -502,16 +502,21 @@ export class Client {
   // dt 기준 지수 감쇠로 바꿔야 주사율과 무관하게 같은 시간에 같은 만큼 수렴한다.
   updateRender(a, dt = 1 / 60){
     if (!this.rx || !this.pred.p[SELF.slot]) return;
-    const cap = 2 * (this.pred.maxStep || stepCap()) * (this.pred.fast ? FAST_MUL : 1);
+    // 보정 속도 상한. 낮추면 매끄럽고 높이면 빨리 따라붙는다 — 정확히 맞바꿈이다.
+    // **1.0배 = 상대가 실제 최고 속도를 절대 넘지 않는다.**
+    // 보정을 빨리 하려고 이 값을 올리면 그만큼 상대가 순간적으로 빨라 보인다.
+    // 칼전만 2배로 뒀다가 "상대만 엄청 빠르게 보인다"는 지적을 받고 되돌렸다.
+    // 몸 겹침이 조금 늘어나는 건 감수한다 — 빨라 보이는 쪽이 훨씬 거슬린다
+    const capMul = 1.0;
+    const cap = capMul * (this.pred.maxStep || stepCap()) * (this.pred.fast ? FAST_MUL : 1);
     const rt = this.renderTick(dt);
     const mrt = this.myTick(dt);
-    // 상대를 어느 시각으로 그릴지는 **모드마다 답이 다르다** (둘 다 만족시킬 수는 없다).
-    //  - 칼전: 붙어서 싸우므로 **몸 겹침**이 치명적 → 현재로 예측해 그린다.
-    //          방향 전환 때 보정이 들어가지만 근접전에선 덜 보인다
-    //  - 총격전: 멀리 떨어져 있어 몸이 안 겹치고, 총알을 피하려면 상대 움직임이
-    //          매끄러워야 한다 → 확정 기록(과거)을 시간 보간. 명중은 서버가 되감아 판정
-    // 실측: 칼전 겹침 79%→4% (예측) / 총격전 튐 p95 2.4틱→1틱 (보간)
-    const predictFoe = !!this.pred.melee;
+    // **모두 같은 시각(현재)으로 그린다.** 한 화면에 두 시각을 섞으면 반드시 어긋난다:
+    //  - 상대 몸을 과거로 그리면 칼전에서 몸이 통과해 보이고(프레임의 79%)
+    //  - 총알은 세로로만 날아가 x가 쏜 순간 그대로라, 몸만 과거로 밀어도 **총구가 안 맞는다**
+    //    (총알 y를 밀어봐야 x는 그대로 → 편도 60ms에서 11.7px 어긋남)
+    // 상대 입력을 미리 알 수 없어 예측은 가끔 틀린다. 그 오차는 여러 프레임에 걸쳐 녹인다
+    const predictFoe = true;   // 아래 주석 참고 — 두 모드 다 '현재'로 통일
     for (let i = 0; i < this.pred.p.length; i++){        // 2대2는 네 명 다 보정해야 한다
       if (this.rx[i] === undefined){
         this.rx[i] = this.pred.p[i].x; this.ry[i] = this.pred.p[i].y;

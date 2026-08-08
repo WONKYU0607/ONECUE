@@ -588,10 +588,7 @@ export function createRenderer(canvas){
       px(c.x/FP, cy2, c.w/FP, c.h/FP, c.hp > 2 ? COL.cover : COL.cover2);
       px(c.x/FP, cy2, c.w/FP, 2, '#7676a0');
     }
-    // 총알은 **시뮬 시각 그대로** 그린다.
-    // 예전엔 상대 총알을 상대 몸 시간축으로 밀어 그렸는데, 그러면 총알이
-    // 표적에 닿기 전에 사라져 보였다. 지금은 서버가 쏜 사람 시점으로 되감아
-    // 판정하므로(지연 보상) 총알을 밀 이유가 없다
+    // 총알은 시뮬 시각 그대로. 몸도 전부 '현재'로 그리므로 밀 이유가 없다
     for (const b of s.bullets)
       px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5,
          TEAMS[(s.color && s.color[b.o] != null) ? s.color[b.o] : TEAM_OF[b.o]].m);
