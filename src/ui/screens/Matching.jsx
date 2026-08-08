@@ -32,6 +32,8 @@ export default function Matching({ session, onCancel, onMatched }){
       code: session?.code || '',
       n: session?.n || 2,
       melee: !!session?.melee,
+      ffa: !!session?.ffa,
+      color: Number.isInteger(session?.color) ? session.color : -1,
       onCode: c => { if (alive.current) setCode(c); },
       onLobby: l => { if (alive.current) setLobby(prev => ({ ...prev, ...l })); },
       onStage: (s, i, n) => {

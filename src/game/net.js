@@ -192,10 +192,10 @@ export class WsTransport {
 
 // ================= SERVER (authoritative) =================
 export class Server {
-  constructor(net, n = 2, melee = false){
+  constructor(net, n = 2, melee = false, ffa = false){
     this.net = net;
     this.n = n;
-    this.s = newState(n, melee);
+    this.s = newState(n, melee, ffa);
     this.inbox = new Map();     // tick -> 슬롯별 입력
     this.rtt = Array(n).fill(0);
     this.delay = MIN_DELAY;     // 양 플레이어에게 동일 적용되는 공통 입력 지연

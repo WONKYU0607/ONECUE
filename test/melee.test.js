@@ -412,4 +412,34 @@ console.log('죽어도 폭발 연출이 없다');
   assert(s.fx.length === 0, '폭발 아이콘이 안 뜬다');
 }
 
+console.log('개인전 — 각자 한 팀, 마지막 한 명이 승리');
+{
+  const { teamCount } = await import('../src/game/config.js');
+  for (const n of [3, 4]){
+    const s = newState(n, true, true);
+    assert(s.ffa === true, `${n}인 개인전 표시`);
+    assert(teamCount(n) === n, `${n}인이면 팀도 ${n}개`);
+    const teams = Array.from({ length: n }, (_, i) => teamOf(i, n));
+    assert(new Set(teams).size === n, `각자 다른 팀 (${teams})`);
+    // 시작 위치가 서로 겹치지 않는다
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++)
+      assert(s.p[i].x !== s.p[j].x || s.p[i].y !== s.p[j].y, `${n}인: 슬롯${i}·${j}가 겹쳐 서지 않는다`);
+    // 한 명 빼고 다 죽으면 그 사람이 이긴다
+    s.phase = PH_PLAY;
+    for (let i = 0; i < n; i++) if (i !== 1) s.p[i].hp = 0;
+    step(s, IN(n));
+    assert(s.over === true, `${n}인: 한 명 남으면 끝난다`);
+    assert(s.winner === 2, `${n}인: 슬롯1이 승자 (winner ${s.winner})`);
+    // 전멸이면 무승부
+    const s2 = newState(n, true, true);
+    s2.phase = PH_PLAY;
+    for (const p of s2.p) p.hp = 0;
+    step(s2, IN(n));
+    assert(s2.winner === 0, `${n}인: 전멸이면 무승부`);
+  }
+  // 팀전은 예전 그대로
+  const t = newState(4, true, false);
+  assert(t.ffa === false && teamOf(0, 4) === teamOf(1, 4), '팀전은 둘씩 같은 팀');
+}
+
 console.log('melee.test.js 통과');

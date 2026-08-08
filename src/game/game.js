@@ -5,7 +5,7 @@ import {
 import { Loopback, Server, Client } from './net.js';
 import { createRenderer } from './render.js';
 import { attachInput } from './input.js';
-import { createAI } from './ai.js';
+import { createAI, AI_STAGES } from './ai.js';
 import { createJuice } from './juice.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { canPlace, canThrow, allPlaced, myItemAt, newState } from './sim.js';
@@ -37,8 +37,20 @@ export function createGame(canvas, opts = {}){
   const nLocal = (!online && session.n === 4) ? 4 : 2;
   // 칼전 여부: 로컬은 session, 온라인은 서버가 hello로 알려준 값
   const isMelee = session.kind === 'melee' || (online ? !!SELF.melee : !!session.melee);
+  // 개인전(각자 한 팀). 칼전 3~4인 전용
+  const isFfa = online ? !!SELF.ffa : !!session.ffa;
   if (!online){ SELF.slot = 0; SELF.n = nLocal; }
-  const server = online ? null : new Server(net, nLocal, isMelee);
+  const server = online ? null : new Server(net, nLocal, isMelee, isFfa);
+  // AI 모드: 단계가 오를수록 상대가 조금씩 빨라진다.
+  // 자동 발사 게임이라 회피와 공격이 서로 배타적이어서, 판단만으로는 난이도가 안 갈렸다
+  if (server && session.kind === 'ai' && session.stage){
+    const st = AI_STAGES[Math.max(0, Math.min(AI_STAGES.length - 1, session.stage - 1))];
+    for (let i = 0; i < nLocal; i++)
+      if (i !== SELF.slot){
+        server.s.spdMul[i] = st.mul || 1;
+        server.s.coolMul[i] = st.cool || 1;
+      }
+  }
   const all = Array.from({ length: nLocal }, (_, i) => i);
   // 온라인이면 내 슬롯만, 로컬(AI·디버그)이면 전원 이 클라가 입력을 넣는다
   const client = new Client(net, online ? [SELF.slot] : all);
@@ -51,7 +63,7 @@ export function createGame(canvas, opts = {}){
   // 인원수는 시작 전에 이미 알고 있으니 미리 맞춰둔다
   const n0 = online ? (SELF.n || 2) : nLocal;
   if (n0 !== client.s.n || isMelee){ client.s = newState(n0, isMelee); client.pred = newState(n0, isMelee); }
-  setArena(n0, isMelee);
+  setArena(n0, isMelee, isFfa);
   const practice = !online && session.kind === 'practice';
   if (practice){
     // 상대도 총알도 승패도 없다. 이동·배치·투척만 자유롭게 해보는 모드
@@ -199,11 +211,9 @@ export function createGame(canvas, opts = {}){
     // 발사: 쿨다운이 막 채워진 순간
     for (let i = 0; i < n; i++){
       if (cur.cool[i] > prev.cool[i]){
-        // 칼전은 총이 아니다. 소리도 불빛도 다르게
-        if (st.melee){ sfx.slash(i === me); continue; }
-        sfx.shot(i === me);
-        const p = drawnAt(i, st);
-        juice.muzzle((p.x + PWf / 2 - FP) / FP + 1, viewY(p.y / FP), teamOf(i, n) === 0);
+        // 총구 불빛은 없앴다(사용자 요청). 소리만 남긴다.
+        // 칼전은 총이 아니므로 칼 소리로 갈린다
+        if (st.melee) sfx.slash(i === me); else sfx.shot(i === me);
       }
     }
     // 피격
@@ -254,7 +264,8 @@ export function createGame(canvas, opts = {}){
     prev = cur;
   }
   // 슬롯1이면 화면이 뒤집혀 있으므로 연출 좌표도 뒤집는다
-  const flipped = () => teamOf(SELF.slot, SELF.n || 2) === 1;
+  // 개인전은 팀이 없으므로 시작 위치로 정한다 (render.js와 같은 규칙)
+  const flipped = () => (ARENA.ffa ? SELF.slot % 2 === 1 : teamOf(SELF.slot, SELF.n || 2) === 1);
   function viewY(y){ return flipped() ? ARENA.flip - y - PHf / FP : y; }
 
   function loop(){

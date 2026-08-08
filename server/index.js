@@ -15,7 +15,7 @@ let nextRoomId = 1;
 const rooms = new Map();         // id -> Room
 const codes = new Map();         // 코드 -> Room (친구방)
 const waiting = new Map();       // '인원수:모드' -> 대기 소켓 목록. 섞이면 안 된다
-const qkey = (n, melee) => `${n}:${melee ? 'm' : 's'}`;
+const qkey = (n, melee, ffa) => `${n}:${melee ? 'm' : 's'}${ffa ? ':f' : ''}`;
 const queueOf = k => { if (!waiting.has(k)) waiting.set(k, []); return waiting.get(k); };
 const waitingCount = () => [...waiting.values()].reduce((a, q) => a + q.length, 0);
 
@@ -29,11 +29,12 @@ function newCode(){
 }
 
 class Room {
-  constructor(id, code = null, n = 2, melee = false){
+  constructor(id, code = null, n = 2, melee = false, ffa = false){
     this.id = id;
     this.code = code;
     this.n = n;
     this.melee = melee;          // 칼전 방인가 (총격전과 규칙이 다르다)
+    this.ffa = ffa;              // 개인전인가 (각자 한 팀, 칼전 3~4인)
     // 자리마다 세션 id를 기억한다. 소켓이 끊겨도 sid가 남아 있으면 그 자리는 예약 상태
     this.seats = Array.from({ length: n }, () => ({ sid: null, ws: null, goneAt: 0 }));
     this.emptyAt = 0;
@@ -46,7 +47,7 @@ class Room {
     this.server = new Server({
       serverSend: (msg, pid) => this.send(msg, pid),
       toServer: null
-    }, n, melee);
+    }, n, melee, ffa);
   }
   send(msg, pid){
     const raw = JSON.stringify(msg);
@@ -103,10 +104,10 @@ class Room {
   waitJoin(ws, sid, back = false){
     this.pending.set(sid, 0);
     this.waitingList.push(ws);
-    ws.send(JSON.stringify({ t: 'hello', pid: -1, room: this.id, n: this.n, melee: this.melee, back, ver: PROTO_VER }));
+    ws.send(JSON.stringify({ t: 'hello', pid: -1, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, back, ver: PROTO_VER }));
     this.sendLobby();
   }
-  join(ws, sid, team){
+  join(ws, sid, team, wantColor){
     const back = this.seatOf(sid);
     const slot = back >= 0 ? back
                : (team === undefined ? this.freeSeat() : this.freeSeatIn(team));
@@ -117,12 +118,18 @@ class Room {
     if (seat.ws && seat.ws !== ws) seat.ws.close();   // 같은 sid로 중복 접속하면 옛 소켓을 끊는다
 
     seat.sid = sid; seat.ws = ws; seat.goneAt = 0;
+    // 1대1·개인전은 팀 로비가 없어서 색을 메뉴에서 고른다.
+    // 남이 이미 쓰는 색이면 서버가 빈 색으로 바꿔준다
+    if (!reconnected){
+      const c = Number.isInteger(wantColor) && wantColor >= 0 && wantColor < 4 ? wantColor : -1;
+      this.server.s.color[slot] = (c >= 0 && !this.colorTaken(c)) ? c : this.freeColor();
+    }
     this.pending.delete(sid);                 // 자리를 받았으니 대기 기록은 필요 없다
     setOff(this.server.s, slot, false);       // 돌아왔으면 표시를 지운다
     ws.roomId = this.id; ws.slot = slot;
     this.emptyAt = 0;
 
-    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, n: this.n, melee: this.melee, back: reconnected, ver: PROTO_VER }));
+    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, back: reconnected, ver: PROTO_VER }));
     // 방은 이미 돌고 있으므로 현재 상태를 먼저 보내 시작점을 맞춘다
     this.snapshotTo(slot);
     if (reconnected) this.send({ t: 'peer', slot, state: 'back' });
@@ -220,8 +227,8 @@ http.listen(PORT, () => console.log(`듀얼 서버 대기중 :${PORT}`));
 // 오지 않을 사람을 기다리게 된다. 둘이 모였을 때만 방을 만든다.
 function pairUp(key){
   const q = queueOf(key);
-  const [nStr, mode] = key.split(':');
-  const n = +nStr, melee = mode === 'm';
+  const parts = key.split(':');
+  const n = +parts[0], melee = parts[1] === 'm', ffa = parts[2] === 'f';
   while (q.length >= n){
     const picked = [];
     while (picked.length < n && q.length){
@@ -229,14 +236,14 @@ function pairUp(key){
       if (ws.readyState === 1) picked.push(ws); // 끊긴 소켓은 버린다
     }
     if (picked.length < n){ q.unshift(...picked); return; }
-    const room = new Room(nextRoomId++, null, n, melee);
+    const room = new Room(nextRoomId++, null, n, melee, ffa);
     rooms.set(room.id, room);
     for (const ws of picked){ ws.room = room; }
-    if (n > 2){
+    if (n > 2 && !ffa){          // 개인전은 팀을 고를 게 없다
       // 2대2는 팀을 직접 골라야 하므로 자리를 바로 주지 않는다
       for (const ws of picked) room.waitJoin(ws, ws.sid);
     } else {
-      for (const ws of picked) room.join(ws, ws.sid);
+      for (const ws of picked) room.join(ws, ws.sid, undefined, ws.wantColor);
     }
     console.log(`매칭: room ${room.id} ${key} (대기 ${waitingCount()}명, 방 ${rooms.size}개)`);
   }
@@ -251,7 +258,9 @@ wss.on('connection', (ws, req) => {
   const mode = q.get('mode') || 'queue';      // queue | create | join
   const code = (q.get('code') || '').trim();
   const resume = q.get('resume') === '1';    // 끊겼다 자동으로 다시 붙는 경우에만 true
-  const want = q.get('n') === '4' ? 4 : 2;   // 원하는 인원수
+  const want = [2, 3, 4].includes(+q.get('n')) ? +q.get('n') : 2;   // 원하는 인원수
+  const ffa = q.get('ffa') === '1';         // 개인전
+  const wantColor = q.has('color') ? +q.get('color') : -1;   // 메뉴에서 고른 캐릭터 색
   const melee = q.get('melee') === '1';      // 칼전인가
   ws.sid = sid;
 
@@ -268,23 +277,23 @@ wss.on('connection', (ws, req) => {
   if (back){
     ws.room = back;
     if (back.seatOf(sid) >= 0){
-      back.join(ws, sid);                     // 자리가 있으면 원래 슬롯으로
+      back.join(ws, sid, undefined, wantColor);   // 자리가 있으면 원래 슬롯으로
     } else {
       back.waitJoin(ws, sid, true);           // 팀 고르던 중이었으면 같은 방에서 다시 고른다
     }
     console.log(`복귀: room ${back.id} slot ${ws.slot ?? -1} sid ${sid.slice(0, 8)}`);
   } else if (mode === 'create'){
     // 친구방 만들기: 코드를 발급하고 상대가 들어올 때까지 혼자 기다린다
-    const room = new Room(nextRoomId++, newCode(), want, melee);
+    const room = new Room(nextRoomId++, newCode(), want, melee, ffa);
     rooms.set(room.id, room);
     codes.set(room.code, room);
     ws.room = room;
     if (want > 2){
       room.waitJoin(ws, sid);
     } else {
-      room.join(ws, sid);
+      room.join(ws, sid, undefined, wantColor);
     }
-    ws.send(JSON.stringify({ t: 'room', code: room.code, n: room.n, melee: room.melee }));
+    ws.send(JSON.stringify({ t: 'room', code: room.code, n: room.n, melee: room.melee, ffa: room.ffa }));
     console.log(`방 개설: ${room.code} ${room.n}인 (room ${room.id})`);
   } else if (mode === 'join'){
     const room = codes.get(code);
@@ -295,7 +304,7 @@ wss.on('connection', (ws, req) => {
       // 2대2는 팀을 직접 고른다. 고를 때까지는 자리를 주지 않는다
       room.waitJoin(ws, sid);
     } else {
-      room.join(ws, sid);
+      room.join(ws, sid, undefined, wantColor);
     }
     console.log(`방 입장: ${code} (room ${room.id})`);
   } else {
@@ -306,8 +315,9 @@ wss.on('connection', (ws, req) => {
       }
     }
     ws.room = null;
-    const key = qkey(want, melee);          // 인원수·모드가 같은 사람끼리만 붙인다
+    const key = qkey(want, melee, ffa);     // 인원수·모드가 같은 사람끼리만 붙인다
     ws.qkey = key;
+    ws.wantColor = wantColor;
     const q = queueOf(key);
     q.push(ws);
     ws.send(JSON.stringify({ t: 'queued', ahead: q.length - 1 }));

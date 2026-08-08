@@ -115,6 +115,7 @@ import {
   spdMult,
   stepCap,
   teamOf,
+  teamCount,
   teamYMax,
   teamYMin,
   topSpan,
@@ -140,11 +141,15 @@ export function normalizeState(st){
   if (typeof st.fast !== 'boolean') st.fast = false;
   if (typeof st.fastBy !== 'number') st.fastBy = 0;
   st.bare = !!st.bare;
+  st.ffa = !!st.ffa;
   if (typeof st.bareBy !== 'number') st.bareBy = 0;
   for (const k of ['fastT', 'bareT']) if (typeof st[k] !== 'number') st[k] = 0;
   if (!Array.isArray(st.negOk)) st.negOk = [];
   if (typeof st.lag !== 'number') st.lag = 0;
   if (!Array.isArray(st.pastP)) st.pastP = [];
+  for (const k of ['spdMul', 'coolMul'])
+    if (!Array.isArray(st[k]) || st[k].length !== (st.n || 2))
+      st[k] = Array.from({ length: st.n || 2 }, (_, i) => (st[k] && st[k][i]) || 1);
   if (!Array.isArray(st.proj)) st.proj = [];
   if (!Array.isArray(st.fire)) st.fire = [];
   if (!Array.isArray(st.off)) st.off = Array(st.n || 2).fill(false);
@@ -167,25 +172,29 @@ export function newCovers(){
   // 예) c.push({x:19*FP, y:147*FP, w:32*FP, h:10*FP, hp:4});
   return [];
 }
-export function newState(n = 2, melee = false){
-  setArena(n, melee);
+export function newState(n = 2, melee = false, ffa = false){
+  setArena(n, melee, ffa);
   const players = [];
   for (let i = 0; i < n; i++){
     const team = teamOf(i, n);
-    // 같은 팀은 가로로 나눠 서고, 세로는 자기 진영 끝에서 시작한다
-    const perTeam = n / 2;
-    const idx = i % perTeam;
-    const col = perTeam === 1 ? HOME_COL : TEAM_COLS[idx] ?? HOME_COL;
+    // 팀전: 같은 팀은 가로로 나눠 서고 세로는 자기 진영 끝
+    // 개인전: 서로 최대한 멀게 흩뜨린다(위·아래 줄을 번갈아)
+    const perTeam = ffa ? 1 : n / 2;
+    const idx = ffa ? Math.floor(i / 2) : i % perTeam;
+    const col = ffa
+      ? (TEAM_COLS[idx % TEAM_COLS.length] ?? HOME_COL)
+      : (perTeam === 1 ? HOME_COL : TEAM_COLS[idx] ?? HOME_COL);
+    const bottom = ffa ? (i % 2 === 0) : team === 0;
     players.push({
       x: homeXFP(col),
-      y: team === 0 ? homeYFP(ROW_MAX[0]) : homeYFP(ROW_MIN[1]),
+      y: bottom ? homeYFP(ROW_MAX[0]) : homeYFP(ROW_MIN[1]),
       hp: MAXHP, cool: 0, invul: 0, flash: 0,
       atk: 0,                     // 칼 휘두르는 모션 남은 틱
       hitBy: -1,                  // 마지막으로 나를 때린 슬롯 (-1 = 없음·불 같은 무주체)
       shield: 0,                  // 방패를 든 남은 틱
       shCool: 0,                  // 방패 쿨다운
       stun: 0,                    // 막혀서 굳은 남은 틱
-      face: team === 0 ? 0 : 1    // 0=위 1=아래 2=왼 3=오른. 이동 방향을 따라간다
+      face: bottom ? 0 : 1        // 0=위 1=아래 2=왼 3=오른. 아래에서 시작하면 위를 본다
     });
   }
   return {
@@ -216,6 +225,15 @@ export function newState(n = 2, melee = false){
     negOk: [],                  // 이번 신청에 수락한 슬롯들 (상대 팀 전원이 모여야 켜진다)
     lag: 0,                     // 지연 보상 틱 수. 서버가 매 프레임 넣어준다
     pastP: [],                  // 최근 위치 기록 [[x,y]x인원] x LAG_HIST. 명중을 되감아 판정한다
+    // 슬롯별 이동 속도 배율. **AI 모드 전용**(단계가 오를수록 상대가 조금씩 빨라진다).
+    // PVP에서는 전부 1이라 아무 영향이 없다
+    spdMul: Array.from({ length: n }, () => 1),
+    // 슬롯별 발사 간격 배율(작을수록 빨리 쏨). 역시 **AI 모드 전용**.
+    // 회피·교전율·속도·투척을 다 시험해봤지만 상위권이 안 갈렸다 —
+    // 이미 거의 안 맞는 수준이라 회피 쪽엔 여지가 없고, 투척은 탄이 정해져 있다
+    coolMul: Array.from({ length: n }, () => 1),
+    ffa,                        // 개인전(각자 한 팀). 칼전 3~4인 전용
+
     phase: PH_READY, timer: 0, clock: 0,
     maxStep: stepCap(),
     bulletV: bulletFP(),
@@ -247,7 +265,7 @@ export function itemRect(it){
 // 해당 슬롯이 이 칸에 이 아이템을 놓을 수 있는가
 // 이 슬롯이 놓아야 할 아이템을 전부 놓았는가 (설치 완료 조건)
 export function allPlaced(s, slot){
-  setArena(s.n, s.melee);
+  setArena(s.n, s.melee, s.ffa);
   const team = teamOf(slot, s.n);
   if (coverUsed(s.items, team) < coverBudget()) return false;      // 엄폐물 합계
   for (const k of itemKinds()){
@@ -259,7 +277,7 @@ export function allPlaced(s, slot){
 }
 // 내가 놓은 아이템 찾기 (옮기려고 집을 때)
 export function myItemAt(s, slot, c, r){
-  setArena(s.n, s.melee);
+  setArena(s.n, s.melee, s.ffa);
   const team = teamOf(slot, s.n);
   return (s.items || []).find(it => {
     const w = ITEM_DEF[it.k].cells;
@@ -269,7 +287,7 @@ export function myItemAt(s, slot, c, r){
 
 // from을 주면 그 자리의 내 아이템은 없는 셈 치고 검사한다 (자리 옮기기)
 export function canPlace(s, slot, k, c, r, from){
-  setArena(s.n, s.melee);
+  setArena(s.n, s.melee, s.ffa);
   const team = teamOf(slot, s.n);
   const def = ITEM_DEF[k];
   if (!def) return false;
@@ -321,7 +339,7 @@ export function canPlace(s, slot, k, c, r, from){
 // 칸 (c,r)을 중심으로 rad칸 범위를 터뜨린다. 드럼통·수류탄이 함께 쓴다
 // 정중앙 칸에 서 있는가 (직격 판정)
 export function atCenter(s, i, c, r){
-  setArena(s.n, s.melee);
+  setArena(s.n, s.melee, s.ffa);
   const x0 = Math.round(cellX(c) * FP), x1 = Math.round(cellX(c + 1) * FP);
   const y0 = Math.round(cellY(r) * FP), y1 = Math.round(cellY(r + 1) * FP);
   const p = s.p[i];
@@ -343,7 +361,7 @@ function killFx(s, p){
 }
 
 export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
-  setArena(s.n, s.melee);
+  setArena(s.n, s.melee, s.ffa);
   const x0 = Math.round(cellX(c - rad) * FP);
   const x1 = Math.round(cellX(c + rad + 1) * FP);
   const y0 = Math.round(cellY(r - rad) * FP);
@@ -388,13 +406,13 @@ export function throwRow(slot, charge, n = 2, melee = false){
 // 연결 끊김 표시. 1대1은 나간 사람이 지고, 2대2는 그대로 두고 계속 굴린다
 // (한 명 끊겼다고 나머지 셋의 판을 망치는 게 더 이상하다는 판단)
 export function setOff(s, slot, v){
-  setArena(s.n, s.melee);
+  setArena(s.n, s.melee, s.ffa);
   if (!Array.isArray(s.off)) s.off = Array(s.n).fill(false);
   s.off[slot] = !!v;
 }
 // 자리를 완전히 뜬 경우 (직접 나감 / 유예 시간 초과)
 export function forfeit(s, slot){
-  setArena(s.n, s.melee);
+  setArena(s.n, s.melee, s.ffa);
   setOff(s, slot, true);
   if (s.n > 2) return;                       // 2대2는 계속 진행
   if (s.phase === PH_OVER || s.solo) return;
@@ -402,7 +420,7 @@ export function forfeit(s, slot){
   s.winner = teamOf(slot, s.n) === 0 ? 2 : 1;
 }
 export function canThrow(s, slot, k){
-  setArena(s.n, s.melee);
+  setArena(s.n, s.melee, s.ffa);
   if (s.phase !== PH_PLAY) return false;
   if (s.bare) return false;                            // 노템전은 투척물이 없다
   if (!s.p[slot] || s.p[slot].hp <= 0) return false;   // 죽으면 관전. 던지기도 안 된다
@@ -414,7 +432,7 @@ export function canThrow(s, slot, k){
 // 이 위치에 서면 엄폐물과 겹치는가. 드럼통은 함정이라 막지 않는다
 // (막으면 안 보이는 상태에서 길이 막혀 위치가 드러난다)
 export function blocked(s, x, y, self = -1){
-  setArena(s.n, s.melee);
+  setArena(s.n, s.melee, s.ffa);
   for (const it of (s.items || [])){
     if (it.hp <= 0 || it.k === ITEM.DRUM) continue;
     const r = itemRect(it);
@@ -431,7 +449,7 @@ export function blocked(s, x, y, self = -1){
 }
 
 export function step(s, inp){
-  setArena(s.n, s.melee);
+  setArena(s.n, s.melee, s.ffa);
   s.tick++;
 
   // 대기/종료 화면: START 입력(fire)으로만 카운트다운 시작
@@ -530,7 +548,7 @@ export function step(s, inp){
     if (s.phase === PH_PLAY){
       // 자유 이동. dx/dy 는 이동량(고정소수점). 기절 중엔 입력이 통째로 무시된다
       let dx = q.dx | 0, dy = q.dy | 0;
-      const cap = s.maxStep * (s.fast ? FAST_MUL : 1), len2 = dx*dx + dy*dy;
+      const cap = s.maxStep * (s.fast ? FAST_MUL : 1) * ((s.spdMul && s.spdMul[i]) || 1), len2 = dx*dx + dy*dy;
       if (len2 > cap*cap){                     // 대각선이 빨라지지 않도록 벡터 길이로 제한
         const k = cap / Math.sqrt(len2);
         dx = Math.round(dx * k); dy = Math.round(dy * k);
@@ -732,7 +750,9 @@ export function step(s, inp){
     const p = s.p[i];
     if (p.hp <= 0) continue;                   // 죽으면 관전
     if (p.cool > 0){ p.cool--; continue; }
-    p.cool = Math.max(1, Math.round(s.coolT / (s.fast ? FAST_MUL : 1))) - 1;   // 2배속이면 발사도 두 배로
+    // 2배속이면 발사도 두 배로. coolMul은 AI 단계용(작을수록 빨리 쏜다)
+    const cm = (s.coolMul && s.coolMul[i]) || 1;
+    p.cool = Math.max(1, Math.round(s.coolT * cm / (s.fast ? FAST_MUL : 1))) - 1;
     const up = teamOf(i, s.n) === 0;             // 아래 팀은 위로 쏜다
     s.bullets.push({
       x: p.x + BOFF,
@@ -801,11 +821,14 @@ export function step(s, inp){
   }
   // 한 팀이 전멸하면 끝. 동시에 전멸하면 무승부
   if (!s.solo && !s.over && s.phase === PH_PLAY){
-    const alive = [0, 0];
+    // 개인전은 **마지막 한 명**이 남으면 끝. 팀전은 한 팀 전멸
+    const tc = teamCount(s.n);
+    const alive = Array(tc).fill(0);
     for (let i = 0; i < s.n; i++) if (s.p[i].hp > 0) alive[teamOf(i, s.n)]++;
-    if (!alive[0] || !alive[1]){
+    const left = alive.filter(v => v > 0);
+    if (left.length <= 1){
       s.over = true; s.phase = PH_OVER;
-      s.winner = (!alive[0] && !alive[1]) ? 0 : (alive[0] ? 1 : 2);
+      s.winner = left.length === 0 ? 0 : alive.findIndex(v => v > 0) + 1;
     }
   }
 
@@ -821,7 +844,7 @@ export function step(s, inp){
 }
 
 export function checksum(s){
-  setArena(s.n, s.melee);
+  setArena(s.n, s.melee, s.ffa);
   let h = s.tick + s.maxStep + s.bulletV + s.coolT + s.phase * 7 + s.timer + s.clock;
   for (const p of s.p) h = (h*31 + p.x + p.y*3 + p.hp*7 + p.cool*3 + p.invul) | 0;
   for (const b of s.bullets) h = (h*31 + b.x + b.y + b.o) | 0;
@@ -829,6 +852,8 @@ export function checksum(s){
   for (const it of s.items) h = (h*31 + it.k*7 + it.c*13 + it.r*29 + it.hp*3 + it.by) | 0;
   // 인원수만큼 전부 넣어야 한다. 두 명만 보면 3·4번 슬롯이 어긋나도 못 잡는다
   for (let i = 0; i < s.n; i++) h = (h*31 + (s.ready[i] ? i + 1 : 0) + (s.done[i] ? 17 : 0)) | 0;
+  for (const m of (s.spdMul || [])) h = (h*31 + Math.round(m*100)) | 0;
+  for (const m of (s.coolMul || [])) h = (h*31 + Math.round(m*100)) | 0;
   h = (h*31 + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16 + (s.bare ? 32 : 0) + s.bareBy*64 + s.fastT*3 + s.bareT*5 + s.negOk.length*13) | 0;
   for (const c of (s.color || [])) h = (h*31 + c) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;

@@ -39,7 +39,9 @@ const itemScale = () => ({ x: GRID_CW / SHEET_CW, y: GRID_CH / SHEET_CH });
 // 아레나 배경·격자·중앙선은 상하 대칭이라 그대로 둬도 된다.
 // 각자 자기 팀이 아래쪽에 보이도록 뒤집는다
 const myTeamNow = () => teamOf(SELF.slot, SELF.n || 2);
-const flipped = () => myTeamNow() === 1;
+// 개인전은 팀이 없으므로 **시작 위치**로 정한다(짝수 슬롯이 아래에서 시작).
+// 그래야 개인전에서도 각자 자기가 아래에 보인다
+const flipped = () => (ARENA.ffa ? SELF.slot % 2 === 1 : myTeamNow() === 1);
 // 뒤집기 축은 아레나 격자의 세로 중심. 1대1은 H와 같다
 const fy = (y, h) => flipped() ? ARENA.flip - y - h : y;
 
@@ -260,6 +262,32 @@ export function createRenderer(canvas){
   // 가운데에 큰 것 하나만 그리면 버섯구름이 위로만 솟아 아래쪽 칸이 비어 보인다.
   // 화염병 불꽃: 3x3 칸마다 하나씩. 칸마다 위상을 어긋나게 해서 같이 흔들리지 않게 한다
   // 연결이 끊긴 캐릭터 머리 위에 표시. 0.5초 주기로 깜빡인다
+  // 시작 전에 **내 캐릭터 위에 "나"** 를 띄운다. 색만으로는 넷 중 누가 나인지 헷갈린다.
+  // 전투가 시작되면 사라진다 (화면이 복잡해지고, 그때는 이미 알아본다)
+  function drawMeMark(s, rx, ry){
+    if (s.phase === PH_PLAY || s.phase === PH_OVER) return;
+    const me = s.p[SELF.slot];
+    if (!me || me.hp <= 0) return;
+    const x = (rx[SELF.slot] !== undefined ? rx[SELF.slot] : me.x) / FP;
+    const y = (ry[SELF.slot] !== undefined ? ry[SELF.slot] : me.y) / FP;
+    const cx = x + ARENA.pw / 2;
+    const top = fy(y, ARENA.ph) - 3.5;
+    ctx.font = 'bold ' + (7 * RS) + 'px monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.lineWidth = 3 * RS; ctx.strokeStyle = 'rgba(8,8,14,0.92)';
+    ctx.strokeText('나', cx * RS, top * RS);
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillText('나', cx * RS, top * RS);
+    // 작은 삼각형으로 아래를 가리킨다
+    ctx.beginPath();
+    ctx.moveTo((cx - 2) * RS, (top + 1.2) * RS);
+    ctx.lineTo((cx + 2) * RS, (top + 1.2) * RS);
+    ctx.lineTo(cx * RS, (top + 3.4) * RS);
+    ctx.closePath();
+    ctx.fillStyle = '#ffe9a8'; ctx.fill();
+    ctx.textAlign = 'left';
+  }
+
   function drawOffline(s, rx, ry){
     if (!s.off) return;
     if (Math.floor(s.tick / 18) % 2) return;              // 깜빡임
@@ -549,7 +577,8 @@ export function createRenderer(canvas){
   }
 
   function draw(s, dbg, a, cl, stick, drag, left, ok, extra = {}){
-    setArena(s && s.n ? s.n : 2, s && s.melee);   // 격자·캐릭터·배경을 이 판에 맞춘다
+    // **ffa까지 넘겨야 한다.** 예전에 melee를 빠뜨려 배경이 딴 모드로 나온 적이 있다
+    setArena(s && s.n ? s.n : 2, s && s.melee, s && s.ffa);
     const j = extra.juice;
     const sh = j ? j.offset() : { x: 0, y: 0 };
     ctx.save();
@@ -596,6 +625,7 @@ export function createRenderer(canvas){
     const rx = cl.rx || [], ry = cl.ry || [];
     for (let i = 0; i < s.p.length; i++)
       drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, s.color);
+    drawMeMark(s, rx, ry);
     drawOffline(s, rx, ry);
     drawProjectiles(s, a);
     drawFire(s);

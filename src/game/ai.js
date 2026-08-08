@@ -30,26 +30,26 @@ function foeOf(s, me){
 export const AI_STAGES = [
   //                        방어                              공격
   //          react horizon danger speed  aim  push slop | thrGap aimErr chargeErr combo
-  { name: '연습',   react: 900, horizon: 18,  danger: 9,  speed: 0.35, aim: 0.10, push: 0.10, slop: 14,
-    thrGap: 9000, aimErr: 2.4, chargeErr: 0.35, combo: 0, lead: 0.0 },
-  { name: '초보',   react: 760, horizon: 26,  danger: 10, speed: 0.45, aim: 0.18, push: 0.15, slop: 11,
-    thrGap: 8000, aimErr: 2.0, chargeErr: 0.28, combo: 0, lead: 0.15 },
-  { name: '견습',   react: 620, horizon: 36,  danger: 11, speed: 0.55, aim: 0.28, push: 0.20, slop: 9,
-    thrGap: 7000, aimErr: 1.6, chargeErr: 0.22, combo: 0, lead: 0.3 },
-  { name: '숙련',   react: 500, horizon: 48,  danger: 12, speed: 0.64, aim: 0.38, push: 0.28, slop: 7,
-    thrGap: 6000, aimErr: 1.2, chargeErr: 0.17, combo: 0.2, lead: 0.45 },
-  { name: '베테랑', react: 400, horizon: 62,  danger: 13, speed: 0.72, aim: 0.48, push: 0.35, slop: 5,
-    thrGap: 5200, aimErr: 0.9, chargeErr: 0.13, combo: 0.35, lead: 0.6 },
-  { name: '정예',   react: 310, horizon: 78,  danger: 14, speed: 0.80, aim: 0.58, push: 0.42, slop: 4,
-    thrGap: 4400, aimErr: 0.7, chargeErr: 0.10, combo: 0.5, lead: 0.7 },
-  { name: '저격수', react: 240, horizon: 95,  danger: 15, speed: 0.87, aim: 0.68, push: 0.50, slop: 3,
-    thrGap: 3700, aimErr: 0.5, chargeErr: 0.07, combo: 0.65, lead: 0.8 },
-  { name: '교관',   react: 170, horizon: 112, danger: 16, speed: 0.92, aim: 0.78, push: 0.58, slop: 2,
-    thrGap: 3100, aimErr: 0.35, chargeErr: 0.05, combo: 0.75, lead: 0.88 },
-  { name: '지휘관', react: 110, horizon: 130, danger: 17, speed: 0.96, aim: 0.87, push: 0.66, slop: 1,
-    thrGap: 2600, aimErr: 0.2, chargeErr: 0.03, combo: 0.85, lead: 0.94 },
-  { name: '전설',   react: 60,  horizon: 150, danger: 19, speed: 1.00, aim: 0.95, push: 0.75, slop: 0,
-    thrGap: 2100, aimErr: 0.1, chargeErr: 0.015, combo: 1.0, lead: 1.0 }
+  { name: '연습',   react: 900, horizon: 18,  danger: 9,  speed: 0.35, aim: 0.1, push: 0.1, slop: 14.0,
+    thrGap: 9000, aimErr: 2.4, chargeErr: 0.35, combo: 0.0, lead: 0.0 , timing: 0.0 , mul: 0.8 , engage: 0.04 , cool: 1.25 },
+  { name: '초보',   react: 807, horizon: 23,  danger: 10, speed: 0.417, aim: 0.153, push: 0.133, slop: 12.0,
+    thrGap: 8333, aimErr: 2.133, chargeErr: 0.303, combo: 0.0, lead: 0.0 , timing: 0.04 , mul: 0.833 , engage: 0.06 , cool: 1.217 },
+  { name: '견습',   react: 713, horizon: 29,  danger: 10, speed: 0.483, aim: 0.213, push: 0.167, slop: 10.333,
+    thrGap: 7667, aimErr: 1.867, chargeErr: 0.26, combo: 0.0, lead: 0.0 , timing: 0.087 , mul: 0.867 , engage: 0.08 , cool: 1.183 },
+  { name: '숙련',   react: 620, horizon: 36,  danger: 11, speed: 0.55, aim: 0.28, push: 0.2, slop: 9.0,
+    thrGap: 7000, aimErr: 1.6, chargeErr: 0.22, combo: 0.0, lead: 0.0 , timing: 0.14 , mul: 0.9 , engage: 0.1 , cool: 1.15 },
+  { name: '베테랑', react: 540, horizon: 44,  danger: 12, speed: 0.61, aim: 0.347, push: 0.253, slop: 7.667,
+    thrGap: 6333, aimErr: 1.333, chargeErr: 0.187, combo: 0.133, lead: 0.0 , timing: 0.207 , mul: 0.94 , engage: 0.12 , cool: 1.117 },
+  { name: '정예',   react: 467, horizon: 53,  danger: 12, speed: 0.667, aim: 0.413, push: 0.303, slop: 6.333,
+    thrGap: 5667, aimErr: 1.1, chargeErr: 0.157, combo: 0.25, lead: 0.0 , timing: 0.28 , mul: 0.973 , engage: 0.14 , cool: 1.083 },
+  { name: '저격수', react: 400, horizon: 62,  danger: 13, speed: 0.72, aim: 0.48, push: 0.35, slop: 5.0,
+    thrGap: 5000, aimErr: 0.9, chargeErr: 0.13, combo: 0.35, lead: 0.0 , timing: 0.36 , mul: 1.0 , engage: 0.16 , cool: 1.05 },
+  { name: '교관',   react: 340, horizon: 73, danger: 14, speed: 0.773, aim: 0.547, push: 0.397, slop: 4.333,
+    thrGap: 4467, aimErr: 0.767, chargeErr: 0.11, combo: 0.45, lead: 0.0 , timing: 0.453 , mul: 1.027 , engage: 0.173 , cool: 1.017 },
+  { name: '지휘관', react: 287, horizon: 84, danger: 14, speed: 0.823, aim: 0.613, push: 0.447, slop: 3.667,
+    thrGap: 3933, aimErr: 0.633, chargeErr: 0.09, combo: 0.55, lead: 0.0 , timing: 0.547 , mul: 1.053 , engage: 0.187 , cool: 0.98 },
+  { name: '전설',   react: 240,  horizon: 95, danger: 15, speed: 0.87, aim: 0.68, push: 0.5, slop: 3.0,
+    thrGap: 3400, aimErr: 0.5, chargeErr: 0.07, combo: 0.65, lead: 0.0 , timing: 0.64 , mul: 1.08 , engage: 0.2 , cool: 0.94 }
 ];
 
 const HALF = 7 * FP;        // 캐릭터 가로 절반
@@ -67,12 +67,36 @@ export function createAI(stage = 1){
 
   // 어느 x에 서 있으면 안전한지 훑어서 가장 좋은 자리를 고른다.
   // 상대 x를 그냥 따라가면 상대가 쏜 총알 정면으로 걸어들어가게 된다.
+  // 최근에 상대와 같은 줄에 서 있던 비율 (지수 이동 평균).
+  // 이게 없으면 잘하는 AI일수록 완전히 안전한 열을 찾아 **숨어서 아무것도 안 한다** —
+  // 실측에서 10단계가 60초에 8/10 피해로 무해했다
+  let engaged = 0;
+  let foeLastX = null, foeVel = 0;      // 상대 가로 속도 (FP/틱). 리드샷에 쓴다
   function planX(s, me){
     const my = s.p[me], foe = foeOf(s, me);
     if (!foe) return my.x;                       // 적이 전부 죽었으면 제자리
     const wi = wallIdx(my.y);
     const lo = WALL_L[wi], hi = WALL_R[wi];
-    const foeCx = foe.x + HALF, myCy = my.y + MID;
+    // **리드샷**: 총알이 날아가는 동안 상대가 움직인다. 그 앞을 노린다.
+    // lead는 단계마다 있었지만 코드에서 한 번도 안 쓰이던 죽은 값이었다
+    if (foeLastX !== null) foeVel = foeVel * 0.7 + (foe.x - foeLastX) * 0.3;
+    foeLastX = foe.x;
+    const flight = Math.abs((foe.y - my.y) / (s.bulletV || 1)) || 0;
+    const foeCx = foe.x + HALF + foeVel * Math.min(flight, 60) * (p.lead || 0), myCy = my.y + MID;
+
+    // **줄을 맞출 좋은 순간 = 내 총은 준비됐고 상대는 막 쐈을 때.**
+    // 자동 발사라 그냥 붙으면 같이 맞는다. 실측에서 높은 단계가 더 때리는 만큼
+    // 더 맞아 실력 차이가 0이었고, 회피만 키우면 안 맞는 대신 안 때리게 됐다
+    const cool = s.coolT || 27;
+    const ready = 1 - Math.min(1, (my.cool || 0) / cool);   // 1 = 지금 쏠 수 있다
+    const fresh = Math.min(1, (foe.cool || 0) / cool);      // 1 = 상대가 막 쐈다
+    const good = ready * fresh;                             // 둘 다일 때만 좋은 순간
+    // timing이 0이면 예전과 똑같이 행동한다(낮은 단계).
+    // 하한을 둔다 — 음수면 정렬을 '피하는' 셈이라 아예 안 싸운다
+    const safeW = Math.max(0.25, 1 + p.timing * (good * 3.2 - 0.8));
+    // 목표 교전율에 못 미치면 **안전을 포기하고 붙는다.** 채우고 있으면 안전 우선
+    const need = Math.max(0, (p.engage || 0) - engaged);
+    const push = 1 + need * 14;
 
     // 나를 향해 오는 총알만 추린다
     const inc = [];
@@ -101,8 +125,17 @@ export function createAI(stage = 1){
       const align = Math.abs(cx - foeCx) / FP;
       // 위험이 최우선, 그다음이 상대와의 정렬(aim이 클수록 더 붙으려 함).
       // 이 균형을 건드려 봤지만 회피가 무너져서 원래대로 되돌렸다
-      const alignW = 0.15 + p.aim * 1.2;
-      const score = -danger * 60 - align * alignW;
+      //
+      // **정렬 욕심을 상대 쿨다운에 맞춰 흔든다(timing).** 자동 발사라서
+      // 그냥 붙으면 나도 같이 맞는다 — 실측에서 높은 단계가 더 때리는 만큼
+      // 더 맞아 실력 차이가 0이었다. 사람이 잘하는 건 **상대가 막 쏜 직후에
+      // 줄을 맞추고, 다음 발사가 임박하면 빠지는 것**이다
+      const alignW = (0.15 + p.aim * 1.2) * safeW * push;
+      // 위험 가중치도 단계에 따라 낮춘다. 높은 단계가 완벽히 안전한 열만 찾아
+      // 서 있으면 **안 맞는 대신 안 때린다** — 실측에서 10단계가 8/10 피해로 무해했다.
+      // 잘하는 사람은 위험을 알면서도 좋은 순간에 들어간다
+      const dangerW = 60 * (1.15 - p.timing * 0.75) / push;
+      const score = -danger * dangerW - align * alignW;
       if (score > bestScore){ bestScore = score; best = x; }
     }
     return best;
@@ -132,7 +165,7 @@ export function createAI(stage = 1){
           const gapX = Math.abs(dxc) - PWf;
           const vx2 = gapX > want2 ? Math.sign(dxc) : (gapX < want2 - reach * 0.3 ? -Math.sign(dxc) : 0);
           const vy2 = Math.abs(dyc) < PHf * 0.5 ? 0 : Math.sign(dyc);
-          return { vx: vx2 * p.speed, vy: vy2 * p.speed, sh: guard ? 1 : 0 };
+          return { vx: vx2 * p.speed * (p.mul || 1), vy: vy2 * p.speed * (p.mul || 1), sh: guard ? 1 : 0 };
         }
         const up = dyc < 0;                               // 상대가 위에 있으면 위를 본다
         const gap = up ? my.y - (foe.y + PHf) : foe.y - (my.y + PHf);
@@ -147,10 +180,14 @@ export function createAI(stage = 1){
         else if (gap > want + reach * 0.15) vy = up ? -1 : 1;
         else if (gap < want - reach * 0.15) vy = up ? 1 : -1;
         const vx = Math.abs(dxc) < PWf * 0.35 ? 0 : Math.sign(dxc);
-        return { vx: vx * p.speed, vy: vy * p.speed, sh: guard ? 1 : 0 };
+        return { vx: vx * p.speed * (p.mul || 1), vy: vy * p.speed * (p.mul || 1), sh: guard ? 1 : 0 };
       }
 
       const myCx = my.x + HALF;
+
+      // 지금 상대와 같은 줄에 서 있는가 (캐릭터 폭 기준)
+      const lined = Math.abs((my.x + HALF) - (foe.x + HALF)) < HALF * 1.6;
+      engaged += ((lined ? 1 : 0) - engaged) * Math.min(1, dt * 1.1);
 
       // react가 짧을수록 자주 다시 판단한다 = 반응이 빠르다
       if (targetX === null || now >= nextPlan){
@@ -162,7 +199,9 @@ export function createAI(stage = 1){
       const wi2 = wallIdx(my.y);
       targetX = Math.max(WALL_L[wi2], Math.min(WALL_R[wi2], targetX));
       const dx = targetX - my.x;
-      let vx = Math.max(-1, Math.min(1, dx / (6 * FP)));
+      // 속도 배율이 크면 같은 이득으로 목표를 지나쳐 좌우로 떤다.
+      // 실측에서 10단계(1.48배)가 7단계보다 약했던 원인
+      let vx = Math.max(-1, Math.min(1, dx / (6 * FP * (p.mul || 1))));
 
       // 앞뒤: push가 클수록 중앙선 쪽에 붙는다. 약간의 어슬렁거림 추가
       wanderT -= dt;
@@ -224,7 +263,7 @@ export function createAI(stage = 1){
         }
       }
 
-      return { vx: vx * p.speed, vy: vy * p.speed, thr };
+      return { vx: vx * p.speed * (p.mul || 1), vy: vy * p.speed * (p.mul || 1), thr };
     }
   };
 }

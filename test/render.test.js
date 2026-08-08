@@ -51,7 +51,9 @@ const modes = [
   { name: '총격 1대1', n: 2, melee: false },
   { name: '총격 2대2', n: 4, melee: false },
   { name: '칼전 1대1', n: 2, melee: true },
-  { name: '칼전 2대2', n: 4, melee: true }
+  { name: '칼전 2대2', n: 4, melee: true },
+  { name: '칼전 개인 3인', n: 3, melee: true, ffa: true },
+  { name: '칼전 개인 4인', n: 4, melee: true, ffa: true }
 ];
 const phases = [['배치', PH_READY], ['카운트다운', PH_COUNT], ['전투', PH_PLAY], ['종료', PH_OVER]];
 
@@ -59,7 +61,7 @@ console.log('모드 x 페이즈 x 내 슬롯 전부 한 프레임씩 그려본�
 for (const m of modes){
   for (const [pn, ph] of phases){
     for (let slot = 0; slot < m.n; slot++){
-      const s = newState(m.n, m.melee);
+      const s = newState(m.n, m.melee, m.ffa);
       s.phase = ph;
       if (ph === PH_OVER){ s.over = true; s.winner = 1; }
       let fc = null, err = null;
@@ -89,7 +91,7 @@ console.log('우리 팀은 뒷모습, 상대 팀은 앞모습');
   // NaN도 예외도 아니라 연기 테스트로는 안 걸리므로 프레임 번호를 직접 본다
   for (const m of modes){
     for (let slot = 0; slot < m.n; slot++){
-      const s = newState(m.n, m.melee);
+      const s = newState(m.n, m.melee, m.ffa);
       s.phase = PH_PLAY;
       const fc = drawOnce(s, slot);
       // 캐릭터 그리기: 총격전은 원본 14x16, 칼전은 310x184
@@ -101,15 +103,20 @@ console.log('우리 팀은 뒷모습, 상대 팀은 앞모습');
         const idx = Math.round(c.args[0] / SW);
         return m.melee ? (idx === 2 || idx === 3) : (idx % 2) === 1;
       }).length;
-      assert(backs === m.n / 2,
+      // 칼전에서 앞/뒤는 팀이 아니라 **바라보는 방향**으로 정해진다.
+      // 팀전은 같은 팀이 같은 쪽을 보고 시작해 절반이 뒷모습이지만,
+      // 개인전은 각자 흩어져 서므로 그 관계가 없다
+      if (!m.ffa) assert(backs === m.n / 2,
         `${m.name} 슬롯${slot} — 우리 팀 ${m.n / 2}명만 뒷모습 (${backs}명)`);
+      else assert(backs >= 1 && backs <= m.n,
+        `${m.name} 슬롯${slot} — 뒷모습이 1~${m.n}명 사이 (${backs}명)`);
     }
   }
 }
 
 console.log('아이템·투척물·효과가 화면에 있을 때');
 for (const m of modes.filter(v => !v.melee)){
-  const s = newState(m.n, m.melee);
+  const s = newState(m.n, m.melee, m.ffa);
   s.phase = PH_PLAY;
   // 놓을 수 있는 아이템을 팀마다 채운다
   for (const team of [0, 1]){
@@ -157,7 +164,7 @@ console.log('격자 표시를 켠 상태');
   const keep = VIEW.grid;
   VIEW.grid = true;
   for (const m of modes){
-    const s = newState(m.n, m.melee);
+    const s = newState(m.n, m.melee, m.ffa);
     s.phase = PH_READY;
     let err = null, fc = null;
     try { fc = drawOnce(s, 0); } catch (e) { err = e; }
@@ -169,7 +176,7 @@ console.log('격자 표시를 켠 상태');
 
 console.log('렌더 위치가 아직 없을 때 (첫 프레임)');
 for (const m of modes){
-  const s = newState(m.n, m.melee);
+  const s = newState(m.n, m.melee, m.ffa);
   s.phase = PH_PLAY;
   for (let slot = 0; slot < m.n; slot++){
     let err = null;
@@ -180,7 +187,7 @@ for (const m of modes){
 
 console.log('죽은 사람·전멸 상태');
 for (const m of modes){
-  const s = newState(m.n, m.melee);
+  const s = newState(m.n, m.melee, m.ffa);
   s.phase = PH_PLAY;
   s.p[0].hp = 0;
   if (m.n === 4) s.p[1].hp = 0;
@@ -192,7 +199,7 @@ for (const m of modes){
 
 console.log('한 판을 실제로 굴리며 매 프레임 그린다');
 for (const m of modes){
-  const s = newState(m.n, m.melee);
+  const s = newState(m.n, m.melee, m.ffa);
   s.phase = PH_PLAY;
   let err = null, worst = 0;
   try {
