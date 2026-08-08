@@ -15,7 +15,7 @@ import {
   GRID_X0, GRID_Y0, H, cellOwner, cellX, cellY
 } from './config.js';
 import { padRect, paletteSlots, uiBoxRect } from './layout.js';
-import { uiPrompt } from './ui-state.js';
+import { uiPrompt, resultFor } from './ui-state.js';
 import { CHARGE_MAX_MS, PH_PLAY, THROW } from './config.js';
 
 // 게임 한 판을 만들고 rAF 루프를 돌린다.
@@ -246,9 +246,9 @@ export function createGame(canvas, opts = {}){
     }
     // 라운드 종료
     if (cur.phase === PH_OVER && prev.phase !== PH_OVER){
-      const w = st.winner;
-      if (w === 0) sfx.count(0);
-      else if (w === me + 1) sfx.win();
+      const r = resultFor(st, SELF.slot);
+      if (r === 'draw') sfx.count(0);
+      else if (r === 'win') sfx.win();
       else { sfx.lose(); buzz([18, 50, 18]); }
     }
     prev = cur;
@@ -388,8 +388,7 @@ export function createGame(canvas, opts = {}){
       lastPhase = client.pred.phase;
       onPhase(lastPhase);
       if (lastPhase === PH_OVER){
-        const w = client.pred.winner;
-        onFinish(w === 0 ? 'draw' : (w === SELF.slot + 1 ? 'win' : 'lose'));
+        onFinish(resultFor(client.pred, SELF.slot));
       }
     }
     raf = requestAnimationFrame(loop);

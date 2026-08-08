@@ -85,27 +85,27 @@ console.log('칼전 2배속 — 카운트다운 중에 신청한다');
   const w = world(true);
   w.run(60);
   assert(w.srv.s.melee === true, '칼전 방');
-  assert(w.srv.s.phase === PH_COUNT, '배치 단계 없이 바로 카운트다운');
+  assert(w.srv.s.phase === PH_READY, '칼전도 준비 단계 (설치는 자동)');
+  assert(w.srv.s.done.every(Boolean), '설치 완료는 자동');
 
   SELF.slot = 0; SELF.n = 2;
   w.cs[0].requestFast(0);
   w.run(20);
-  assert(w.srv.s.fastBy === 1, '카운트다운 중에도 신청이 들어간다');
+  assert(w.srv.s.fastBy === 1, '준비 단계에서 신청이 들어간다');
   assert(w.cs[1].pred.fastBy === 1, '**상대 클라까지 전달된다**');
 
   // 답을 기다리는 동안 카운트가 멈춰야 한다 (안 그러면 3.8초 안에 못 누른다)
-  const t0 = w.srv.s.timer;
-  w.run(150);                                  // 제한 시간(5초) 안에서만 확인
-  assert(w.srv.s.timer === t0, '답을 기다리는 동안 카운트가 멈춘다');
-  assert(w.srv.s.phase === PH_COUNT, '전투로 안 넘어간다');
+  w.run(150);
+  assert(w.srv.s.phase === PH_READY, '준비 단계라 시간 압박이 없다');
 
   SELF.slot = 1;
   w.cs[1].answerFast(1, true);
   w.run(20);
   assert(w.srv.s.fast === true, '수락하면 켜진다');
   assert(w.cs[0].pred.fast === true && w.cs[1].pred.fast === true, '양쪽 클라 모두 켜진다');
+  for (let i = 0; i < 2; i++){ SELF.slot = i; w.cs[i].setGo(i); }
   w.run(300);
-  assert(w.srv.s.phase === PH_PLAY, '수락 뒤 카운트가 다시 흘러 전투 시작');
+  assert(w.srv.s.phase === PH_PLAY, '준비완료하면 전투 시작');
 }
 
 console.log('노템전이 켜지면 설치 완료를 건너뛴다');
@@ -153,10 +153,11 @@ console.log('칼전은 답이 없어도 제한 시간 뒤 시작한다');
   SELF.slot = 0; SELF.n = 2;
   w.cs[0].requestFast(0);
   w.run(20);
-  assert(w.srv.s.phase === PH_COUNT, '카운트가 멈춘 상태');
-  w.run(NEG_TICKS + 300);
-  assert(w.srv.s.fastBy === 0 && w.srv.s.fast === false, '신청이 취소된다');
-  assert(w.srv.s.phase === PH_PLAY, '**영영 안 시작되는 일이 없다**');
+  w.run(NEG_TICKS + 60);
+  assert(w.srv.s.fastBy === 0 && w.srv.s.fast === false, '제한 시간이 지나면 신청이 취소된다');
+  for (let i = 0; i < 2; i++){ SELF.slot = i; w.cs[i].setGo(i); }
+  w.run(300);
+  assert(w.srv.s.phase === PH_PLAY, '그 뒤 준비완료로 시작할 수 있다');
 }
 
 console.log('칼전엔 노템전이 없다 (원래 아이템이 없다)');
@@ -169,11 +170,14 @@ console.log('칼전엔 노템전이 없다 (원래 아이템이 없다)');
   assert(w.srv.s.bareBy === 0 && w.srv.s.bare === false, '칼전에선 노템전 신청이 무시된다');
 }
 
-console.log('신청을 안 하면 칼전은 바로 시작한다');
+console.log('칼전은 준비완료를 누르면 바로 시작한다');
 {
   const w = world(true);
+  w.run(120);
+  assert(w.srv.s.phase === PH_READY, '누르기 전엔 대기');
+  for (let i = 0; i < 2; i++){ SELF.slot = i; w.cs[i].setGo(i); }
   w.run(300);
-  assert(w.srv.s.phase === PH_PLAY, '4초 안에 전투 시작 (기다리게 만들지 않는다)');
+  assert(w.srv.s.phase === PH_PLAY, '누르면 바로 시작');
 }
 
 SELF.slot = keep.slot; SELF.n = keep.n;

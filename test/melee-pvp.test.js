@@ -41,7 +41,7 @@ try {
   assert(ha.room === hb.room, '같은 방');
   assert(ha.melee === true && hb.melee === true, 'hello에 칼전 표시');
   assert(ha.pid !== hb.pid, '슬롯이 다르다');
-  assert(a.last('go'), '둘이 모이면 바로 시작');
+  assert(a.last('go'), '둘이 모이면 방이 열린다');
 
   console.log('서버도 칼전 규칙으로 돈다');
   await sleep(1200);
@@ -50,7 +50,7 @@ try {
   assert(snap.st.melee === true, '서버 상태가 칼전');
   assert((snap.st.bullets || []).length === 0, '총알이 없다');
   assert(snap.st.p.every(p => typeof p.face === 'number'), '바라보는 방향이 상태에 있다');
-  assert(snap.st.ready.every(Boolean), '칼전은 준비 단계를 건너뛴다');
+  assert(snap.st.done.every(Boolean), '칼전은 설치 완료를 건너뛴다 (놓을 게 없다)');
 
   console.log('총격전 대기자와 섞이지 않는다');
   const s1 = conn('s1', {});                       // 총격전 1대1 대기

@@ -121,14 +121,14 @@ export default function GameCanvas({ session, onExit, onFinish }){
       )}
 
       {/* 1단계: 아이템을 다 놓아야 설치 완료 */}
-      {placing && !ready.melee && !ready.cnt?.meDone && (
+      {placing && !ready.cnt?.meDone && (
         <button className="panelbtn place ui-overlay" style={boxStyle}
                 onClick={() => gameRef.current?.ready()}>
           설치 완료
         </button>
       )}
       {/* 2단계: 전원이 눌러야 시작한다 */}
-      {placing && !ready.melee && ready.cnt?.meDone && !ready.me && (
+      {placing && ready.cnt?.meDone && !ready.me && (
         <button className="panelbtn place go ui-overlay" style={boxStyle}
                 onClick={() => gameRef.current?.go()}>
           준비 완료

@@ -76,20 +76,32 @@ console.log('빈 팔레트에서 UI 계산이 죽지 않는다');
   assert(Number.isFinite(stickGeom(86).cx), '스틱도 정상');
 }
 
-console.log('준비 단계 없이 바로 시작한다');
+console.log('배치는 건너뛰고 준비완료만 남는다');
 {
   const s = newState(2, true);
-  const { PH_COUNT } = await import('../src/game/config.js');
+  const { PH_COUNT, PH_READY } = await import('../src/game/config.js');
   step(s, IN(2));
-  assert(s.ready.every(Boolean) && s.phase === PH_COUNT, '한 틱 만에 카운트다운으로 (준비 버튼 없음)');
+  assert(s.phase === PH_READY, '2인: 아직 배치 단계');
+  assert(s.done.every(Boolean), '2인: 설치 완료는 자동 (놓을 게 없다)');
+  assert(!s.ready.some(Boolean), '2인: 준비완료는 각자 누른다');
+  // 아무도 안 누르면 계속 기다린다 → 2배속 신청에 시간 압박이 없다
+  for (let t = 0; t < 600; t++) step(s, IN(2));
+  assert(s.phase === PH_READY, '2인: 누를 때까지 기다린다');
+  const g = IN(2); for (const q of g) q.go = 1;
+  step(s, g);
+  assert(s.phase === PH_COUNT, '2인: 전원 준비완료 → 카운트다운');
   for (let t = 0; t < 400 && s.phase !== PH_PLAY; t++) step(s, IN(2));
-  assert(s.phase === PH_PLAY, '전투까지 자동으로 넘어간다');
+  assert(s.phase === PH_PLAY, '2인: 전투 시작');
 }
 {
   const s = newState(4, true);
-  const { PH_COUNT } = await import('../src/game/config.js');
+  const { PH_COUNT, PH_READY } = await import('../src/game/config.js');
   step(s, IN(4));
-  assert(s.phase === PH_COUNT, '2대2도 마찬가지');
+  assert(s.phase === PH_READY && s.done.every(Boolean) && !s.ready.some(Boolean),
+    '2대2도 마찬가지 (설치 자동, 준비완료는 각자)');
+  const g4 = IN(4); for (const q of g4) q.go = 1;
+  step(s, g4);
+  assert(s.phase === PH_COUNT, '2대2도 전원 준비완료 → 카운트다운');
 }
 
 console.log('설치할 아이템이 없다');
@@ -359,21 +371,21 @@ console.log('방패로 막으면 상대가 굳는다');
 console.log('2배속');
 {
   const { PH_COUNT, FAST_MUL, SHIELD_TICKS, STUN_TICKS } = await import('../src/game/config.js');
-  // 칼전은 배치 단계가 없으니 카운트다운 중에 신청·수락한다
+  // 준비 단계에서 신청·수락한다 (화면이 멈춰 있어 시간 압박이 없다)
   const s = newState(2, true);
   step(s, IN(2));
-  assert(s.phase === PH_COUNT, '바로 카운트다운');
   const q = IN(2); q[0].fastReq = 1;
   step(s, q);
   assert(s.fastBy === 1, '신청이 들어간다');
-  const t0 = s.timer;
   for (let t = 0; t < 30; t++) step(s, IN(2));
-  assert(s.timer === t0, '답을 기다리는 동안 카운트가 멈춘다');
+  assert(s.fastBy === 1, '기다리는 동안 신청이 유지된다');
   const q2 = IN(2); q2[1].fastAns = 1;
   step(s, q2);
   assert(s.fast === true && s.fastBy === 0, '수락하면 켜진다');
+  const g2 = IN(2); for (const q of g2) q.go = 1;
+  step(s, g2);
   for (let t = 0; t < 400 && s.phase !== PH_PLAY; t++) step(s, IN(2));
-  assert(s.phase === PH_PLAY, '수락 뒤 카운트가 다시 흐른다');
+  assert(s.phase === PH_PLAY, '준비완료하면 전투 시작');
 
   // 칼·방패 수치도 절반이어야 한다 (이동만 빨라지면 2배속이 아니다)
   s.p[0].x = Math.round(90 * FP); s.p[0].y = Math.round(150 * FP); s.p[0].face = 0;

@@ -7,6 +7,17 @@
 // 여기로 옮기면 평범한 상태 객체만 있으면 검사할 수 있다. JSX는 받은 대로 그리기만 한다.
 import { PH_READY, PH_COUNT, teamOf } from './config.js';
 
+// 이 판의 결과가 나에게 무엇인가.
+// **`s.winner`는 팀 번호 + 1 이다(0=무승부).** 슬롯 번호가 아니다.
+// 1대1에서는 슬롯과 팀이 우연히 같아서 슬롯으로 비교해도 맞았고,
+// 그래서 2대2에서만 터졌다 — 한 명만 승리가 뜨고, 진 팀에 승리가 뜨기도 했다.
+export function resultFor(st, slot){
+  if (!st) return 'lose';
+  const w = st.winner | 0;
+  if (w === 0) return 'draw';
+  return w === teamOf(slot, st.n || 2) + 1 ? 'win' : 'lose';
+}
+
 export const NEG_LABEL = {
   fast: {
     title: '상대방이 2배속 대결을 신청했습니다.',

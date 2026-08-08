@@ -2,7 +2,7 @@
 //
 // 이게 없어서 두 번 놓쳤다 — 시뮬은 멀쩡한데 화면만 안 떴다.
 // 여기서는 진짜 시뮬 상태를 만들어 넣고, 띄워야 할 것이 나오는지 검사한다.
-import { uiPrompt, NEG_LABEL } from '../src/game/ui-state.js';
+import { uiPrompt, NEG_LABEL, resultFor } from '../src/game/ui-state.js';
 import { newState, step, NOIN } from '../src/game/sim.js';
 import { PH_READY, PH_COUNT, PH_PLAY, NEG_TICKS } from '../src/game/config.js';
 import { assert } from './harness.js';
@@ -23,7 +23,7 @@ console.log('칼전 카운트다운 — 여기서 안 뜨는 게 예전 버그�
 {
   const s = newState(2, true);
   step(s, IN(2));
-  assert(s.phase === PH_COUNT, '칼전은 바로 카운트다운');
+  assert(s.phase === PH_READY, '칼전도 준비 단계가 있다 (설치만 자동)');
   const r = P(s);
   assert(r.pre === true, '**카운트다운도 전투 전 단계다**');
   assert(r.offer.includes('fast'), '2배속 신청 버튼이 뜬다');
@@ -131,6 +131,37 @@ console.log('2대2 — 상대 팀 두 명에게만 창이 뜨고, 누른 사람�
   assert(!P(s, foes[0]).ask && P(s, foes[0]).waiting, '누른 사람은 대기로');
   assert(P(s, foes[1]).ask, '아직 안 누른 사람은 창 그대로');
   assert(P(s, foes[0]).offer.length === 0, '오가는 중엔 신청 버튼 없음');
+}
+
+console.log('승패 판정 — 팀 기준이어야 한다');
+{
+  const { teamOf } = await import('../src/game/config.js');
+  // s.winner 는 **팀 번호 + 1**. 슬롯 번호와 비교하면 2대2에서 무너진다:
+  // 한 명만 승리가 뜨고, 진 팀에 승리가 뜨기도 했다 (실제로 겪은 버그)
+  for (const n of [2, 4]){
+    for (const w of [1, 2]){
+      const s = newState(n);
+      s.winner = w;
+      const wins = [], loses = [];
+      for (let slot = 0; slot < n; slot++)
+        (resultFor(s, slot) === 'win' ? wins : loses).push(slot);
+      assert(wins.length === n / 2,
+        `${n}인 winner=${w} — 이긴 팀 ${n/2}명 모두 승리 (지금 ${wins.length}명: ${wins})`);
+      for (const slot of wins)
+        assert(teamOf(slot, n) + 1 === w, `${n}인 winner=${w} — 슬롯${slot}은 실제로 이긴 팀`);
+      for (const slot of loses)
+        assert(teamOf(slot, n) + 1 !== w, `${n}인 winner=${w} — 슬롯${slot}은 진 팀`);
+    }
+    // 무승부는 전원 무승부
+    const s = newState(n); s.winner = 0;
+    for (let slot = 0; slot < n; slot++)
+      assert(resultFor(s, slot) === 'draw', `${n}인 무승부는 전원 무승부`);
+  }
+  // 한 명도 빠짐없이 셋 중 하나가 나온다
+  const s = newState(4); s.winner = 2;
+  for (let slot = 0; slot < 4; slot++)
+    assert(['win','lose','draw'].includes(resultFor(s, slot)), '결과는 셋 중 하나');
+  assert(resultFor(null, 0) === 'lose', '상태가 없어도 안 죽는다');
 }
 
 console.log('uistate.test.js 통과');
