@@ -89,6 +89,8 @@ class Room {
   }
   // 팀 선택 중인 사람들에게 현재 인원 구성을 알린다
   sendLobby(){
+    // 개인전은 팀을 고를 게 없다. 보내면 클라가 팀 선택 화면을 띄운다
+    if (this.ffa) return;
     const c = this.teamCounts();
     const taken = Array.from({ length: COLOR_COUNT }, (_, c) => c).filter(c => this.colorTaken(c));
     const raw = { t: 'lobby', teams: c, need: this.n / 2, taken };
@@ -288,10 +290,10 @@ wss.on('connection', (ws, req) => {
     rooms.set(room.id, room);
     codes.set(room.code, room);
     ws.room = room;
-    if (want > 2){
+    if (want > 2 && !ffa){
       room.waitJoin(ws, sid);
     } else {
-      room.join(ws, sid, undefined, wantColor);
+      room.join(ws, sid, undefined, wantColor);   // 개인전은 팀이 없어 바로 앉는다
     }
     ws.send(JSON.stringify({ t: 'room', code: room.code, n: room.n, melee: room.melee, ffa: room.ffa }));
     console.log(`방 개설: ${room.code} ${room.n}인 (room ${room.id})`);
@@ -300,8 +302,9 @@ wss.on('connection', (ws, req) => {
     if (!room){ ws.send(JSON.stringify({ t: 'joinfail', reason: 'notfound' })); ws.close(); return; }
     if (room.full){ ws.send(JSON.stringify({ t: 'joinfail', reason: 'full' })); ws.close(); return; }
     ws.room = room;
-    if (room.n > 2){
-      // 2대2는 팀을 직접 고른다. 고를 때까지는 자리를 주지 않는다
+    if (room.n > 2 && !room.ffa){
+      // 팀전(2대2·3대3)은 팀을 직접 고른다. 고를 때까지는 자리를 주지 않는다.
+      // **개인전은 팀이 없으므로 바로 앉힌다** — 안 그러면 팀 로비에서 자리를 영영 못 받는다
       room.waitJoin(ws, sid);
     } else {
       room.join(ws, sid, undefined, wantColor);
@@ -326,7 +329,7 @@ wss.on('connection', (ws, req) => {
 
   ws.on('message', raw => {
     let m; try { m = JSON.parse(raw); } catch { return; }
-    if (m.t === 'team' && ws.room && ws.room.n > 2){
+    if (m.t === 'team' && ws.room && ws.room.n > 2 && !ws.room.ffa){
       const room = ws.room, team = m.team === 1 ? 1 : 0;
       if (ws.slot === undefined || ws.slot < 0){
         const seat = room.freeSeatIn(team);

@@ -288,29 +288,30 @@ export function createRenderer(canvas){
     }
   }
 
-  // 시작 전에 **내 캐릭터 위에 "나"** 를 띄운다. 색만으로는 넷 중 누가 나인지 헷갈린다.
-  // 전투가 시작되면 사라진다 (화면이 복잡해지고, 그때는 이미 알아본다)
+  // **내 캐릭터 발밑에 "나"** 를 띄운다. 6인전이면 색만으로는 누가 나인지 헷갈린다.
+  // 머리 위는 체력바가 쓰므로 아래로 내렸고, 전투 중에도 계속 보인다
   function drawMeMark(s, rx, ry){
-    if (s.phase === PH_PLAY || s.phase === PH_OVER) return;
+    if (s.phase === PH_OVER) return;
     const me = s.p[SELF.slot];
     if (!me || me.hp <= 0) return;
     const x = (rx[SELF.slot] !== undefined ? rx[SELF.slot] : me.x) / FP;
     const y = (ry[SELF.slot] !== undefined ? ry[SELF.slot] : me.y) / FP;
     const cx = x + ARENA.pw / 2;
-    const top = fy(y, ARENA.ph) - 3.5;
-    ctx.font = '900 ' + (7 * RS) + 'px ' + GF;
+    // 발밑. 맨 아래 줄에 서면 아레나 밖으로 나가므로 안쪽으로 붙인다
+    const base = Math.min(fy(y, ARENA.ph) + ARENA.ph + 5.4, H - 1);
+    // 위를 가리키는 작은 삼각형
+    ctx.beginPath();
+    ctx.moveTo((cx - 2) * RS, (base - 4.6) * RS);
+    ctx.lineTo((cx + 2) * RS, (base - 4.6) * RS);
+    ctx.lineTo(cx * RS, (base - 6.6) * RS);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,233,168,0.9)'; ctx.fill();
+    ctx.font = '900 ' + (6.5 * RS) + 'px ' + GF;
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
     ctx.lineWidth = 3 * RS; ctx.strokeStyle = 'rgba(8,8,14,0.92)';
-    ctx.strokeText('나', cx * RS, top * RS);
+    ctx.strokeText('나', cx * RS, base * RS);
     ctx.fillStyle = '#ffe9a8';
-    ctx.fillText('나', cx * RS, top * RS);
-    // 작은 삼각형으로 아래를 가리킨다
-    ctx.beginPath();
-    ctx.moveTo((cx - 2) * RS, (top + 1.2) * RS);
-    ctx.lineTo((cx + 2) * RS, (top + 1.2) * RS);
-    ctx.lineTo(cx * RS, (top + 3.4) * RS);
-    ctx.closePath();
-    ctx.fillStyle = '#ffe9a8'; ctx.fill();
+    ctx.fillText('나', cx * RS, base * RS);
     ctx.textAlign = 'left';
   }
 
