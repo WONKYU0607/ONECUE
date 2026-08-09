@@ -114,7 +114,7 @@ padding:10px 12px;border-bottom:1px solid #1e1e2e}
 .stage{display:flex;align-items:center;gap:14px;padding:14px;cursor:pointer;
 background:rgba(18,18,28,.92);border:1px solid #2a2a40;color:#e8e8f0;font-family:var(--gf);font-weight:700}
 .stage .no{width:28px;color:#4ec9f0;font:900 17px var(--gf)}
-.stage .nm{flex:1;text-align:left;font:900 14px var(--gf);letter-spacing:2px}
+.stage .nm{flex:1 1 0;min-width:0;text-align:left;font:900 14px var(--gf);letter-spacing:2px}
 .stage .st{font-size:11px;color:#7a7a95}
 .stage.locked{opacity:.4;cursor:default}
 
@@ -150,11 +150,16 @@ letter-spacing:2px;cursor:pointer;line-height:1}
 .panelbtn.start{color:#8fd8ff;border:2px solid #4ec9f0}
 .panelbtn.start:active{background:#4ec9f0;color:#12121c}
 .wide-menu{width:min(340px, calc(100% - 4px))}
-.code-row{display:flex;gap:8px;align-items:stretch}
-.code-input{flex:0 0 110px;background:#12121c;border:2px solid #2a2a40;color:#e8e8f0;
-font:900 20px/1 var(--gf);letter-spacing:6px;text-align:center;padding:0 8px}
+.code-row{display:flex;gap:6px;align-items:stretch;width:100%}
+/* 입력칸을 반으로. 예전 110px + 금속 틀 버튼이면 폭을 넘겨 입장 버튼이 화면 밖으로 나갔다 */
+.code-input{flex:0 0 86px;min-width:0;background:#12121c;border:2px solid #2a2a40;color:#e8e8f0;
+font:900 19px/1 var(--gf);letter-spacing:3px;text-align:center;padding:0 4px}
 .code-input:focus{outline:none;border-color:#4ec9f0}
-.menu-btn.join{flex:1;align-items:center;justify-content:center;border-color:#4ec9f0;color:#8fd8ff}
+/* **min-width:0이 핵심.** flex 항목은 기본이 min-width:auto라 내용보다 작아지지 않는다.
+   버튼 안쪽에 금속 틀(좌우 17px)과 여백이 들어가 최소 폭이 커져 밖으로 밀려났다 */
+.menu-btn.join{flex:1 1 0;min-width:0;align-items:center;justify-content:center;
+  padding:6px 8px;color:#eaf7ff}
+.menu-btn.join .t{font-size:18px;letter-spacing:1px}
 .menu-btn.join:disabled{border-color:#2a2a40;color:#4a4a63;cursor:default}
 .roomcode{display:flex;flex-direction:column;align-items:center;gap:6px;margin:6px 0}
 .roomcode .lbl{font:700 11px var(--gf);color:#8b9db0;letter-spacing:2px}
@@ -172,7 +177,7 @@ font:900 20px/1 var(--gf);letter-spacing:6px;text-align:center;padding:0 8px}
 .help-body{overflow-y:auto;padding:4px 0}
 .help-row{display:flex;gap:10px;padding:9px 14px;border-top:1px solid #1e1e2e}
 .help-row .k{flex:0 0 54px;color:#8fd8ff;font:900 12px var(--gf)}
-.help-row .v{flex:1;color:#c8c8da;font:700 12px/1.6 var(--gf)}
+.help-row .v{flex:1 1 0;min-width:0;color:#c8c8da;font:700 12px/1.6 var(--gf)}
 .help-ok{margin:10px 14px 14px}
 .fastbtn{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:22;
 padding:8px 16px;background:rgba(18,18,28,.92);border:2px solid #8f6ef0;color:#c3adff;
@@ -185,8 +190,8 @@ font:900 14px var(--gf);letter-spacing:2px;cursor:pointer}
 .modal.ask{width:min(340px,88vw);padding:18px 16px}
 .ask-t{font:900 15px/1.6 var(--gf);color:#e8e8f0;margin:0 0 6px}
 .ask-d{font:700 12px/1.6 var(--gf);color:#9fb0c2;margin:0 0 14px}
-.ask-row{display:flex;gap:10px}
-.ask-row .menu-btn{flex:1;align-items:center;text-align:center}
+.ask-row{display:flex;gap:10px;width:100%}
+.ask-row .menu-btn{flex:1 1 0;min-width:0;align-items:center;text-align:center;padding:6px 8px}
 /* 게임 중엔 조절 패널을 접어두고 작은 버튼만 남긴다 */
 .tunetoggle{position:fixed;right:6px;top:6px;z-index:31;width:30px;height:30px;
 background:rgba(18,18,28,.75);border:1px solid #2a2a40;color:#5f5f7a;
@@ -194,16 +199,20 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .tunetoggle:active{opacity:1;color:#8fd8ff}
 .tune .row.head{border-bottom:1px solid #2a2a40;padding-bottom:4px;margin-bottom:2px}
 .teampick{display:flex;gap:10px;width:min(340px,86vw);margin:6px 0}
-.teambtn{flex:1;align-items:center;text-align:center}
+.teambtn{flex:1 1 0;min-width:0;align-items:center;text-align:center;padding:6px 8px}
 .teambtn.off{opacity:.4;cursor:default}
-.colorpick{display:flex;gap:10px;margin:2px 0 4px}
+/* 색이 6개로 늘어 좁은 폰에서 빠듯하다. 넘치면 줄바꿈 */
+.colorpick{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:2px 0 4px}
 .swatch{width:38px;height:38px;border:2px solid #2a2a40;cursor:pointer;padding:0}
 .swatch.on{border-color:#e8e8f0;box-shadow:0 0 0 2px rgba(232,232,240,.35)}
 .swatch.off{opacity:.25;cursor:default}
 
 /* AI 스테이지: 1대1 / 2대2 고르기 */
-.mode-row{display:flex;gap:8px;justify-content:center;margin:0 0 10px}
-.menu-btn.mode{flex:0 0 96px;align-items:center;justify-content:center;padding:8px 0}
+/* 고정 96px 세 개면 296px + 간격이라 작은 폰(메뉴 276px)에서 넘쳤다. 남는 만큼 나눠 갖게 한다 */
+.mode-row{display:flex;gap:6px;justify-content:center;margin:0 0 10px;width:100%}
+.menu-btn.mode{flex:1 1 0;min-width:0;max-width:104px;align-items:center;justify-content:center;
+  padding:8px 2px}
+.menu-btn.mode .t{font-size:15px;letter-spacing:0}
 .menu-btn.mode.on{border-color:#4ec9f0;color:#8fd8ff}
 
 /* ── 진입창 ─────────────────────────────────────────────── */
