@@ -145,6 +145,8 @@ export function normalizeState(st){
   if (typeof st.bareBy !== 'number') st.bareBy = 0;
   for (const k of ['fastT', 'bareT']) if (typeof st[k] !== 'number') st[k] = 0;
   if (!Array.isArray(st.negOk)) st.negOk = [];
+  if (!Array.isArray(st.dealt) || st.dealt.length !== (st.n || 2))
+    st.dealt = Array.from({ length: st.n || 2 }, (_, i) => (st.dealt && st.dealt[i]) || 0);
   if (typeof st.lag !== 'number') st.lag = 0;
   if (!Array.isArray(st.pastP)) st.pastP = [];
   for (const k of ['spdMul', 'coolMul'])
@@ -235,6 +237,9 @@ export function newState(n = 2, melee = false, ffa = false){
     // 이미 거의 안 맞는 수준이라 회피 쪽엔 여지가 없고, 투척은 탄이 정해져 있다
     coolMul: Array.from({ length: n }, () => 1),
     ffa,                        // 개인전(각자 한 팀). 칼전 3~4인 전용
+    // 슬롯별 **가한 피해 합계.** 점수 계산(기여도 배분)과 결과 창에 쓴다.
+    // 자해·아군 오사는 애초에 안 되므로 여기 안 들어온다
+    dealt: Array.from({ length: n }, () => 0),
 
     phase: PH_READY, timer: 0, clock: 0,
     maxStep: stepCap(),
@@ -362,6 +367,11 @@ function killFx(s, p){
   });
 }
 
+// 가한 피해를 더한다. **남은 체력을 넘겨 세지 않는다** — 10 남은 상대를 40으로 때려도 10만 인정
+export function addDealt(s, by, amount){
+  if (!Array.isArray(s.dealt) || by < 0 || by >= s.n) return;
+  s.dealt[by] += Math.max(0, amount);
+}
 export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
   setArena(s.n, s.melee, s.ffa);
   const x0 = Math.round(cellX(c - rad) * FP);
@@ -382,10 +392,13 @@ export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
     if (!DEBUG_INF_HP){
       const d = (centerDmg && atCenter(s, i, c, r)) ? centerDmg : dmg;
       const was = p.hp;
+      addDealt(s, by, Math.min(d, Math.max(0, was)));
       p.hp -= d;
       if (was > 0 && p.hp <= 0) killFx(s, p);
-      // 승패는 아래 팀 전멸 판정에서 정한다. 여기서 정하면 2대2에서 한 명만 죽어도 끝난다
-      if (p.hp <= 0 && s.solo){ s.over = true; s.phase = PH_OVER; s.winner = i === 0 ? 2 : 1; }
+      // 승패는 아래 팀 전멸 판정에서 정한다. 여기서 정하면 2대2에서 한 명만 죽어도 끝난다.
+      // **연습 모드는 승패가 없다** — 죽으면 끝내지 말고 체력을 되돌려 계속 연습하게 한다
+      // (예전엔 여기서 끝내버려서 수류탄으로 허수아비를 잡으면 결과 창이 떴다)
+      if (p.hp <= 0 && s.solo) p.hp = MAXHP;
     }
   }
   s.fx.push({ c, r, t: EXPLO_TICKS, k: 0 });   // k=0: 폭발
@@ -736,6 +749,7 @@ export function step(s, inp){
               continue;
             }
             const was = t.hp;
+            addDealt(s, i, Math.min(MELEE_DAMAGE, Math.max(0, t.hp)));   // 깎기 전 체력 기준
             if (!DEBUG_INF_HP) t.hp -= MELEE_DAMAGE;
             t.flash = FLASH_T; t.hitBy = i;
             if (was > 0 && t.hp <= 0) killFx(s, t);
@@ -759,6 +773,7 @@ export function step(s, inp){
         if (fireTeam >= 0 && teamOf(v, s.n) === fireTeam) continue;   // 자해·아군 오사 없음
         if (!overlap(t.x, t.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
         const was = t.hp;
+        addDealt(s, fr.by, Math.min(FIRE_DAMAGE, Math.max(0, t.hp)));
         t.hp -= FIRE_DAMAGE; t.flash = FLASH_T; t.hitBy = -1;
         if (was > 0 && t.hp <= 0) killFx(s, t);
       }
@@ -836,7 +851,9 @@ export function step(s, inp){
         gone = true;
         if (t.invul === 0){
           t.invul = INVUL_T; t.flash = FLASH_T; t.hitBy = b.o;
+
           if (!DEBUG_INF_HP){
+            addDealt(s, b.o, Math.min(BULLET_DAMAGE, Math.max(0, t.hp)));   // 깎기 전 체력 기준
             t.hp -= BULLET_DAMAGE;
             if (t.hp <= 0) killFx(s, t);
           }
@@ -881,6 +898,7 @@ export function checksum(s){
   for (let i = 0; i < s.n; i++) h = (h*31 + (s.ready[i] ? i + 1 : 0) + (s.done[i] ? 17 : 0)) | 0;
   for (const m of (s.spdMul || [])) h = (h*31 + Math.round(m*100)) | 0;
   for (const m of (s.coolMul || [])) h = (h*31 + Math.round(m*100)) | 0;
+  for (const v of (s.dealt || [])) h = (h*31 + Math.round(v)) | 0;
   h = (h*31 + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16 + (s.bare ? 32 : 0) + s.bareBy*64 + s.fastT*3 + s.bareT*5 + s.negOk.length*13) | 0;
   for (const c of (s.color || [])) h = (h*31 + c) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;

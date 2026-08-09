@@ -67,6 +67,23 @@ console.log('칼전 연습 — 칼·방패를 익힐 수 있다');
   assert(s.bullets.length === 0, '칼전이라 총알이 없다');
 }
 
+
+console.log('연습은 죽여도 안 끝난다 — 결과 창이 뜨면 안 된다');
+{
+  const { blast } = await import('../src/game/sim.js');
+  const { MAXHP, cellX, cellY, FP, ROUND_TICKS } = await import('../src/game/config.js');
+  const s = newState(2);
+  s.solo = true; s.phase = PH_PLAY; s.clock = ROUND_TICKS;
+  const c = 3, r = 2;
+  s.p[1].x = Math.round((cellX(c) + 2) * FP);
+  s.p[1].y = Math.round((cellY(r) + 1) * FP);
+  for (let k = 0; k < 12; k++){ blast(s, c, r, 1, 40, 0, 0); s.p[1].invul = 0; }
+  assert(s.p[1].hp === MAXHP, `허수아비가 되살아난다 (${s.p[1].hp})`);
+  assert(s.over === false, '판이 안 끝난다');
+  for (let t = 0; t < 300; t++) step(s, IN(2));
+  assert(s.over === false && s.phase === PH_PLAY, '계속 연습할 수 있다');
+}
+
 console.log('practice.test.js 통과');
 
 console.log('연습 모드는 혼자서도 시작된다');
@@ -106,6 +123,23 @@ console.log('칼전 연습 — 칼·방패를 익힐 수 있다');
   assert(shields > 100, `방패를 들 수 있다 (${shields}프레임)`);
   assert(s.over === false, '연습이라 승패가 안 난다');
   assert(s.bullets.length === 0, '칼전이라 총알이 없다');
+}
+
+
+console.log('연습은 죽여도 안 끝난다 — 결과 창이 뜨면 안 된다');
+{
+  const { blast } = await import('../src/game/sim.js');
+  const { MAXHP, cellX, cellY, FP, ROUND_TICKS } = await import('../src/game/config.js');
+  const s = newState(2);
+  s.solo = true; s.phase = PH_PLAY; s.clock = ROUND_TICKS;
+  const c = 3, r = 2;
+  s.p[1].x = Math.round((cellX(c) + 2) * FP);
+  s.p[1].y = Math.round((cellY(r) + 1) * FP);
+  for (let k = 0; k < 12; k++){ blast(s, c, r, 1, 40, 0, 0); s.p[1].invul = 0; }
+  assert(s.p[1].hp === MAXHP, `허수아비가 되살아난다 (${s.p[1].hp})`);
+  assert(s.over === false, '판이 안 끝난다');
+  for (let t = 0; t < 300; t++) step(s, IN(2));
+  assert(s.over === false && s.phase === PH_PLAY, '계속 연습할 수 있다');
 }
 
 console.log('practice.test.js 통과');

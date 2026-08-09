@@ -80,7 +80,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
         if (u.peer === 'gone') setGraceLeft(Math.ceil((u.grace || 0) / 1000));
         if (u.peer === 'back' || u.peer === 'here') setGraceLeft(0);
       },
-      onFinish: r => setTimeout(() => onFinish?.(r), 1400),  // 결과 연출을 잠깐 보여준 뒤 넘어감
+      onFinish: (r, summary) => setTimeout(() => onFinish?.(r, summary), 1400),  // 결과 연출을 잠깐 보여준 뒤
       softFlash: () => getSettings().softFlash   // 번쩍임이 부담되면 옅은 안개로
     });
     gameRef.current = game;

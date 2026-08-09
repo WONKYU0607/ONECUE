@@ -20,6 +20,7 @@ export default function App(){
   const [screen, setScreen] = useState('splash');   // splash|home|ai|matching|game|result
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
+  const [summary, setSummary] = useState(null);   // 결과 창에 띄울 한 판 요약
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
@@ -59,7 +60,8 @@ export default function App(){
     setScreen('game');
   }, []);
   const toGame    = useCallback(() => setScreen('game'), []);
-  const onFinish  = useCallback(r => {
+  const onFinish  = useCallback((r, summary) => {
+    setSummary(summary || null);
     // AI 모드에서 이기면 다음 단계가 열린다
     // 모드별로 따로 기록한다 (1대1을 깼다고 3대3까지 열리면 안 된다)
     if (session?.kind === 'ai') recordResult(session.stage, r, modeKey(session.n || 2, !!session.melee));
@@ -82,7 +84,7 @@ export default function App(){
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toGame} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome} onFinish={onFinish} />}
-      {screen === 'result'   && <Result result={result} session={session} onAgain={again} onHome={goHome} />}
+      {screen === 'result'   && <Result result={result} summary={summary} session={session} onAgain={again} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </>

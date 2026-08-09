@@ -11,6 +11,37 @@ import { PH_READY, PH_COUNT, teamOf } from './config.js';
 // **`s.winner`는 팀 번호 + 1 이다(0=무승부).** 슬롯 번호가 아니다.
 // 1대1에서는 슬롯과 팀이 우연히 같아서 슬롯으로 비교해도 맞았고,
 // 그래서 2대2에서만 터졌다 — 한 명만 승리가 뜨고, 진 팀에 승리가 뜨기도 했다.
+// 결과 창에 띄울 한 판 요약. **시뮬 상태에서만 뽑는다**(화면 코드가 규칙을 다시 쓰지 않게)
+export function matchSummary(st, slot){
+  if (!st || !st.p) return null;
+  const n = st.n || 2;
+  const me = teamOf(slot, n);
+  const rows = st.p.map((p, i) => ({
+    slot: i,
+    team: teamOf(i, n),
+    mine: teamOf(i, n) === me,
+    self: i === slot,
+    color: (st.color && st.color[i] != null) ? st.color[i] : i,
+    hp: Math.max(0, p.hp | 0),
+    dealt: Math.round((st.dealt || [])[i] || 0),
+    off: !!(st.off || [])[i]
+  }));
+  const sum = t => rows.filter(r => r.team === t).reduce((a, r) => a + r.hp, 0);
+  const teams = [...new Set(rows.map(r => r.team))].sort((a, b) => a - b);
+  return {
+    result: resultFor(st, slot),
+    ffa: !!st.ffa,
+    melee: !!st.melee,
+    n,
+    rows,
+    myHp: sum(me),
+    foeHp: teams.filter(t => t !== me).reduce((a, t) => a + sum(t), 0),
+    totalDealt: rows.reduce((a, r) => a + r.dealt, 0),
+    // 남은 시간이 0이면 시간 만료로 끝난 판
+    timeout: (st.clock | 0) <= 0
+  };
+}
+
 export function resultFor(st, slot){
   if (!st) return 'lose';
   const w = st.winner | 0;

@@ -15,7 +15,7 @@ import {
   GRID_X0, GRID_Y0, H, cellOwner, cellX, cellY
 } from './config.js';
 import { padRect, paletteSlots, uiBoxRect } from './layout.js';
-import { uiPrompt, resultFor } from './ui-state.js';
+import { uiPrompt, resultFor, matchSummary } from './ui-state.js';
 import { CHARGE_MAX_MS, PH_PLAY, THROW } from './config.js';
 
 // 게임 한 판을 만들고 rAF 루프를 돌린다.
@@ -420,7 +420,7 @@ export function createGame(canvas, opts = {}){
       lastPhase = client.pred.phase;
       onPhase(lastPhase);
       if (lastPhase === PH_OVER){
-        onFinish(resultFor(client.pred, SELF.slot));
+        onFinish(resultFor(client.pred, SELF.slot), matchSummary(client.pred, SELF.slot));
       }
     }
   }

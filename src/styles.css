@@ -245,3 +245,28 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 
 /* 루프가 죽었을 때 원인을 보여준다. 예전엔 검은 화면만 남아 단서가 없었다 */
 .crashmsg{word-break:break-all;color:#f0a0a0;font-size:11px;line-height:1.5}
+
+/* ── 결과 창 ─────────────────────────────────────────── */
+.title.res-win{color:#8fd8ff}
+.title.res-lose{color:#f0918a}
+.title.res-draw{color:#e8e8f0}
+.resbox{width:100%;padding:10px 10px 6px;margin-bottom:6px;
+  background:rgba(10,14,22,.55);border:1px solid #2f4a63}
+.res-sum{display:flex;justify-content:center;align-items:center;gap:8px;
+  font:900 14px var(--gf);color:#d6eeff;margin-bottom:8px}
+.res-tag{font:700 10px var(--gf);color:#f0c86e;border:1px solid #6b5a2e;padding:1px 5px}
+.res-rows{display:flex;flex-direction:column;gap:4px}
+.res-row{display:flex;align-items:center;gap:6px;font:700 12px var(--gf);color:#c8d8e6}
+.res-row.me{color:#ffe9a8}
+.res-row.foe{opacity:.72}
+.res-row .dot{flex:0 0 8px;height:8px;border-radius:1px}
+.res-row .who{flex:0 0 40px;min-width:0;text-align:left}
+.res-row .bar{flex:1 1 0;min-width:0;height:7px;background:rgba(255,255,255,.10)}
+.res-row .bar .fill{display:block;height:100%;background:#4ec9f0}
+.res-row.foe .bar .fill{background:#f0645a}
+.res-row .num{flex:0 0 30px;text-align:right}
+.res-row .num.dmg{flex:0 0 42px;color:#8fd8ff}
+.res-head{display:flex;justify-content:flex-end;gap:6px;margin-top:3px;
+  font:700 9px var(--gf);color:#7e9eb6}
+.res-head span:first-child{width:30px;text-align:right}
+.res-head span:last-child{width:42px;text-align:right}

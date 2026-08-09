@@ -2,7 +2,7 @@
 //
 // 이게 없어서 두 번 놓쳤다 — 시뮬은 멀쩡한데 화면만 안 떴다.
 // 여기서는 진짜 시뮬 상태를 만들어 넣고, 띄워야 할 것이 나오는지 검사한다.
-import { uiPrompt, NEG_LABEL, resultFor } from '../src/game/ui-state.js';
+import { uiPrompt, NEG_LABEL, resultFor, matchSummary } from '../src/game/ui-state.js';
 import { newState, step, NOIN } from '../src/game/sim.js';
 import { PH_READY, PH_COUNT, PH_PLAY, NEG_TICKS } from '../src/game/config.js';
 import { assert } from './harness.js';
@@ -162,6 +162,42 @@ console.log('승패 판정 — 팀 기준이어야 한다');
   for (let slot = 0; slot < 4; slot++)
     assert(['win','lose','draw'].includes(resultFor(s, slot)), '결과는 셋 중 하나');
   assert(resultFor(null, 0) === 'lose', '상태가 없어도 안 죽는다');
+}
+
+
+console.log('결과 요약 — 결과 창이 쓸 값');
+{
+  const { MAXHP, teamOf } = await import('../src/game/config.js');
+  // 팀전
+  const s = newState(4);
+  s.p[0].hp = 60; s.p[1].hp = 0; s.p[2].hp = 0; s.p[3].hp = 0;
+  s.dealt = [80, 20, 40, 10];
+  s.winner = 1;
+  const m = matchSummary(s, 0);
+  assert(m.rows.length === 4, '인원수만큼 줄');
+  assert(m.rows[0].self && !m.rows[1].self, '나를 표시한다');
+  assert(m.rows[1].mine && !m.rows[2].mine, '우리 편을 구분한다');
+  assert(m.myHp === 60 && m.foeHp === 0, `체력 합 (${m.myHp}:${m.foeHp})`);
+  assert(m.totalDealt === 150, `총 피해 (${m.totalDealt})`);
+  assert(m.result === 'win', '승패가 팀 기준');
+  // 죽은 사람 체력이 음수로 새지 않는다
+  const neg = newState(2);
+  neg.p[1].hp = -8; neg.winner = 1;
+  assert(matchSummary(neg, 0).rows[1].hp === 0, '체력은 0 밑으로 안 보인다');
+  // 개인전
+  const f = newState(4, true, true);
+  f.p[0].hp = 0; f.p[1].hp = 0; f.p[2].hp = 30; f.p[3].hp = 0;
+  f.dealt = [50, 10, 70, 5];
+  f.winner = 3;
+  const fm = matchSummary(f, 0);
+  assert(fm.ffa === true, '개인전 표시');
+  assert(fm.rows.every((r, i) => r.team === teamOf(i, 4)), '각자 다른 팀');
+  assert(fm.result === 'lose', '슬롯2가 이겼으니 나는 패배');
+  // 끊긴 사람 표시
+  const off = newState(4);
+  off.off[2] = true; off.winner = 1;
+  assert(matchSummary(off, 0).rows[2].off === true, '이탈 표시가 실린다');
+  assert(matchSummary(null, 0) === null, '상태가 없으면 null');
 }
 
 console.log('uistate.test.js 통과');
