@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TEAMS } from '../../game/config.js';
+import { ticketsLeft, TICKET_DEF, ticketKey } from '../../state/tickets.js';
 
 // PVP 진입. 화면마다 버튼 두세 개만 보이도록 단계로 내려간다.
 //   모드(총격전·칼전) → 방식(랜덤·방 만들기·코드) → 인원수(1대1·2대2)
@@ -14,6 +15,11 @@ export default function PvpMenu({ onBack, onStart }){
   const ok = /^\d{4}$/.test(code);
 
   const modeName = melee ? '칼전' : '총격전';
+  // 남은 티켓 (남은/최대). 개인전은 따로 센다
+  const tk = k => {
+    const def = TICKET_DEF.find(d => d.key === k);
+    return def ? `${ticketsLeft(k)}/${def.max}` : '';
+  };
   const back = () => {
     if (step === 'mode') return onBack();
     if (step === 'how') return setStep('mode');
@@ -65,17 +71,21 @@ export default function PvpMenu({ onBack, onStart }){
           <>
             <button className="menu-btn primary" onClick={() => { setPending({ mode: how, n: 2, melee }); setStep('color'); }}>
               <span className="t">1 vs 1</span>
+              <span className="tkn">{tk(ticketKey(melee, false))}</span>
             </button>
             <button className="menu-btn" onClick={() => onStart({ mode: how, n: 4, melee })}>
               <span className="t">2 vs 2</span>
+              <span className="tkn">{tk(ticketKey(melee, false))}</span>
             </button>
             <button className="menu-btn" onClick={() => onStart({ mode: how, n: 6, melee })}>
               <span className="t">3 vs 3</span>
+              <span className="tkn">{tk(ticketKey(melee, false))}</span>
             </button>
             {/* 개인전은 칼전에만. 총격전은 진영이 나뉘어 있어 성립하지 않는다 */}
             {melee && (
               <button className="menu-btn" onClick={() => setStep('ffa')}>
                 <span className="t">개인전</span>
+                <span className="tkn">{tk('ffa')}</span>
               </button>
             )}
           </>
@@ -87,6 +97,7 @@ export default function PvpMenu({ onBack, onStart }){
               <button key={k} className={'menu-btn' + (i === 0 ? ' primary' : '')}
                 onClick={() => { setPending({ mode: how, n: k, melee, ffa: true }); setStep('color'); }}>
                 <span className="t">{k}인전</span>
+                <span className="tkn">{tk('ffa')}</span>
               </button>
             ))}
           </>

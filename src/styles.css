@@ -281,18 +281,19 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   image-rendering:pixelated;vertical-align:middle}
 
 /* ── 홈 위쪽: 점수·티켓 ───────────────────────────────── */
-.pbar{width:100%;padding:10px 12px 8px;margin-bottom:6px;
-  border-style:solid;border-width:14px 16px;border-color:#0a0c12;
-  border-image:var(--panel) 60 fill stretch}
-.pbar-scores{display:flex;gap:8px}
-.pbar-score{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:5px}
-.pbar-score .lbl{font:700 11px var(--gf);color:#9fb0c2}
-.pbar-score .val{margin-left:auto;font:900 16px var(--gf);color:#ffe9a8}
-.pbar-tickets{display:flex;gap:6px;margin-top:8px}
-.tk{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:3px;
-  padding:3px 5px;background:rgba(10,14,22,.5);border:1px solid #2f4a63}
-.tk.out{opacity:.45}
-.tk-ico{flex:0 0 20px;height:14px;background:var(--ticket) center/contain no-repeat}
-.tk-n{font:900 14px var(--gf);color:#8fd8ff}
-.tk-nm{font:700 10px var(--gf);color:#9fb0c2;margin-left:auto}
-.pbar-warn{margin-top:6px;font:700 9px var(--gf);color:#f0a86e;text-align:center}
+.pbar{width:100%;display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+/* 보내준 금속 틀. 모서리는 원본 그대로, 변만 늘어난다 */
+.panel-box{width:100%;padding:9px 12px;display:flex;flex-direction:column;gap:6px;
+  border-style:solid;border-width:13px 15px;border-color:#0a0c12;
+  border-image:var(--panel) 58 fill stretch}
+/* **한 줄로 붙인다.** 세로로 쪼개지면 못 읽는다 */
+.pscore,.ptk{display:flex;align-items:center;gap:7px;white-space:nowrap;min-height:26px}
+.pscore .lbl,.ptk .lbl{font:900 14px var(--gf);color:#c8d8e6;white-space:nowrap}
+.pscore .val{margin-left:auto;font:900 20px var(--gf);color:#ffe9a8}
+.ptk .val{margin-left:auto;font:900 20px var(--gf);color:#8fd8ff}
+.ptk.out{opacity:.42}
+.ptk.out .val{color:#8b9db0}
+.tk-ico{flex:0 0 30px;height:20px;background:var(--ticket) center/contain no-repeat}
+.pbar-warn{font:700 10px var(--gf);color:#f0a86e;text-align:center;margin:0}
+/* 메뉴 버튼 안 티켓 잔량 (남은/최대) */
+.menu-btn .tkn{font:900 12px var(--gf);color:#8fd8ff;letter-spacing:0;margin-top:1px}
