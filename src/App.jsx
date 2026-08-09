@@ -11,7 +11,7 @@ import HelpModal from './ui/HelpModal.jsx';
 import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings, setSetting } from './state/settings.js';
 import { disconnect } from './net/connection.js';
-import { recordResult } from './state/progress.js';
+import { recordResult, modeKey } from './state/progress.js';
 import { VIEW, SELF, HAND } from './game/config.js';
 
 // 화면 전환은 여기 한 곳에서만 한다.
@@ -61,7 +61,8 @@ export default function App(){
   const toGame    = useCallback(() => setScreen('game'), []);
   const onFinish  = useCallback(r => {
     // AI 모드에서 이기면 다음 단계가 열린다
-    if (session?.kind === 'ai') recordResult(session.stage, r);
+    // 모드별로 따로 기록한다 (1대1을 깼다고 3대3까지 열리면 안 된다)
+    if (session?.kind === 'ai') recordResult(session.stage, r, modeKey(session.n || 2, !!session.melee));
     setResult(r); setScreen('result');
   }, [session]);
   const again     = useCallback(() => {

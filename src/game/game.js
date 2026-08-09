@@ -271,8 +271,22 @@ export function createGame(canvas, opts = {}){
   const flipped = () => (ARENA.ffa ? SELF.slot % 2 === 1 : teamOf(SELF.slot, SELF.n || 2) === 1);
   function viewY(y){ return flipped() ? ARENA.flip - y - PHf / FP : y; }
 
+  let crashed = null;
   function loop(){
     if (!running) return;
+    // **프레임 루프가 예외로 죽으면 캔버스가 통째로 검은 화면이 되고 단서가 안 남는다.**
+    // 오늘까지 그렇게 여러 번 헤맸다. 잡아서 화면에 띄우고, 한 번만 알린다
+    try { frame(); } catch (e){
+      if (!crashed){
+        crashed = e;
+        console.error('게임 루프 오류', e);
+        try { opts.onCrash?.(e); } catch { /* 알림 자체가 실패해도 무시 */ }
+      }
+    }
+    raf = requestAnimationFrame(loop);
+  }
+
+  function frame(){
     const now = performance.now();
     const dt = Math.min(0.05, (now - lastNow) / 1000);
     lastNow = now;
@@ -293,9 +307,13 @@ export function createGame(canvas, opts = {}){
     const fvy = flipped() ? -vy : vy;   // 화면이 뒤집힌 쪽은 세로 입력도 반전
     if (vx || vy) client.input(SELF.slot, vx * sp * dt, fvy * sp * dt, 0);
 
-    // 연습 모드는 상대를 기다릴 필요가 없다
-    if (practice && client.pred.phase === PH_READY && !client.pred.ready[1 - SELF.slot]){
-      client.setReady(1 - SELF.slot); client.setGo(1 - SELF.slot);
+    // 연습 모드는 상대를 기다릴 필요가 없다. **나 말고 전부** 자동으로 준비시킨다
+    // (`1 - SELF.slot`은 2인 전제라 3인 이상에서 한 명만 준비돼 시작이 안 된다)
+    if (practice && client.pred.phase === PH_READY){
+      for (let i = 0; i < (client.pred.n || 2); i++){
+        if (i === SELF.slot) continue;
+        if (!client.pred.ready[i]){ client.setReady(i); client.setGo(i); }
+      }
     }
 
     // AI도 배치 단계를 거친다.
@@ -405,7 +423,6 @@ export function createGame(canvas, opts = {}){
         onFinish(resultFor(client.pred, SELF.slot));
       }
     }
-    raf = requestAnimationFrame(loop);
   }
   raf = requestAnimationFrame(loop);
 

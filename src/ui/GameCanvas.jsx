@@ -12,6 +12,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
   const canvasRef = useRef(null);
   const gameRef = useRef(null);
   const [phase, setPhase] = useState(PH_READY);
+  const [crash, setCrash] = useState(null);   // 루프가 죽으면 검은 화면 대신 이걸 보여준다
   const [link, setLink] = useState({ self: 'ok', peer: 'here' });
   const [ready, setReady] = useState({ me: false, peer: false });
   const [box, setBox] = useState(null);   // 버튼을 놓을 자리 (아이템 칸 위 여백)
@@ -57,6 +58,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
     const conn = session?.kind === 'pvp' ? getConnection() : null;
     const game = createGame(canvasRef.current, {
       onPhase: setPhase,
+      onCrash: e => setCrash(String(e && e.message || e)),
       session,
       transport: conn?.transport,
       onLink: u => setLink(prev => ({ ...prev, ...u })),
@@ -73,6 +75,17 @@ export default function GameCanvas({ session, onExit, onFinish }){
   return (
     <div className="game-root">
       <div className="wrap"><canvas ref={canvasRef} /></div>
+      {crash && (
+        <div className="modal-back">
+          <div className="modal ask">
+            <p className="ask-t">게임을 그리다 멈췄습니다</p>
+            <p className="ask-d crashmsg">{crash}</p>
+            <div className="ask-row">
+              <button className="menu-btn primary" onClick={onExit}>나가기</button>
+            </div>
+          </div>
+        </div>
+      )}
       <button className="icon-btn top-left ui-overlay"
               onClick={() => { disconnect(); onExit(); }} aria-label="나가기">‹</button>
       {link.self === 'noconn' && (

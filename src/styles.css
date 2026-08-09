@@ -233,3 +233,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 @media (prefers-reduced-motion: reduce){
   .splash .tap{animation:none; opacity:1}
 }
+
+/* 루프가 죽었을 때 원인을 보여준다. 예전엔 검은 화면만 남아 단서가 없었다 */
+.crashmsg{word-break:break-all;color:#f0a0a0;font-size:11px;line-height:1.5}

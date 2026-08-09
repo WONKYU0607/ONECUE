@@ -262,6 +262,7 @@ export class Server {
 
 // 상대 위치 추종 속도(1/초). 60Hz에서 프레임당 0.35와 같은 수렴 속도
 const FOLLOW_RATE = 26;
+export const MAX_PLAYERS = 6;   // 지금 최대 인원 (3대3 / 개인전 6인)
 const SMOOTH_RATE = 90;   // 상대 예측 오차를 녹이는 속도 (클수록 빨리 붙는다)
 export const RENDER_BUF = 2;   // 상대를 확정 기록보다 이만큼 뒤에서 그린다 (renderTick과 같은 값)
 
@@ -277,7 +278,10 @@ export class Client {
     this.rtt = -1; this.pings = new Map(); this.pingId = 1; this.lastPing = -1e9;
     this.svTick = 0; this.svAt = CLOCK.now();
     const blank = () => ({ dx:0, dy:0, fire:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0 });
-    this.pend = [ blank(), blank(), blank(), blank() ];   // 최대 4명
+    // 슬롯 수가 늘어도(3대3=6인) 자리가 있어야 한다. 4칸 고정이라
+    // 칼전 3대3에서 setReady가 undefined에 쓰다 죽고 화면이 검게 남았다
+    this.blank = blank;
+    this.pend = Array.from({ length: MAX_PLAYERS }, blank);
     this.sent = [];                    // 아직 서버가 확정하지 않은 내 입력
     this.pred = newState();            // 예측 상태 (화면에 그리는 것)
     this.rx = null; this.ry = null;    // 렌더 위치 (전원 같은 필터)
@@ -361,7 +365,7 @@ export class Client {
       const t = this.nextInputTick++;
       this.tickAt = now;
       for (const pid of this.controlled){
-        const q = this.pend[pid];
+        const q = this.slotIn(pid);
         // 모아둔 이동량을 통째로 한 틱에 실으면 안 된다.
         //  - 시뮬이 틱당 maxStep으로 자르므로 넘치는 만큼이 **영영 사라진다**
         //    (60fps가 아닌 기기는 이동이 느려진다. 30fps에서 43%, 90fps에서 10% 손실)
@@ -554,52 +558,57 @@ export class Client {
     }
   }
   setCfg(cfg){ this.net.clientSend({ t:'cfg', cfg }); }
+  // 슬롯 자리를 보장한다. 4칸 고정이던 탓에 6인전에서 undefined에 쓰다 죽었다
+  slotIn(slot){
+    if (!this.pend[slot]) this.pend[slot] = this.blank();
+    return this.pend[slot];
+  }
   input(pid, dx, dy, fire){
     if (!this.controlled.includes(pid)) return;
-    if (dx) this.pend[pid].dx += Math.round(dx * FP);
-    if (dy) this.pend[pid].dy += Math.round(dy * FP);
-    if (fire) this.pend[pid].fire = 1;
+    if (dx) this.slotIn(pid).dx += Math.round(dx * FP);
+    if (dy) this.slotIn(pid).dy += Math.round(dy * FP);
+    if (fire) this.slotIn(pid).fire = 1;
   }
   // 아이템 배치·설치 완료도 같은 입력 경로로 보낸다 (서버가 검증)
   // from을 주면 그 자리의 아이템을 옮긴다
   place(pid, k, c, r, from){
     if (!this.controlled.includes(pid)) return;
-    this.pend[pid].place = from ? { k, c, r, from } : { k, c, r };
+    this.slotIn(pid).place = from ? { k, c, r, from } : { k, c, r };
   }
   requestFast(pid){
     if (!this.controlled.includes(pid)) return;
-    this.pend[pid].fastReq = 1;
+    this.slotIn(pid).fastReq = 1;
   }
   // 노템전: 엄폐물·투척물 없이 기본 공격만
   requestBare(pid){
     if (!this.controlled.includes(pid)) return;
-    this.pend[pid].bareReq = 1;
+    this.slotIn(pid).bareReq = 1;
   }
   answerBare(pid, ok){
     if (!this.controlled.includes(pid)) return;
-    this.pend[pid].bareAns = ok ? 1 : 2;
+    this.slotIn(pid).bareAns = ok ? 1 : 2;
   }
   answerFast(pid, ok){
     if (!this.controlled.includes(pid)) return;
-    this.pend[pid].fastAns = ok ? 1 : 2;
+    this.slotIn(pid).fastAns = ok ? 1 : 2;
   }
   // 방패 들기 (칼전)
   raiseShield(pid){
     if (!this.controlled.includes(pid)) return;
-    this.pend[pid].sh = 1;
+    this.slotIn(pid).sh = 1;
   }
   // 준비완료(2단계). 설치 완료를 누른 사람만 서버가 받아준다
   setGo(pid){
     if (!this.controlled.includes(pid)) return;
-    this.pend[pid].go = 1;
+    this.slotIn(pid).go = 1;
   }
   setReady(pid){
     if (!this.controlled.includes(pid)) return;
-    this.pend[pid].ready = 1;
+    this.slotIn(pid).ready = 1;
   }
   // 던지기: ch는 0~100 정수 (누른 시간 비율)
   throwItem(pid, k, ch){
     if (!this.controlled.includes(pid)) return;
-    this.pend[pid].thr = { k, ch: Math.max(0, Math.min(100, Math.round(ch))) };
+    this.slotIn(pid).thr = { k, ch: Math.max(0, Math.min(100, Math.round(ch))) };
   }
 }
