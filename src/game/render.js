@@ -176,7 +176,8 @@ export function createRenderer(canvas){
     // 2대2는 한 줄에 네 개를 욱여넣으면 좁고 글자와 겹친다.
     // 우리 팀 한 줄 / 상대 팀 한 줄로 나눠 그린다
     const two = mine.length > 1;
-    const BH = two ? 4 : 5;
+    // 한 줄뿐일 때(1대1)는 두껍게. 버튼이 이 구간에 맞춰 그려지는데 5px이면 글씨가 안 들어간다
+    const BH = two ? 4 : 11;
     const rowGap = 1.5;
     const BY0 = H + (two ? 2.5 : 4.5);
     const BW = 56, gap = 2;   // 가운데 버튼 자리를 벌리려고 62 → 56

@@ -42,22 +42,43 @@ export function shieldBtn(uiH){
 // 화면 위에 겹쳐 띄우는 버튼·배너가 차지할 자리 (월드 좌표).
 // 팔레트 위쪽을 쓰되, 칼전처럼 팔레트가 비어 있으면 패드 전체를 기준으로 잡는다.
 // (예전엔 game.js가 sl[0].y를 그냥 읽어 칼전에서 화면이 통째로 죽었다)
+// 체력바가 차지하는 세로 구간. **render.js와 이 값을 공유해야** 준비 버튼이
+// 정확히 그 사이에 들어간다 (예전엔 각자 계산해서 버튼이 아래로 삐져나왔다)
+export function hpBand(){
+  const n = ARENA.n || 2;
+  const mineRows = ARENA.ffa ? 1 : n / 2;          // 내 편 줄 수
+  const foeRows  = ARENA.ffa ? n - 1 : n / 2;      // 상대 줄 수
+  const two = mineRows > 1;
+  const BH = two ? 4 : 5, gap = 1.5;
+  const rows = Math.max(mineRows, foeRows);
+  return { y: H + (two ? 2.5 : 4.5), h: rows * BH + (rows - 1) * gap, BH, gap };
+}
+
 export function uiBoxRect(uiH){
   const pd = padRect(uiH);
   const sl = paletteSlots(uiH);
-  // **체력바 사이 가운데.** 체력바는 좌 4~66 / 우 (W-66)~(W-4)에 그려지므로
-  // 그 사이 빈 자리에 버튼을 놓는다. 예전엔 왼쪽에 붙어 있어 한쪽으로 쏠렸다
-  const BARW = 56, MARGIN = 3;   // render.js의 체력바와 같은 값이어야 한다
-  const free = (W - MARGIN - BARW) - (MARGIN + BARW);   // 가운데 빈 폭
-  // 체력바에 닿지 않게 양쪽 4px씩 띄운다. 2px이면 화면에서 붙어 보였다
-  const w = free - 8;
+  // **체력바 사이 검은 여백**에 올린다. 예전엔 체력바 아래에 있어서 자리가 남았다.
+  // 체력바는 좌 3~59 / 우 (W-59)~(W-3) 이고 세로는 render.js의 BY0부터 여러 줄
+  const BARW = 56, MARGIN = 3;
+  const free = (W - MARGIN - BARW) - (MARGIN + BARW);
+  const w = free - 8;                       // 양쪽 4px씩 띄운다
   const x = (W - w) / 2;
-  const top = pd.y + 1;
-  const bottom = sl.length ? sl[0].y - 2 : shieldBtn(uiH).y - 3;
-  // 아래는 글씨가 안 보이는 한계, 위는 총격전과 비슷하게. 칼전이 유독 컸다
-  const h = Math.max(18, Math.min(22, bottom - top));
-  return { x, y: top, w, h };
+  // 체력바 블록의 세로 범위. **render.js와 정확히 같아야** 버튼이 그 사이에 딱 들어간다.
+  // 개인전은 상대가 n-1줄이라 내 편(1줄)보다 길다 — 긴 쪽을 따라간다
+  const n = ARENA.n || 2;
+  const mineRows = ARENA.ffa ? 1 : n / 2;
+  const foeRows  = ARENA.ffa ? n - 1 : n / 2;
+  const two = mineRows > 1;
+  const BH = two ? 4 : 11, rowGap = 1.5;   // render.js와 같은 값
+  const rows = Math.max(mineRows, foeRows);
+  const top = H + (two ? 2.5 : 4.5);
+  // **체력바 구간을 절대 안 벗어난다.** 예전엔 최소 18로 키워서 아래로 삐져나왔다.
+  // 개인전 6인은 상대 줄이 5개라 구간이 31px까지 커지므로 상한을 두고 세로 가운데
+  const blockH = rows * BH + (rows - 1) * rowGap;
+  const h = Math.min(blockH, 22);
+  return { x, y: top + (blockH - h) / 2, w, h };
 }
+
 
 
 // 배치 팔레트: 스틱 반대쪽에 아이템 아이콘. 종류 수는 아레나에 따라 다르다
