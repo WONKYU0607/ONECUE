@@ -173,7 +173,7 @@ export function createRenderer(canvas){
     const BH = two ? 4 : 5;
     const rowGap = 1.5;
     const BY0 = H + (two ? 2.5 : 4.5);
-    const BW = 62, gap = 2;
+    const BW = 56, gap = 2;   // 가운데 버튼 자리를 벌리려고 62 → 56
     const bar = (x, y, h, hp, team, rightAlign) => {
       px(x, y, BW, h, 'rgba(255,255,255,0.10)');
       const pct = Math.max(0, Math.round(hp / MAXHP * 100));
@@ -195,9 +195,9 @@ export function createRenderer(canvas){
     // 내가 항상 맨 위(1대1이면 맨 왼쪽)에 오도록 정렬한다
     mine.sort((a, b) => (a === SELF.slot ? -1 : b === SELF.slot ? 1 : a - b));
     const colOf = slot => (s.color && s.color[slot] != null) ? s.color[slot] : TEAM_OF[slot];
-    mine.forEach((slot, i) => bar(4, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), false));
+    mine.forEach((slot, i) => bar(3, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), false));
     foes.forEach((slot, i) =>
-      bar(W - 4 - BW, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), true));
+      bar(W - 3 - BW, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), true));
 
     ctx.font = '900 ' + (8 * RS) + 'px ' + GF; ctx.textAlign = 'center';
     if (s.phase === PH_PLAY){
