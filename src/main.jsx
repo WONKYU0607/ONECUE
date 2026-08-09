@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import { apply as applyHomeUI } from './state/homeLayout.js';
 import './styles.css';
 
 // 금속 틀 이미지. 상대 경로는 어디를 기준으로 풀릴지 애매해서 **절대 URL로 못 박는다**
@@ -19,6 +20,7 @@ for (const [name, file] of [['--tiers', 'tiers.webp'], ['--ticket', 'ticket.webp
   document.documentElement.style.setProperty(name, `url("${u}")`);
 }
 
+applyHomeUI();   // 홈 배치 수치를 CSS 변수로 내보낸다
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

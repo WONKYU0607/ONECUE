@@ -71,21 +71,21 @@ export default function PvpMenu({ onBack, onStart }){
           <>
             <button className="menu-btn primary" onClick={() => { setPending({ mode: how, n: 2, melee }); setStep('color'); }}>
               <span className="t">1 vs 1</span>
-              <span className="tkn">{tk(ticketKey(melee, false))}</span>
+              <span className="tkn"><span className="tk-ico" />{tk(ticketKey(melee, false))}</span>
             </button>
             <button className="menu-btn" onClick={() => onStart({ mode: how, n: 4, melee })}>
               <span className="t">2 vs 2</span>
-              <span className="tkn">{tk(ticketKey(melee, false))}</span>
+              <span className="tkn"><span className="tk-ico" />{tk(ticketKey(melee, false))}</span>
             </button>
             <button className="menu-btn" onClick={() => onStart({ mode: how, n: 6, melee })}>
               <span className="t">3 vs 3</span>
-              <span className="tkn">{tk(ticketKey(melee, false))}</span>
+              <span className="tkn"><span className="tk-ico" />{tk(ticketKey(melee, false))}</span>
             </button>
             {/* 개인전은 칼전에만. 총격전은 진영이 나뉘어 있어 성립하지 않는다 */}
             {melee && (
               <button className="menu-btn" onClick={() => setStep('ffa')}>
                 <span className="t">개인전</span>
-                <span className="tkn">{tk('ffa')}</span>
+                <span className="tkn"><span className="tk-ico" />{tk('ffa')}</span>
               </button>
             )}
           </>
@@ -97,7 +97,7 @@ export default function PvpMenu({ onBack, onStart }){
               <button key={k} className={'menu-btn' + (i === 0 ? ' primary' : '')}
                 onClick={() => { setPending({ mode: how, n: k, melee, ffa: true }); setStep('color'); }}>
                 <span className="t">{k}인전</span>
-                <span className="tkn">{tk('ffa')}</span>
+                <span className="tkn"><span className="tk-ico" />{tk('ffa')}</span>
               </button>
             ))}
           </>
