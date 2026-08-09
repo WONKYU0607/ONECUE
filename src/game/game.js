@@ -34,7 +34,8 @@ export function createGame(canvas, opts = {}){
   if (session.kind === 'pvp' && !online) onLink({ self: 'noconn' });
   const net = online || new Loopback();
   // 로컬 AI전은 2인/4인을 고를 수 있다. 4인이면 나 말고 셋이 AI
-  const nLocal = (!online && session.n === 4) ? 4 : 2;
+  // 3대3(6인)과 개인전(3~6인)이 생겼다. 4만 허용하던 탓에 3대3이 1대1로 돌아갔다
+  const nLocal = (!online && [3, 4, 5, 6].includes(session.n)) ? session.n : 2;
   // 칼전 여부: 로컬은 session, 온라인은 서버가 hello로 알려준 값
   const isMelee = session.kind === 'melee' || (online ? !!SELF.melee : !!session.melee);
   // 개인전(각자 한 팀). 칼전 3~4인 전용
@@ -62,7 +63,9 @@ export function createGame(canvas, opts = {}){
   // 스냅샷이 와서야 바뀐다(맵이 깜빡임). 슬롯 2·3은 그 사이 존재하지 않아 예측이 죽는다.
   // 인원수는 시작 전에 이미 알고 있으니 미리 맞춰둔다
   const n0 = online ? (SELF.n || 2) : nLocal;
-  if (n0 !== client.s.n || isMelee){ client.s = newState(n0, isMelee); client.pred = newState(n0, isMelee); }
+  if (n0 !== client.s.n || isMelee || isFfa){
+    client.s = newState(n0, isMelee, isFfa); client.pred = newState(n0, isMelee, isFfa);
+  }
   setArena(n0, isMelee, isFfa);
   const practice = !online && session.kind === 'practice';
   if (practice){

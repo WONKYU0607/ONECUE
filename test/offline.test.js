@@ -1,8 +1,8 @@
 // 연결 끊김 정책
 //  - 1대1: 나간 사람이 진다
 //  - 2대2: 그 자리에 멈춰 서서 계속 맞는다. 나머지 셋의 판을 망치지 않는다
-import { newState, step, forfeit, setOff, checksum, normalizeState, cloneState, NOIN } from '../src/game/sim.js';
-import { FP, PH_PLAY, PH_OVER, MAXHP, stepCap } from '../src/game/config.js';
+import { newState, step, forfeit, setOff, canThrow, checksum, normalizeState, cloneState, NOIN } from '../src/game/sim.js';
+import { FP, PH_PLAY, PH_OVER, MAXHP, stepCap, THROW } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 const IN = n => Array.from({ length: n }, () => ({ ...NOIN }));
@@ -81,6 +81,22 @@ console.log('돌아오면 표시가 사라진다');
   const x0 = s.p[2].x;
   for (let t = 0; t < 60; t++){ const q = IN(4); push(q[2], stepCap()); step(s, q); }
   assert(s.p[2].x !== x0, '입력이 다시 먹는다');
+}
+
+console.log('죽거나 끊기면 못 던진다');
+{
+  const s = newState(4);
+  s.phase = PH_PLAY;
+  assert(canThrow(s, 2, THROW.NADE), '살아 있으면 던진다');
+  s.p[2].hp = 0;
+  assert(!canThrow(s, 2, THROW.NADE), '죽으면 못 던진다');
+  const q = IN(4); q[2].thr = { k: THROW.NADE, ch: 50 };
+  step(s, q);
+  assert(s.proj.length === 0, '죽은 사람의 수류탄은 날아가지 않는다');
+  assert(s.ammo[2][THROW.NADE] === 3, '탄약도 안 닳는다');
+
+  setOff(s, 1, true);
+  assert(!canThrow(s, 1, THROW.NADE), '끊긴 사람도 못 던진다');
 }
 
 console.log('offline.test.js 통과');

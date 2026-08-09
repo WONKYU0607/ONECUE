@@ -42,6 +42,9 @@ export default function AiStages({ onBack, onStart, onMelee }){
         <button className="menu-btn" onClick={() => onMelee(4)}>
           <span className="t">2 vs 2</span>
         </button>
+        <button className="menu-btn" onClick={() => onMelee(6)}>
+          <span className="t">3 vs 3</span>
+        </button>
       </div>
     </div>
   );

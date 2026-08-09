@@ -15,6 +15,8 @@ import { paletteSlots, throwSlots } from './layout.js';
 // 스프라이트 시트의 한 칸 크기 (원본은 14x16 고정)
 const FW = 14 * RS, FH = 16 * RS;
 // 칼전 시트 규격 (melee.json)
+// 화면(CSS)과 같은 게임 글꼴. canvas는 CSS 변수를 못 읽어 여기에 한 번 더 적는다
+const GF = '"Arial Black","Helvetica Neue",Impact,"Apple SD Gothic Neo","Malgun Gothic",sans-serif';
 const MELEE_FW = 484, MELEE_FH = 198, MELEE_BODY_H = 190;
 // 시트 열: 앞대기 앞공격 뒤대기 뒤공격 좌대기 좌공격 우대기 우공격
 // 화면이 뒤집힌 팀은 위·아래가 바뀌므로 그때만 앞뒤를 맞바꾼다
@@ -178,7 +180,7 @@ export function createRenderer(canvas){
       const w = BW * Math.max(0, hp) / MAXHP;
       px(rightAlign ? x + BW - w : x, y, w, h, hp > 0 ? TEAMS[team].m : 'rgba(255,255,255,0.06)');
       for (let i = 1; i < HP_MARKS; i++) px(x + BW * i / HP_MARKS, y, 0.4, h, 'rgba(13,13,22,0.85)');
-      ctx.font = 'bold ' + ((two ? 3.6 : 5) * RS) + 'px monospace';
+      ctx.font = '900 ' + ((two ? 3.6 : 5) * RS) + 'px ' + GF;
       ctx.textAlign = rightAlign ? 'left' : 'right';
       ctx.textBaseline = 'middle';
       const tx = (rightAlign ? x + 2 : x + BW - 2) * RS;
@@ -197,7 +199,7 @@ export function createRenderer(canvas){
     foes.forEach((slot, i) =>
       bar(W - 4 - BW, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), true));
 
-    ctx.font = 'bold ' + (8 * RS) + 'px monospace'; ctx.textAlign = 'center';
+    ctx.font = '900 ' + (8 * RS) + 'px ' + GF; ctx.textAlign = 'center';
     if (s.phase === PH_PLAY){
       const left = Math.ceil(s.clock / 60);
       ctx.fillStyle = left <= 10 ? '#f0645a' : '#e8e8f0';   // 10초 남으면 빨갛게
@@ -263,6 +265,29 @@ export function createRenderer(canvas){
   // 가운데에 큰 것 하나만 그리면 버섯구름이 위로만 솟아 아래쪽 칸이 비어 보인다.
   // 화염병 불꽃: 3x3 칸마다 하나씩. 칸마다 위상을 어긋나게 해서 같이 흔들리지 않게 한다
   // 연결이 끊긴 캐릭터 머리 위에 표시. 0.5초 주기로 깜빡인다
+  // 머리 위 미니 체력바. 위쪽 큰 막대는 누가 누군지 짚어야 알 수 있어서,
+  // 붙어 싸울 때 얼마나 깎였는지 바로 보이게 각자 위에 띄운다
+  function drawMiniHp(s, rx, ry){
+    // 전투 중에만. 시작 전에는 같은 자리에 "나" 표시가 뜬다
+    if (s.phase !== PH_PLAY) return;
+    const BW = ARENA.pw * 0.9, BH = 1.3;
+    for (let i = 0; i < s.p.length; i++){
+      const p = s.p[i];
+      if (p.hp <= 0) continue;
+      const x = (rx[i] !== undefined ? rx[i] : p.x) / FP;
+      const y = (ry[i] !== undefined ? ry[i] : p.y) / FP;
+      const bx = x + (ARENA.pw - BW) / 2;
+      const by = fy(y, ARENA.ph) - BH - 2.2;   // "나" 표시가 있던 자리
+      px(bx - 0.35, by - 0.35, BW + 0.7, BH + 0.7, 'rgba(8,10,16,0.78)');   // 테두리
+      px(bx, by, BW, BH, 'rgba(255,255,255,0.13)');
+      const w = BW * Math.max(0, p.hp) / MAXHP;
+      const col = (s.color && s.color[i] != null) ? s.color[i] : TEAM_OF[i];
+      // 많이 깎이면 색이 죽는다 — 위험한지 한눈에 보이게
+      const frac = p.hp / MAXHP;
+      px(bx, by, w, BH, frac > 0.3 ? TEAMS[col].m : '#f0645a');
+    }
+  }
+
   // 시작 전에 **내 캐릭터 위에 "나"** 를 띄운다. 색만으로는 넷 중 누가 나인지 헷갈린다.
   // 전투가 시작되면 사라진다 (화면이 복잡해지고, 그때는 이미 알아본다)
   function drawMeMark(s, rx, ry){
@@ -273,7 +298,7 @@ export function createRenderer(canvas){
     const y = (ry[SELF.slot] !== undefined ? ry[SELF.slot] : me.y) / FP;
     const cx = x + ARENA.pw / 2;
     const top = fy(y, ARENA.ph) - 3.5;
-    ctx.font = 'bold ' + (7 * RS) + 'px monospace';
+    ctx.font = '900 ' + (7 * RS) + 'px ' + GF;
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
     ctx.lineWidth = 3 * RS; ctx.strokeStyle = 'rgba(8,8,14,0.92)';
     ctx.strokeText('나', cx * RS, top * RS);
@@ -480,7 +505,7 @@ export function createRenderer(canvas){
                       Math.round(dw*RS), Math.round(dh*RS));
         ctx.globalAlpha = 1;
       }
-      ctx.font = 'bold ' + (7*RS) + 'px monospace'; ctx.textAlign = 'right';
+      ctx.font = '900 ' + (7*RS) + 'px ' + GF; ctx.textAlign = 'right';
       ctx.fillStyle = n > 0 ? '#8fd8ff' : '#4a4a63';
       ctx.fillText('x' + n, (sl.x + sl.w - 1.5)*RS, (sl.y + sl.h - 1.5)*RS);
       ctx.textAlign = 'left';
@@ -522,7 +547,7 @@ export function createRenderer(canvas){
       px(sl.x, sl.y, sl.w, 0.7, c); px(sl.x, sl.y + sl.h - 0.7, sl.w, 0.7, c);
       px(sl.x, sl.y, 0.7, sl.h, c); px(sl.x + sl.w - 0.7, sl.y, 0.7, sl.h, c);
       if (!isReady(items)){                       // 그림이 아직이면 빈 칸이라도 보여준다
-        ctx.font = 'bold ' + (7*RS) + 'px monospace'; ctx.textAlign = 'right';
+        ctx.font = '900 ' + (7*RS) + 'px ' + GF; ctx.textAlign = 'right';
         ctx.fillStyle = n > 0 ? '#8fd8ff' : '#4a4a63';
         ctx.fillText('x' + n, (sl.x + sl.w - 1.5) * RS, (sl.y + sl.h - 1.5) * RS);
         ctx.textAlign = 'left';
@@ -535,7 +560,7 @@ export function createRenderer(canvas){
         Math.round((sl.x + (sl.w - dw) / 2) * RS), Math.round((sl.y + (sl.h - dh) / 2) * RS),
         Math.round(dw * RS), Math.round(dh * RS));
       ctx.globalAlpha = 1;
-      ctx.font = 'bold ' + (7 * RS) + 'px monospace'; ctx.textAlign = 'right';
+      ctx.font = '900 ' + (7 * RS) + 'px ' + GF; ctx.textAlign = 'right';
       ctx.fillStyle = n > 0 ? '#8fd8ff' : '#4a4a63';
       ctx.fillText('x' + n, (sl.x + sl.w - 1.5) * RS, (sl.y + sl.h - 1.5) * RS);
       ctx.textAlign = 'left';
@@ -626,6 +651,7 @@ export function createRenderer(canvas){
     const rx = cl.rx || [], ry = cl.ry || [];
     for (let i = 0; i < s.p.length; i++)
       drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, s.color);
+    drawMiniHp(s, rx, ry);
     drawMeMark(s, rx, ry);
     drawOffline(s, rx, ry);
     drawProjectiles(s, a);
@@ -639,7 +665,7 @@ export function createRenderer(canvas){
     if (ARENA.melee) drawShieldBtn(s, uiH);
     drawBlind(s, extra.softFlash);
     if (SHOW_HUD){
-      ctx.font = (8*RS) + 'px monospace'; ctx.textAlign = 'left';
+      ctx.font = '700 ' + (8*RS) + 'px ' + GF; ctx.textAlign = 'left';
       ctx.fillStyle = COL.dim;
       ctx.fillText(dbg, 4*RS, (H + uiH - 3) * RS);
     }
@@ -650,19 +676,19 @@ export function createRenderer(canvas){
                   : left > CD_STEP   + CD_GO ? '2'
                   : left > CD_GO            ? '1' : 'GAME START';
       const big = label.length > 2;
-      ctx.font = 'bold ' + ((big ? 16 : 48) * RS) + 'px monospace';
+      ctx.font = '900 ' + ((big ? 16 : 48) * RS) + 'px ' + GF;
       ctx.fillStyle = '#e8e8f0';
       ctx.fillText(label, W/2*RS, (H/2 + (big ? 6 : 16))*RS);
-      ctx.font = (8*RS) + 'px monospace';
+      ctx.font = '700 ' + (8*RS) + 'px ' + GF;
     }
     if (s.phase === PH_OVER){
       px(0, H/2-26, W, 26, 'rgba(0,0,0,0.75)');
-      ctx.font = 'bold ' + (12*RS) + 'px monospace';
+      ctx.font = '900 ' + (12*RS) + 'px ' + GF;
       // 결과 판단은 한 곳에서만 (예전에 화면과 결과창이 서로 다른 답을 냈다)
       const res = resultFor(s, SELF.slot);
       ctx.fillStyle = res === 'draw' ? COL.txt : (res === 'win' ? '#4ec9f0' : '#f0645a');
       ctx.fillText(res === 'draw' ? 'DRAW' : (res === 'win' ? 'YOU WIN' : 'YOU LOSE'), W/2*RS, (H/2 - 8)*RS);
-      ctx.font = (8*RS) + 'px monospace';
+      ctx.font = '700 ' + (8*RS) + 'px ' + GF;
     }
     ctx.textAlign = 'left';
   }

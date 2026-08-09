@@ -47,10 +47,10 @@ export default function App(){
     setSession({ kind: 'practice', ...opt });   // opt: { melee }
     setScreen('game');
   }, []);
-  const startMelee = useCallback((n = 2) => {
+  const startMelee = useCallback((n = 2, ffa = false) => {
     disconnect();
     setResult(null);
-    setSession({ kind: 'melee', n });
+    setSession({ kind: 'melee', n, ffa });
     setScreen('game');
   }, []);
   const startAi   = useCallback((stage, n = 2) => {
@@ -77,6 +77,7 @@ export default function App(){
       {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
                                      onSettings={() => setShowSettings(true)} onHelp={() => setShowHelp(true)} />}
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} onMelee={startMelee} />}
+      {screen === 'practice' && <PracticeMenu onBack={goHome} onStart={startPractice} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toGame} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome} onFinish={onFinish} />}

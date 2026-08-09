@@ -2,6 +2,9 @@
   /* CSS의 url()은 **CSS 파일 위치 기준**이라 개발 서버와 빌드 결과에서 경로가 갈린다.
      페이지 기준으로 잡아야 둘 다 맞으므로 main.jsx에서 이 값을 넣어준다 */
   --frame:none;
+  /* 게임 글꼴. 웹폰트 없이 시스템 글꼴만으로 최대한 두껍게.
+     한 곳에서만 바꾸면 화면 전체가 따라오도록 변수로 둔다 */
+  --gf:"Arial Black","Helvetica Neue",Impact,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --fx:44px;   /* 틀 좌우 두께 */
   --fy:46px;   /* 틀 위아래 두께 */
 }
@@ -20,7 +23,7 @@ border:1px solid #4ec9f0;font:15px/1 monospace;cursor:pointer;padding:0}
 .tune .val{min-width:46px;text-align:center;color:#e8e8f0}
 .startbtn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;
 padding:14px 34px;background:rgba(18,18,28,0.92);color:#8fd8ff;border:2px solid #4ec9f0;
-font:bold 20px/1 monospace;letter-spacing:2px;cursor:pointer}
+font:900 21px/1 var(--gf);letter-spacing:2px;cursor:pointer}
 .startbtn:active{background:#4ec9f0;color:#12121c}
 
 .tune button.wide{width:auto;padding:0 10px}
@@ -32,7 +35,7 @@ font:bold 20px/1 monospace;letter-spacing:2px;cursor:pointer}
    게임은 늘 폰 비율로 그려지는데 메뉴만 풀스크린이면 들어갈 때마다 크기가 널뛴다.
    캔버스 실측: 1917x950에서 466px, 1280x800에서 392px → 대략 높이의 0.455배 */
 .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
-justify-content:center;gap:18px;color:#e8e8f0;font-family:monospace;padding:8px}
+justify-content:center;gap:18px;color:#e8e8f0;font-family:var(--gf);font-weight:700;padding:8px}
 /* 금속 틀. CSS border-image 가 9분할을 대신 해준다 —
    네 모서리는 그대로, 변만 늘어나고, fill 로 가운데(바닥 타일)까지 채운다.
    그래서 화면 크기가 달라져도 이미지 한 장이면 된다 */
@@ -53,12 +56,11 @@ justify-content:center;gap:18px;color:#e8e8f0;font-family:monospace;padding:8px}
 }
 .screen.list{justify-content:flex-start;padding:0}
 /* 한글 네 글자라 자간 8px은 너무 벌어진다. 좁히고 크기는 화면 폭에 맞춘다 */
-.logo{font-family:"Arial Black","Helvetica Neue",Impact,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
-  font-weight:900;font-size:min(46px,13vw);letter-spacing:3px;color:#8fd8ff;
+.logo{font-family:var(--gf);font-weight:900;font-size:min(46px,13vw);letter-spacing:3px;color:#8fd8ff;
   text-shadow:0 0 18px rgba(78,201,240,.45);white-space:nowrap}
 .logo.win{color:#4ec9f0}.logo.lose{color:#f0645a}.logo.draw{color:#e8e8f0}
-.hint{font-size:12px;color:#7a7a95;letter-spacing:2px}
-.big{font-size:16px;letter-spacing:2px}
+.hint{font:700 12px var(--gf);color:#8b9db0;letter-spacing:2px}
+.big{font:900 17px var(--gf);letter-spacing:2px}
 .ver{position:fixed;bottom:12px;font-size:11px;color:#4a4a63}
 
 /* 틀 두께(좌우)와 화면 패딩을 빼고 남는 만큼만. 안 그러면 폰에서 틀 밖으로 넘친다 */
@@ -75,8 +77,7 @@ border-image:var(--frame) 86 fill stretch}
 /* 굵고 각진 게임 느낌. 웹폰트 없이 시스템 글꼴만으로 최대한 두껍게 만든다:
    무게 900 + 획을 한 겹 덧그리기(text-stroke) + 푸른 발광 */
 .menu-btn .t{
-  font-family:"Arial Black","Helvetica Neue",Impact,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
-  font-size:20px; font-weight:900; letter-spacing:2px;
+  font-family:var(--gf);font-size:20px;font-weight:900; letter-spacing:2px;
   -webkit-text-stroke:0.6px rgba(255,255,255,.55);
   text-shadow:0 0 10px rgba(110,200,255,.45), 0 2px 3px rgba(0,0,0,.8);
 }
@@ -87,7 +88,7 @@ border-image:var(--frame) 86 fill stretch}
 .menu-btn:active{filter:brightness(1.35)}
 
 .icon-btn{width:38px;height:38px;background:rgba(10,16,26,.72);border:1px solid #2f4a63;
-color:#8fd8ff;font:19px/1 monospace;cursor:pointer}
+color:#8fd8ff;font:900 19px/1 var(--gf);cursor:pointer}
 .icon-btn:active{background:#4ec9f0;color:#12121c}
 /* 금속 틀 테두리(가로 44 / 세로 46) 안쪽으로. 밖에 두면 테두리에 걸린다 */
 /* 틀 안쪽(테두리 다음) 기준. 오른쪽 위 모서리 바로 밑에 붙인다 */
@@ -107,13 +108,13 @@ border-radius:50%;animation:spin .8s linear infinite}
 /* ---------- 목록 화면 ---------- */
 .bar-top{display:flex;align-items:center;justify-content:space-between;width:100%;
 padding:10px 12px;border-bottom:1px solid #1e1e2e}
-.bar-top .title{font-size:14px;letter-spacing:3px}
+.bar-top .title{font:900 15px/1.2 var(--gf);letter-spacing:3px}
 .bar-top .spacer{width:40px}
 .stages{width:100%;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:12px}
 .stage{display:flex;align-items:center;gap:14px;padding:14px;cursor:pointer;
-background:rgba(18,18,28,.92);border:1px solid #2a2a40;color:#e8e8f0;font-family:monospace}
-.stage .no{width:28px;color:#4ec9f0;font-size:16px}
-.stage .nm{flex:1;text-align:left;font-size:13px;letter-spacing:2px}
+background:rgba(18,18,28,.92);border:1px solid #2a2a40;color:#e8e8f0;font-family:var(--gf);font-weight:700}
+.stage .no{width:28px;color:#4ec9f0;font:900 17px var(--gf)}
+.stage .nm{flex:1;text-align:left;font:900 14px var(--gf);letter-spacing:2px}
 .stage .st{font-size:11px;color:#7a7a95}
 .stage.locked{opacity:.4;cursor:default}
 
@@ -121,10 +122,10 @@ background:rgba(18,18,28,.92);border:1px solid #2a2a40;color:#e8e8f0;font-family
 .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:40;
 display:flex;align-items:center;justify-content:center}
 .modal{width:min(340px,86vw);background:#12121c;border:2px solid #2a2a40;
-color:#e8e8f0;font-family:monospace}
+color:#e8e8f0;font-family:var(--gf);font-weight:700}
 .toggle-row{display:flex;align-items:center;justify-content:space-between;width:100%;
 padding:14px 16px;background:none;border:0;border-top:1px solid #1e1e2e;
-color:#e8e8f0;font:13px monospace;cursor:pointer}
+color:#e8e8f0;font:700 14px var(--gf);cursor:pointer}
 .switch{width:40px;height:22px;background:#2a2a40;border-radius:11px;position:relative;
 transition:background .15s}
 .switch i{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#7a7a95;
@@ -134,15 +135,15 @@ border-radius:50%;transition:transform .15s,background .15s}
 .hint.note{max-width:min(320px,80vw);text-align:center;line-height:1.6;color:#5f5f7a}
 .link-note{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:25;
 padding:8px 14px;background:rgba(18,18,28,.94);border:1px solid #f0a81e;
-color:#f0c86e;font:12px/1.4 monospace;white-space:nowrap}
+color:#f0c86e;font:700 12px/1.4 var(--gf);white-space:nowrap}
 .placebtn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;
 padding:14px 28px;background:rgba(18,18,28,.92);color:#f0c86e;border:2px solid #f0a81e;
-font:bold 16px/1 monospace;letter-spacing:2px;cursor:pointer}
+font:900 16px/1 var(--gf);letter-spacing:2px;cursor:pointer}
 .placebtn:active{background:#f0a81e;color:#12121c}
 
 /* 패널 안(아이템 칸 위 여백)에 얹는 버튼 — 위치·크기는 JS가 계산해 넣는다 */
 .panelbtn{position:fixed;z-index:20;display:flex;align-items:center;justify-content:center;
-padding:0;background:rgba(18,18,28,.92);font-family:monospace;font-weight:bold;
+padding:0;background:rgba(18,18,28,.92);font-family:var(--gf);font-weight:900;
 letter-spacing:2px;cursor:pointer;line-height:1}
 .panelbtn.place{color:#f0c86e;border:2px solid #f0a81e;font-weight:bold;letter-spacing:1px}
 .panelbtn.place:active{background:#f0a81e;color:#12121c}
@@ -151,13 +152,13 @@ letter-spacing:2px;cursor:pointer;line-height:1}
 .wide-menu{width:min(340px, calc(100% - 4px))}
 .code-row{display:flex;gap:8px;align-items:stretch}
 .code-input{flex:0 0 110px;background:#12121c;border:2px solid #2a2a40;color:#e8e8f0;
-font:20px/1 monospace;letter-spacing:6px;text-align:center;padding:0 8px}
+font:900 20px/1 var(--gf);letter-spacing:6px;text-align:center;padding:0 8px}
 .code-input:focus{outline:none;border-color:#4ec9f0}
 .menu-btn.join{flex:1;align-items:center;justify-content:center;border-color:#4ec9f0;color:#8fd8ff}
 .menu-btn.join:disabled{border-color:#2a2a40;color:#4a4a63;cursor:default}
 .roomcode{display:flex;flex-direction:column;align-items:center;gap:6px;margin:6px 0}
-.roomcode .lbl{font-size:11px;color:#7a7a95;letter-spacing:2px}
-.roomcode strong{font:bold 40px monospace;letter-spacing:10px;color:#8fd8ff}
+.roomcode .lbl{font:700 11px var(--gf);color:#8b9db0;letter-spacing:2px}
+.roomcode strong{font:900 40px var(--gf);letter-spacing:10px;color:#8fd8ff}
 .link-note .sub{display:block;margin-top:4px;font-size:10px;color:#9a9ab0;letter-spacing:0}
 .panelbtn.place.off{border-color:#3a3a52;color:#6a6a85;cursor:default}
 /* 설치 완료 다음 단계. 앞 버튼(주황)과 확실히 구분되게 파랑 */
@@ -170,26 +171,26 @@ font:20px/1 monospace;letter-spacing:6px;text-align:center;padding:0 8px}
 .modal.help{width:min(400px,92vw);max-height:82vh;display:flex;flex-direction:column}
 .help-body{overflow-y:auto;padding:4px 0}
 .help-row{display:flex;gap:10px;padding:9px 14px;border-top:1px solid #1e1e2e}
-.help-row .k{flex:0 0 54px;color:#8fd8ff;font:bold 12px monospace}
-.help-row .v{flex:1;color:#c8c8da;font:12px/1.6 monospace}
+.help-row .k{flex:0 0 54px;color:#8fd8ff;font:900 12px var(--gf)}
+.help-row .v{flex:1;color:#c8c8da;font:700 12px/1.6 var(--gf)}
 .help-ok{margin:10px 14px 14px}
 .fastbtn{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:22;
 padding:8px 16px;background:rgba(18,18,28,.92);border:2px solid #8f6ef0;color:#c3adff;
-font:bold 13px monospace;letter-spacing:2px;cursor:pointer}
+font:900 14px var(--gf);letter-spacing:2px;cursor:pointer}
 .fastbtn:active{background:#8f6ef0;color:#12121c}
 .link-note.fast{border-color:#8f6ef0;color:#c3adff}
 /* 노템전은 2배속과 색을 갈라서 뭘 신청받았는지 바로 알게 한다 */
 .fastbtn.bare{top:110px;border-color:#f0a81e;color:#f0c86e}
 .fastbtn.bare:active{background:#f0a81e;color:#12121c}
 .modal.ask{width:min(340px,88vw);padding:18px 16px}
-.ask-t{font:bold 14px/1.6 monospace;color:#e8e8f0;margin:0 0 6px}
-.ask-d{font:12px/1.6 monospace;color:#9a9ab0;margin:0 0 14px}
+.ask-t{font:900 15px/1.6 var(--gf);color:#e8e8f0;margin:0 0 6px}
+.ask-d{font:700 12px/1.6 var(--gf);color:#9fb0c2;margin:0 0 14px}
 .ask-row{display:flex;gap:10px}
 .ask-row .menu-btn{flex:1;align-items:center;text-align:center}
 /* 게임 중엔 조절 패널을 접어두고 작은 버튼만 남긴다 */
 .tunetoggle{position:fixed;right:6px;top:6px;z-index:31;width:30px;height:30px;
 background:rgba(18,18,28,.75);border:1px solid #2a2a40;color:#5f5f7a;
-font:15px/1 monospace;cursor:pointer;opacity:.55}
+font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .tunetoggle:active{opacity:1;color:#8fd8ff}
 .tune .row.head{border-bottom:1px solid #2a2a40;padding-bottom:4px;margin-bottom:2px}
 .teampick{display:flex;gap:10px;width:min(340px,86vw);margin:6px 0}
@@ -223,7 +224,7 @@ font:15px/1 monospace;cursor:pointer;opacity:.55}
   background:radial-gradient(ellipse at center, rgba(8,8,14,.72), rgba(8,8,14,0) 72%)}
 /* 깜빡임: 완전히 사라지지 않게 0.35까지만 내린다. 다 꺼지면 눌러야 하는지 헷갈림 */
 .splash .tap{
-  margin:0; font:bold 17px/1.4 monospace; letter-spacing:3px; color:#ffe9a8;
+  margin:0; font:900 18px/1.4 var(--gf); letter-spacing:3px; color:#ffe9a8;
   text-shadow:0 0 12px rgba(255,190,80,.55), 0 2px 4px rgba(0,0,0,.9);
   animation:tapblink 1.15s ease-in-out infinite;
 }
