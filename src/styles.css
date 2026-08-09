@@ -306,15 +306,35 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .menu-btn .tkn{display:flex;align-items:center;justify-content:center;gap:4px;
   font:900 12px var(--gf);color:#8fd8ff;letter-spacing:0;margin-top:2px}
 .menu-btn .tkn .tk-ico{flex:0 0 20px;height:13px}
-/* 홈 배치 조절 패널 (개발용) */
-.htune{width:min(340px,90vw);max-height:80vh;overflow:auto}
-.htune-rows{display:flex;flex-direction:column;gap:3px;margin:6px 0 10px}
-.htune-row{display:flex;align-items:center;gap:6px;font:700 12px var(--gf);color:#c8d8e6}
-.htune-row .nm{flex:1 1 0;min-width:0;text-align:left}
-.htune-row .num{flex:0 0 34px;text-align:center;color:#8fd8ff;font-weight:900}
-.htune-row button{width:26px;height:24px;background:#1b2436;color:#8fd8ff;
-  border:1px solid #35506b;font:900 14px/1 var(--gf);cursor:pointer;padding:0}
+/* 홈 배치 조절 패널 (개발용).
+   **화면 위에 겹치지 않고 옆에 붙는다** — 조절한 결과를 바로 봐야 하기 때문 */
+.htune{position:fixed;left:2px;top:2px;z-index:60;width:148px;max-height:96vh;
+  display:flex;flex-direction:column;
+  background:rgba(8,12,20,.72);border:1px solid #35506b;backdrop-filter:blur(2px)}
+.htune:hover{background:rgba(8,12,20,.94)}
+.htune.wide{width:230px}
+/* 접으면 머리만 남는다. 조절 결과를 가리지 않고 확인할 수 있다 */
+.htune.fold{width:auto}
+.htune.fold .htune-rows,.htune.fold .htune-foot{display:none}
+.htune-top span{cursor:pointer}
+.htune-top{display:flex;align-items:center;gap:4px;padding:3px 4px;
+  background:#12203a;font:900 11px var(--gf);color:#8fd8ff}
+.htune-top span{flex:1 1 0;min-width:0}
+.htune-top button,.htune-foot button{background:#1b2436;color:#8fd8ff;border:1px solid #35506b;
+  font:900 10px/1 var(--gf);cursor:pointer;padding:3px 5px}
+.htune-rows{flex:1 1 auto;min-height:0;min-width:0;overflow:auto;
+  display:flex;flex-direction:column;gap:2px;padding:3px 4px}
+.htune-row{display:flex;align-items:center;gap:3px;font:700 10px var(--gf);color:#c8d8e6}
+.htune-row .nm{flex:1 1 0;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.htune.wide .htune-row{font-size:12px}
+.htune-row .num{flex:0 0 26px;text-align:center;color:#8fd8ff;font-weight:900}
+.htune-row button{flex:0 0 20px;height:20px;background:#1b2436;color:#8fd8ff;
+  border:1px solid #35506b;font:900 12px/1 var(--gf);cursor:pointer;padding:0}
 .htune-row button:active{background:#35506b}
+.htune-foot{display:flex;gap:3px;padding:4px}
+.htune-foot button{flex:1 1 0;min-width:0}
+.htune-foot .go{background:#1d3a52;color:#ffe9a8}
 .htune-btn{position:absolute;right:6px;top:52px;z-index:30;opacity:.5}
 
 /* 티어 트로피 — 한 장짜리 시트에서 잘라 쓴다 */

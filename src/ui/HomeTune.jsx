@@ -5,10 +5,16 @@ import { HOME_DEF, getHomeUI, setHomeUI, resetHomeUI, dumpHomeUI } from '../stat
 export default function HomeTune({ onClose }){
   const [v, setV] = useState(getHomeUI());
   const bump = (k, d) => setV(prev => ({ ...prev, [k]: setHomeUI(k, prev[k] + d) }));
+  const [wide, setWide] = useState(false);
+  const [fold, setFold] = useState(false);   // 접으면 머리만 남아 화면을 안 가린다
+  // **화면을 가리면 안 된다.** 조절한 결과를 바로 봐야 하므로 옆에 붙이고 반투명하게
   return (
-    <div className="modal-back" onClick={e => e.target === e.currentTarget && onClose?.()}>
-      <div className="modal htune">
-        <p className="ask-t">홈 배치 조절</p>
+    <div className={'htune' + (wide ? ' wide' : '') + (fold ? ' fold' : '')}>
+      <div className="htune-top">
+        <span onClick={() => setFold(f => !f)}>{fold ? '홈 배치 ▸' : '홈 배치 ▾'}</span>
+        {!fold && <button onClick={() => setWide(w => !w)}>{wide ? '좁게' : '넓게'}</button>}
+        <button onClick={onClose}>✕</button>
+      </div>
         <div className="htune-rows">
           {HOME_DEF.map(([k, nm, , , , step]) => (
             <div key={k} className="htune-row">
@@ -19,19 +25,13 @@ export default function HomeTune({ onClose }){
             </div>
           ))}
         </div>
-        <div className="ask-row">
-          <button className="menu-btn ghost" onClick={() => setV(resetHomeUI())}>
-            <span className="t">되돌리기</span>
-          </button>
-          <button className="menu-btn primary" onClick={() => {
-            const text = dumpHomeUI();
-            try { navigator.clipboard?.writeText(text); } catch { /* 무시 */ }
-            console.log(text);
-          }}>
-            <span className="t">값 복사</span>
-          </button>
-          <button className="menu-btn" onClick={onClose}><span className="t">닫기</span></button>
-        </div>
+      <div className="htune-foot">
+        <button onClick={() => setV(resetHomeUI())}>되돌리기</button>
+        <button className="go" onClick={() => {
+          const text = dumpHomeUI();
+          try { navigator.clipboard?.writeText(text); } catch { /* 무시 */ }
+          console.log(text);
+        }}>값 복사</button>
       </div>
     </div>
   );
