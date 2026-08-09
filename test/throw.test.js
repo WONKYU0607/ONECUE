@@ -136,4 +136,38 @@ console.log('섬광탄은 3x3 안에 있어야 맞는다');
   const total = BLIND_TICKS + BLIND_CENTER_BONUS;
   assert(n <= total + 1, `${(total/60).toFixed(1)}초 뒤 풀림 (${n}틱)`);
 }
+
+console.log('폭발도 자해·아군 오사가 없다');
+{
+  const { blast } = await import('../src/game/sim.js');
+  const { teamOf, GRID_MIDROW } = await import('../src/game/config.js');
+  // 팀전: 던진 사람과 팀원은 안 맞는다
+  const s = newState(4);
+  s.phase = PH_PLAY;
+  const c = 3, r = GRID_MIDROW + 2;
+  for (const i of [0, 1]){
+    s.p[i].x = Math.round((cellX(c) + 2) * FP);
+    s.p[i].y = Math.round((cellY(r) + 1) * FP);
+  }
+  s.p[2].x = s.p[0].x; s.p[2].y = s.p[0].y;      // 상대도 같은 칸에 강제로
+  const hp0 = s.p.map(p => p.hp);
+  blast(s, c, r, 1, 20, 0, 0);                    // 슬롯0이 터뜨림
+  assert(s.p[0].hp === hp0[0], `던진 사람 무사 (${s.p[0].hp})`);
+  assert(s.p[1].hp === hp0[1], `팀원 무사 (${s.p[1].hp})`);
+  assert(s.p[2].hp < hp0[2], `상대는 맞는다 (${s.p[2].hp})`);
+  assert(teamOf(0, 4) === teamOf(1, 4), '0·1은 같은 팀');
+
+  // 개인전: 던진 사람만 무사
+  const f = newState(4, false, true);
+  f.phase = PH_PLAY;
+  for (const i of [0, 1, 2]){
+    f.p[i].x = Math.round((cellX(c) + 2) * FP);
+    f.p[i].y = Math.round((cellY(r) + 1) * FP);
+  }
+  const fh = f.p.map(p => p.hp);
+  blast(f, c, r, 1, 20, 0, 0);
+  assert(f.p[0].hp === fh[0], '개인전: 던진 사람 무사');
+  assert(f.p[1].hp < fh[1] && f.p[2].hp < fh[2], '개인전: 나머지는 맞는다');
+}
+
 console.log('throw.test.js 통과');

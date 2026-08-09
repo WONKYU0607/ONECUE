@@ -93,4 +93,42 @@ console.log('2대2에서도 (슬롯 2·3이 던져도)');
   assert(s.ammo[3][THROW.MOLO] === 0 && s.ammo[2][THROW.MOLO] === 1, '탄약은 던진 사람만 닳는다');
 }
 
+
+console.log('자해·아군 오사가 없다');
+{
+  const { teamOf } = await import('../src/game/config.js');
+  const s = newState(4);
+  s.phase = PH_PLAY; s.solo = true;             // 총알은 빼고 불만 본다
+  // **상대(위 팀)는 자기 영역 밖으로 못 나온다.** 불을 위 팀 자리에 놓고,
+  // 아래 팀은 화면 뒤집기와 무관하게 같은 칸에 세워 자해·오사만 본다
+  const fr = { c: 3, r: ROW_MIN[1] + 2, t: FIRE_TICKS, by: 0 };
+  s.fire.push(fr);
+  for (const i of [0, 1, 2]){
+    s.p[i].x = Math.round((cellX(fr.c) + 2) * FP);
+    s.p[i].y = Math.round((cellY(fr.r) + 1) * FP);
+  }
+  const hp0 = s.p.map(p => p.hp);
+  for (let t = 0; t < FIRE_DMG_EVERY * 4 + 2; t++) step(s, IN(4));
+  assert(s.p[0].hp === hp0[0], `던진 사람은 자기 불에 안 탄다 (${s.p[0].hp})`);
+  assert(s.p[1].hp === hp0[1], `같은 팀도 안 탄다 (${s.p[1].hp})`);
+  assert(s.p[2].hp < hp0[2], `상대 팀은 탄다 (${s.p[2].hp})`);
+  assert(teamOf(0, 4) === teamOf(1, 4) && teamOf(2, 4) !== teamOf(0, 4), '팀 배정 확인');
+}
+
+console.log('개인전은 던진 사람만 무사하다');
+{
+  const s = newState(4, false, true);            // ffa
+  s.phase = PH_PLAY; s.solo = true;
+  const fr = { c: 3, r: ROW_MIN[1] + 2, t: FIRE_TICKS, by: 0 };
+  s.fire.push(fr);
+  for (const i of [0, 1, 2]){
+    s.p[i].x = Math.round((cellX(fr.c) + 2) * FP);
+    s.p[i].y = Math.round((cellY(fr.r) + 1) * FP);
+  }
+  const hp0 = s.p.map(p => p.hp);
+  for (let t = 0; t < FIRE_DMG_EVERY * 4 + 2; t++) step(s, IN(4));
+  assert(s.p[0].hp === hp0[0], '던진 사람은 안 탄다');
+  assert(s.p[1].hp < hp0[1] && s.p[2].hp < hp0[2], '개인전은 나머지 전부 탄다');
+}
+
 console.log('molotov.test.js 통과');

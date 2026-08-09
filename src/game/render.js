@@ -13,6 +13,9 @@ import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
 
 // 스프라이트 시트의 한 칸 크기 (원본은 14x16 고정)
+// 캐릭터 시트. 6색 전부 프레임(42x48)을 꽉 채워야 **화면에서 크기가 같다**.
+// 새로 넣은 두 색은 원본이 세로로 길어서(폭/높이 0.66 vs 0.875) 비율을 유지하면
+// 키만 크거나 몸통만 좁아진다 → 가로·세로를 따로 늘려 상자에 맞춘다
 const FW = 14 * RS, FH = 16 * RS;
 // 칼전 시트 규격 (melee.json)
 // 화면(CSS)과 같은 게임 글꼴. canvas는 CSS 변수를 못 읽어 여기에 한 번 더 적는다
@@ -91,9 +94,11 @@ export function createRenderer(canvas){
     }
     px(x + hx - 2, y + hy - 1, 4, 4, '#ffffff');
   }
-  function drawPlayer(p, i, xOverride, yOverride, blind = 0, tick = 0, colorOf = null){
+  function drawPlayer(p, i, xOverride, yOverride, blind = 0, tick = 0, colorOf = null, off = false){
     if (p.hp <= 0) return;                       // 쓰러지면 아레나에서 사라진다
     if (p.invul > 0 && (p.invul >> 2) % 2 === 0) return;
+    // 끊긴 사람은 유령이다. 총알·칼이 통과하므로 **보기에도 통과하게** 흐리게 그린다
+    if (off) ctx.globalAlpha = 0.35;
     const xw = (xOverride === undefined ? p.x : xOverride) / FP;
     const yw = fy((yOverride === undefined ? p.y : yOverride) / FP, ARENA.ph);
     // 섬광에 당한 캐릭터는 지속 시간 내내 흰색으로 깜빡인다 (상대도 맞았는지 알 수 있게)
@@ -156,6 +161,7 @@ export function createRenderer(canvas){
       ctx.drawImage(sheet, idx*FW, 0, FW, FH, Math.round(xw*RS), Math.round(yw*RS), dw, dh);
     }
     if (hit) drawBurst(xw, yw, (colorOf && colorOf[i] != null) ? colorOf[i] : TEAM_OF[i], 1 - p.flash / FLASH_T);
+    if (off) ctx.globalAlpha = 1;   // **반드시 되돌린다.** 안 그러면 뒤에 그려지는 게 전부 흐려진다
   }
   function drawPanel(s, stick){
     px(0, H, W, uiH, '#0d0d16');
@@ -651,7 +657,7 @@ export function createRenderer(canvas){
     // 렌더 위치 배열은 첫 예측이 끝나야 생긴다. 없으면 보정 없이 확정 위치로 그린다
     const rx = cl.rx || [], ry = cl.ry || [];
     for (let i = 0; i < s.p.length; i++)
-      drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, s.color);
+      drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, s.color, (s.off || [])[i]);
     drawMiniHp(s, rx, ry);
     drawMeMark(s, rx, ry);
     drawOffline(s, rx, ry);

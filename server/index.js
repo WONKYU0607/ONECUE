@@ -9,7 +9,7 @@ import { forfeit, setOff } from '../src/game/sim.js';
 const PORT = process.env.PORT || 8080;
 const TICK_MS = 1000 / 60;
 const EMPTY_ROOM_TTL = 30_000;   // 둘 다 나간 방을 정리하기까지
-const GRACE_MS = 30_000;         // 끊긴 사람의 자리를 잡아두는 시간
+const GRACE_MS = 10_000;         // 끊긴 사람을 기다리는 시간. 판이 1~2분이라 30초는 너무 길었다
 
 let nextRoomId = 1;
 const rooms = new Map();         // id -> Room

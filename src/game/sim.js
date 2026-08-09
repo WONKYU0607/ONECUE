@@ -152,6 +152,8 @@ export function normalizeState(st){
       st[k] = Array.from({ length: st.n || 2 }, (_, i) => (st[k] && st[k][i]) || 1);
   if (!Array.isArray(st.proj)) st.proj = [];
   if (!Array.isArray(st.fire)) st.fire = [];
+  // 옛 상태에는 불에 by가 없다. -1이면 아무도 안 봐주는 예전 동작
+  for (const fr of st.fire) if (typeof fr.by !== 'number') fr.by = -1;
   if (!Array.isArray(st.off)) st.off = Array(st.n || 2).fill(false);
   for (let i = 0; i < (st.p || []).length; i++)
     if (typeof st.p[i].face !== 'number') st.p[i].face = teamOf(i, st.n || 2) === 0 ? 0 : 1;
@@ -366,8 +368,14 @@ export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
   const x1 = Math.round(cellX(c + rad + 1) * FP);
   const y0 = Math.round(cellY(r - rad) * FP);
   const y1 = Math.round(cellY(r + rad + 1) * FP);
+  // **자해·아군 오사 없음.** 총알은 원래 상대 팀만 때리는데 폭발·불만 아무나 때려서
+  // 팀전에서 팀원을 실수로 죽이거나 자기 수류탄에 자기가 맞았다.
+  // 개인전은 각자 한 팀이라 이 판정이 곧 '자신만 제외'가 된다
+  const byTeam = by >= 0 && by < s.n ? teamOf(by, s.n) : -1;
   for (let i = 0; i < s.n; i++){
     const p = s.p[i];
+    if (s.off && s.off[i]) continue;        // 끊긴 사람은 유령
+    if (byTeam >= 0 && teamOf(i, s.n) === byTeam) continue;
     if (!overlap(p.x, p.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
     if (p.invul > 0) continue;
     p.invul = INVUL_T; p.flash = FLASH_T; p.hitBy = by;
@@ -414,10 +422,26 @@ export function setOff(s, slot, v){
 export function forfeit(s, slot){
   setArena(s.n, s.melee, s.ffa);
   setOff(s, slot, true);
-  if (s.n > 2) return;                       // 2대2는 계속 진행
   if (s.phase === PH_OVER || s.solo) return;
-  s.over = true; s.phase = PH_OVER;
-  s.winner = teamOf(slot, s.n) === 0 ? 2 : 1;
+  // **나간 사람은 죽은 것으로 본다.** 예전엔 3인 이상이면 아무 처리도 안 해서
+  // 그 자리에 멈춰 선 채 살아 있었다 — 개인전에서 나간 사람이 끝까지 남아
+  // 1등이 되거나, 팀전에서 그 체력이 시간 만료 합계에 들어갔다
+  const p = s.p[slot];
+  if (p && p.hp > 0) p.hp = 0;
+  if (s.n <= 2){
+    s.over = true; s.phase = PH_OVER;
+    s.winner = teamOf(slot, s.n) === 0 ? 2 : 1;
+    return;
+  }
+  // 3인 이상은 남은 편이 하나뿐이면 그때 끝난다 (step의 승리 판정과 같은 규칙)
+  const tc = teamCount(s.n);
+  const alive = Array(tc).fill(0);
+  for (let i = 0; i < s.n; i++) if (s.p[i].hp > 0) alive[teamOf(i, s.n)]++;
+  const left = alive.filter(v => v > 0);
+  if (left.length <= 1){
+    s.over = true; s.phase = PH_OVER;
+    s.winner = left.length === 0 ? 0 : alive.findIndex(v => v > 0) + 1;
+  }
 }
 export function canThrow(s, slot, k){
   setArena(s.n, s.melee, s.ffa);
@@ -442,7 +466,7 @@ export function blocked(s, x, y, self = -1){
   for (let i = 0; i < s.n; i++){
     if (i === self) continue;
     const o = s.p[i];
-    if (o.hp <= 0) continue;
+    if (o.hp <= 0 || (s.off && s.off[i])) continue;   // 끊긴 사람은 유령 — 몸도 통과
     if (overlap(x, y, PWf, PHf, o.x, o.y, PWf, PHf)) return true;
   }
   return false;
@@ -629,7 +653,7 @@ export function step(s, inp){
       if (--pr.t === 0 && pr.k === THROW.NADE) pr.fuse = FUSE_TICKS;
       if (pr.t === 0 && pr.k === THROW.MOLO){
         // 깨지면서 3x3에 불이 붙는다. 폭발 피해는 없고 지속 피해만
-        s.fire.push({ c: pr.c, r: pr.r1, t: FIRE_TICKS });
+        s.fire.push({ c: pr.c, r: pr.r1, t: FIRE_TICKS, by: pr.by });
         s.fx.push({ c: pr.c, r: pr.r1, t: EXPLO_TICKS });
         s.proj.splice(i, 1);
         continue;
@@ -703,7 +727,7 @@ export function step(s, inp){
           for (let v = 0; v < s.n; v++){
             if (v === i || teamOf(v, s.n) === teamOf(i, s.n)) continue;
             const t = s.p[v];
-            if (t.hp <= 0) continue;
+            if (t.hp <= 0 || s.off[v]) continue;   // 끊긴 사람은 유령 — 칼도 통과
             if (!overlap(t.x, t.y, PWf, PHf, hx, hy, hw, hh)) continue;
             // 방패로 막았는가 — **마주 보고 있을 때만** 막힌다. 등 뒤는 못 막는다
             if (t.shield > 0 && t.face === FACE_OPP[p.face]){
@@ -728,9 +752,11 @@ export function step(s, inp){
       const x1 = Math.round(cellX(fr.c + FIRE_RADIUS + 1) * FP);
       const y0 = Math.round(cellY(fr.r - FIRE_RADIUS) * FP);
       const y1 = Math.round(cellY(fr.r + FIRE_RADIUS + 1) * FP);
+      const fireTeam = fr.by >= 0 && fr.by < s.n ? teamOf(fr.by, s.n) : -1;
       for (let v = 0; v < s.n; v++){
         const t = s.p[v];
-        if (t.hp <= 0) continue;
+        if (t.hp <= 0 || s.off[v]) continue;                          // 끊긴 사람은 유령
+        if (fireTeam >= 0 && teamOf(v, s.n) === fireTeam) continue;   // 자해·아군 오사 없음
         if (!overlap(t.x, t.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
         const was = t.hp;
         t.hp -= FIRE_DAMAGE; t.flash = FLASH_T; t.hitBy = -1;
@@ -803,6 +829,7 @@ export function step(s, inp){
       for (let i = 0; i < s.n; i++){
         const t = s.p[i];
         if (t.hp <= 0 || teamOf(i, s.n) === myTeam) continue;
+        if (s.off[i]) continue;              // 끊긴 사람은 유령 — 총알이 통과한다
         const hx = snap && snap[i] ? snap[i][0] : t.x;
         const hy = snap && snap[i] ? snap[i][1] : t.y;
         if (!overlap(b.x,b.y,BWf,BHf, hx,hy,PWf,PHf)) continue;
@@ -858,7 +885,9 @@ export function checksum(s){
   for (const c of (s.color || [])) h = (h*31 + c) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;
-  for (const fr of s.fire) h = (h*31 + fr.c*7 + fr.r*13 + fr.t) | 0;
+  // by가 없는 옛 상태는 -1로 본다. 원본과 복제본이 어긋나지 않게 여기서도 같은 기본값
+  for (const fr of s.fire)
+    h = (h*31 + fr.c*7 + fr.r*13 + fr.t + ((typeof fr.by === 'number' ? fr.by : -1) + 1) * 17) | 0;
   for (let i = 0; i < s.n; i++){ const q = s.p[i];
     h = (h*31 + (s.off[i] ? i + 3 : 0) + (q.atk || 0) * 5 + (q.face || 0) * 3 + (q.hitBy + 1) * 9
          + (q.shield || 0) * 7 + (q.stun || 0) * 11 + (q.shCool || 0)) | 0; }

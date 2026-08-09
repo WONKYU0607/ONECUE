@@ -49,7 +49,8 @@ export function uiBoxRect(uiH){
   // 그 사이 빈 자리에 버튼을 놓는다. 예전엔 왼쪽에 붙어 있어 한쪽으로 쏠렸다
   const BARW = 56, MARGIN = 3;   // render.js의 체력바와 같은 값이어야 한다
   const free = (W - MARGIN - BARW) - (MARGIN + BARW);   // 가운데 빈 폭
-  const w = Math.max(46, free - 4);
+  // 체력바에 닿지 않게 양쪽 4px씩 띄운다. 2px이면 화면에서 붙어 보였다
+  const w = free - 8;
   const x = (W - w) / 2;
   const top = pd.y + 1;
   const bottom = sl.length ? sl[0].y - 2 : shieldBtn(uiH).y - 3;

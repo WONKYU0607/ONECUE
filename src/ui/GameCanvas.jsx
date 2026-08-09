@@ -14,8 +14,17 @@ export default function GameCanvas({ session, onExit, onFinish }){
   const [phase, setPhase] = useState(PH_READY);
   const [crash, setCrash] = useState(null);   // 루프가 죽으면 검은 화면 대신 이걸 보여준다
   const [link, setLink] = useState({ self: 'ok', peer: 'here' });
+  const [graceLeft, setGraceLeft] = useState(0);   // 상대 복귀까지 남은 초
+
   const [ready, setReady] = useState({ me: false, peer: false });
   const [box, setBox] = useState(null);   // 버튼을 놓을 자리 (아이템 칸 위 여백)
+
+  // 남은 초를 1초마다 줄인다. 0이 되면 서버가 알아서 판을 끝낸다
+  useEffect(() => {
+    if (graceLeft <= 0) return;
+    const t = setTimeout(() => setGraceLeft(v => Math.max(0, v - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [graceLeft]);
 
   // **페이즈로 거르지 않는다.** 예전엔 PH_READY에서만 돌려서, 배치 단계를 건너뛰는
   // 칼전은 신청 버튼이 아예 안 떴다. 무엇을 띄울지는 prompt()가 정하므로
@@ -48,8 +57,12 @@ export default function GameCanvas({ session, onExit, onFinish }){
   const boxStyle = box ? {
     left: box.left + 'px', top: box.top + 'px',
     width: box.width + 'px', height: box.height + 'px',
-    // 2대2는 상자가 낮아 예전 비율(0.42)이면 글씨가 10px까지 줄었다
-    fontSize: Math.max(15, Math.round(box.height * 0.5)) + 'px'
+    // 상자는 체력바 사이 칸에 딱 맞춰져 있다. 글씨가 그 폭을 넘지 않게
+    // **높이와 폭 둘 다** 보고 정한다 ("설치 완료"는 공백 포함 5글자 폭)
+    fontSize: Math.max(11, Math.min(
+      Math.round(box.height * 0.5),
+      Math.floor((box.width - 12) / 4.8)   // 자간 1px까지 감안
+    )) + 'px'
   } : { display: 'none' };
 
   useEffect(() => {
@@ -61,7 +74,12 @@ export default function GameCanvas({ session, onExit, onFinish }){
       onCrash: e => setCrash(String(e && e.message || e)),
       session,
       transport: conn?.transport,
-      onLink: u => setLink(prev => ({ ...prev, ...u })),
+      onLink: u => {
+        setLink(prev => ({ ...prev, ...u }));
+        // 상대가 끊기면 서버가 알려준 유예 시간을 초 단위로 센다
+        if (u.peer === 'gone') setGraceLeft(Math.ceil((u.grace || 0) / 1000));
+        if (u.peer === 'back' || u.peer === 'here') setGraceLeft(0);
+      },
       onFinish: r => setTimeout(() => onFinish?.(r), 1400),  // 결과 연출을 잠깐 보여준 뒤 넘어감
       softFlash: () => getSettings().softFlash   // 번쩍임이 부담되면 옅은 안개로
     });
@@ -95,7 +113,11 @@ export default function GameCanvas({ session, onExit, onFinish }){
         <div className="link-note ui-overlay">연결이 끊겼다 · 다시 붙는 중…</div>
       )}
       {link.self === 'ok' && link.peer === 'gone' && (
-        <div className="link-note ui-overlay">상대 연결이 끊겼다 · 복귀 대기 중…</div>
+        <div className="link-note ui-overlay">
+          상대방의 연결이 끊어졌습니다
+          <br />
+          {graceLeft}초 뒤에 돌아오지 않으면 자동 승리 처리됩니다
+        </div>
       )}
       {link.peer === 'left' && (
         <div className="link-note ui-overlay">상대가 나갔다</div>
