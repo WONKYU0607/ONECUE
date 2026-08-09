@@ -13,6 +13,11 @@ import './styles.css';
   img.onerror = () => console.warn('틀 이미지를 못 찾음:', url);
   img.src = url;
 }
+// 트로피 시트도 같은 방식으로 (CSS 변수 안의 url()은 기준이 애매하다)
+for (const [name, file] of [['--tiers', 'tiers.webp'], ['--ticket', 'ticket.webp'], ['--panel', 'panel.webp']]){
+  const u = new URL('assets/' + file, document.baseURI).href;
+  document.documentElement.style.setProperty(name, `url("${u}")`);
+}
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -1,9 +1,13 @@
 // 첫 화면: 모드 선택 + 설정
+import PlayerBar from '../PlayerBar.jsx';
+
 export default function Home({ onPvp, onAi, onPractice, onSettings, onHelp }){
   return (
     <div className="screen home">
       <button className="icon-btn top-right" onClick={onSettings} aria-label="설정">⚙</button>
       <button className="icon-btn top-right2" onClick={onHelp} aria-label="조작 방법">?</button>
+
+      <PlayerBar />
 
       <div className="menu">
         <button className="menu-btn primary" onClick={onPvp}>

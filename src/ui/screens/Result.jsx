@@ -1,9 +1,19 @@
-import { TEAMS, MAXHP } from '../../game/config.js';
+import { TEAMS } from '../../game/config.js';
 
 // 라운드 결과 창.
 // 예전엔 캔버스에 YOU WIN만 띄우고 끝이라 **뭘 잘했는지 알 수가 없었다.**
 // 점수제가 붙으면 여기에 증감·연승·광고 방어가 들어가므로 자리를 미리 잡아둔다.
 const LABEL = { win: '승리', lose: '패배', draw: '무승부' };
+
+// 3대3이면 `팀원`이 둘, `상대`가 셋이라 이름만으로는 못 가린다. 번호를 붙인다
+function name(r, sum){
+  if (r.self) return '나';
+  if (sum.ffa) return `${r.slot + 1}번`;
+  const same = sum.rows.filter(x => x.mine === r.mine && !x.self);
+  const idx = same.findIndex(x => x.slot === r.slot) + 1;
+  const base = r.mine ? '팀원' : '상대';
+  return same.length > 1 ? `${base}${idx}` : base;
+}
 
 export default function Result({ result, summary, session, onAgain, onHome }){
   const label = LABEL[result] || '무승부';
@@ -32,13 +42,20 @@ export default function Result({ result, summary, session, onAgain, onHome }){
               {summary.timeout && <span className="res-tag">시간 만료</span>}
             </div>
 
+            {/* 막대는 **기여도**. 남은 체력은 대부분 0이라 막대로는 정보가 없다 */}
+            <div className="res-head">
+              <span className="who" />
+              <span className="bar">기여도</span>
+              <span className="num">체력</span>
+              <span className="num dmg">피해</span>
+            </div>
             <div className="res-rows">
               {ordered.map(r => (
                 <div key={r.slot} className={'res-row' + (r.self ? ' me' : '') + (r.mine ? '' : ' foe')}>
                   <span className="dot" style={{ background: TEAMS[r.color % TEAMS.length].m }} />
-                  <span className="who">{r.self ? '나' : (summary.ffa ? `${r.slot + 1}번` : (r.mine ? '팀원' : '상대'))}</span>
+                  <span className="who">{name(r, summary)}</span>
                   <span className="bar">
-                    <span className="fill" style={{ width: Math.max(0, r.hp / MAXHP * 100) + '%' }} />
+                    <span className="fill" style={{ width: (total ? r.dealt / total * 100 : 0) + '%' }} />
                   </span>
                   <span className="num">{r.hp}</span>
                   <span className="num dmg">{r.dealt}</span>
@@ -46,20 +63,12 @@ export default function Result({ result, summary, session, onAgain, onHome }){
                 </div>
               ))}
             </div>
-            <div className="res-head"><span>체력</span><span>가한 피해</span></div>
             {total > 0 && (
-              <p className="hint">
+              <p className="res-mine">
                 내 기여 {Math.round((rows.find(r => r.self)?.dealt || 0) / total * 100)}%
               </p>
             )}
           </div>
-        )}
-
-        {session?.kind === 'ai' && (
-          <p className="hint">
-            AI {session.stage}단계
-            {result === 'win' && session.stage < 10 && <><br />{session.stage + 1}단계가 열렸다</>}
-          </p>
         )}
 
         <button className="menu-btn primary" onClick={onAgain}>

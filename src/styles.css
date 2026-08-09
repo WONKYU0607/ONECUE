@@ -250,23 +250,49 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .title.res-win{color:#8fd8ff}
 .title.res-lose{color:#f0918a}
 .title.res-draw{color:#e8e8f0}
-.resbox{width:100%;padding:10px 10px 6px;margin-bottom:6px;
+/* 표를 크게. 6인전이면 여섯 줄이라 작으면 안 읽힌다 */
+.resbox{width:100%;padding:12px 12px 10px;margin-bottom:8px;
   background:rgba(10,14,22,.55);border:1px solid #2f4a63}
 .res-sum{display:flex;justify-content:center;align-items:center;gap:8px;
-  font:900 14px var(--gf);color:#d6eeff;margin-bottom:8px}
-.res-tag{font:700 10px var(--gf);color:#f0c86e;border:1px solid #6b5a2e;padding:1px 5px}
-.res-rows{display:flex;flex-direction:column;gap:4px}
-.res-row{display:flex;align-items:center;gap:6px;font:700 12px var(--gf);color:#c8d8e6}
+  font:900 16px var(--gf);color:#d6eeff;margin-bottom:10px}
+.res-tag{font:700 11px var(--gf);color:#f0c86e;border:1px solid #6b5a2e;padding:1px 5px}
+.res-rows{display:flex;flex-direction:column;gap:6px}
+.res-row,.res-head{display:flex;align-items:center;gap:8px}
+.res-row{font:900 15px var(--gf);color:#c8d8e6;min-height:22px}
 .res-row.me{color:#ffe9a8}
-.res-row.foe{opacity:.72}
-.res-row .dot{flex:0 0 8px;height:8px;border-radius:1px}
-.res-row .who{flex:0 0 40px;min-width:0;text-align:left}
-.res-row .bar{flex:1 1 0;min-width:0;height:7px;background:rgba(255,255,255,.10)}
+.res-row.foe{opacity:.75}
+.res-row .dot{flex:0 0 10px;height:10px;border-radius:1px}
+.res-row .who{flex:0 0 52px;min-width:0;text-align:left}
+.res-row .bar{flex:1 1 0;min-width:0;height:12px;background:rgba(255,255,255,.10)}
 .res-row .bar .fill{display:block;height:100%;background:#4ec9f0}
 .res-row.foe .bar .fill{background:#f0645a}
-.res-row .num{flex:0 0 30px;text-align:right}
-.res-row .num.dmg{flex:0 0 42px;color:#8fd8ff}
-.res-head{display:flex;justify-content:flex-end;gap:6px;margin-top:3px;
-  font:700 9px var(--gf);color:#7e9eb6}
-.res-head span:first-child{width:30px;text-align:right}
-.res-head span:last-child{width:42px;text-align:right}
+.res-row .num{flex:0 0 34px;text-align:right}
+.res-row .num.dmg{flex:0 0 44px;color:#8fd8ff}
+/* 머리글은 **표 위에**. 아래에 있으면 다 읽고 나서야 무슨 열인지 알게 된다 */
+.res-head{margin-bottom:5px;font:700 11px var(--gf);color:#7e9eb6}
+.res-head .who{flex:0 0 62px}
+.res-head .bar{flex:1 1 0;min-width:0;text-align:left;background:none;height:auto}
+.res-head .num{flex:0 0 34px;text-align:right}
+.res-head .num.dmg{flex:0 0 44px}
+.res-mine{margin-top:8px;font:900 14px var(--gf);color:#ffe9a8;text-align:center}
+
+/* 티어 트로피 — 한 장짜리 시트에서 잘라 쓴다 */
+.tier-ico{display:inline-block;flex:0 0 auto;background-repeat:no-repeat;
+  image-rendering:pixelated;vertical-align:middle}
+
+/* ── 홈 위쪽: 점수·티켓 ───────────────────────────────── */
+.pbar{width:100%;padding:10px 12px 8px;margin-bottom:6px;
+  border-style:solid;border-width:14px 16px;border-color:#0a0c12;
+  border-image:var(--panel) 60 fill stretch}
+.pbar-scores{display:flex;gap:8px}
+.pbar-score{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:5px}
+.pbar-score .lbl{font:700 11px var(--gf);color:#9fb0c2}
+.pbar-score .val{margin-left:auto;font:900 16px var(--gf);color:#ffe9a8}
+.pbar-tickets{display:flex;gap:6px;margin-top:8px}
+.tk{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:3px;
+  padding:3px 5px;background:rgba(10,14,22,.5);border:1px solid #2f4a63}
+.tk.out{opacity:.45}
+.tk-ico{flex:0 0 20px;height:14px;background:var(--ticket) center/contain no-repeat}
+.tk-n{font:900 14px var(--gf);color:#8fd8ff}
+.tk-nm{font:700 10px var(--gf);color:#9fb0c2;margin-left:auto}
+.pbar-warn{margin-top:6px;font:700 9px var(--gf);color:#f0a86e;text-align:center}
