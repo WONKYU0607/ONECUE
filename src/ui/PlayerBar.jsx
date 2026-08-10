@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import TierIcon from './TierIcon.jsx';
 import ProfileTab from './ProfileTab.jsx';
 import { getNick } from '../state/profile.js';
-import { scoreOf, ticketsLeft, ffaLeft, nextTicketIn, fmtLeft, SERVER_BACKED } from '../state/tickets.js';
+import { scoreOf, ticketsLeft, ffaLeft, nextTicketIn, fmtLeft } from '../state/tickets.js';
 import { fitBar } from '../state/homeLayout.js';
 import { getSettings, setSetting } from '../state/settings.js';
 
@@ -81,7 +81,6 @@ export default function PlayerBar({ onHelp, onSettings }){
           </svg>
         </button>
       </div>
-      {!SERVER_BACKED && <p className="pbar-warn">기기 저장 · 서버 연결 전</p>}
       {prof && <ProfileTab onClose={() => setProf(false)} />}
     </>
   );

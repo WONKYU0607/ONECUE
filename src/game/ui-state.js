@@ -30,6 +30,7 @@ export function matchSummary(st, slot){
   const teams = [...new Set(rows.map(r => r.team))].sort((a, b) => a - b);
   return {
     result: resultFor(st, slot),
+    state: st,                    // 점수 계산은 시뮬 상태에서만 한다
     ffa: !!st.ffa,
     melee: !!st.melee,
     n,

@@ -10,6 +10,8 @@ import SettingsModal from './ui/SettingsModal.jsx';
 import HelpModal from './ui/HelpModal.jsx';
 import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings, setSetting } from './state/settings.js';
+import { scoreDelta } from './game/score.js';
+import { recordMatch, streakOf } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
 import { recordResult, modeKey } from './state/progress.js';
 import { VIEW, SELF, HAND } from './game/config.js';
@@ -21,6 +23,7 @@ export default function App(){
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
   const [summary, setSummary] = useState(null);   // 결과 창에 띄울 한 판 요약
+  const [score, setScore] = useState(null);       // 이번 판 점수 변화 (PVP만)
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
@@ -61,6 +64,18 @@ export default function App(){
   }, []);
   const toGame    = useCallback(() => setScreen('game'), []);
   const onFinish  = useCallback((r, summary) => {
+    // **PVP만 점수를 매긴다.** AI·연습은 연습이므로 기록하지 않는다
+    let sc = null;
+    if (session?.kind === 'pvp' && summary?.state){
+      const kind = summary.melee ? 'melee' : 'gun';
+      const d = scoreDelta(summary.state, SELF.slot, {
+        streak: streakOf(kind) + (r === 'win' ? 1 : 0),
+        left: false, teamLeft: (summary.rows || []).some(x => x.mine && !x.self && x.off)
+      });
+      const moved = recordMatch(kind, r, d.delta);
+      sc = { ...d, ...moved, kind };
+    }
+    setScore(sc);
     setSummary(summary || null);
     // AI 모드에서 이기면 다음 단계가 열린다
     // 모드별로 따로 기록한다 (1대1을 깼다고 3대3까지 열리면 안 된다)
@@ -84,7 +99,7 @@ export default function App(){
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toGame} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome} onFinish={onFinish} />}
-      {screen === 'result'   && <Result result={result} summary={summary} session={session} onAgain={again} onHome={goHome} />}
+      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} onAgain={again} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </>

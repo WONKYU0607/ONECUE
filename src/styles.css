@@ -400,3 +400,19 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .tier-ico{display:inline-block;flex:0 0 auto;background-repeat:no-repeat;
   image-rendering:pixelated;vertical-align:middle}
 
+
+/* 결과 화면 점수 */
+.scorebox{padding:10px 12px}
+.sc-main{display:flex;align-items:baseline;gap:10px}
+.sc-kind{font:700 13px var(--gf);color:#9fb0c2}
+.sc-delta{font:900 26px var(--gf);color:#c8d8e6}
+.sc-delta.up{color:#8fd8ff}
+.sc-delta.down{color:#f0918a}
+.sc-after{margin-left:auto;font:900 18px var(--gf);color:#ffe9a8}
+.sc-why{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;
+  font:700 11px var(--gf);color:#8b9db0}
+.sc-why .hi{color:#ffe9a8}
+
+/* 티켓이 없어 못 누르는 버튼 */
+.menu-btn.off{opacity:.42;cursor:not-allowed}
+.menu-btn.off .tkn{color:#f0918a}

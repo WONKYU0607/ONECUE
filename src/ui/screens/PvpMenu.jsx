@@ -17,6 +17,9 @@ export default function PvpMenu({ onBack, onStart }){
   const modeName = melee ? '칼전' : '총격전';
   // 남은 티켓 (남은/최대). 개인전은 따로 하루 3판이라 갈라 본다
   const tk = (ffa = false) => `${leftFor(ffa)}/${maxFor(ffa)}`;
+  // 티켓이 없으면 못 들어간다. 버튼을 흐리게 하고 눌러도 안 먹는다
+  const out = (ffa = false) => leftFor(ffa) <= 0;
+  const guard = (ffa, fn) => () => { if (!out(ffa)) fn(); };
   const back = () => {
     if (step === 'mode') return onBack();
     if (step === 'how') return setStep('mode');
@@ -66,21 +69,25 @@ export default function PvpMenu({ onBack, onStart }){
 
         {step === 'n' && (
           <>
-            <button className="menu-btn primary" onClick={() => { setPending({ mode: how, n: 2, melee }); setStep('color'); }}>
+            <button className={'menu-btn primary' + (out() ? ' off' : '')}
+                    onClick={guard(false, () => { setPending({ mode: how, n: 2, melee }); setStep('color'); })}>
               <span className="t">1 vs 1</span>
               <span className="tkn"><span className="tk-ico" />{tk()}</span>
             </button>
-            <button className="menu-btn" onClick={() => onStart({ mode: how, n: 4, melee })}>
+            <button className={'menu-btn' + (out() ? ' off' : '')}
+                    onClick={guard(false, () => onStart({ mode: how, n: 4, melee }))}>
               <span className="t">2 vs 2</span>
               <span className="tkn"><span className="tk-ico" />{tk()}</span>
             </button>
-            <button className="menu-btn" onClick={() => onStart({ mode: how, n: 6, melee })}>
+            <button className={'menu-btn' + (out() ? ' off' : '')}
+                    onClick={guard(false, () => onStart({ mode: how, n: 6, melee }))}>
               <span className="t">3 vs 3</span>
               <span className="tkn"><span className="tk-ico" />{tk()}</span>
             </button>
             {/* 개인전은 칼전에만. 총격전은 진영이 나뉘어 있어 성립하지 않는다 */}
             {melee && (
-              <button className="menu-btn" onClick={() => setStep('ffa')}>
+              <button className={'menu-btn' + (out(true) ? ' off' : '')}
+                      onClick={guard(true, () => setStep('ffa'))}>
                 <span className="t">개인전</span>
                 <span className="tkn"><span className="tk-ico" />{tk(true)}</span>
               </button>
@@ -92,7 +99,7 @@ export default function PvpMenu({ onBack, onStart }){
           <>
             {[3, 4, 5, 6].map((k, i) => (
               <button key={k} className={'menu-btn' + (i === 0 ? ' primary' : '')}
-                onClick={() => { setPending({ mode: how, n: k, melee, ffa: true }); setStep('color'); }}>
+                onClick={guard(true, () => { setPending({ mode: how, n: k, melee, ffa: true }); setStep('color'); })}>
                 <span className="t">{k}인전</span>
                 <span className="tkn"><span className="tk-ico" />{tk(true)}</span>
               </button>

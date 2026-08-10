@@ -121,10 +121,14 @@ class Room {
 
     seat.sid = sid; seat.ws = ws; seat.goneAt = 0;
     // 1대1·개인전은 팀 로비가 없어서 색을 메뉴에서 고른다.
-    // 남이 이미 쓰는 색이면 서버가 빈 색으로 바꿔준다
+    // **고른 색을 그대로 둔다.** 색은 그리기에만 쓰이므로 겹쳐도 판정에 영향이 없고,
+    // 겹치는 건 화면에서 각자 다르게 그려 푼다(팀 구분이 필요한 2대2·3대3만 선착순).
+    // 예전엔 `wantColor < 4`라 보라·검정을 고르면 아예 무시됐다
     if (!reconnected){
-      const c = Number.isInteger(wantColor) && wantColor >= 0 && wantColor < 4 ? wantColor : -1;
-      this.server.s.color[slot] = (c >= 0 && !this.colorTaken(c)) ? c : this.freeColor();
+      const c = Number.isInteger(wantColor) && wantColor >= 0 && wantColor < COLOR_COUNT ? wantColor : -1;
+      const teamMode = this.n > 2 && !this.ffa;
+      this.server.s.color[slot] = c < 0 ? this.freeColor()
+        : (teamMode && this.colorTaken(c)) ? this.freeColor() : c;
     }
     this.pending.delete(sid);                 // 자리를 받았으니 대기 기록은 필요 없다
     setOff(this.server.s, slot, false);       // 돌아왔으면 표시를 지운다

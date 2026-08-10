@@ -15,7 +15,7 @@ function name(r, sum){
   return same.length > 1 ? `${base}${idx}` : base;
 }
 
-export default function Result({ result, summary, session, onAgain, onHome }){
+export default function Result({ result, summary, score, session, onAgain, onHome }){
   const label = LABEL[result] || '무승부';
   const rows = summary?.rows || [];
   const total = summary?.totalDealt || 0;
@@ -33,6 +33,28 @@ export default function Result({ result, summary, session, onAgain, onHome }){
       </header>
 
       <div className="menu wide-menu">
+        {/* 점수 변화 — PVP만. 어떻게 나온 값인지 같이 보여준다 */}
+        {score && (
+          <div className="resbox scorebox">
+            <div className="sc-main">
+              <span className="sc-kind">{score.kind === 'melee' ? '칼전' : '총격전'}</span>
+              <b className={'sc-delta ' + (score.delta > 0 ? 'up' : score.delta < 0 ? 'down' : '')}>
+                {score.delta > 0 ? '+' : ''}{score.delta}
+              </b>
+              <span className="sc-after">{score.after.toLocaleString()}</span>
+            </div>
+            <div className="sc-why">
+              {score.reason === 'leave' && <span>중도 이탈</span>}
+              {score.reason === 'teamLeft' && <span>팀원 이탈 · 점수 안 깎임</span>}
+              {!score.reason && score.rank > 0 && <span>{score.rank}등</span>}
+              {!score.reason && score.total > 0 &&
+                <span>기여 {Math.round(score.mine / score.total * 100)}%</span>}
+              {score.odds > 1 && <span className="hi">인원 열세 x{score.odds.toFixed(1)}</span>}
+              {score.streakMul > 1 && <span className="hi">{score.streak}연승 x{score.streakMul.toFixed(1)}</span>}
+            </div>
+          </div>
+        )}
+
         {summary && (
           <div className="resbox">
             <div className="res-sum">

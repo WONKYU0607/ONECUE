@@ -168,6 +168,29 @@ export const TEAMS = [
   { m:'#4a4a56', d:'#232329' }    // 5 검정
 ];
 export const COLOR_COUNT = TEAMS.length;
+
+// **화면에 쓸 색.** 색은 그리기에만 쓰이므로 기기마다 달라도 판정에 영향이 없다.
+// 1대1·개인전은 서로 같은 색을 골라도 되게 두고, 겹치면 **여기서만** 갈라 준다:
+//   - 내 슬롯은 내가 고른 색을 그대로
+//   - 남은 사람은 자기가 고른 색을 쓰되, 이미 쓰인 색이면 빈 색으로
+// 2대2·3대3은 팀원을 알아봐야 하므로 서버가 선착순으로 정한 값을 그대로 쓴다
+export function viewColors(colors, n, self, teamMode){
+  const base = Array.from({ length: n }, (_, i) =>
+    (colors && Number.isInteger(colors[i])) ? colors[i] : (i % COLOR_COUNT));
+  if (teamMode) return base;
+  const out = new Array(n).fill(-1);
+  const used = new Set();
+  const take = i => { out[i] = base[i]; used.add(base[i]); };
+  if (self >= 0 && self < n) take(self);              // 나부터 자리를 잡는다
+  for (let i = 0; i < n; i++){
+    if (out[i] >= 0) continue;
+    if (!used.has(base[i])){ take(i); continue; }
+    for (let c = 0; c < COLOR_COUNT; c++)
+      if (!used.has(c)){ out[i] = c; used.add(c); break; }
+    if (out[i] < 0) out[i] = base[i];                 // 색이 모자라면 겹쳐도 그대로
+  }
+  return out;
+}
 export const TEAM_OF = [0, 1, 2, 3, 4, 5];     // 플레이어 슬롯 -> 컬러 (1대1 호환)
 // 2대2에서는 슬롯 0·1이 아래 팀, 2·3이 위 팀. 1대1은 0이 아래, 1이 위
 // **개인전(ffa)이면 각자가 자기 팀이다.** 팀 판정이 45곳에 흩어져 있어서
@@ -321,7 +344,7 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 55;
+export const PROTO_VER = 56;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

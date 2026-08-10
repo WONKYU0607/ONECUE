@@ -5,8 +5,8 @@ import {
   ITEM, ITEM_DEF, cellOwner, teamOf, COLOR_COUNT, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
   FIRE_TICKS, FIRE_RADIUS, SHIELD_TICKS, SHIELD_COOL, STUN_TICKS,
   WALL_L, WALL_R, wallIdx, PWf,
-  THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS
-} from './config.js';
+  THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS,
+  viewColors} from './config.js';
 import { RS, computeLayout, stickGeom, shieldBtn } from './layout.js';
 import { resultFor } from './ui-state.js';
 import { getImage, isReady } from './assets.js';
@@ -93,6 +93,14 @@ export function createRenderer(canvas){
       px(x + hx - 1 + dir[k][0] * r, y + hy + dir[k][1] * r, sz, sz, c);
     }
     px(x + hx - 2, y + hy - 1, 4, 4, '#ffffff');
+  }
+  // **화면에 쓸 색을 한 곳에서 정한다.** 네 군데가 각자 계산하면 총알과 캐릭터 색이
+  // 어긋난다. 1대1·개인전은 겹치는 색을 여기서 갈라 준다(판정과 무관)
+  let viewCache = null, viewKey = '';
+  function viewOf(s){
+    const key = (s.color || []).join(',') + '|' + s.n + '|' + SELF.slot + '|' + (s.ffa ? 1 : 0);
+    if (key !== viewKey){ viewKey = key; viewCache = viewColors(s.color, s.n, SELF.slot, s.n > 2 && !s.ffa); }
+    return viewCache;
   }
   function drawPlayer(p, i, xOverride, yOverride, blind = 0, tick = 0, colorOf = null, off = false){
     if (p.hp <= 0) return;                       // 쓰러지면 아레나에서 사라진다
@@ -201,7 +209,7 @@ export function createRenderer(canvas){
     };
     // 내가 항상 맨 위(1대1이면 맨 왼쪽)에 오도록 정렬한다
     mine.sort((a, b) => (a === SELF.slot ? -1 : b === SELF.slot ? 1 : a - b));
-    const colOf = slot => (s.color && s.color[slot] != null) ? s.color[slot] : TEAM_OF[slot];
+    const colOf = slot => viewOf(s)[slot];
     mine.forEach((slot, i) => bar(3, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), false));
     foes.forEach((slot, i) =>
       bar(W - 3 - BW, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), true));
@@ -288,7 +296,7 @@ export function createRenderer(canvas){
       px(bx - 0.35, by - 0.35, BW + 0.7, BH + 0.7, 'rgba(8,10,16,0.78)');   // 테두리
       px(bx, by, BW, BH, 'rgba(255,255,255,0.13)');
       const w = BW * Math.max(0, p.hp) / MAXHP;
-      const col = (s.color && s.color[i] != null) ? s.color[i] : TEAM_OF[i];
+      const col = viewOf(s)[i];
       // 많이 깎이면 색이 죽는다 — 위험한지 한눈에 보이게
       const frac = p.hp / MAXHP;
       px(bx, by, w, BH, frac > 0.3 ? TEAMS[col].m : '#f0645a');
@@ -654,11 +662,11 @@ export function createRenderer(canvas){
     // 총알은 시뮬 시각 그대로. 몸도 전부 '현재'로 그리므로 밀 이유가 없다
     for (const b of s.bullets)
       px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5,
-         TEAMS[(s.color && s.color[b.o] != null) ? s.color[b.o] : TEAM_OF[b.o]].m);
+         TEAMS[viewOf(s)[b.o]].m);
     // 렌더 위치 배열은 첫 예측이 끝나야 생긴다. 없으면 보정 없이 확정 위치로 그린다
     const rx = cl.rx || [], ry = cl.ry || [];
     for (let i = 0; i < s.p.length; i++)
-      drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, s.color, (s.off || [])[i]);
+      drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, viewOf(s), (s.off || [])[i]);
     drawMiniHp(s, rx, ry);
     drawMeMark(s, rx, ry);
     drawOffline(s, rx, ry);

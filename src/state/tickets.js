@@ -90,6 +90,19 @@ export function addTicket(n = 1){                  // 광고 보상용
   return cur.tk;
 }
 export const scoreOf = kind => cur.score[kind] | 0;
+
+// 한 판이 끝나면 점수·연승·전적을 한 번에 갱신한다.
+// **여기 한 곳에서만 쓴다** — 여러 곳에서 고치면 연승이 어긋난다
+export function recordMatch(kind, result, delta){
+  const k = kind === 'melee' ? 'melee' : 'gun';
+  const before = cur.score[k] | 0;
+  cur.score[k] = Math.max(0, before + (delta | 0));       // [stated] 하한 0
+  cur.streak[k] = result === 'win' ? (cur.streak[k] | 0) + 1 : 0;
+  const rec = cur.record[k];
+  if (result === 'win') rec.w++; else if (result === 'lose') rec.l++; else rec.d++;
+  save();
+  return { before, after: cur.score[k], streak: cur.streak[k] };
+}
 export const streakOf = kind => cur.streak[kind] | 0;
 export const recordOf = kind => ({ ...cur.record[kind] });
 export function getPlay(){ regen(); return JSON.parse(JSON.stringify(cur)); }

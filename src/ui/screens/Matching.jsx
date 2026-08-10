@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { connectAndWait, disconnect, serverUrl, pickTeam } from '../../net/connection.js';
 import { TEAMS } from '../../game/config.js';
+import { spendFor } from '../../state/tickets.js';
 
 const LABEL = {
   team:       '팀을 고르세요',
@@ -42,7 +43,12 @@ export default function Matching({ session, onCancel, onMatched }){
         if (i) setTries([i, n]);
       }
     })
-      .then(() => { if (alive.current) setTimeout(onMatched, 400); })
+      .then(() => {
+        if (!alive.current) return;
+        // **상대를 만난 뒤에 티켓을 뺀다.** 매칭에 실패하거나 도중에 나가면 안 빠진다
+        spendFor(!!session?.ffa);
+        setTimeout(onMatched, 400);
+      })
       .catch(e => { if (alive.current){ setErr(e?.message || ''); setStage('error'); } });
 
     // 매칭 도중에 나가면 취소 버튼이 소켓을 끊는다. 매칭이 끝나 게임으로 넘어간 경우엔
