@@ -291,10 +291,11 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* ── 화면 맨 윗줄 (프로필·점수·티켓) ───────────────────
    금속 틀 위쪽 홈(좌우 기둥 사이)에 맞춘다. 두 줄로 나눠 폭을 아낀다.
    수치는 state/homeLayout.js가 CSS 변수로 내보낸다 */
-/* **틀 안쪽 폭을 그대로 쓴다.** 실측 결과 좌우 기둥 사이는 화면의 8%~92%로,
-   금속 틀 두께(--fx) 바로 안쪽이면 기둥에 안 걸린다 */
-.pbar{position:absolute;left:calc(var(--fx) + 4px);right:calc(var(--fx) + 4px);
-  top:calc(var(--fy) + var(--h-barY,-2) * var(--u));
+/* **`position:absolute`는 테두리 안쪽(패딩 박스) 기준이다.**
+   여기에 --fx/--fy(테두리 두께)를 또 더하면 두 번 세어 62px이나 떠 버린다.
+   실제로 그것 때문에 상단바가 화면 가운데로 몰려 보였다 */
+.pbar{position:absolute;left:calc(var(--h-barX,0) * var(--u));right:calc(var(--h-barX,0) * var(--u));
+  top:calc(var(--h-barY,2) * var(--u));
   z-index:25;display:flex;gap:calc(var(--h-boxGap,3) * var(--u));align-items:stretch}
 .pcell{display:flex;align-items:center;gap:calc(var(--h-gapIco,3) * var(--u));
   height:calc(var(--h-rowH,20) * var(--u));padding:0 calc(var(--h-padX,5) * var(--u));
@@ -323,7 +324,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .tk-ico{flex:0 0 calc(var(--h-tkW,13) * var(--u));height:calc(var(--h-tkH,13) * var(--u));
   background:var(--ticket) center/contain no-repeat}
 .pbar-warn{position:absolute;left:0;right:0;
-  top:calc(var(--fy) + (var(--h-barY,-2) + var(--h-rowH,20) + 3) * var(--u));
+  top:calc((var(--h-barY,2) + var(--h-rowH,20) + 3) * var(--u));
   z-index:24;font-family:var(--gf);font-weight:700;font-size:calc(var(--h-warnSz,8) * var(--u));
   color:#f0a86e;text-align:center;margin:0}
 /* 메뉴 버튼 안 티켓 잔량 */

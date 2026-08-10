@@ -39,4 +39,39 @@ console.log('길이로 쓸 때 --u를 곱했는가');
 if (bad.length) console.log('\n' + bad.join('\n') + '\n');
 assert(bad.length === 0, `  --u 없이 쓴 선언 ${bad.length}개`);
 console.log('  ok  단위 없는 값 ' + unitless.length + '개가 전부 --u와 함께 쓰인다');
+
+// **JS가 실제로 넣는 값에 단위가 붙는지 직접 확인한다.**
+// `setProperty('--h-rowH', '19px')` 이면 CSS가 `calc(19px * var(--u))` =
+// 길이 x 길이가 되어 선언을 버린다. PC에서만 줄이기가 발동해 상단바가 무너졌었다.
+// 정규식으로 코드를 훑다가 놓쳐서, **모듈을 실제로 돌려** 들어가는 값을 본다
+console.log('JS가 넣는 값에 단위가 안 붙는가');
+{
+  const put = new Map();
+  globalThis.localStorage = { _s: new Map(),
+    getItem(k){ return this._s.has(k) ? this._s.get(k) : null },
+    setItem(k, v){ this._s.set(k, v) }, removeItem(k){ this._s.delete(k) } };
+  globalThis.window = { addEventListener(){}, removeEventListener(){} };
+  let tight = true;
+  globalThis.document = {
+    documentElement: { style: { setProperty: (k, v) => put.set(k, String(v)) } },
+    // 처음엔 넘치게 해서 줄이기(fitBar)를 반드시 태운다
+    querySelector: () => ({ get clientWidth(){ return 281 },
+                            get scrollWidth(){ return tight ? 400 : 270 } })
+  };
+  const H = await import('../src/state/homeLayout.js');
+  // **한 번 부를 때 나온 값을 전부 모아 본다.** 나중 호출이 앞 호출을 덮어써서
+  // Map만 보면 줄이기 단계에서 붙은 단위를 놓친다 (실제로 놓쳤다)
+  const seen = [];
+  document.documentElement.style.setProperty = (k, v) => { put.set(k, String(v)); seen.push([k, String(v)]); };
+  H.apply();                    // 넘치는 상태 → fitBar가 값을 다시 쓴다
+  assert(seen.length > put.size, '  줄이기가 값을 다시 썼다');
+  tight = false;
+  H.apply();
+  assert(seen.length > 0, '  값을 내보냈다');
+  const withUnit = seen.filter(([, v]) => /[a-z%]/i.test(v));
+  assert(withUnit.length === 0,
+    `  단위가 붙은 값: ${withUnit.map(([k, v]) => k + '=' + v).slice(0, 5).join(', ')}`);
+  console.log('  ok  내보낸 ' + seen.length + '회 전부 단위 없음 (줄이기 포함)');
+}
+
 console.log('cssunit.test.js 통과');
