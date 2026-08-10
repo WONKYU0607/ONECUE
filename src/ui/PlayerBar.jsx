@@ -74,10 +74,10 @@ export default function PlayerBar({ onHelp, onSettings }){
         {/* 톱니도 그림으로. JSX 본문에 \u2699 처럼 쓰면 **글자 그대로** 나오고,
             문자로 넣어도 기기마다 모양이 달라진다 */}
         <button className="pcell pico" onClick={onSettings} aria-label="설정" title="설정">
+          {/* **톱니 8개를 실제로 그린다.** 원 + 방사선으로 그렸더니 해처럼 보였다 */}
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="2" />
-            <path d="M12 2.6v3M12 18.4v3M2.6 12h3M18.4 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"
-                  fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M22.77 9.77 L22.77 14.23 L19.80 14.53 L19.31 15.72 L21.19 18.04 L18.04 21.19 L15.72 19.31 L14.53 19.80 L14.23 22.77 L9.77 22.77 L9.47 19.80 L8.28 19.31 L5.96 21.19 L2.81 18.04 L4.69 15.72 L4.20 14.53 L1.23 14.23 L1.23 9.77 L4.20 9.47 L4.69 8.28 L2.81 5.96 L5.96 2.81 L8.28 4.69 L9.47 4.20 L9.77 1.23 L14.23 1.23 L14.53 4.20 L15.72 4.69 L18.04 2.81 L21.19 5.96 L19.31 8.28 L19.80 9.47 Z" fill="currentColor" fillRule="evenodd" />
+            <circle cx="12" cy="12" r="3.6" fill="none" stroke="currentColor" strokeWidth="2.2" />
           </svg>
         </button>
       </div>

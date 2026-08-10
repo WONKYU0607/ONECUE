@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getNick, setNick, clampNick, NICK_MAX, NICK_MAX_KO } from '../state/profile.js';
-import { scoreOf, ticketsLeft, ffaLeft, TICKET_MAX, FFA_MAX } from '../state/tickets.js';
+import { scoreOf } from '../state/tickets.js';
 import { tierOf } from '../state/rank.js';
 import TierIcon from './TierIcon.jsx';
 
@@ -18,7 +18,8 @@ export default function ProfileTab({ onClose }){
         <button className="icon-btn prof-edit" onClick={() => { setDraft(nick); setEdit(true); }}
                 aria-label="닉네임 수정">✎</button>
 
-        <div className="prof-head">
+        {/* 칸으로 묶어 가운데 정렬. 티켓은 상단바에 이미 있어 여기서는 뺐다 */}
+        <div className="prof-head prof-card">
           <span className="prof-av" />
           {edit ? (
             <div className="prof-edit-row">
@@ -36,21 +37,18 @@ export default function ProfileTab({ onClose }){
 
         <div className="prof-rows">
           {[['gun', '총격전'], ['melee', '칼전']].map(([k, nm]) => (
-            <div key={k} className="prof-row">
+            <div key={k} className="prof-row prof-card">
               <TierIcon score={scoreOf(k)} />
               <span className="nm">{nm}</span>
               <span className="tier">{tierOf(scoreOf(k)).name}</span>
               <span className="val">{scoreOf(k).toLocaleString()}</span>
             </div>
           ))}
-          <div className="prof-row">
-            <span className="tk-ico" />
-            <span className="nm">티켓</span>
-            <span className="val">{ticketsLeft()}/{TICKET_MAX} · 개인전 {ffaLeft()}/{FFA_MAX}</span>
-          </div>
         </div>
 
-        <button className="menu-btn" onClick={onClose}><span className="t">닫기</span></button>
+        <div className="prof-foot">
+          <button className="menu-btn" onClick={onClose}><span className="t">닫기</span></button>
+        </div>
       </div>
     </div>
   );

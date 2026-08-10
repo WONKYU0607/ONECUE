@@ -349,16 +349,21 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* ── 프로필 탭 ─────────────────────────────────────── */
 .prof-tab{position:relative;width:min(320px,88vw)}
 .prof-edit{position:absolute;right:8px;top:8px}
-.prof-head{display:flex;align-items:center;gap:10px;margin:2px 0 12px}
-.prof-head .prof-av{width:48px;height:48px}
+/* 칸으로 묶는다. 상단바와 같은 테두리색으로 맞춘다 */
+.prof-card{background:rgba(8,14,26,.6);border:1px solid #5a96c8;padding:8px 12px}
+.prof-head{display:flex;align-items:center;justify-content:center;gap:12px;margin:2px 0 8px}
+.prof-head .prof-av{width:48px;height:48px;flex:0 0 auto}
 .prof-nick{font:900 20px var(--gf);color:#ffe9a8}
 .prof-edit-row{flex:1 1 0;min-width:0;display:flex;gap:6px}
 .nick-input{flex:1 1 0;min-width:0;letter-spacing:1px;font-size:16px}
-.prof-rows{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
-.prof-row{display:flex;align-items:center;gap:8px;font:700 13px var(--gf);color:#c8d8e6}
-.prof-row .nm{flex:0 0 52px;text-align:left}
-.prof-row .tier{flex:0 0 auto;color:#8fd8ff;font-size:11px}
-.prof-row .val{margin-left:auto;font-weight:900;color:#ffe9a8}
+.prof-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.prof-row{display:flex;align-items:center;gap:10px;font:900 14px var(--gf);color:#c8d8e6}
+.prof-row .nm{flex:0 0 auto}
+.prof-row .tier{flex:0 0 auto;color:#8fd8ff;font-size:12px}
+.prof-row .val{margin-left:auto;font-weight:900;color:#ffe9a8;font-size:16px}
+/* 닫기는 가운데 */
+.prof-foot{display:flex;justify-content:center}
+.prof-foot .menu-btn{width:auto;min-width:120px}
 
 /* 홈 배치 조절 패널 (개발용).
    **화면 위에 겹치지 않고 옆에 붙는다** — 조절한 결과를 바로 봐야 하기 때문 */
