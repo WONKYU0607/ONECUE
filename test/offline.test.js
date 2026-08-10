@@ -93,7 +93,8 @@ console.log('끊긴 사람은 유령이다 — 아무것도 안 맞는다');
   setOff(s, 3, true);
   s.p[1].x = s.p[3].x;                     // 슬롯1을 같은 세로줄에 세운다
   const hp0 = s.p[3].hp;
-  for (let t = 0; t < 600; t++) step(s, IN(4));
+  // 무적을 줄인 뒤로 총알이 다 들어가 600틱이면 승부가 난다. 유령 판정만 보면 되므로 짧게
+  for (let t = 0; t < 240; t++) step(s, IN(4));
   assert(s.p[3].hp === hp0, `총알이 통과한다 (${s.p[3].hp})`);
   assert(s.p[1].hp < hp0, '반대로 살아 있는 사람은 맞는다');
   assert(!s.over, '판은 계속 진행된다');

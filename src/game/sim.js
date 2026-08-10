@@ -145,6 +145,8 @@ export function normalizeState(st){
   if (typeof st.bareBy !== 'number') st.bareBy = 0;
   for (const k of ['fastT', 'bareT']) if (typeof st[k] !== 'number') st[k] = 0;
   if (!Array.isArray(st.negOk)) st.negOk = [];
+  if (!Array.isArray(st.nick) || st.nick.length !== (st.n || 2))
+    st.nick = Array.from({ length: st.n || 2 }, (_, i) => (st.nick && st.nick[i]) || '');
   if (!Array.isArray(st.dealt) || st.dealt.length !== (st.n || 2))
     st.dealt = Array.from({ length: st.n || 2 }, (_, i) => (st.dealt && st.dealt[i]) || 0);
   if (typeof st.lag !== 'number') st.lag = 0;
@@ -240,6 +242,8 @@ export function newState(n = 2, melee = false, ffa = false){
     // 슬롯별 **가한 피해 합계.** 점수 계산(기여도 배분)과 결과 창에 쓴다.
     // 자해·아군 오사는 애초에 안 되므로 여기 안 들어온다
     dealt: Array.from({ length: n }, () => 0),
+    // 슬롯별 닉네임. 서버가 채워 모두에게 전달한다 (그리기·결과 표시 전용)
+    nick: Array.from({ length: n }, () => ''),
 
     phase: PH_READY, timer: 0, clock: 0,
     maxStep: stepCap(),

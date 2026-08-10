@@ -1,5 +1,6 @@
 import { WsTransport } from '../game/net.js';
 import { SELF, PROTO_VER } from '../game/config.js';
+import { getNick } from '../state/profile.js';
 
 // 서버 연결은 화면 전환보다 오래 살아야 한다 (매칭 화면 -> 게임 화면).
 // 그래서 React 밖 모듈에 두고, 게임을 나갈 때만 끊는다.
@@ -39,12 +40,16 @@ export function getSid(){
   }
 }
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// **닉네임도 같이 보낸다.** 게임 중 상대 이름은 서버가 뿌려야 한다 —
+// 저장소(Firebase)를 조회해서는 상대가 누군지 알 수도, 실시간으로 받을 수도 없다
 const wsUrl = (mode = 'queue', code = '', resume = false, n = 2, melee = false, ffa = false, color = -1) =>
   BASE + '?sid=' + encodeURIComponent(getSid()) +
+  '&nick=' + encodeURIComponent(getNick()) +
   '&mode=' + mode + (code ? '&code=' + encodeURIComponent(code) : '') +
-  (n !== 2 ? '&n=' + n : '') + (melee ? '&melee=1' : '') + (ffa ? '&ffa=1' : '') + (color >= 0 ? '&color=' + color : '') + (resume ? '&resume=1' : '');
+  (n !== 2 ? '&n=' + n : '') + (melee ? '&melee=1' : '') + (ffa ? '&ffa=1' : '') +
+  (color >= 0 ? '&color=' + color : '') + (resume ? '&resume=1' : '');
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 잠든 서버는 HTTP 요청으로도 깨어난다. 소켓보다 먼저 두드려 둔다.
 // 시간 제한이 없으면 잠든 서버가 요청을 붙잡고 있는 동안 화면이 멈춘 것처럼 보인다.
 export async function wakeServer(timeoutMs = 9000){

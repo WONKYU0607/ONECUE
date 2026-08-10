@@ -22,6 +22,7 @@ export function matchSummary(st, slot){
     mine: teamOf(i, n) === me,
     self: i === slot,
     color: (st.color && st.color[i] != null) ? st.color[i] : i,
+    nick: ((st.nick || [])[i] || '').trim(),
     hp: Math.max(0, p.hp | 0),
     dealt: Math.round((st.dealt || [])[i] || 0),
     off: !!(st.off || [])[i]

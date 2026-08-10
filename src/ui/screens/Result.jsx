@@ -5,8 +5,10 @@ import { TEAMS } from '../../game/config.js';
 // 점수제가 붙으면 여기에 증감·연승·광고 방어가 들어가므로 자리를 미리 잡아둔다.
 const LABEL = { win: '승리', lose: '패배', draw: '무승부' };
 
-// 3대3이면 `팀원`이 둘, `상대`가 셋이라 이름만으로는 못 가린다. 번호를 붙인다
+// **닉네임이 있으면 그걸 쓴다.** 서버가 슬롯별로 실어 보낸다.
+// 없으면(AI·연습·옛 서버) 예전처럼 나/팀원1/상대2 식으로 부른다
 function name(r, sum){
+  if (r.nick) return r.nick;
   if (r.self) return '나';
   if (sum.ffa) return `${r.slot + 1}번`;
   const same = sum.rows.filter(x => x.mine === r.mine && !x.self);

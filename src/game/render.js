@@ -660,9 +660,13 @@ export function createRenderer(canvas){
       px(c.x/FP, cy2, c.w/FP, 2, '#7676a0');
     }
     // 총알은 시뮬 시각 그대로. 몸도 전부 '현재'로 그리므로 밀 이유가 없다
-    for (const b of s.bullets)
-      px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5,
-         TEAMS[viewOf(s)[b.o]].m);
+    for (const b of s.bullets){
+      const t = TEAMS[viewOf(s)[b.o]];
+      const bx = b.x/FP, by = fy((b.y + b.vy * a)/FP, 5);
+      // **어두운 색은 밝은 테두리를 두른다.** 검정 총알이 바닥에 묻혀 안 보였다
+      if (t.o) px(bx - 0.5, by - 0.5, 3, 6, t.o);
+      px(bx, by, 2, 5, t.m);
+    }
     // 렌더 위치 배열은 첫 예측이 끝나야 생긴다. 없으면 보정 없이 확정 위치로 그린다
     const rx = cl.rx || [], ry = cl.ry || [];
     for (let i = 0; i < s.p.length; i++)

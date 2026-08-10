@@ -56,7 +56,11 @@ export const coolTicks = () => Math.max(2, Math.round(TUNE.rate.v * 60));
 export const BASE_MAX_STEP = Math.round(10 * FP);    // 틱당 이동 상한 = 600px/s (배속 1.0)
 export const stepCap = () => Math.round(BASE_MAX_STEP * spdMult());
 export const RENDER_MAXJUMP = 30 * FP; // 이보다 크게 튀면 보간 생략 (라운드 리셋 등)
-export const INVUL_T = 54, FLASH_T = 15;
+// **무적은 발사 간격보다 짧아야 한다.** 54틱(0.9초)이면 발사 간격 27틱(0.45초)의 두 배라
+// 총알의 정확히 절반이 무적 중에 들어와 사라졌다 — 20발 쏘면 10발만 박혔다.
+// 12틱(0.2초)이면 총알·불(12틱)·칼(30틱)이 전부 들어가면서
+// 한 번의 폭발이 여러 번 세지는 것만 막는다
+export const INVUL_T = 12, FLASH_T = 15;
 export const PH_READY = 0, PH_COUNT = 1, PH_PLAY = 2, PH_OVER = 3;
 export const CD_STEP = 60, CD_GO = 45;                  // 3/2/1 각 1초 + GAME START 0.75초
 export const CD_TICKS = CD_STEP * 3 + CD_GO;
@@ -165,7 +169,9 @@ export const TEAMS = [
   { m:'#4ad14a', d:'#248f24' },   // 2 초록
   { m:'#f0a81e', d:'#a86e10' },   // 3 노랑
   { m:'#9a5cf0', d:'#5f2fa8' },   // 4 보라
-  { m:'#4a4a56', d:'#232329' }    // 5 검정
+  // 검정은 바닥(#3a3f57)과 밝기가 거의 같아 총알이 안 보였다.
+  // 더 어둡게 하고, 총알엔 밝은 테두리(o)를 둘러 구분한다
+  { m:'#16161c', d:'#0a0a0e', o:'#c8ccdd' }    // 5 검정
 ];
 export const COLOR_COUNT = TEAMS.length;
 
@@ -344,7 +350,7 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 56;
+export const PROTO_VER = 58;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;
