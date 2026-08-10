@@ -313,6 +313,17 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .prof-name{font-family:var(--gf);font-weight:900;font-size:calc(var(--h-nickSz,10) * var(--u));
   color:#d6eeff;white-space:nowrap}
 .pscore{flex:0 1 auto}
+/* 남는 폭을 밀어내 아이콘 세 개를 오른쪽 끝에 붙인다 */
+.pgap{flex:1 1 auto;min-width:0}
+.pico{flex:0 0 auto;justify-content:center;cursor:pointer;
+  width:calc(var(--h-rowH,20) * var(--u));padding:0;color:#8fd8ff;
+  font-family:var(--gf);font-weight:900;font-size:calc(var(--h-valSz,10) * var(--u));line-height:1}
+.pico:active{background:#2a4a68}
+/* 아이콘 버튼 안의 그림. 글자 대신 그려서 뜻이 분명하다 */
+.pico svg{width:calc(var(--h-rowH,20) * var(--u) * 0.62);
+  height:calc(var(--h-rowH,20) * var(--u) * 0.62);display:block}
+/* 꺼진 상태는 사선에 더해 **색까지 죽인다**. 그림만으로는 헷갈린다는 게 조사 결론 */
+.pico.off{color:#6b7d90;border-color:#3a5876}
 .ptime{font-family:var(--gf);font-weight:700;font-size:calc(var(--h-warnSz,8) * var(--u));color:#8b9db0}
 .pcell .sep{flex:0 0 1px;height:58%;background:#5a96c8;margin:0 3px}
 .tier-ico{display:block;flex:0 0 auto;

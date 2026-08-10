@@ -7,10 +7,8 @@ export default function Home({ onPvp, onAi, onPractice, onSettings, onHelp }){
   const [tune, setTune] = useState(false);
   return (
     <div className="screen home">
-      <button className="icon-btn top-right" onClick={onSettings} aria-label="설정">⚙</button>
-      <button className="icon-btn top-right2" onClick={onHelp} aria-label="조작 방법">?</button>
 
-      <PlayerBar />
+      <PlayerBar onHelp={onHelp} onSettings={onSettings} />
       {/* 배치를 화면에서 바로 맞춰보기 위한 개발용 버튼. 값이 정해지면 지운다 */}
       <button className="icon-btn htune-btn" onClick={() => setTune(true)} aria-label="배치 조절">▦</button>
       {tune && <HomeTune onClose={() => setTune(false)} />}
