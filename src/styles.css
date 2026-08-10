@@ -91,15 +91,18 @@ border-image:var(--frame) 86 fill stretch}
 .menu-btn.ghost{color:#7e9eb6}
 .menu-btn:active{filter:brightness(1.35)}
 
-.icon-btn{width:19px;height:19px;background:rgba(10,16,26,.72);border:1px solid #2f4a63;
-color:#8fd8ff;font:900 11px/1 var(--gf);cursor:pointer;padding:0}
+.icon-btn{width:calc(19 * var(--u));height:calc(19 * var(--u));background:rgba(10,16,26,.72);
+border:1px solid #2f4a63;color:#8fd8ff;font-family:var(--gf);font-weight:900;
+font-size:calc(11 * var(--u));line-height:1;cursor:pointer;padding:0}
 .icon-btn:active{background:#4ec9f0;color:#12121c}
 /* 금속 틀 테두리(가로 44 / 세로 46) 안쪽으로. 밖에 두면 테두리에 걸린다 */
 /* 틀 안쪽(테두리 다음) 기준. 오른쪽 위 모서리 바로 밑에 붙인다 */
 /* 맨 윗줄은 점수·티켓이 쓴다. 물음표·설정은 그 아래 오른쪽 */
-.top-right{position:absolute;right:6px;top:var(--h-icoTop,42px);z-index:30}
-.top-right2{position:absolute;right:29px;top:var(--h-icoTop,42px);z-index:30}
-.top-left{position:absolute;left:6px;top:var(--h-icoTop,42px);z-index:30}
+/* **조절값은 단위 없는 수다.** 그냥 쓰면 `top:42`가 되어 CSS가 통째로 무시하고,
+   버튼이 흐름으로 떨어져 화면 한가운데로 간다. 반드시 --u를 곱할 것 */
+.top-right{position:absolute;right:calc(6 * var(--u));top:calc(var(--h-icoTop,42) * var(--u));z-index:30}
+.top-right2{position:absolute;right:calc(29 * var(--u));top:calc(var(--h-icoTop,42) * var(--u));z-index:30}
+.top-left{position:absolute;left:calc(6 * var(--u));top:calc(var(--h-icoTop,42) * var(--u));z-index:30}
 
 /* ---------- 진입창 ---------- */
 .bar{width:min(260px,70vw);height:4px;background:#1b1b2a;overflow:hidden}
@@ -297,7 +300,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   height:calc(var(--h-rowH,20) * var(--u));padding:0 calc(var(--h-padX,5) * var(--u));
   background:rgba(8,14,26,.86);border:1px solid #5a96c8}
 /* **숫자는 절대 줄이지 않는다.** 칸이 줄면 "1,240"이 "1,0"으로 잘린다 */
-.pcell b{font-family:var(--gf);font-weight:900;font-size:var(--h-valSz,9px);
+.pcell b{font-family:var(--gf);font-weight:900;font-size:calc(var(--h-valSz,10) * var(--u));
   color:#ffe9a8;margin-left:auto;flex:0 0 auto;white-space:nowrap;padding-right:1px}
 .pcell.ptk b{color:#8fd8ff}
 /* 프로필은 두 줄 높이. 캐릭터 시트 0번(파랑 앞모습) */
@@ -306,7 +309,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   width:calc((var(--h-rowH,20) - 4) * var(--u));height:calc((var(--h-rowH,20) - 4) * var(--u));
   /* 캐릭터 시트는 24칸(6색 x 앞뒤 + 피격). 0번 = 파랑 앞모습 */
   background:var(--chars) 0 0/2400% 100% no-repeat;image-rendering:pixelated}
-.prof-name{font-family:var(--gf);font-weight:900;font-size:var(--h-nickSz,10px);
+.prof-name{font-family:var(--gf);font-weight:900;font-size:calc(var(--h-nickSz,10) * var(--u));
   color:#d6eeff;white-space:nowrap}
 .pscore{flex:0 1 auto}
 .ptime{font-family:var(--gf);font-weight:700;font-size:calc(var(--h-warnSz,8) * var(--u));color:#8b9db0}
