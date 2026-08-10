@@ -15,7 +15,7 @@ import './styles.css';
   img.src = url;
 }
 // 트로피 시트도 같은 방식으로 (CSS 변수 안의 url()은 기준이 애매하다)
-for (const [name, file] of [['--tiers', 'tiers.webp'], ['--ticket', 'ticket.webp'], ['--panel', 'panel.webp']]){
+for (const [name, file] of [['--tiers', 'tiers.webp'], ['--ticket', 'ticket.webp'], ['--panel', 'panel.webp'], ['--chars', 'characters.png']]){
   const u = new URL('assets/' + file, document.baseURI).href;
   document.documentElement.style.setProperty(name, `url("${u}")`);
 }
