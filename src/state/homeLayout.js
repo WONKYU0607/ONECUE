@@ -5,26 +5,27 @@ const KEY = 'duel.homeui.v1';
 
 export const HOME_DEF = [
   // [열쇠, 이름, 기본값, 최소, 최대, 증감, 단위]
-  ['padX',    '틀 좌우 안여백', 12, 0, 40, 1, 'px'],
+  ['padX',    '틀 좌우 안여백', 4, 0, 40, 1, 'px'],
   ['padY',    '틀 상하 안여백',  9, 0, 40, 1, 'px'],
   ['bordX',   '틀 좌우 두께',   15, 4, 40, 1, 'px'],
   ['bordY',   '틀 상하 두께',   13, 4, 40, 1, 'px'],
   ['slice',   '틀 모서리 잘라내기', 58, 20, 120, 2, ''],
-  ['rowH',    '한 줄 높이',     26, 14, 60, 1, 'px'],
-  ['rowGap',  '줄 사이 간격',    6, 0, 24, 1, 'px'],
-  ['boxGap',  '틀 사이 간격',    6, 0, 30, 1, 'px'],
+  ['rowH',    '한 줄 높이',     15, 14, 60, 1, 'px'],
+  ['rowGap',  '줄 사이 간격',    2, 0, 24, 1, 'px'],
+  ['boxGap',  '틀 사이 간격',    2, 0, 30, 1, 'px'],
   ['barBot',  '아래 여백',       8, 0, 40, 1, 'px'],
-  ['tierSz',  '트로피 크기',    26, 12, 60, 1, 'px'],
-  ['tkW',     '티켓 가로',      30, 12, 70, 1, 'px'],
-  ['tkH',     '티켓 세로',      20, 8, 50, 1, 'px'],
-  ['gapIco',  '아이콘~글자 간격', 7, 0, 24, 1, 'px'],
-  ['lblSz',   '이름 글씨',      14, 8, 28, 1, 'px'],
-  ['valSz',   '숫자 글씨',      20, 8, 40, 1, 'px'],
-  ['warnSz',  '안내 글씨',      10, 6, 20, 1, 'px'],
-  ['barX',    '맨윗줄 좌우 여백',  4, 0, 40, 1, 'px'],
-  ['barY',    '맨윗줄 위 여백',    2, 0, 40, 1, 'px'],
+  ['tierSz',  '트로피 크기',    11, 12, 60, 1, 'px'],
+  ['tkW',     '티켓 가로',      11, 12, 70, 1, 'px'],
+  ['tkH',     '티켓 세로',      11, 8, 50, 1, 'px'],
+  ['gapIco',  '아이콘~글자 간격', 3, 0, 24, 1, 'px'],
+  ['lblSz',   '이름 글씨',      10, 8, 28, 1, 'px'],
+  ['valSz',   '숫자 글씨',      9, 8, 40, 1, 'px'],
+  ['warnSz',  '안내 글씨',      7, 6, 20, 1, 'px'],
+  ['barX',    '맨윗줄 좌우 여백',  0, 0, 40, 1, 'px'],
+  ['barY',    '맨윗줄 위 여백',    -5, 0, 40, 1, 'px'],
   ['icoTop',  '물음표·설정 높이', 42, 10, 120, 2, 'px'],
-  ['profW',   '프로필 칸 폭',     64, 0, 160, 2, 'px']
+  ['profW',   '프로필 칸 폭',     64, 0, 160, 2, 'px'],
+  ['nickSz',  '이름 글씨',      10, 6, 24, 1, 'px']
 ];
 
 const defaults = () => Object.fromEntries(HOME_DEF.map(d => [d[0], d[2]]));
@@ -54,6 +55,26 @@ function save(){ try { localStorage.setItem(KEY, JSON.stringify(cur)); } catch {
 export function apply(){
   const el = document.documentElement;
   for (const [k, , , , , , unit] of HOME_DEF) el.style.setProperty('--h-' + k, cur[k] + (unit || ''));
+  fitBar();
+}
+
+// **좁은 화면에서는 값을 자동으로 줄인다.**
+// 상단바가 넘치면 글자·아이콘이 잘려서 "1,240"이 "1,0"으로 보인다.
+// 칸을 줄이는 대신 **글씨와 아이콘을 줄여** 넘치지 않게 맞춘다
+export function fitBar(){
+  const el = document.documentElement;
+  const bar = document.querySelector('.pbar');
+  if (!bar) return;
+  const avail = bar.clientWidth;
+  if (!avail) return;
+  let k = 1;
+  for (let i = 0; i < 8; i++){
+    const need = bar.scrollWidth;
+    if (need <= avail || k <= 0.62) break;
+    k = Math.max(0.62, k * Math.min(0.97, avail / need));
+    for (const key of ['rowH', 'tierSz', 'tkW', 'tkH', 'valSz', 'padX', 'gapIco', 'boxGap'])
+      el.style.setProperty('--h-' + key, Math.round(cur[key] * k) + 'px');
+  }
 }
 
 // 확정한 값을 코드에 옮겨 적기 좋게

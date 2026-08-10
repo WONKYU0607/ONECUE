@@ -14,7 +14,8 @@ const blocks = [...css.matchAll(/([.#][\w.\-> ]+)\s*\{([^}]*)\}/g)]
   .map(m => ({ sel: m[1].trim(), body: m[2] }));
 
 console.log('늘어나는 flex 항목에 min-width:0 이 있는가');
-const grow = blocks.filter(b => /flex:\s*1/.test(b.body));
+// flex:0 1 / flex:0 0 은 늘어나지 않으니 검사 대상이 아니다
+const grow = blocks.filter(b => /flex:\s*1\s/.test(b.body) || /flex:\s*1;/.test(b.body) || /flex:\s*1\s+1/.test(b.body));
 assert(grow.length > 0, '  검사 대상이 있다');
 for (const b of grow)
   assert(/min-width:\s*0/.test(b.body), `  ${b.sel} 에 min-width:0 이 있다`);

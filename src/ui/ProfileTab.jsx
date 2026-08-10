@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getNick, setNick, NICK_MAX } from '../state/profile.js';
+import { getNick, setNick, clampNick, NICK_MAX, NICK_MAX_KO } from '../state/profile.js';
 import { scoreOf, ticketsLeft, ffaLeft, TICKET_MAX, FFA_MAX } from '../state/tickets.js';
 import { tierOf } from '../state/rank.js';
 import TierIcon from './TierIcon.jsx';
@@ -22,8 +22,8 @@ export default function ProfileTab({ onClose }){
           <span className="prof-av" />
           {edit ? (
             <div className="prof-edit-row">
-              <input className="code-input nick-input" value={draft} maxLength={NICK_MAX}
-                     autoFocus onChange={e => setDraft(e.target.value.slice(0, NICK_MAX))}
+              <input className="code-input nick-input" value={draft}
+                     autoFocus onChange={e => setDraft(clampNick(e.target.value))}
                      onKeyDown={e => e.key === 'Enter' && save()} />
               <button className="menu-btn primary" onClick={save}><span className="t">확인</span></button>
             </div>
@@ -31,6 +31,8 @@ export default function ProfileTab({ onClose }){
             <span className="prof-nick">{nick}</span>
           )}
         </div>
+
+        {edit && <p className="hint nick-hint">영문 {NICK_MAX}자 · 한글 {NICK_MAX_KO}자까지</p>}
 
         <div className="prof-rows">
           {[['gun', '총격전'], ['melee', '칼전']].map(([k, nm]) => (

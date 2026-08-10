@@ -282,40 +282,52 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   image-rendering:pixelated;vertical-align:middle}
 
 /* ── 화면 맨 윗줄 (프로필·점수·티켓) ───────────────────
-   칸을 전부 같은 높이로 세운다. 수치는 state/homeLayout.js가 CSS 변수로 내보낸다 */
-.pbar{position:absolute;left:var(--h-barX,4px);right:var(--h-barX,4px);top:var(--h-barY,2px);
-  z-index:25;display:flex;gap:var(--h-boxGap,5px);align-items:stretch}
+   금속 틀 위쪽 홈(좌우 기둥 사이)에 맞춘다. 두 줄로 나눠 폭을 아낀다.
+   수치는 state/homeLayout.js가 CSS 변수로 내보낸다 */
+/* 좌우 기둥 안쪽(화면 폭의 21.3%~78.2%)에 맞춘다. 틀 두께가 아니라 기둥 위치 기준 */
+.pbar{position:absolute;left:21.3%;width:56.9%;
+  top:calc(var(--fy) + var(--h-barY, -5px));
+  z-index:25;display:flex;gap:var(--h-boxGap,2px);align-items:stretch}
+.pcol{display:flex;flex-direction:column;gap:var(--h-rowGap,2px);min-width:0}
+.pcol.scores{flex:1 1 0;min-width:0}
+.pcol.tkcol{flex:0 0 auto}
 .pcell{display:flex;align-items:center;gap:var(--h-gapIco,3px);
-  height:var(--h-rowH,34px);min-width:0;padding:0 var(--h-padX,6px);
-  background:rgba(10,16,28,.88);border:1px solid #3a5876}
-.pcell b{font-family:var(--gf);font-weight:900;font-size:var(--h-valSz,14px);
-  color:#ffe9a8;margin-left:auto}
-.pcell.ptk b{color:#8fd8ff;margin-left:0}
-/* 프로필은 정사각. 캐릭터 시트 0번(파랑 앞모습)을 그대로 쓴다 */
-.prof-btn{flex:0 0 var(--h-rowH,34px);justify-content:center;padding:0;cursor:pointer;
-  border-color:#5a96c8}
-.pscore{flex:1 1 0;min-width:0}
-.ptk{flex:0 0 auto}
-.prof-av{display:block;width:calc(var(--h-rowH,34px) - 6px);height:calc(var(--h-rowH,34px) - 6px);
+  height:var(--h-rowH,15px);padding:0 var(--h-padX,4px);
+  background:rgba(8,14,26,.86);border:1px solid #5a96c8}
+/* **숫자는 절대 줄이지 않는다.** 칸이 줄면 "1,240"이 "1,0"으로 잘린다 */
+.pcell b{font-family:var(--gf);font-weight:900;font-size:var(--h-valSz,9px);
+  color:#ffe9a8;margin-left:auto;flex:0 0 auto;white-space:nowrap;padding-right:1px}
+.pcell.ptk b{color:#8fd8ff}
+/* 프로필은 두 줄 높이. 캐릭터 시트 0번(파랑 앞모습) */
+.prof-btn{flex:0 0 auto;height:auto;cursor:pointer;gap:var(--h-padX,4px);
+  padding-right:var(--h-padX,4px);background:rgba(16,24,40,.9)}
+.prof-av{display:block;flex:0 0 auto;
+  width:calc(var(--h-rowH,15px) * 2 + var(--h-rowGap,2px) - 6px);
+  height:calc(var(--h-rowH,15px) * 2 + var(--h-rowGap,2px) - 6px);
   /* 캐릭터 시트는 24칸(6색 x 앞뒤 + 피격). 0번 = 파랑 앞모습 */
   background:var(--chars) 0 0/2400% 100% no-repeat;image-rendering:pixelated}
+.prof-name{font-family:var(--gf);font-weight:900;font-size:var(--h-nickSz,10px);
+  color:#d6eeff;white-space:nowrap}
+.pscore{flex:0 1 auto}
+.ptime{justify-content:center;font-family:var(--gf);font-weight:700;
+  font-size:var(--h-warnSz,7px);color:#8b9db0}
 .tier-ico{display:block;flex:0 0 auto;
-  width:var(--h-tierSz,22px);height:var(--h-tierSz,22px);
+  width:var(--h-tierSz,11px);height:var(--h-tierSz,11px);
   background-image:var(--tiers);background-repeat:no-repeat;
-  background-size:calc(var(--h-tierSz,22px) * 5) var(--h-tierSz,22px);
-  background-position:calc(var(--tier-i,0) * var(--h-tierSz,22px) * -1) 0;
+  background-size:calc(var(--h-tierSz,11px) * 5) var(--h-tierSz,11px);
+  background-position:calc(var(--tier-i,0) * var(--h-tierSz,11px) * -1) 0;
   image-rendering:pixelated}
-.tk-ico{flex:0 0 var(--h-tkW,22px);height:var(--h-tkH,22px);
+.tk-ico{flex:0 0 var(--h-tkW,11px);height:var(--h-tkH,11px);
   background:var(--ticket) center/contain no-repeat}
-.pcell .sep{flex:0 0 1px;height:60%;background:#3a5876;margin:0 4px}
-.tk-timer{font-family:var(--gf);font-weight:700;font-size:var(--h-warnSz,10px);color:#8b9db0}
-.pbar-warn{position:absolute;left:0;right:0;top:calc(var(--h-barY,2px) + var(--h-rowH,34px) + 2px);
-  z-index:24;font-family:var(--gf);font-weight:700;font-size:var(--h-warnSz,10px);
+.pbar-warn{position:absolute;left:0;right:0;
+  top:calc(var(--fy) + var(--h-barY,-5px) + var(--h-rowH,15px) * 2 + 6px);
+  z-index:24;font-family:var(--gf);font-weight:700;font-size:var(--h-warnSz,7px);
   color:#f0a86e;text-align:center;margin:0}
 /* 메뉴 버튼 안 티켓 잔량 */
 .menu-btn .tkn{display:flex;align-items:center;justify-content:center;gap:4px;
   font:900 12px var(--gf);color:#8fd8ff;letter-spacing:0;margin-top:2px}
 .menu-btn .tkn .tk-ico{flex:0 0 20px;height:13px}
+
 /* ── 프로필 탭 ─────────────────────────────────────── */
 .prof-tab{position:relative;width:min(320px,88vw)}
 .prof-edit{position:absolute;right:8px;top:8px}
