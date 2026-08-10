@@ -1,18 +1,11 @@
-import { tierOf, TIER_PX } from '../state/rank.js';
+import { tierOf } from '../state/rank.js';
 
-// 점수 앞에 붙는 트로피. 한 장짜리 시트를 배경 위치로 잘라 쓴다
-export default function TierIcon({ score = 0, size = 20 }){
+// 점수 앞에 붙는 트로피. 한 장짜리 시트(5칸)를 배경 위치로 잘라 쓴다.
+// **크기는 CSS 변수(--h-tierSz)가 정한다** — 인라인으로 박으면 조절 패널이 안 먹는다
+export default function TierIcon({ score = 0 }){
   const t = tierOf(score);
   return (
-    <span
-      className="tier-ico"
-      title={t.name}
-      style={{
-        width: size, height: size,
-        backgroundImage: 'var(--tiers)',
-        backgroundSize: `${TIER_PX * 5 / TIER_PX * size}px ${size}px`,
-        backgroundPosition: `${-t.index * size}px 0`
-      }}
-    />
+    <span className="tier-ico" title={t.name}
+      style={{ '--tier-i': t.index }} />
   );
 }

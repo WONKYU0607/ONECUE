@@ -280,32 +280,42 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .tier-ico{display:inline-block;flex:0 0 auto;background-repeat:no-repeat;
   image-rendering:pixelated;vertical-align:middle}
 
-/* ── 홈 위쪽: 점수·티켓 ───────────────────────────────── */
-/* 수치는 전부 `state/homeLayout.js`가 CSS 변수로 내보낸다. 화면에서 바로 조절 가능 */
-.pbar{width:100%;display:flex;flex-direction:column;gap:var(--h-boxGap,6px);
-  margin-bottom:var(--h-barBot,8px)}
-.panel-box{width:100%;display:flex;flex-direction:column;gap:var(--h-rowGap,6px);
+/* ── 화면 맨 위 가로 바 (점수·티켓) ──────────────────────
+   수치는 전부 `state/homeLayout.js`가 CSS 변수로 내보낸다 */
+.pbar{width:100%;margin-bottom:var(--h-barBot,8px)}
+.pbar-row{display:flex;gap:var(--h-boxGap,6px);align-items:stretch}
+.panel-box.scores{flex:1 1 0;min-width:0;justify-content:space-around}
+/* 티켓 틀은 내용만큼만 */
+.panel-box.tkbox{flex:0 0 auto;width:auto;justify-content:center;gap:var(--h-gapIco,7px)}
+.tk-timer{font-family:var(--gf);font-weight:700;font-size:var(--h-warnSz,10px);color:#8b9db0;
+  line-height:1;margin-left:2px}
+/* 개인전 티켓은 색으로 구분한다 */
+.pitem.tk.ffa b{color:#c9a6ff}
+.ffa-ico{filter:hue-rotate(255deg) saturate(1.15)}
+.panel-box{width:100%;display:flex;align-items:center;justify-content:space-between;
+  gap:var(--h-rowGap,6px);min-height:var(--h-rowH,26px);
   padding:var(--h-padY,9px) var(--h-padX,12px);
   border-style:solid;border-width:var(--h-bordY,13px) var(--h-bordX,15px);border-color:#0a0c12;
   border-image:var(--panel) var(--h-slice,58) fill stretch}
-/* **한 줄로 붙인다.** 세로로 쪼개지면 못 읽는다 */
-.pscore,.ptk{display:flex;align-items:center;gap:var(--h-gapIco,7px);
-  white-space:nowrap;min-height:var(--h-rowH,26px)}
-.pscore .lbl,.ptk .lbl{font-family:var(--gf);font-weight:900;
-  font-size:var(--h-lblSz,14px);color:#c8d8e6;white-space:nowrap}
-.pscore .val,.ptk .val{margin-left:auto;font-family:var(--gf);font-weight:900;
-  font-size:var(--h-valSz,20px);color:#ffe9a8}
-.ptk .val{color:#8fd8ff}
-.ptk.out{opacity:.42}
-.ptk.out .val{color:#8b9db0}
+.pitem{display:flex;align-items:center;gap:var(--h-gapIco,7px);white-space:nowrap}
+.pitem b{font-family:var(--gf);font-weight:900;font-size:var(--h-valSz,20px);color:#ffe9a8}
+.pitem.tk b{color:#8fd8ff}
+/* 트로피 — 시트 5칸 중 --tier-i번째 */
+.tier-ico{display:block;flex:0 0 auto;
+  width:var(--h-tierSz,26px);height:var(--h-tierSz,26px);
+  background-image:var(--tiers);background-repeat:no-repeat;
+  background-size:calc(var(--h-tierSz,26px) * 5) var(--h-tierSz,26px);
+  background-position:calc(var(--tier-i,0) * var(--h-tierSz,26px) * -1) 0;
+  image-rendering:pixelated}
 .tk-ico{flex:0 0 var(--h-tkW,30px);height:var(--h-tkH,20px);
   background:var(--ticket) center/contain no-repeat}
 .pbar-warn{font-family:var(--gf);font-weight:700;font-size:var(--h-warnSz,10px);
-  color:#f0a86e;text-align:center;margin:0}
+  color:#f0a86e;text-align:center;margin:2px 0 0}
 /* 메뉴 버튼 안 티켓 잔량 (아이콘 + 남은/최대) */
 .menu-btn .tkn{display:flex;align-items:center;justify-content:center;gap:4px;
   font:900 12px var(--gf);color:#8fd8ff;letter-spacing:0;margin-top:2px}
 .menu-btn .tkn .tk-ico{flex:0 0 20px;height:13px}
+
 /* 홈 배치 조절 패널 (개발용).
    **화면 위에 겹치지 않고 옆에 붙는다** — 조절한 결과를 바로 봐야 하기 때문 */
 .htune{position:fixed;z-index:60;width:148px;max-height:96vh;
