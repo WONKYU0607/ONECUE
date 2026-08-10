@@ -9,8 +9,8 @@
      UI 수치를 절대 px로 두면 PC에서 작아 보인다. 폰 360px을 1로 잡고 비례시킨다.
      [stated] PC도 폰과 완전히 같은 화면으로 간다 */
   --u:calc(min(100vw, 45.5vh) / 360);
-  --fx:44px;   /* 틀 좌우 두께 */
-  --fy:46px;   /* 틀 위아래 두께 */
+  --fx:36px;   /* 틀 좌우 두께 */
+  --fy:38px;   /* 틀 위아래 두께 */
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:#07070d;overflow:hidden;touch-action:none;
@@ -51,7 +51,9 @@ justify-content:center;gap:18px;color:#e8e8f0;font-family:var(--gf);font-weight:
 }
 .screen.center{justify-content:center}
 /* 좁은 폰에서 두꺼운 틀은 내용을 너무 먹는다 */
-@media (max-width: 400px){ :root{ --fx:30px; --fy:32px; } }
+/* 폰은 틀을 얇게. **440px까지 폰으로 본다** — 412px(갤럭시 등)이 PC용 두꺼운 틀을
+   쓰면 안쪽 폭이 352 → 324로 줄어 상단바가 축소되기 시작한다 */
+@media (max-width: 440px){ :root{ --fx:30px; --fy:32px; } }
 @media (min-aspect-ratio: 3/5){
   .screen{
     left:50%; right:auto; transform:translateX(-50%);
@@ -316,12 +318,13 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* 남는 폭을 밀어내 아이콘 세 개를 오른쪽 끝에 붙인다 */
 .pgap{flex:1 1 auto;min-width:0}
 .pico{flex:0 0 auto;justify-content:center;cursor:pointer;
-  width:calc(var(--h-rowH,20) * var(--u));padding:0;color:#8fd8ff;
+  width:calc((var(--h-rowH,22) + 2) * var(--u));padding:0;color:#8fd8ff;
   font-family:var(--gf);font-weight:900;font-size:calc(var(--h-valSz,10) * var(--u));line-height:1}
 .pico:active{background:#2a4a68}
+.pico.help{font-size:calc(var(--h-rowH,22) * var(--u) * 0.60)}
 /* 아이콘 버튼 안의 그림. 글자 대신 그려서 뜻이 분명하다 */
-.pico svg{width:calc(var(--h-rowH,20) * var(--u) * 0.62);
-  height:calc(var(--h-rowH,20) * var(--u) * 0.62);display:block}
+.pico svg{width:calc(var(--h-rowH,22) * var(--u) * 0.62);
+  height:calc(var(--h-rowH,22) * var(--u) * 0.62);display:block}
 /* 꺼진 상태는 사선에 더해 **색까지 죽인다**. 그림만으로는 헷갈린다는 게 조사 결론 */
 .pico.off{color:#6b7d90;border-color:#3a5876}
 .ptime{font-family:var(--gf);font-weight:700;font-size:calc(var(--h-warnSz,8) * var(--u));color:#8b9db0}

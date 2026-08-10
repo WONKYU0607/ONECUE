@@ -70,8 +70,16 @@ export default function PlayerBar({ onHelp, onSettings }){
             )}
           </svg>
         </button>
-        <button className="pcell pico" onClick={onHelp} aria-label="조작 방법">?</button>
-        <button className="pcell pico" onClick={onSettings} aria-label="설정">\u2699</button>
+        <button className="pcell pico help" onClick={onHelp} aria-label="조작 방법" title="조작 방법">?</button>
+        {/* 톱니도 그림으로. JSX 본문에 \u2699 처럼 쓰면 **글자 그대로** 나오고,
+            문자로 넣어도 기기마다 모양이 달라진다 */}
+        <button className="pcell pico" onClick={onSettings} aria-label="설정" title="설정">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="2" />
+            <path d="M12 2.6v3M12 18.4v3M2.6 12h3M18.4 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"
+                  fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
       </div>
       {!SERVER_BACKED && <p className="pbar-warn">기기 저장 · 서버 연결 전</p>}
       {prof && <ProfileTab onClose={() => setProf(false)} />}
