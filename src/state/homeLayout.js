@@ -20,7 +20,11 @@ export const HOME_DEF = [
   ['gapIco',  '아이콘~글자 간격', 7, 0, 24, 1, 'px'],
   ['lblSz',   '이름 글씨',      14, 8, 28, 1, 'px'],
   ['valSz',   '숫자 글씨',      20, 8, 40, 1, 'px'],
-  ['warnSz',  '안내 글씨',      10, 6, 20, 1, 'px']
+  ['warnSz',  '안내 글씨',      10, 6, 20, 1, 'px'],
+  ['barX',    '맨윗줄 좌우 여백',  4, 0, 40, 1, 'px'],
+  ['barY',    '맨윗줄 위 여백',    2, 0, 40, 1, 'px'],
+  ['icoTop',  '물음표·설정 높이', 42, 10, 120, 2, 'px'],
+  ['profW',   '프로필 칸 폭',     64, 0, 160, 2, 'px']
 ];
 
 const defaults = () => Object.fromEntries(HOME_DEF.map(d => [d[0], d[2]]));

@@ -87,14 +87,15 @@ border-image:var(--frame) 86 fill stretch}
 .menu-btn.ghost{color:#7e9eb6}
 .menu-btn:active{filter:brightness(1.35)}
 
-.icon-btn{width:38px;height:38px;background:rgba(10,16,26,.72);border:1px solid #2f4a63;
-color:#8fd8ff;font:900 19px/1 var(--gf);cursor:pointer}
+.icon-btn{width:19px;height:19px;background:rgba(10,16,26,.72);border:1px solid #2f4a63;
+color:#8fd8ff;font:900 11px/1 var(--gf);cursor:pointer;padding:0}
 .icon-btn:active{background:#4ec9f0;color:#12121c}
 /* 금속 틀 테두리(가로 44 / 세로 46) 안쪽으로. 밖에 두면 테두리에 걸린다 */
 /* 틀 안쪽(테두리 다음) 기준. 오른쪽 위 모서리 바로 밑에 붙인다 */
-.top-right{position:absolute;right:6px;top:6px;z-index:30}
-.top-right2{position:absolute;right:52px;top:6px;z-index:30}
-.top-left{position:absolute;left:6px;top:6px;z-index:30}
+/* 맨 윗줄은 점수·티켓이 쓴다. 물음표·설정은 그 아래 오른쪽 */
+.top-right{position:absolute;right:6px;top:var(--h-icoTop,42px);z-index:30}
+.top-right2{position:absolute;right:29px;top:var(--h-icoTop,42px);z-index:30}
+.top-left{position:absolute;left:6px;top:var(--h-icoTop,42px);z-index:30}
 
 /* ---------- 진입창 ---------- */
 .bar{width:min(260px,70vw);height:4px;background:#1b1b2a;overflow:hidden}
@@ -282,8 +283,12 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 
 /* ── 화면 맨 위 가로 바 (점수·티켓) ──────────────────────
    수치는 전부 `state/homeLayout.js`가 CSS 변수로 내보낸다 */
-.pbar{width:100%;margin-bottom:var(--h-barBot,8px)}
+.pbar{position:absolute;left:var(--h-barX,4px);right:var(--h-barX,4px);
+  top:var(--h-barY,2px);z-index:25}
 .pbar-row{display:flex;gap:var(--h-boxGap,6px);align-items:stretch}
+.pbar .prof{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  padding:0 var(--h-padX,12px);white-space:nowrap;
+  font-family:var(--gf);font-weight:900;font-size:var(--h-lblSz,14px);color:#c8d8e6}
 .panel-box.scores{flex:1 1 0;min-width:0;justify-content:space-around}
 /* 티켓 틀은 내용만큼만 */
 .panel-box.tkbox{flex:0 0 auto;width:auto;justify-content:center;gap:var(--h-gapIco,7px)}

@@ -17,6 +17,9 @@ export default function PlayerBar(){
   return (
     <div className="pbar">
       <div className="pbar-row">
+        {/* 프로필 자리. 탭 화면은 아직 없어서 칸만 잡아둔다 */}
+        <div className="panel-box prof" style={{ width: 'var(--h-profW,64px)' }}>프로필</div>
+
         <div className="panel-box scores">
           <span className="pitem" title="총격전 점수">
             <TierIcon score={scoreOf('gun')} />
