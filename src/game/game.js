@@ -248,7 +248,10 @@ export function createGame(canvas, opts = {}){
     // 폭발·섬광 연출이 새로 생김
     if (cur.fx > prev.fx){
       const last = st.fx[st.fx.length - 1];
-      if ((last?.k || 0) === 1) sfx.flash();
+      // **버프(k=2)는 폭발이 아니다.** 예전엔 여기 걸려서 터지는 소리가 나고
+      // 화면까지 흔들렸다 — 효과를 얻는 건데 무언가 터진 것처럼 들렸다
+      if ((last?.k || 0) === 2) sfx.buff();
+      else if ((last?.k || 0) === 1) sfx.flash();
       else { sfx.explode(); juice.shake(2.4); buzz(28); }
     }
     // 투척물이 새로 날아감
