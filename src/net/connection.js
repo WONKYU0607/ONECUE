@@ -1,6 +1,7 @@
 import { WsTransport } from '../game/net.js';
 import { SELF, PROTO_VER } from '../game/config.js';
 import { getNick } from '../state/profile.js';
+import { t } from '../i18n/index.js';
 // **firebase를 직접 부르면 안 된다.** 그러면 게임 본체에 SDK가 딸려 들어와
 // 첫 로딩이 gzip 90KB → 258KB가 된다. 로그인이 끝나면 sync가 여기에 값을 넣어준다
 let myUid = '';
@@ -95,7 +96,7 @@ export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue',
   }
   // 서버가 살아 있는데 버전이 다르면 소켓을 열어봐야 소용없다. 여기서 바로 알린다
   if (health && (health.ver || 0) !== PROTO_VER){
-    throw new Error(`서버 버전이 다르다 (서버 ${health.ver || '없음'} / 앱 ${PROTO_VER}) — 서버 재배포 필요`);
+    throw new Error(t('err.version', { a: health.ver || t('err.none'), b: PROTO_VER }));
   }
 
   let transport = null;
@@ -105,13 +106,13 @@ export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue',
     try { await openOnce(transport); break; }
     catch { transport.close(); transport = null; await sleep(GAP_MS); }
   }
-  if (!transport) throw new Error('서버에 연결할 수 없다');
+  if (!transport) throw new Error(t('err.noServer'));
   pending = transport;   // 팀 선택 메시지를 보낼 통로
 
   return new Promise((resolve, reject) => {
     let slot = -1, room = -1, settled = false;
     transport.onStatus = st => {
-      if (st === 'closed' && !settled){ settled = true; reject(new Error('연결이 끊겼다')); }
+      if (st === 'closed' && !settled){ settled = true; reject(new Error(t('err.lost'))); }
     };
     const done = () => {
       if (settled) return;
@@ -131,7 +132,7 @@ export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue',
         if ((m.ver || 0) !== PROTO_VER){
           settled = true;
           transport.close();
-          reject(new Error(`서버 버전이 다르다 (서버 ${m.ver || '없음'} / 앱 ${PROTO_VER}) — 서버 재배포 필요`));
+          reject(new Error(t('err.version', { a: m.ver || t('err.none'), b: PROTO_VER })));
           return;
         }
         slot = m.pid; room = m.room;
@@ -158,7 +159,7 @@ export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue',
       } else if (m.t === 'joinfail'){
         settled = true;
         transport.close();
-        reject(new Error(m.reason === 'full' ? '이미 꽉 찬 방이다' : '없는 방 코드다'));
+        reject(new Error(m.reason === 'full' ? t('err.roomFull') : t('err.noRoom')));
       } else if (m.t === 'queued'){
         onStage?.('waiting', m.ahead);
       } else if (m.t === 'go'){

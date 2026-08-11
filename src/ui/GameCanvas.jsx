@@ -158,14 +158,14 @@ export default function GameCanvas({ session, onExit, onFinish }){
       {placing && !ready.cnt?.meDone && (
         <button className="panelbtn place ui-overlay" style={boxStyle}
                 onClick={() => gameRef.current?.ready()}>
-          설치 완료
+          {t('ready.placeDone')}
         </button>
       )}
       {/* 2단계: 전원이 눌러야 시작한다 */}
       {placing && ready.cnt?.meDone && !ready.me && (
         <button className="panelbtn place go ui-overlay" style={boxStyle}
                 onClick={() => gameRef.current?.go()}>
-          준비 완료
+          {t('ready.goDone')}
         </button>
       )}
       {placing && ready.me && !ready.peer && (

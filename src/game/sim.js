@@ -974,7 +974,9 @@ export function step(s, inp){
         if (b.k === BUFF.HEAL) p.hp = Math.min(MAXHP, p.hp + Math.round(MAXHP * def.mul));
         else s.bf[i][b.k] = def.ticks;            // 같은 버프를 또 먹으면 시간이 새로 찬다
         s.buffs.splice(bi, 1);
-        s.fx.push({ c: b.c, r: b.r, t: 18, k: 1 });   // 먹은 표시
+        // **k=1은 섬광 연출이다.** 그걸 쓰면 버프를 먹을 때마다 화면이 번쩍이고
+        // 섬광탄 소리가 났다 — 버프 전용 번호(2)를 쓴다
+        s.fx.push({ c: b.c, r: b.r, t: 20, k: 2 });
         break;
       }
     }

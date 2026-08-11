@@ -89,15 +89,19 @@ console.log('화면에 한국어가 박혀 있지 않다');
 {
   // **캔버스(render.js)와 템플릿 문자열(백틱)도 본다.**
   // 처음엔 JSX 텍스트만 봐서 AI 단계 이름·전적·캔버스 문구를 통째로 놓쳤다
-  const ui = files.filter(p => p.includes('/ui/') || p.endsWith('ui-state.js')
-    || p.endsWith('rank.js') || p.endsWith('render.js') || p.endsWith('ai.js'));
+  // **화면에 닿는 파일을 전부 본다.** 범위를 좁게 잡아 두 번 놓쳤다 —
+  // `설치 완료`(여러 줄 JSX)와 연결 오류 문구(connection.js → 매칭 화면에 그대로 뜬다)
+  const skip = ['homeLayout.js', 'assets.js', 'audio.js'];   // 개발용 라벨·주석만 있는 곳
+  const ui = files.filter(p =>
+    !skip.some(x => p.endsWith(x)) &&
+    (p.includes('/ui/') || p.includes('/net/') || p.includes('/game/') || p.includes('/state/')));
   const left = [];
   for (const p of ui){
     let src = fs.readFileSync(p, 'utf8');
     src = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
     src = src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
     const pats = [
-      />([^<>{}\n]*[가-힣][^<>{}\n]*)</g,     // JSX 텍스트
+      />([^<>{}]*[가-힣][^<>{}]*)</g,          // JSX 텍스트 (여러 줄도)
       /`([^`]*[가-힣][^`]*)`/g,                // 템플릿 문자열
       /'([^'\n]*[가-힣][^'\n]*)'/g,           // 문자열 (캔버스 등)
       /"([^"\n]*[가-힣][^"\n]*)"/g

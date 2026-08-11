@@ -17,6 +17,7 @@ import {
 import { padRect, paletteSlots, uiBoxRect } from './layout.js';
 import { uiPrompt, resultFor, matchSummary } from './ui-state.js';
 import { CHARGE_MAX_MS, PH_PLAY, THROW } from './config.js';
+import { t } from '../i18n/index.js';
 
 // 게임 한 판을 만들고 rAF 루프를 돌린다.
 // React는 이 함수 하나만 호출하고, 언마운트 때 stop()만 부르면 된다.
@@ -279,7 +280,7 @@ export function createGame(canvas, opts = {}){
     try { frame(); } catch (e){
       if (!crashed){
         crashed = e;
-        console.error('게임 루프 오류', e);
+        console.error(t('err.crash'), e);
         try { opts.onCrash?.(e); } catch { /* 알림 자체가 실패해도 무시 */ }
       }
     }

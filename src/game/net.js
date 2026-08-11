@@ -117,6 +117,7 @@ import {
   step,
   throwCol,
   throwRow, LAG_HIST } from './sim.js';
+import { t } from '../i18n/index.js';
 
 // ================= TRANSPORT (NET SEAM) =================
 // 시계 주입: 브라우저는 실제 시간, 테스트는 가상 시계를 넣어 결정론적으로 돌린다
@@ -161,10 +162,10 @@ export class WsTransport {
       };
       ws.onclose = () => {
         this.onStatus('closed');
-        reject(new Error('연결 종료'));
+        reject(new Error(t('err.closed')));
         this.retry();
       };
-      ws.onerror = () => { this.onStatus('error'); reject(new Error('연결 실패')); };
+      ws.onerror = () => { this.onStatus('error'); reject(new Error(t('err.failed'))); };
     });
   }
   // 끊기면 점점 간격을 늘리며 다시 붙는다. 폰은 화면만 꺼도 끊기므로 필수

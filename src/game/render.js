@@ -2,7 +2,7 @@ import {
   W, H, FP, COL, TEAMS, TEAM_OF, SELF, MAXHP, FLASH_T, VIEW, SHOW_HUD,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO, HP_MARKS,
-  ITEM, ITEM_DEF, cellOwner, teamOf, COLOR_COUNT, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
+  ITEM, ITEM_DEF, cellOwner, teamOf, COLOR_COUNT, BUFF, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
   FIRE_TICKS, FIRE_RADIUS, SHIELD_TICKS, SHIELD_COOL, STUN_TICKS,
   WALL_L, WALL_R, wallIdx, PWf,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS,
@@ -204,11 +204,59 @@ export function createRenderer(canvas){
     for (const b of s.buffs){
       const x = cellX(b.c), y = fy(cellY(b.r), GRID_CH);
       const bob = Math.sin(s.tick / 12 + b.c + b.r) * 0.8;
-      const w = GRID_CW * 0.86, h = GRID_CH * 0.86;
+      // [stated] 아이콘이 너무 작아 안 보인다 → 칸보다 크게 그린다
+      const w = GRID_CW * 1.5, h = GRID_CH * 1.5;
       ctx.drawImage(buffImg, b.k * BUFF_PX, 0, BUFF_PX, BUFF_PX,
         Math.round((x + (GRID_CW - w) / 2) * RS),
         Math.round((y + (GRID_CH - h) / 2 + bob) * RS),
         Math.round(w * RS), Math.round(h * RS));
+    }
+  }
+
+  // 버프를 먹은 자리에 잠깐 링이 퍼진다 (섬광 연출과 헷갈리면 안 된다)
+  function drawBuffPop(s){
+    if (!s.fx || !s.fx.length) return;
+    for (const f of s.fx){
+      if ((f.k || 0) !== 2) continue;
+      const age = 20 - f.t;
+      const k = Math.max(0, Math.min(1, age / 20));
+      const cx = cellX(f.c) + GRID_CW / 2;
+      const cy = fy(cellY(f.r) + GRID_CH / 2, 0);
+      const rad = GRID_CW * (0.3 + k * 0.9);
+      ctx.beginPath();
+      ctx.arc(cx * RS, cy * RS, rad * RS, 0, Math.PI * 2);
+      ctx.lineWidth = 2 * RS * (1 - k);
+      ctx.strokeStyle = 'rgba(255,233,168,' + (0.85 * (1 - k)).toFixed(3) + ')';
+      ctx.stroke();
+    }
+  }
+
+  // 무적 중인 캐릭터 둘레에 자기장처럼 도는 고리
+  function drawInvulAura(s, rx, ry){
+    if (!s.bf) return;
+    for (let i = 0; i < s.p.length; i++){
+      if (!s.bf[i] || !(s.bf[i][BUFF.INVUL] > 0) || s.p[i].hp <= 0) continue;
+      const x = (rx[i] !== undefined ? rx[i] : s.p[i].x) / FP;
+      const y = (ry[i] !== undefined ? ry[i] : s.p[i].y) / FP;
+      const cx = x + ARENA.pw / 2, cy = fy(y, ARENA.ph) + ARENA.ph / 2;
+      const base = Math.max(ARENA.pw, ARENA.ph) * 0.75;
+      const t2 = s.tick;
+      for (let n = 0; n < 3; n++){
+        const ph = ((t2 / 26) + n / 3) % 1;             // 0~1 로 계속 돈다
+        const rad = base * (0.55 + ph * 0.6);
+        ctx.beginPath();
+        ctx.arc(cx * RS, cy * RS, rad * RS, 0, Math.PI * 2);
+        ctx.lineWidth = 1.6 * RS;
+        ctx.strokeStyle = 'rgba(255,214,84,' + (0.55 * (1 - ph)).toFixed(3) + ')';
+        ctx.stroke();
+      }
+      // 남은 시간이 얼마 없으면 깜빡여 알린다
+      if (s.bf[i][BUFF.INVUL] < 45 && (t2 >> 2) % 2 === 0) continue;
+      ctx.beginPath();
+      ctx.arc(cx * RS, cy * RS, base * 0.5 * RS, 0, Math.PI * 2);
+      ctx.lineWidth = 1.2 * RS;
+      ctx.strokeStyle = 'rgba(255,240,180,0.5)';
+      ctx.stroke();
     }
   }
 
@@ -221,7 +269,7 @@ export function createRenderer(canvas){
     const list = [];
     for (let k = 0; k < mine.length; k++) if (mine[k] > 0) list.push([k, mine[k]]);
     if (!list.length) return;
-    const sz = 11, gap = 2;
+    const sz = 16, gap = 3;
     let x = W / 2 - (list.length * (sz + gap) - gap) / 2;
     for (const [k, left] of list){
       ctx.drawImage(buffImg, k * BUFF_PX, 0, BUFF_PX, BUFF_PX,
@@ -455,6 +503,7 @@ export function createRenderer(canvas){
   function drawFx(s){
     if (!s.fx || !s.fx.length) return;
     for (const f of s.fx){
+      if ((f.k || 0) === 2) continue;      // 버프 먹기는 drawBuffPop 이 따로 그린다
       const isFlash = (f.k || 0) === 1;
       const img = isFlash ? flashfx : boom;
       if (!isReady(img)) continue;
@@ -742,9 +791,11 @@ export function createRenderer(canvas){
     drawMiniHp(s, rx, ry);
     drawMeMark(s, rx, ry);
     drawOffline(s, rx, ry);
+    drawInvulAura(s, rx, ry);
     drawProjectiles(s, a);
     drawFire(s);
     drawBuffs(s);
+    drawBuffPop(s);
     drawMyBuffs(s);
     drawFx(s);
     drawReadyTimer(s);

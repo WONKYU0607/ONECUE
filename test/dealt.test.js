@@ -48,7 +48,12 @@ for (const [n, melee, ffa, nm] of [
   const lost = s.p.reduce((a, p) => a + (MAXHP - Math.max(0, p.hp)), 0);
   const dealt = s.dealt.reduce((a, v) => a + v, 0);
   assert(s.dealt.length === n, `  인원수만큼 기록 (${s.dealt.length})`);
-  assert(dealt === lost, `  합이 정확히 같다 (가한 ${dealt} / 잃은 ${lost})`);
+  // 칼전은 **회복 버프**가 있어 잃은 체력이 그만큼 줄어든다.
+  // 회복 한 번은 최대 체력의 25%이므로 그 배수만큼 차이가 날 수 있다
+  const healed = dealt - lost;
+  const step = Math.round(MAXHP * 0.25);
+  assert(healed >= 0 && healed % step === 0 && (melee || healed === 0),
+    `  합이 맞는다 (가한 ${dealt} / 잃은 ${lost} / 회복 ${healed})`);
   assert(s.dealt.every(v => v >= 0), '  음수가 없다');
   assert(dealt > 0, '  실제로 싸웠다');
 }

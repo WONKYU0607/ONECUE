@@ -140,7 +140,7 @@ export default function PvpMenu({ onBack, onStart }){
             />
             <button className="menu-btn join" disabled={!ok}
                     onClick={() => onStart({ mode: 'join', code })}>
-              입장
+              {t('pvp.enter')}
             </button>
           </div>
         )}

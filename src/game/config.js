@@ -121,13 +121,13 @@ export const DEBUG_INF_HP = false;  // 디버그: 체력 무한 (라운드가 �
 export const ITEM = { WALL: 0, WALL2: 1, WALL3: 2, BARR: 3, BARR2: 4, BARR3: 5, DRUM: 6 };
 // 폭은 달라도 내구는 같다. 넓게 막을수록 칸당 내구는 얇아지는 셈
 export const ITEM_DEF = [
-  { key: 'wall1', name: '벽',          hp: 5, cells: 1, mine: true  },
-  { key: 'wall2', name: '벽 2칸',      hp: 5, cells: 2, mine: true  },
-  { key: 'wall3', name: '벽 3칸',      hp: 5, cells: 3, mine: true  },
-  { key: 'barr1', name: '바리케이트',   hp: 3, cells: 1, mine: true  },
-  { key: 'barr2', name: '바리케이트 2칸', hp: 3, cells: 2, mine: true },
-  { key: 'barr3', name: '바리케이트 3칸', hp: 3, cells: 3, mine: true },
-  { key: 'drum',  name: '드럼통',       hp: 1, cells: 1, mine: false }
+  { key: 'wall1', nameKey: 'item.wall',          hp: 5, cells: 1, mine: true  },
+  { key: 'wall2', nameKey: 'item.wall2',      hp: 5, cells: 2, mine: true  },
+  { key: 'wall3', nameKey: 'item.wall3',      hp: 5, cells: 3, mine: true  },
+  { key: 'barr1', nameKey: 'item.barr',   hp: 3, cells: 1, mine: true  },
+  { key: 'barr2', nameKey: 'item.barr2', hp: 3, cells: 2, mine: true },
+  { key: 'barr3', nameKey: 'item.barr3', hp: 3, cells: 3, mine: true },
+  { key: 'drum',  nameKey: 'item.drum',       hp: 1, cells: 1, mine: false }
 ];
 // 정원은 아레나마다 다르다. 0이면 그 모드엔 없는 아이템
 export const itemQuota = k => (ARENA.quota[k] || 0);
@@ -146,9 +146,9 @@ export const EXPLO_TICKS = 34;        // 폭발 이펙트 지속 (틱)
 // 던지는 아이템: 0=수류탄 1=섬광탄. 누르는 시간이 곧 사거리
 export const THROW = { NADE: 0, FLASH: 1, MOLO: 2 };
 export const THROW_DEF = [
-  { key: 'grenade', name: '수류탄', count: 3 },
-  { key: 'flash',   name: '섬광탄', count: 3 },
-  { key: 'molotov', name: '화염병', count: 1 }    // 한 판에 한 번
+  { key: 'grenade', nameKey: 'throw.nade', count: 3 },
+  { key: 'flash',   nameKey: 'throw.flash', count: 3 },
+  { key: 'molotov', nameKey: 'throw.molo', count: 1 }    // 한 판에 한 번
 ];
 // 칼전(근접전). 총알·아이템 없이 칼로만 싸운다
 export const MELEE_DAMAGE = 8;          // 한 방에 최대 체력의 8%
