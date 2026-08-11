@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createGame } from '../game/game.js';
 import { PH_READY, SHOW_NETINFO } from '../game/config.js';
-import { NEG_LABEL } from '../game/ui-state.js';
+import { negText } from '../game/ui-state.js';
 import TunePanel from './TunePanel.jsx';
 import { getConnection, disconnect, getRoomInfo } from '../net/connection.js';
 import { getSettings } from '../state/settings.js';
+import { t } from '../i18n/index.js';
 
 // 캔버스를 마운트하고 게임을 붙였다 떼는 얇은 껍데기.
 // 게임 루프 상태는 ref에만 두고, React state는 "페이즈"처럼 드물게 바뀌는 것만 쓴다.
@@ -96,60 +97,58 @@ export default function GameCanvas({ session, onExit, onFinish }){
       {crash && (
         <div className="modal-back">
           <div className="modal ask">
-            <p className="ask-t">게임을 그리다 멈췄습니다</p>
+            <p className="ask-t">{t('link.crash')}</p>
             <p className="ask-d crashmsg">{crash}</p>
             <div className="ask-row">
-              <button className="menu-btn primary" onClick={onExit}>나가기</button>
+              <button className="menu-btn primary" onClick={onExit}>{t('common.leave')}</button>
             </div>
           </div>
         </div>
       )}
       <button className="icon-btn top-left ui-overlay"
-              onClick={() => { disconnect(); onExit(); }} aria-label="나가기">‹</button>
+              onClick={() => { disconnect(); onExit(); }} aria-label={t('common.leave')}>‹</button>
       {link.self === 'noconn' && (
-        <div className="link-note ui-overlay">서버에 연결되지 않았다 · 나갔다가 다시 시작해라</div>
+        <div className="link-note ui-overlay">{t('link.noconn')}</div>
       )}
       {link.self === 'reconnecting' && (
-        <div className="link-note ui-overlay">연결이 끊겼다 · 다시 붙는 중…</div>
+        <div className="link-note ui-overlay">{t('link.reconnecting')}</div>
       )}
       {link.self === 'ok' && link.peer === 'gone' && (
-        <div className="link-note ui-overlay">
-          상대방의 연결이 끊어졌습니다
-          <br />
-          {graceLeft}초 뒤에 돌아오지 않으면 자동 승리 처리됩니다
+        <div className="link-note ui-overlay">{t('link.peerGoneL1')}<br />
+          {t('link.peerGoneL2', { n: graceLeft })}
         </div>
       )}
       {link.peer === 'left' && (
-        <div className="link-note ui-overlay">상대가 나갔다</div>
+        <div className="link-note ui-overlay">{t('link.peerLeft')}</div>
       )}
 
       {/* 전투 전 안내·신청은 prompt() 하나가 정한다. 종류마다 마크업을 따로 쓰면
            한쪽만 틀리게 되므로(실제로 그래서 노템전 창이 안 떴다) 한 갈래로 그린다 */}
       {(ready.prompt?.banner || []).map(k => (
-        <div key={k} className="link-note ui-overlay fast">{NEG_LABEL[k].on}</div>
+        <div key={k} className="link-note ui-overlay fast">{negText(k, 'on')}</div>
       ))}
       {(ready.prompt?.offer || []).map((k, i) => (
         <button key={k} className={'fastbtn ui-overlay' + (i ? ' bare' : '')}
                 onClick={() => gameRef.current?.request(k)}>
-          {NEG_LABEL[k].btn}
+          {negText(k, 'btn')}
         </button>
       ))}
       {ready.prompt?.waiting && (
         <div className="link-note ui-overlay">
-          {NEG_LABEL[ready.prompt.waiting.kind].wait} · 상대 응답 대기 {ready.prompt.waiting.sec}
+          {negText(ready.prompt.waiting.kind, 'wait')} · {t('ready.waitPeer', { n: ready.prompt.waiting.sec })}
         </div>
       )}
       {ready.prompt?.ask && (
         <div className="modal-back">
           <div className="modal ask">
-            <p className="ask-t">{NEG_LABEL[ready.prompt.ask.kind].title}</p>
-            <p className="ask-d">{NEG_LABEL[ready.prompt.ask.kind].desc}</p>
+            <p className="ask-t">{negText(ready.prompt.ask.kind, 'title')}</p>
+            <p className="ask-d">{negText(ready.prompt.ask.kind, 'desc')}</p>
             <p className="ask-d">{ready.prompt.ask.sec}초 안에 답하지 않으면 그냥 진행됩니다.</p>
             <div className="ask-row">
               <button className="menu-btn ghost"
-                      onClick={() => gameRef.current?.answer(ready.prompt.ask.kind, false)}>거절</button>
+                      onClick={() => gameRef.current?.answer(ready.prompt.ask.kind, false)}>{t('common.decline')}</button>
               <button className="menu-btn primary"
-                      onClick={() => gameRef.current?.answer(ready.prompt.ask.kind, true)}>수락</button>
+                      onClick={() => gameRef.current?.answer(ready.prompt.ask.kind, true)}>{t('common.accept')}</button>
             </div>
           </div>
         </div>
@@ -171,7 +170,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
       )}
       {placing && ready.me && !ready.peer && (
         <div className="link-note ui-overlay">
-          {ready.cnt ? `다른 사람 기다리는 중… 준비 ${ready.cnt.go}/${ready.cnt.n}` : '다른 사람 기다리는 중…'}
+          {ready.cnt ? `다른 사람 기다리는 중… 준비 ${ready.cnt.go}/${ready.cnt.n}` : t('match.others')}
           {SHOW_NETINFO && ready.srv && (
             <span className="sub">
               서버 확정 · 나 {ready.srv.me ? 'O' : 'X'} / 나머지 {ready.srv.peer ? 'O' : 'X'}
@@ -190,11 +189,11 @@ export default function GameCanvas({ session, onExit, onFinish }){
         </div>
       )}
       {placing && ready.me && ready.peer && (
-        <div className="link-note ui-overlay">곧 시작한다…</div>
+        <div className="link-note ui-overlay">{t('ready.soon')}</div>
       )}
       {placing && !ready.me && ready.peer && (
         <div className="link-note ui-overlay">
-          {ready.cnt ? `나만 남았다 · 준비 ${ready.cnt.go}/${ready.cnt.n}` : '나를 기다리는 중'}
+          {ready.cnt ? `나만 남았다 · 준비 ${ready.cnt.go}/${ready.cnt.n}` : t('ready.waitMe')}
         </div>
       )}
       <TunePanel gameRef={gameRef} />

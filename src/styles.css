@@ -418,3 +418,10 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* 티켓이 없어 못 누르는 버튼 */
 .menu-btn.off{opacity:.42;cursor:not-allowed}
 .menu-btn.off .tkn{color:#f0918a}
+
+/* 설정 안 언어 고르기 */
+.lang-row{cursor:default}
+.lang-pick{display:flex;gap:6px}
+.lang-btn{padding:5px 10px;background:#141c2c;color:#9fb0c2;border:1px solid #35506b;
+  font:700 12px var(--gf);cursor:pointer}
+.lang-btn.on{background:#1d3a52;color:#ffe9a8;border-color:#5a96c8}

@@ -2,7 +2,7 @@
 //
 // 이게 없어서 두 번 놓쳤다 — 시뮬은 멀쩡한데 화면만 안 떴다.
 // 여기서는 진짜 시뮬 상태를 만들어 넣고, 띄워야 할 것이 나오는지 검사한다.
-import { uiPrompt, NEG_LABEL, resultFor, matchSummary } from '../src/game/ui-state.js';
+import { uiPrompt, negText, resultFor, matchSummary } from '../src/game/ui-state.js';
 import { newState, step, NOIN } from '../src/game/sim.js';
 import { PH_READY, PH_COUNT, PH_PLAY, NEG_TICKS } from '../src/game/config.js';
 import { assert } from './harness.js';
@@ -41,7 +41,10 @@ console.log('상대가 신청하면 나에게 창이 뜬다');
   assert(!me.waiting && me.offer.length === 0, '받는 쪽엔 신청 버튼이 안 뜬다');
   assert(him.waiting && him.waiting.kind === 'bare', '신청한 쪽엔 대기 표시');
   assert(!him.ask, '신청한 쪽에 수락 창이 뜨면 안 된다');
-  assert(NEG_LABEL[me.ask.kind].title.includes('노템전'), '문구가 종류에 맞는다');
+    // 언어에 상관없이 종류가 맞는지만 본다 (시험 환경은 기기 언어가 없어 영어로 뜬다)
+  assert(me.ask.kind === 'bare', '신청 종류가 노템전');
+  assert(negText('bare', 'title') !== negText('fast', 'title'), '종류마다 문구가 다르다');
+  assert(negText('bare', 'title').length > 0, '문구가 비어 있지 않다');
 }
 
 console.log('2배속도 같은 방식');

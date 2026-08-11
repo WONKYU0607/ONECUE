@@ -1,6 +1,11 @@
 import { WsTransport } from '../game/net.js';
 import { SELF, PROTO_VER } from '../game/config.js';
 import { getNick } from '../state/profile.js';
+// **firebase를 직접 부르면 안 된다.** 그러면 게임 본체에 SDK가 딸려 들어와
+// 첫 로딩이 gzip 90KB → 258KB가 된다. 로그인이 끝나면 sync가 여기에 값을 넣어준다
+let myUid = '';
+export const setUid = v => { myUid = String(v || ''); };
+const getUid = () => myUid;
 
 // 서버 연결은 화면 전환보다 오래 살아야 한다 (매칭 화면 -> 게임 화면).
 // 그래서 React 밖 모듈에 두고, 게임을 나갈 때만 끊는다.
@@ -45,6 +50,8 @@ export function getSid(){
 const wsUrl = (mode = 'queue', code = '', resume = false, n = 2, melee = false, ffa = false, color = -1) =>
   BASE + '?sid=' + encodeURIComponent(getSid()) +
   '&nick=' + encodeURIComponent(getNick()) +
+  // 점수는 **서버가** 이 계정으로 쓴다. 클라가 쓰면 자기 점수를 자기가 올릴 수 있다
+  (getUid() ? '&uid=' + encodeURIComponent(getUid()) : '') +
   '&mode=' + mode + (code ? '&code=' + encodeURIComponent(code) : '') +
   (n !== 2 ? '&n=' + n : '') + (melee ? '&melee=1' : '') + (ffa ? '&ffa=1' : '') +
   (color >= 0 ? '&color=' + color : '') + (resume ? '&resume=1' : '');

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { preloadAssets } from '../../game/assets.js';
 import { unlockAudio } from '../../game/audio.js';
+import { t } from '../../i18n/index.js';
 
 // 진입창. 자산을 미리 받고, 다 받으면 TAP TO START를 띄운다.
 //
@@ -58,7 +59,7 @@ export default function Splash({ onDone }){
     >
       <div className="splash-foot">
         {ready
-          ? <p className="tap">{ko ? '화면을 터치하세요' : 'TAP TO START'}</p>
+          ? <p className="tap">{ko ? t('splash.tap') : 'TAP TO START'}</p>
           : (
             <>
               <div className="bar"><div className="fill" style={{ width: pct + '%' }} /></div>

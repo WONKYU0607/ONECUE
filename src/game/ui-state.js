@@ -6,6 +6,7 @@
 //   - 상태 갱신 루프가 PH_READY에서만 돌아 칼전(카운트다운)에선 버튼이 안 뜸
 // 여기로 옮기면 평범한 상태 객체만 있으면 검사할 수 있다. JSX는 받은 대로 그리기만 한다.
 import { PH_READY, PH_COUNT, teamOf } from './config.js';
+import { t } from '../i18n/index.js';
 
 // 이 판의 결과가 나에게 무엇인가.
 // **`s.winner`는 팀 번호 + 1 이다(0=무승부).** 슬롯 번호가 아니다.
@@ -51,20 +52,22 @@ export function resultFor(st, slot){
   return w === teamOf(slot, st.n || 2) + 1 ? 'win' : 'lose';
 }
 
+// **열쇠만 담는다.** 여기서 t()를 부르면 파일을 읽을 때 한 번만 계산돼
+// 언어를 바꿔도 안 바뀐다. 쓰는 쪽에서 negText()로 번역한다
 export const NEG_LABEL = {
   fast: {
-    title: '상대방이 2배속 대결을 신청했습니다.',
-    desc: '이동·총알 속도·발사 간격이 두 배가 됩니다.',
-    btn: '2배속 신청',
-    on: '2배속 대결',
-    wait: '2배속 신청함'
+    title: 'ready.fastAsk',
+    desc: 'ready.fastNote',
+    btn: 'ready.fastReq',
+    on: 'ready.fastOn',
+    wait: 'ready.fastSent'
   },
   bare: {
-    title: '상대방이 노템전을 신청했습니다.',
-    desc: '엄폐물·투척물 없이 기본 공격으로만 겨룹니다.',
-    btn: '노템전 신청',
-    on: '노템전',
-    wait: '노템전 신청함'
+    title: 'ready.bareAsk',
+    desc: 'ready.bareNote',
+    btn: 'ready.bareReq',
+    on: 'ready.bareOn',
+    wait: 'ready.bareSent'
   }
 };
 
@@ -109,3 +112,6 @@ export function uiPrompt(st, slot, online){
   }
   return { pre: true, banner, ask, waiting, offer };
 }
+
+// 신청 문구를 번역해서 돌려준다 (표는 열쇠만 담고 있다)
+export const negText = (kind, part) => t((NEG_LABEL[kind] && NEG_LABEL[kind][part]) || part);

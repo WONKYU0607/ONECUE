@@ -2,17 +2,19 @@ import { useState } from 'react';
 import { getSettings, setSetting } from '../state/settings.js';
 import { unlockAudio, sfx } from '../game/audio.js';
 import { VIEW, HAND } from '../game/config.js';
+import { t, LANGS, getLang, setLang } from '../i18n/index.js';
 
-const ROWS = [
-  ['sound',    '효과음'],
-  ['vibrate',  '진동'],
-  ['leftStick', '스틱을 왼쪽에'],
-  ['softFlash', '섬광 눈부심 줄이기'],
-  ['showGrid', '바닥 격자 (디버그)']
-];
+// **열쇠만 담아둔다.** 문구를 여기서 미리 만들면 파일을 읽을 때 한 번만 계산돼
+// 언어를 바꿔도 그대로 남는다
+const ROWS = ['sound', 'vibrate', 'leftStick', 'softFlash', 'showGrid'];
+const LABEL = {
+  sound: 'set.sound', vibrate: 'set.vibrate', leftStick: 'set.stickLeft',
+  softFlash: 'set.softFlash', showGrid: 'set.grid'
+};
 
 export default function SettingsModal({ onClose }){
   const [s, setS] = useState(getSettings);
+  const [lang, setL] = useState(getLang);
 
   const toggle = key => {
     const next = setSetting(key, !s[key]);
@@ -26,15 +28,29 @@ export default function SettingsModal({ onClose }){
     <div className="modal-back" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <header className="bar-top">
-          <span className="title">설정</span>
-          <button className="icon-btn" onClick={onClose} aria-label="닫기">✕</button>
+          <span className="title">{t('home.settings')}</span>
+          <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </header>
-        {ROWS.map(([k, label]) => (
+        {ROWS.map(k => (
           <button key={k} className="toggle-row" onClick={() => toggle(k)}>
-            <span>{label}</span>
+            <span>{t(LABEL[k])}</span>
             <span className={'switch' + (s[k] ? ' on' : '')}><i /></span>
           </button>
         ))}
+
+        {/* 언어. 기기 언어를 자동으로 잡지만 직접 바꿀 수도 있어야 한다 */}
+        <div className="toggle-row lang-row">
+          <span>{t('set.lang')}</span>
+          <span className="lang-pick">
+            {LANGS.map(l => (
+              <button key={l.key}
+                      className={'lang-btn' + (lang === l.key ? ' on' : '')}
+                      onClick={() => { setLang(l.key); setL(l.key); }}>
+                {l.name}
+              </button>
+            ))}
+          </span>
+        </div>
       </div>
     </div>
   );

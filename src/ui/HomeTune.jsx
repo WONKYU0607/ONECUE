@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { HOME_DEF, getHomeUI, setHomeUI, resetHomeUI, dumpHomeUI } from '../state/homeLayout.js';
+import { t } from '../i18n/index.js';
 
 const POS = 'duel.htune.pos';
 
@@ -43,7 +44,7 @@ export default function HomeTune({ onClose }){
       <div className="htune-top" onPointerDown={grab}>
         <span onClick={() => setFold(f => !f)}>{fold ? '배치 ▸' : '배치 ▾'}</span>
         {!fold && <button onPointerDown={e => e.stopPropagation()} onClick={() => setWide(w => !w)}>
-          {wide ? '좁게' : '넓게'}
+          {wide ? t('common.narrow') : t('common.wide')}
         </button>}
         <button onPointerDown={e => e.stopPropagation()} onClick={onClose}>✕</button>
       </div>
@@ -60,12 +61,12 @@ export default function HomeTune({ onClose }){
       </div>
 
       <div className="htune-foot">
-        <button onClick={() => setV(resetHomeUI())}>되돌리기</button>
+        <button onClick={() => setV(resetHomeUI())}>{t('common.reset')}</button>
         <button className="go" onClick={() => {
           const text = dumpHomeUI();
           try { navigator.clipboard?.writeText(text); } catch { /* 무시 */ }
           console.log(text);
-        }}>값 복사</button>
+        }}>{t('common.copy')}</button>
       </div>
     </div>
   );

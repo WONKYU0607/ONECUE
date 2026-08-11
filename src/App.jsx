@@ -10,6 +10,7 @@ import SettingsModal from './ui/SettingsModal.jsx';
 import HelpModal from './ui/HelpModal.jsx';
 import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings, setSetting } from './state/settings.js';
+import { onLangChange } from './i18n/index.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -19,6 +20,10 @@ import { VIEW, SELF, HAND } from './game/config.js';
 // 화면 전환은 여기 한 곳에서만 한다.
 // GameCanvas는 'game'일 때만 마운트되므로, 화면을 벗어나면 게임 루프·소켓이 자동으로 정리된다.
 export default function App(){
+  // **언어가 바뀌면 화면을 통째로 다시 그린다.** 문구가 여기저기 흩어져 있어
+  // 각자 구독하게 하면 빠뜨리는 곳이 생긴다
+  const [, bumpLang] = useState(0);
+  useEffect(() => onLangChange(() => bumpLang(v => v + 1)), []);
   const [screen, setScreen] = useState('splash');   // splash|home|ai|matching|game|result
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
@@ -72,7 +77,9 @@ export default function App(){
         streak: streakOf(kind) + (r === 'win' ? 1 : 0),
         left: false, teamLeft: (summary.rows || []).some(x => x.mine && !x.self && x.off)
       });
-      const moved = recordMatch(kind, r, d.delta);
+      // **기기에만 반영한다.** 구름에는 서버가 쓴다 —
+      // 여기서 올리면 서버 값과 부딪히고, 자기 점수를 자기가 올리는 길이 열린다
+      const moved = recordMatch(kind, r, d.delta, { local: true });
       sc = { ...d, ...moved, kind };
     }
     setScore(sc);

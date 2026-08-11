@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AI_STAGES } from '../../game/ai.js';
 import { isUnlocked, isCleared, getProgress, modeKey } from '../../state/progress.js';
+import { t } from '../../i18n/index.js';
 
 // AI 모드 스테이지 선택. 앞 단계를 깨야 다음이 열린다
 export default function AiStages({ onBack, onStart, onMelee }){
@@ -15,16 +16,16 @@ export default function AiStages({ onBack, onStart, onMelee }){
   if (mode === null) return (
     <div className="screen list">
       <header className="bar-top">
-        <button className="icon-btn" onClick={onBack} aria-label="뒤로">‹</button>
-        <span className="title">AI 모드</span>
+        <button className="icon-btn" onClick={onBack} aria-label={t('common.back')}>‹</button>
+        <span className="title">{t('mode.ai')}</span>
         <span className="spacer" />
       </header>
       <div className="menu wide-menu">
         <button className="menu-btn primary" onClick={() => setMode('gun')}>
-          <span className="t">총격전</span>
+          <span className="t">{t('mode.gun')}</span>
         </button>
         <button className="menu-btn" onClick={() => setMode('melee')}>
-          <span className="t">칼전</span>
+          <span className="t">{t('mode.melee')}</span>
         </button>
       </div>
     </div>
@@ -33,8 +34,8 @@ export default function AiStages({ onBack, onStart, onMelee }){
   if (mode === 'melee') return (
     <div className="screen list">
       <header className="bar-top">
-        <button className="icon-btn" onClick={() => setMode(null)} aria-label="뒤로">‹</button>
-        <span className="title">AI 모드 · 칼전</span>
+        <button className="icon-btn" onClick={() => setMode(null)} aria-label={t('common.back')}>‹</button>
+        <span className="title">{t('ai.melee')}</span>
         <span className="spacer" />
       </header>
       <div className="menu wide-menu">
@@ -54,17 +55,17 @@ export default function AiStages({ onBack, onStart, onMelee }){
   return (
     <div className="screen list">
       <header className="bar-top">
-        <button className="icon-btn" onClick={() => setMode(null)} aria-label="뒤로">‹</button>
-        <span className="title">AI 모드 · 총격전</span>
+        <button className="icon-btn" onClick={() => setMode(null)} aria-label={t('common.back')}>‹</button>
+        <span className="title">{t('ai.gun')}</span>
         <span className="spacer" />
       </header>
 
       <p className="hint record">{p.wins}승 {p.losses}패 {p.draws}무</p>
 
       <div className="mode-row">
-        <button className={'menu-btn mode' + (n === 2 ? ' on' : '')} onClick={() => setN(2)}>1대1</button>  {/* ok: 버튼 강조용 */}
-        <button className={'menu-btn mode' + (n === 4 ? ' on' : '')} onClick={() => setN(4)}>2대2</button>  {/* ok: 버튼 강조용 */}
-        <button className={'menu-btn mode' + (n === 6 ? ' on' : '')} onClick={() => setN(6)}>3대3</button>  {/* ok: 버튼 강조용 */}
+        <button className={'menu-btn mode' + (n === 2 ? ' on' : '')} onClick={() => setN(2)}>{t('mode.1v1')}</button>  {/* ok: 버튼 강조용 */}
+        <button className={'menu-btn mode' + (n === 4 ? ' on' : '')} onClick={() => setN(4)}>{t('mode.2v2')}</button>  {/* ok: 버튼 강조용 */}
+        <button className={'menu-btn mode' + (n === 6 ? ' on' : '')} onClick={() => setN(6)}>{t('mode.3v3')}</button>  {/* ok: 버튼 강조용 */}
       </div>
       <div className="stages">
         {AI_STAGES.map((s, i) => {
@@ -80,7 +81,7 @@ export default function AiStages({ onBack, onStart, onMelee }){
             >
               <span className="no">{stage}</span>
               <span className="nm">{s.name}</span>
-              <span className="st">{!open ? '잠김' : done ? '클리어' : '도전'}</span>
+              <span className="st">{!open ? t('ai.locked') : done ? t('ai.clear') : t('ai.challenge')}</span>
             </button>
           );
         })}

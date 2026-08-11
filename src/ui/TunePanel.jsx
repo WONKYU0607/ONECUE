@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { TUNE, VIEW } from '../game/config.js';
+import { t } from '../i18n/index.js';
 
 // 디버그용 실시간 튜닝 패널. 값은 game.bump()가 시뮬 상태로 밀어넣는다
 const KEYS = ['spd', 'bul', 'rate', 'curve', 'sat', 'rad', 'dead'];
@@ -42,15 +43,15 @@ export default function TunePanel({ gameRef }){
 
   if (!open){
     return (
-      <button className="ui-overlay tunetoggle" onClick={() => setOpen(true)} aria-label="조절">⚙</button>
+      <button className="ui-overlay tunetoggle" onClick={() => setOpen(true)} aria-label={t('home.tune')}>⚙</button>
     );
   }
 
   return (
     <div className="ui-overlay tune">
       <div className="row head">
-        <span className="lbl">조절</span>
-        <button className="wide" onClick={() => setOpen(false)}>닫기</button>
+        <span className="lbl">{t('home.tune')}</span>
+        <button className="wide" onClick={() => setOpen(false)}>{t('common.close')}</button>
       </div>
       {KEYS.map(k => (
         <div className="row" key={k}>

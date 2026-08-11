@@ -3,7 +3,9 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { Server } from '../src/game/net.js';
-import { PROTO_VER, COLOR_COUNT } from '../src/game/config.js';
+import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY } from '../src/game/config.js';
+import { scoreDelta } from '../src/game/score.js';
+import * as store from './store.js';
 import { forfeit, setOff } from '../src/game/sim.js';
 
 const PORT = process.env.PORT || 8080;
@@ -36,7 +38,10 @@ class Room {
     this.melee = melee;          // 칼전 방인가 (총격전과 규칙이 다르다)
     this.ffa = ffa;              // 개인전인가 (각자 한 팀, 칼전 3~4인)
     // 자리마다 세션 id를 기억한다. 소켓이 끊겨도 sid가 남아 있으면 그 자리는 예약 상태
-    this.seats = Array.from({ length: n }, () => ({ sid: null, ws: null, goneAt: 0 }));
+    this.seats = Array.from({ length: n }, () => ({ sid: null, ws: null, goneAt: 0, uid: '' }));
+    // 판 시작 전 점수·연승. **매칭 때 한 번만 읽는다** — 판마다 읽으면 할당량이 닳는다
+    this.preScore = Array.from({ length: n }, () => ({ score: 1000, streak: 0 }));
+    this.settled = false;        // 점수를 이미 썼는가 (한 판에 한 번만)
     this.emptyAt = 0;
     this.waitingList = [];      // 아직 팀을 안 고른 사람들
     // 팀을 고르기 전에는 자리가 없어서 sid를 남길 데가 없다.
@@ -77,6 +82,66 @@ class Room {
     for (let i = a; i <= b; i++) if (!this.seats[i].sid) return i;
     return -1;
   }
+  // 판이 끝나면 **서버가** 점수를 계산해 Firestore에 쓴다.
+  // 클라이언트가 쓰면 자기 점수를 자기가 올릴 수 있어 순위표가 무너진다.
+  // 한 판에 한 번만 부르고, 실패해도 게임은 그대로 굴러간다
+  // 전투가 시작되는 순간 참가자 점수를 한 번 읽는다.
+  // **매칭 때가 아니라 여기서** 읽어야 재접속·팀 변경까지 반영된다
+  prime(){
+    if (this.primed || this.server.s.phase !== PH_PLAY) return;
+    this.primed = true;
+    if (!store.isOn()) return;
+    const uids = this.seats.map(x => x && x.uid).filter(Boolean);
+    if (!uids.length) return;
+    const kind = this.melee ? 'melee' : 'gun';
+    store.readPlayers(uids).then(m => {
+      this.seats.forEach((seat, i) => {
+        const v = seat && seat.uid && m.get(seat.uid);
+        if (v) this.preScore[i] = { score: v.score[kind], streak: v.streak[kind] };
+      });
+    }).catch(() => {});
+  }
+
+  settle(){
+    const st = this.server.s;
+    if (!st.over || this.settled) return;
+    this.settled = true;
+    if (!store.isOn()) return;
+    const kind = st.melee ? 'melee' : 'gun';
+    const rows = [];
+    for (let i = 0; i < this.n; i++){
+      const seat = this.seats[i];
+      if (!seat || !seat.uid) continue;                 // 로그인 안 한 사람은 건너뛴다
+      const before = this.preScore[i] || { score: 1000, streak: 0 };
+      const d = scoreDelta(st, i, {
+        streak: before.streak + 1,
+        left: !!st.off[i],
+        teamLeft: this.teamHasLeaver(i)
+      });
+      const res = d.result;
+      rows.push({
+        uid: seat.uid, kind, result: res,
+        score: Math.max(0, before.score + d.delta),      // [stated] 하한 0
+        streak: res === 'win' ? before.streak + 1 : 0
+      });
+    }
+    if (!rows.length) return;
+    store.writeResults(rows)
+      .then(ok => { if (ok) store.buildRanks(kind).catch(() => {}); })
+      .catch(() => {});
+  }
+
+  // 우리 편에 중도 이탈자가 있었는가 (있으면 져도 점수가 안 깎인다)
+  teamHasLeaver(slot){
+    const st = this.server.s;
+    for (let i = 0; i < this.n; i++){
+      if (i === slot) continue;
+      if (teamOf(i, this.n) !== teamOf(slot, this.n)) continue;
+      if (st.off[i]) return true;
+    }
+    return false;
+  }
+
   colorTaken(c){ return this.seats.some((st, i) => st.sid && this.server.s.color[i] === c); }
   freeColor(){
     for (let c = 0; c < COLOR_COUNT; c++) if (!this.colorTaken(c)) return c;
@@ -120,6 +185,7 @@ class Room {
     if (seat.ws && seat.ws !== ws) seat.ws.close();   // 같은 sid로 중복 접속하면 옛 소켓을 끊는다
 
     seat.sid = sid; seat.ws = ws; seat.goneAt = 0;
+    seat.uid = ws.uid || seat.uid || '';
     // 슬롯별 닉네임을 상태에 실어 모두에게 전달한다
     if (!Array.isArray(this.server.s.nick)) this.server.s.nick = new Array(this.n).fill('');
     if (nick) this.server.s.nick[slot] = nick;
@@ -273,6 +339,7 @@ wss.on('connection', (ws, req) => {
   const ffa = q.get('ffa') === '1';         // 개인전
   const wantColor = q.has('color') ? +q.get('color') : -1;
   ws.nick = nick;      // 모든 경로(대기열·방·팀 로비)가 같이 쓴다
+  ws.uid = String(q.get('uid') || '').slice(0, 64);   // Firebase 익명 계정. 점수는 이 값으로 저장
   const melee = q.get('melee') === '1';      // 칼전인가
   ws.sid = sid;
 
@@ -407,6 +474,8 @@ setInterval(() => {
       continue;
     }
     room.server.update(now);
+    room.prime();           // 전투가 시작되면 점수를 한 번 읽어둔다
+    room.settle();          // 판이 끝났으면 점수를 쓴다 (한 번만)          // 판이 끝났으면 점수를 쓴다 (한 번만)
   }
 }, TICK_MS);
 

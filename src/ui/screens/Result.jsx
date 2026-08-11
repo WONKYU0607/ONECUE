@@ -1,24 +1,26 @@
 import { TEAMS } from '../../game/config.js';
+import { t } from '../../i18n/index.js';
 
 // 라운드 결과 창.
 // 예전엔 캔버스에 YOU WIN만 띄우고 끝이라 **뭘 잘했는지 알 수가 없었다.**
 // 점수제가 붙으면 여기에 증감·연승·광고 방어가 들어가므로 자리를 미리 잡아둔다.
-const LABEL = { win: '승리', lose: '패배', draw: '무승부' };
+// 열쇠만. 그릴 때 번역한다 (언어를 바꿔도 따라오게)
+const LABEL = { win: 'res.win', lose: 'res.lose', draw: 'res.draw' };
 
 // **닉네임이 있으면 그걸 쓴다.** 서버가 슬롯별로 실어 보낸다.
 // 없으면(AI·연습·옛 서버) 예전처럼 나/팀원1/상대2 식으로 부른다
 function name(r, sum){
   if (r.nick) return r.nick;
-  if (r.self) return '나';
+  if (r.self) return t('common.me');
   if (sum.ffa) return `${r.slot + 1}번`;
   const same = sum.rows.filter(x => x.mine === r.mine && !x.self);
   const idx = same.findIndex(x => x.slot === r.slot) + 1;
-  const base = r.mine ? '팀원' : '상대';
+  const base = r.mine ? t('res.mate') : t('res.foe');
   return same.length > 1 ? `${base}${idx}` : base;
 }
 
 export default function Result({ result, summary, score, session, onAgain, onHome }){
-  const label = LABEL[result] || '무승부';
+  const label = t(LABEL[result] || 'res.draw');
   const rows = summary?.rows || [];
   const total = summary?.totalDealt || 0;
   // 개인전은 팀이 없으니 한 줄로, 팀전은 우리 편 먼저
@@ -39,20 +41,20 @@ export default function Result({ result, summary, score, session, onAgain, onHom
         {score && (
           <div className="resbox scorebox">
             <div className="sc-main">
-              <span className="sc-kind">{score.kind === 'melee' ? '칼전' : '총격전'}</span>
+              <span className="sc-kind">{score.kind === 'melee' ? t('mode.melee') : t('mode.gun')}</span>
               <b className={'sc-delta ' + (score.delta > 0 ? 'up' : score.delta < 0 ? 'down' : '')}>
                 {score.delta > 0 ? '+' : ''}{score.delta}
               </b>
               <span className="sc-after">{score.after.toLocaleString()}</span>
             </div>
             <div className="sc-why">
-              {score.reason === 'leave' && <span>중도 이탈</span>}
-              {score.reason === 'teamLeft' && <span>팀원 이탈 · 점수 안 깎임</span>}
-              {!score.reason && score.rank > 0 && <span>{score.rank}등</span>}
+              {score.reason === 'leave' && <span>{t('res.leaveP')}</span>}
+              {score.reason === 'teamLeft' && <span>{t('res.teamLeft')}</span>}
+              {!score.reason && score.rank > 0 && <span>{t('res.rank', { n: score.rank })}</span>}
               {!score.reason && score.total > 0 &&
-                <span>기여 {Math.round(score.mine / score.total * 100)}%</span>}
-              {score.odds > 1 && <span className="hi">인원 열세 x{score.odds.toFixed(1)}</span>}
-              {score.streakMul > 1 && <span className="hi">{score.streak}연승 x{score.streakMul.toFixed(1)}</span>}
+                <span>{t('res.myShare', { n: Math.round(score.mine / score.total * 100) })}</span>}
+              {score.odds > 1 && <span className="hi">{t('res.odds', { m: score.odds.toFixed(1) })}</span>}
+              {score.streakMul > 1 && <span className="hi">{t('res.streak', { n: score.streak, m: score.streakMul.toFixed(1) })}</span>}
             </div>
           </div>
         )}
@@ -61,17 +63,17 @@ export default function Result({ result, summary, score, session, onAgain, onHom
           <div className="resbox">
             <div className="res-sum">
               {summary.ffa
-                ? <span>{summary.n}인 개인전</span>
-                : <span>남은 체력 {summary.myHp} : {summary.foeHp}</span>}
-              {summary.timeout && <span className="res-tag">시간 만료</span>}
+                ? <span>{t('res.ffaN', { n: summary.n })}</span>
+                : <span>{t('res.hpLeft', { a: summary.myHp, b: summary.foeHp })}</span>}
+              {summary.timeout && <span className="res-tag">{t('res.timeUp')}</span>}
             </div>
 
             {/* 막대는 **기여도**. 남은 체력은 대부분 0이라 막대로는 정보가 없다 */}
             <div className="res-head">
               <span className="who" />
-              <span className="bar">기여도</span>
-              <span className="num">체력</span>
-              <span className="num dmg">피해</span>
+              <span className="bar">{t('res.share')}</span>
+              <span className="num">{t('res.hp')}</span>
+              <span className="num dmg">{t('res.dmg')}</span>
             </div>
             <div className="res-rows">
               {ordered.map(r => (
@@ -83,23 +85,23 @@ export default function Result({ result, summary, score, session, onAgain, onHom
                   </span>
                   <span className="num">{r.hp}</span>
                   <span className="num dmg">{r.dealt}</span>
-                  {r.off && <span className="res-tag">이탈</span>}
+                  {r.off && <span className="res-tag">{t('res.left')}</span>}
                 </div>
               ))}
             </div>
             {total > 0 && (
               <p className="res-mine">
-                내 기여 {Math.round((rows.find(r => r.self)?.dealt || 0) / total * 100)}%
+                {t('res.myShare', { n: Math.round((rows.find(r => r.self)?.dealt || 0) / total * 100) })}
               </p>
             )}
           </div>
         )}
 
         <button className="menu-btn primary" onClick={onAgain}>
-          <span className="t">다시 하기</span>
+          <span className="t">{t('res.again')}</span>
         </button>
         <button className="menu-btn ghost" onClick={onHome}>
-          <span className="t">첫 화면으로</span>
+          <span className="t">{t('res.home')}</span>
         </button>
       </div>
     </div>

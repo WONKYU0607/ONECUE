@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import { startSync } from './cloud/sync.js';
 import { apply as applyHomeUI } from './state/homeLayout.js';
 import './styles.css';
 
@@ -21,6 +22,9 @@ for (const [name, file] of [['--tiers', 'tiers.webp'], ['--ticket', 'ticket.webp
 }
 
 applyHomeUI();   // 홈 배치 수치를 CSS 변수로 내보낸다
+// 익명 로그인 + 구름 기록 내려받기. **첫 화면을 막지 않는다** —
+// Firebase는 따로 받아오고, 실패해도 기기 저장으로 게임이 돌아간다
+setTimeout(() => { startSync().catch(() => {}); }, 0);
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

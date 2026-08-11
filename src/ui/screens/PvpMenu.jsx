@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TEAMS } from '../../game/config.js';
 import { leftFor, maxFor } from '../../state/tickets.js';
+import { t } from '../../i18n/index.js';
 
 // PVP 진입. 화면마다 버튼 두세 개만 보이도록 단계로 내려간다.
 //   모드(총격전·칼전) → 방식(랜덤·방 만들기·코드) → 인원수(1대1·2대2)
@@ -14,7 +15,7 @@ export default function PvpMenu({ onBack, onStart }){
   const [code, setCode] = useState('');
   const ok = /^\d{4}$/.test(code);
 
-  const modeName = melee ? '칼전' : '총격전';
+  const modeName = melee ? t('mode.melee') : t('mode.gun');
   // 남은 티켓 (남은/최대). 개인전은 따로 하루 3판이라 갈라 본다
   const tk = (ffa = false) => `${leftFor(ffa)}/${maxFor(ffa)}`;
   // 티켓이 없으면 못 들어간다. 버튼을 흐리게 하고 눌러도 안 먹는다
@@ -28,15 +29,15 @@ export default function PvpMenu({ onBack, onStart }){
     setStep('how');
   };
   const title =
-    step === 'mode' ? 'PVP'
+    step === 'mode' ? t('mode.pvp')
     : step === 'how' ? modeName
-    : step === 'code' ? modeName + ' · 코드 입력'
-    : modeName + ' · ' + (how === 'queue' ? '랜덤 매칭' : '방 만들기') + (step === 'ffa' ? ' · 개인전' : '');
+    : step === 'code' ? modeName + t('pvp.sufJoin')
+    : modeName + ' · ' + (how === 'queue' ? t('pvp.random') : t('pvp.create')) + (step === 'ffa' ? t('pvp.sufFfa') : '');
 
   return (
     <div className="screen list">
       <header className="bar-top">
-        <button className="icon-btn" onClick={back} aria-label="뒤로">‹</button>
+        <button className="icon-btn" onClick={back} aria-label={t('common.back')}>‹</button>
         <span className="title">{title}</span>
         <span className="spacer" />
       </header>
@@ -45,10 +46,10 @@ export default function PvpMenu({ onBack, onStart }){
         {step === 'mode' && (
           <>
             <button className="menu-btn primary" onClick={() => { setMelee(false); setStep('how'); }}>
-              <span className="t">총격전</span>
+              <span className="t">{t('mode.gun')}</span>
             </button>
             <button className="menu-btn" onClick={() => { setMelee(true); setStep('how'); }}>
-              <span className="t">칼전</span>
+              <span className="t">{t('mode.melee')}</span>
             </button>
           </>
         )}
@@ -56,13 +57,13 @@ export default function PvpMenu({ onBack, onStart }){
         {step === 'how' && (
           <>
             <button className="menu-btn primary" onClick={() => { setHow('queue'); setStep('n'); }}>
-              <span className="t">랜덤 매칭</span>
+              <span className="t">{t('pvp.random')}</span>
             </button>
             <button className="menu-btn" onClick={() => { setHow('create'); setStep('n'); }}>
-              <span className="t">방 만들기</span>
+              <span className="t">{t('pvp.create')}</span>
             </button>
             <button className="menu-btn" onClick={() => setStep('code')}>
-              <span className="t">코드 입력</span>
+              <span className="t">{t('pvp.join')}</span>
             </button>
           </>
         )}
@@ -88,7 +89,7 @@ export default function PvpMenu({ onBack, onStart }){
             {melee && (
               <button className={'menu-btn' + (out(true) ? ' off' : '')}
                       onClick={guard(true, () => setStep('ffa'))}>
-                <span className="t">개인전</span>
+                <span className="t">{t('mode.ffa')}</span>
                 <span className="tkn"><span className="tk-ico" />{tk(true)}</span>
               </button>
             )}
@@ -100,7 +101,7 @@ export default function PvpMenu({ onBack, onStart }){
             {[3, 4, 5, 6].map((k, i) => (
               <button key={k} className={'menu-btn' + (i === 0 ? ' primary' : '')}
                 onClick={guard(true, () => { setPending({ mode: how, n: k, melee, ffa: true }); setStep('color'); })}>
-                <span className="t">{k}인전</span>
+                <span className="t">{t('pvp.players', { n: k })}</span>
                 <span className="tkn"><span className="tk-ico" />{tk(true)}</span>
               </button>
             ))}
@@ -109,7 +110,7 @@ export default function PvpMenu({ onBack, onStart }){
 
         {step === 'color' && (
           <>
-            <p className="hint">캐릭터 색을 고르세요</p>
+            <p className="hint">{t('pvp.pickColor')}</p>
             <div className="colorpick">
               {[0, 1, 2, 3, 4, 5].map(c => (
                 <button key={c}
@@ -119,9 +120,9 @@ export default function PvpMenu({ onBack, onStart }){
                   aria-label={'색 ' + (c + 1)} />
               ))}
             </div>
-            <p className="hint">상대가 같은 색을 골랐으면 자동으로 다른 색이 된다</p>
+            <p className="hint">{t('pvp.colorNote')}</p>
             <button className="menu-btn primary" onClick={() => onStart({ ...pending, color })}>
-              <span className="t">시작</span>
+              <span className="t">{t('common.start')}</span>
             </button>
           </>
         )}

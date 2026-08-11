@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { connectAndWait, disconnect, serverUrl, pickTeam } from '../../net/connection.js';
 import { TEAMS } from '../../game/config.js';
 import { spendFor } from '../../state/tickets.js';
+import { t } from '../../i18n/index.js';
 
 const LABEL = {
-  team:       '팀을 고르세요',
-  waking:     '서버를 깨우는 중…',
-  connecting: '서버에 연결하는 중…',
-  retrying:   '서버를 깨우는 중…',
-  hosting:    '친구를 기다리는 중…',
-  waiting:    '상대를 찾는 중…',
-  matched:    '상대를 찾았다',
-  error:      '연결할 수 없다'
+  team:       t('match.pickTeam'),
+  waking:     t('match.waking'),
+  connecting: t('match.connecting'),
+  retrying:   t('match.waking'),
+  hosting:    t('match.friend'),
+  waiting:    t('match.searching'),
+  matched:    t('match.found'),
+  error:      t('match.failed')
 };
 
 export default function Matching({ session, onCancel, onMatched }){
@@ -62,11 +63,11 @@ export default function Matching({ session, onCancel, onMatched }){
   return (
     <div className="screen center">
       {stage !== 'error' && <div className="spinner" />}
-      <p className="big">{LABEL[stage] || '연결 중…'}</p>
+      <p className="big">{LABEL[stage] || t('match.connect')}</p>
 
       {code && (
         <div className="roomcode">
-          <span className="lbl">방 코드</span>
+          <span className="lbl">{t('match.roomCode')}</span>
           <strong>{code}</strong>
           <span className="hint">
             친구에게 알려주면 이 코드로 들어온다
@@ -77,7 +78,7 @@ export default function Matching({ session, onCancel, onMatched }){
 
       {lobby && stage === 'team' && (
         <>
-          <p className="hint">캐릭터 색</p>
+          <p className="hint">{t('pvp.color')}</p>
           <div className="colorpick">
             {[0, 1, 2, 3, 4, 5].map(c => {
               const taken = (lobby.taken || []).includes(c) && lobby.myColor !== c;
@@ -103,12 +104,12 @@ export default function Matching({ session, onCancel, onMatched }){
                   className={'menu-btn teambtn' + (mine ? ' primary' : '') + (full && !mine ? ' off' : '')}
                   disabled={(full && !mine) || lobby.mine != null}
                   onClick={() => pickTeam(t, color)}>
-                  <span className="t">{t === 0 ? 'A 팀' : 'B 팀'}</span>
+                  <span className="t">{t === 0 ? t('match.teamA') : t('match.teamB')}</span>
                 </button>
               );
             })}
           </div>
-          {lobby.mine != null && <p className="hint">나머지 인원을 기다리는 중</p>}
+          {lobby.mine != null && <p className="hint">{t('match.rest')}</p>}
         </>
       )}
       {stage !== 'error' && <p className="hint">{sec}초</p>}
@@ -129,7 +130,7 @@ export default function Matching({ session, onCancel, onMatched }){
       )}
 
       <button className="menu-btn ghost" onClick={cancel}>
-        {stage === 'error' ? '돌아가기' : '취소'}
+        {stage === 'error' ? t('common.goBack') : t('common.cancel')}
       </button>
     </div>
   );

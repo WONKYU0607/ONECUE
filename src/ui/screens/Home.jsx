@@ -1,5 +1,6 @@
 // 첫 화면: 모드 선택 + 설정
 import PlayerBar from '../PlayerBar.jsx';
+import { t } from '../../i18n/index.js';
 
 export default function Home({ onPvp, onAi, onPractice, onSettings, onHelp }){
   return (
@@ -9,13 +10,13 @@ export default function Home({ onPvp, onAi, onPractice, onSettings, onHelp }){
 
       <div className="menu">
         <button className="menu-btn primary" onClick={onPvp}>
-          <span className="t">PVP</span>
+          <span className="t">{t('mode.pvp')}</span>
         </button>
         <button className="menu-btn" onClick={onAi}>
-          <span className="t">AI 모드</span>
+          <span className="t">{t('mode.ai')}</span>
         </button>
         <button className="menu-btn" onClick={onPractice}>
-          <span className="t">연습 모드</span>
+          <span className="t">{t('mode.practice')}</span>
         </button>
       </div>
 
