@@ -84,9 +84,10 @@ console.log('배치는 건너뛰고 준비완료만 남는다');
   assert(s.phase === PH_READY, '2인: 아직 배치 단계');
   assert(s.done.every(Boolean), '2인: 설치 완료는 자동 (놓을 게 없다)');
   assert(!s.ready.some(Boolean), '2인: 준비완료는 각자 누른다');
-  // 아무도 안 누르면 계속 기다린다 → 2배속 신청에 시간 압박이 없다
-  for (let t = 0; t < 600; t++) step(s, IN(2));
-  assert(s.phase === PH_READY, '2인: 누를 때까지 기다린다');
+  // [stated] **제한 시간이 지나면 자동 시작한다** (칼전 10초).
+  // 예전엔 무한히 기다려서 상대가 준비완료를 안 누르면 게임이 영영 안 시작됐다
+  for (let t = 0; t < 300; t++) step(s, IN(2));
+  assert(s.phase === PH_READY, `2인: 5초까지는 기다린다 (남은 ${s.rdy})`);
   const g = IN(2); for (const q of g) q.go = 1;
   step(s, g);
   assert(s.phase === PH_COUNT, '2인: 전원 준비완료 → 카운트다운');

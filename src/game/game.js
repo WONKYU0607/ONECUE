@@ -415,12 +415,20 @@ export function createGame(canvas, opts = {}){
       ammo: ammoLeft, charge: input.charge, softFlash: opts.softFlash?.() || false, juice
     });
 
-    // 페이즈가 바뀔 때만 React에 알린다 (매 프레임 setState 하면 안 됨)
-    if (client.pred.phase !== lastPhase){
-      lastPhase = client.pred.phase;
+    // 페이즈가 바뀔 때만 React에 알린다 (매 프레임 setState 하면 안 됨).
+    // **끝 판정은 확정 상태(client.s)로 한다.** 예측 상태는 아직 서버가 인정하지 않은
+    // 내 입력이 얹혀 있어 기기마다 다르다 — 칼전은 위치로 타격을 판정하므로
+    // 예측 위치가 조금만 어긋나도 한쪽만 "죽었다"고 판단해 혼자 결과 화면으로 갔다.
+    // 화면은 그대로 예측으로 그리고(반응이 즉각적이어야 하므로) 승패만 확정본을 본다
+    const shownPhase = client.pred.phase;
+    const truePhase = client.s.phase;
+    const phase = truePhase === PH_OVER ? PH_OVER
+                : (shownPhase === PH_OVER ? truePhase : shownPhase);
+    if (phase !== lastPhase){
+      lastPhase = phase;
       onPhase(lastPhase);
       if (lastPhase === PH_OVER){
-        onFinish(resultFor(client.pred, SELF.slot), matchSummary(client.pred, SELF.slot));
+        onFinish(resultFor(client.s, SELF.slot), matchSummary(client.s, SELF.slot));
       }
     }
   }

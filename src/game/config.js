@@ -61,6 +61,11 @@ export const RENDER_MAXJUMP = 30 * FP; // 이보다 크게 튀면 보간 생략 
 // 12틱(0.2초)이면 총알·불(12틱)·칼(30틱)이 전부 들어가면서
 // 한 번의 폭발이 여러 번 세지는 것만 막는다
 export const INVUL_T = 12, FLASH_T = 15;
+// [stated] 준비 단계 제한 시간. **상대가 준비완료를 안 누르면 영원히 시작이 안 됐다.**
+// 총격전은 설치할 게 있어 15초, 칼전은 놓을 게 없어 10초
+export const READY_TICKS = 15 * 60;
+export const READY_TICKS_MELEE = 10 * 60;
+export const readyLimit = melee => (melee ? READY_TICKS_MELEE : READY_TICKS);
 export const PH_READY = 0, PH_COUNT = 1, PH_PLAY = 2, PH_OVER = 3;
 export const CD_STEP = 60, CD_GO = 45;                  // 3/2/1 각 1초 + GAME START 0.75초
 export const CD_TICKS = CD_STEP * 3 + CD_GO;
@@ -350,7 +355,7 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 58;
+export const PROTO_VER = 59;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

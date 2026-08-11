@@ -219,7 +219,12 @@ export function createRenderer(canvas){
       const left = Math.ceil(s.clock / 60);
       ctx.fillStyle = left <= 10 ? '#f0645a' : '#e8e8f0';   // 10초 남으면 빨갛게
       ctx.fillText(String(left).padStart(2, '0'), W / 2 * RS, (H + 9.5) * RS);
-    }   // 전투 중이 아니면 가운데는 비워둔다 (안내 문구는 화면 위 버튼·배너로 충분)
+    } else if (s.phase === PH_READY && !s.solo && s.rdy > 0){
+      // 준비 단계 남은 시간. 다 되면 자동으로 시작하므로 보여줘야 한다
+      const left = Math.ceil(s.rdy / 60);
+      ctx.fillStyle = left <= 5 ? '#f0a81e' : '#9fb0c2';
+      ctx.fillText(String(left).padStart(2, '0'), W / 2 * RS, (H + 9.5) * RS);
+    }
     ctx.textAlign = 'left';
 
     const g = stickGeom(uiH);

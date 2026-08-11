@@ -40,6 +40,7 @@ import {
   HOME_COL,
   HP_MARKS,
   INVUL_T,
+  readyLimit,
   INV_SLOTS,
   ITEM,
   ITEM_DEF,
@@ -170,6 +171,7 @@ export function normalizeState(st){
   if (typeof st.blindMax !== 'number') st.blindMax = 0;
   if (!Array.isArray(st.ammo)) st.ammo = st.p.map(() => THROW_DEF.map(d => d.count));
   if (typeof st.clock !== 'number') st.clock = 0;
+  if (typeof st.rdy !== 'number') st.rdy = readyLimit(st.melee);
   return st;
 }
 
@@ -246,6 +248,7 @@ export function newState(n = 2, melee = false, ffa = false){
     nick: Array.from({ length: n }, () => ''),
 
     phase: PH_READY, timer: 0, clock: 0,
+    rdy: readyLimit(melee),   // 준비 단계 남은 틱. 0이 되면 자동으로 시작한다
     maxStep: stepCap(),
     bulletV: bulletFP(),
     coolT:   coolTicks(),
@@ -561,7 +564,15 @@ export function step(s, inp){
     // 전원이 준비완료를 눌러야 시작한다 (START 버튼 없음).
     // 연습 모드는 상대가 없으므로 한쪽만 완료하면 시작한다
     const allReady = s.solo ? s.ready.some(Boolean) : s.ready.every(Boolean);
-    if (allReady){
+    // [stated] **제한 시간이 지나면 자동으로 시작한다.** 안 그러면 상대가 준비완료를
+    // 안 누를 때 영원히 안 시작된다. 2배속·노템전 신청 중에는 멈춘다(답을 기다려야 하므로)
+    // 2배속·노템전 신청에 답을 기다리는 동안은 멈춘다 (답할 시간을 뺏으면 안 된다)
+    const asking = s.fastT > 0 || s.bareT > 0;
+    if (!s.solo && !asking && s.rdy > 0) s.rdy--;
+    const timeUp = !s.solo && s.rdy === 0;
+    if (allReady || timeUp){
+      // 시간이 다 되면 안 누른 사람도 준비된 것으로 본다
+      if (timeUp) for (let i = 0; i < s.n; i++){ s.done[i] = true; s.ready[i] = true; }
       s.phase = PH_COUNT; s.timer = CD_TICKS;
     }
     return;
@@ -570,7 +581,7 @@ export function step(s, inp){
   if (s.phase === PH_OVER){
     if (inp[0].fire || inp[1].fire){
       const t = s.tick, ms = s.maxStep, bv = s.bulletV, ct = s.coolT, n = newState();
-      n.tick = t; n.phase = PH_READY; n.timer = 0;
+      n.tick = t; n.phase = PH_READY; n.timer = 0; n.rdy = readyLimit(n.melee);
       s.p = n.p; s.bullets = n.bullets; s.covers = n.covers;
       s.items = n.items; s.ready = n.ready; s.fx = n.fx;
       s.proj = n.proj; s.blind = n.blind; s.ammo = n.ammo; s.fire = n.fire;
@@ -894,6 +905,7 @@ export function step(s, inp){
 export function checksum(s){
   setArena(s.n, s.melee, s.ffa);
   let h = s.tick + s.maxStep + s.bulletV + s.coolT + s.phase * 7 + s.timer + s.clock;
+  h = (h*31 + (s.rdy | 0)) | 0;
   for (const p of s.p) h = (h*31 + p.x + p.y*3 + p.hp*7 + p.cool*3 + p.invul) | 0;
   for (const b of s.bullets) h = (h*31 + b.x + b.y + b.o) | 0;
   for (const c of s.covers) h = (h*31 + c.hp) | 0;
