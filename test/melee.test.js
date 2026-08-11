@@ -444,3 +444,35 @@ console.log('개인전 — 각자 한 팀, 마지막 한 명이 승리');
 }
 
 console.log('melee.test.js 통과');
+
+console.log('같은 틱에 서로 베면 둘 다 들어간다 (무승부)');
+{
+  // [stated] "칼전 같이 타격해도 같이 안 끝나고, 항상 한쪽이 4% 남음"
+  // 원인: 판정이 슬롯 순서대로 돌면서 `t.hp <= 0`을 지금 체력으로 봤다.
+  // 슬롯0이 먼저 죽이면 슬롯1은 휘두를 기회를 잃었다 → **틱 시작 체력**으로 판정
+  const { FP, ATK_TICKS, MELEE_DAMAGE, setArena, SELF, PH_PLAY: PLAY } = await import('../src/game/config.js');
+  const face = s2 => { s2.p[0].face = 0; s2.p[1].face = 1; };
+  const mk = (a, b) => {
+    SELF.slot = 0; SELF.n = 2; setArena(2, true);
+    const s2 = newState(2, true);
+    s2.phase = PLAY;
+    s2.p[0].hp = a; s2.p[1].hp = b;
+    s2.p[0].x = s2.p[1].x;
+    s2.p[0].y = s2.p[1].y + Math.round(12 * FP);
+    face(s2);
+    const q = IN(2); q[0].atk = 1; q[1].atk = 1;
+    step(s2, q);
+    for (let t = 0; t < ATK_TICKS + 6; t++) step(s2, IN(2));
+    return s2;
+  };
+  const half = MELEE_DAMAGE / 2;
+  const both = mk(half, half);
+  assert(both.p[0].hp <= 0 && both.p[1].hp <= 0, `둘 다 죽는다 (${both.p.map(p => p.hp)})`);
+  assert(both.winner === 0, `무승부 (winner ${both.winner})`);
+  // 체력이 다르면 여전히 갈린다
+  const one = mk(half, MELEE_DAMAGE * 3);
+  assert(one.p[0].hp <= 0 && one.p[1].hp > 0, '체력이 많은 쪽이 산다');
+  assert(one.winner === 2, `슬롯1 승 (winner ${one.winner})`);
+  const two = mk(MELEE_DAMAGE * 3, half);
+  assert(two.winner === 1, `반대도 마찬가지 (winner ${two.winner})`);
+}

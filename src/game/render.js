@@ -171,6 +171,26 @@ export function createRenderer(canvas){
     if (hit) drawBurst(xw, yw, (colorOf && colorOf[i] != null) ? colorOf[i] : TEAM_OF[i], 1 - p.flash / FLASH_T);
     if (off) ctx.globalAlpha = 1;   // **반드시 되돌린다.** 안 그러면 뒤에 그려지는 게 전부 흐려진다
   }
+  // 준비 단계 남은 시간. **아레나 한가운데에 크게.** 패널 안 작은 숫자는
+  // 체력바·버튼과 겹쳐 안 보인다는 지적을 받았다
+  function drawReadyTimer(s){
+    if (s.phase !== PH_READY || s.solo || !(s.rdy > 0)) return;
+    const left = Math.ceil(s.rdy / 60);
+    const cx = W / 2 * RS, cy = H * 0.42 * RS;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '900 ' + (30 * RS) + 'px ' + GF;
+    ctx.lineWidth = 6 * RS; ctx.strokeStyle = 'rgba(6,8,14,0.9)';
+    ctx.strokeText(String(left), cx, cy);
+    ctx.fillStyle = left <= 5 ? '#f0a81e' : '#dceaf6';
+    ctx.fillText(String(left), cx, cy);
+    ctx.font = '900 ' + (7 * RS) + 'px ' + GF;
+    ctx.lineWidth = 4 * RS;
+    const msg = '준비하세요';
+    ctx.strokeText(msg, cx, cy + 22 * RS);
+    ctx.fillStyle = 'rgba(220,234,246,0.8)';
+    ctx.fillText(msg, cx, cy + 22 * RS);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
   function drawPanel(s, stick){
     px(0, H, W, uiH, '#0d0d16');
     px(0, H, W, 0.6, 'rgba(78,201,240,0.55)');
@@ -190,7 +210,8 @@ export function createRenderer(canvas){
     const BY0 = H + (two ? 2.5 : 4.5);
     const BW = 56, gap = 2;   // 가운데 버튼 자리를 벌리려고 62 → 56
     const bar = (x, y, h, hp, team, rightAlign) => {
-      px(x, y, BW, h, 'rgba(255,255,255,0.10)');
+      // 바탕을 밝게. 어두운 색 캐릭터는 옅은 바탕 위에서 줄어드는 게 안 보였다
+      px(x, y, BW, h, 'rgba(255,255,255,0.82)');
       const pct = Math.max(0, Math.round(hp / MAXHP * 100));
       const w = BW * Math.max(0, hp) / MAXHP;
       px(rightAlign ? x + BW - w : x, y, w, h, hp > 0 ? TEAMS[team].m : 'rgba(255,255,255,0.06)');
@@ -218,11 +239,6 @@ export function createRenderer(canvas){
     if (s.phase === PH_PLAY){
       const left = Math.ceil(s.clock / 60);
       ctx.fillStyle = left <= 10 ? '#f0645a' : '#e8e8f0';   // 10초 남으면 빨갛게
-      ctx.fillText(String(left).padStart(2, '0'), W / 2 * RS, (H + 9.5) * RS);
-    } else if (s.phase === PH_READY && !s.solo && s.rdy > 0){
-      // 준비 단계 남은 시간. 다 되면 자동으로 시작하므로 보여줘야 한다
-      const left = Math.ceil(s.rdy / 60);
-      ctx.fillStyle = left <= 5 ? '#f0a81e' : '#9fb0c2';
       ctx.fillText(String(left).padStart(2, '0'), W / 2 * RS, (H + 9.5) * RS);
     }
     ctx.textAlign = 'left';
@@ -299,7 +315,7 @@ export function createRenderer(canvas){
       const bx = x + (ARENA.pw - BW) / 2;
       const by = fy(y, ARENA.ph) - BH - 2.2;   // "나" 표시가 있던 자리
       px(bx - 0.35, by - 0.35, BW + 0.7, BH + 0.7, 'rgba(8,10,16,0.78)');   // 테두리
-      px(bx, by, BW, BH, 'rgba(255,255,255,0.13)');
+      px(bx, by, BW, BH, 'rgba(255,255,255,0.82)');   // 바탕을 밝게 (어두운 색도 줄어드는 게 보이게)
       const w = BW * Math.max(0, p.hp) / MAXHP;
       const col = viewOf(s)[i];
       // 많이 깎이면 색이 죽는다 — 위험한지 한눈에 보이게
@@ -665,13 +681,9 @@ export function createRenderer(canvas){
       px(c.x/FP, cy2, c.w/FP, 2, '#7676a0');
     }
     // 총알은 시뮬 시각 그대로. 몸도 전부 '현재'로 그리므로 밀 이유가 없다
-    for (const b of s.bullets){
-      const t = TEAMS[viewOf(s)[b.o]];
-      const bx = b.x/FP, by = fy((b.y + b.vy * a)/FP, 5);
-      // **어두운 색은 밝은 테두리를 두른다.** 검정 총알이 바닥에 묻혀 안 보였다
-      if (t.o) px(bx - 0.5, by - 0.5, 3, 6, t.o);
-      px(bx, by, 2, 5, t.m);
-    }
+    // 총알은 색만 다르고 모양은 전부 같다 (테두리를 두르면 그것만 달라 보인다)
+    for (const b of s.bullets)
+      px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5, TEAMS[viewOf(s)[b.o]].m);
     // 렌더 위치 배열은 첫 예측이 끝나야 생긴다. 없으면 보정 없이 확정 위치로 그린다
     const rx = cl.rx || [], ry = cl.ry || [];
     for (let i = 0; i < s.p.length; i++)
@@ -682,6 +694,7 @@ export function createRenderer(canvas){
     drawProjectiles(s, a);
     drawFire(s);
     drawFx(s);
+    drawReadyTimer(s);
     if (j) drawJuice(j);
     ctx.restore();
     drawPanel(s, stick);

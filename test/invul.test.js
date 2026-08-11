@@ -69,12 +69,13 @@ console.log('검정 총알이 바닥에 안 묻힌다');
     const n = parseInt(h.slice(1), 16);
     return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
   };
+  // 바닥(밝기 64)과 충분히 갈려야 한다. 원래 #4a4a56 은 밝기 75로 거의 같았다
   assert(lum(black.m) < 40, `검정이 충분히 어둡다 (밝기 ${lum(black.m).toFixed(0)})`);
-  assert(typeof black.o === 'string', '총알 테두리 색이 있다');
-  assert(lum(black.o) > 150, `테두리가 밝다 (${lum(black.o).toFixed(0)})`);
-  // 다른 색은 테두리가 없어야 한다 (있으면 다 두꺼워 보인다)
-  const others = TEAMS.filter(t => t !== black);
-  assert(others.every(t => !t.o), '밝은 색에는 테두리를 안 두른다');
+  const FLOOR = 64;
+  assert(FLOOR - lum(black.m) > 30,
+    `바닥보다 확실히 어둡다 (${lum(black.m).toFixed(0)} vs ${FLOOR})`);
+  // **어느 색에도 테두리를 두르지 않는다** — 그 총알만 모양이 달라 보인다
+  assert(TEAMS.every(t => !t.o), '총알은 전부 같은 모양');
 }
 
 console.log('invul.test.js 통과');

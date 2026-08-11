@@ -725,13 +725,16 @@ export function step(s, inp){
     const shT = Math.max(1, Math.round(SHIELD_TICKS / fm));
     const shC = Math.max(1, Math.round(SHIELD_COOL / fm));
     const stT = Math.max(1, Math.round(STUN_TICKS / fm));
+    // **이 틱이 시작될 때의 체력.** 같은 틱에 서로 베면 둘 다 들어가야 한다 —
+    // 지금 체력을 보면 슬롯 번호가 앞선 사람이 먼저 죽여서 상대가 기회를 잃는다
+    const hp0 = s.p.map(x => x.hp);
     for (let i = 0; i < s.n; i++){
       const p = s.p[i], q = s.off[i] ? NOIN : (inp[i] || NOIN);
       if (p.cool > 0) p.cool--;
       if (p.shield > 0) p.shield--;
       if (p.shCool > 0) p.shCool--;
       if (p.stun > 0) p.stun--;
-      if (p.hp <= 0){ p.atk = 0; p.shield = 0; p.stun = 0; continue; }
+      if (hp0[i] <= 0){ p.atk = 0; p.shield = 0; p.stun = 0; continue; }
       if (s.off[i]) continue;                       // 끊긴 사람은 아무것도 안 한다
       // 방패: 누르면 0.5초간 방어 자세. 기절 중엔 못 든다.
       // 드는 순간 **휘두르던 칼은 취소된다** — 막는 동안은 공격을 포기하는 게 대가
@@ -755,7 +758,10 @@ export function step(s, inp){
           for (let v = 0; v < s.n; v++){
             if (v === i || teamOf(v, s.n) === teamOf(i, s.n)) continue;
             const t = s.p[v];
-            if (t.hp <= 0 || s.off[v]) continue;   // 끊긴 사람은 유령 — 칼도 통과
+            // **이 틱이 시작될 때 살아 있었는가**로 본다. 지금 체력을 보면
+            // 슬롯 번호가 앞선 사람이 먼저 죽여서 상대가 휘두를 기회를 잃는다 —
+            // 같은 틱에 서로 베어도 항상 한쪽만 죽고 4%가 남았던 원인
+            if (hp0[v] <= 0 || s.off[v]) continue;   // 끊긴 사람은 유령 — 칼도 통과
             if (!overlap(t.x, t.y, PWf, PHf, hx, hy, hw, hh)) continue;
             // 방패로 막았는가 — **마주 보고 있을 때만** 막힌다. 등 뒤는 못 막는다
             if (t.shield > 0 && t.face === FACE_OPP[p.face]){
@@ -763,11 +769,10 @@ export function step(s, inp){
               t.blocked = (t.blocked || 0) + 1;      // 연출용 (막은 순간 표시)
               continue;
             }
-            const was = t.hp;
-            addDealt(s, i, Math.min(MELEE_DAMAGE, Math.max(0, t.hp)));   // 깎기 전 체력 기준
+            addDealt(s, i, Math.min(MELEE_DAMAGE, Math.max(0, hp0[v])));   // 깎기 전 체력 기준
             if (!DEBUG_INF_HP) t.hp -= MELEE_DAMAGE;
             t.flash = FLASH_T; t.hitBy = i;
-            if (was > 0 && t.hp <= 0) killFx(s, t);
+            if (hp0[v] > 0 && t.hp <= 0) killFx(s, t);
           }
         }
       }
