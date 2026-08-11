@@ -34,9 +34,10 @@ function side(pd, total){
 // 칼전 방패 버튼: 스틱 반대쪽. 스와이프와 확실히 떨어뜨린다
 export function shieldBtn(uiH){
   const pd = padRect(uiH);
-  // 작게, 그리고 **아래로**. 위 공간은 준비완료 버튼 자리로 비운다
+  // [stated] 맨 아래에 붙어 있어 누르기 불편하다 → **세로 가운데**로 올린다.
+  // 준비 버튼은 체력바 사이(패드 위쪽)에 있어서 겹치지 않는다
   const size = Math.min(pd.h - 8, 34);
-  return { x: pd.x + 8, y: pd.y + pd.h - 4 - size, w: size, h: size };
+  return { x: pd.x + 8, y: pd.y + (pd.h - size) / 2, w: size, h: size };
 }
 
 // 화면 위에 겹쳐 띄우는 버튼·배너가 차지할 자리 (월드 좌표).

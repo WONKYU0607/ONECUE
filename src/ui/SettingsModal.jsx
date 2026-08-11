@@ -6,10 +6,12 @@ import { t, LANGS, getLang, setLang } from '../i18n/index.js';
 
 // **열쇠만 담아둔다.** 문구를 여기서 미리 만들면 파일을 읽을 때 한 번만 계산돼
 // 언어를 바꿔도 그대로 남는다
-const ROWS = ['sound', 'vibrate', 'leftStick', 'softFlash', 'showGrid'];
+// **`showGrid`는 뺐다.** 격자 좌표를 맞출 때 쓰던 개발용이라 사용자에게 보일 이유가 없다.
+// 코드는 남겨뒀다 — 새 아레나를 만들 때 다시 필요하다
+const ROWS = ['sound', 'vibrate', 'leftStick', 'softFlash'];
 const LABEL = {
   sound: 'set.sound', vibrate: 'set.vibrate', leftStick: 'set.stickLeft',
-  softFlash: 'set.softFlash', showGrid: 'set.grid'
+  softFlash: 'set.softFlash'
 };
 
 export default function SettingsModal({ onClose }){

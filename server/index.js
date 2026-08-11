@@ -53,6 +53,10 @@ class Room {
       serverSend: (msg, pid) => this.send(msg, pid),
       toServer: null
     }, n, melee, ffa);
+    // 버프가 뜨는 자리를 정하는 씨앗. **서버가 정해 모두에게 내려보낸다** —
+    // 클라마다 다르면 서로 다른 칸에 버프가 보인다.
+    // Server 를 만든 **뒤에** 넣어야 한다 (앞에 두면 this.server 가 아직 없다)
+    this.server.s.seed = (Math.random() * 0x7fffffff) | 0;
   }
   send(msg, pid){
     const raw = JSON.stringify(msg);

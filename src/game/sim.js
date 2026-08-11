@@ -41,6 +41,7 @@ import {
   HP_MARKS,
   INVUL_T,
   readyLimit,
+  BUFF, BUFF_DEF, BUFF_EVERY, BUFF_MAX, BUFF_KINDS,
   INV_SLOTS,
   ITEM,
   ITEM_DEF,
@@ -172,6 +173,11 @@ export function normalizeState(st){
   if (!Array.isArray(st.ammo)) st.ammo = st.p.map(() => THROW_DEF.map(d => d.count));
   if (typeof st.clock !== 'number') st.clock = 0;
   if (typeof st.rdy !== 'number') st.rdy = readyLimit(st.melee);
+  if (!Array.isArray(st.buffs)) st.buffs = [];
+  if (!Array.isArray(st.bf) || st.bf.length !== (st.n || 2))
+    st.bf = Array.from({ length: st.n || 2 }, (_, i) => (st.bf && st.bf[i]) || [0, 0, 0, 0]);
+  if (typeof st.seed !== 'number') st.seed = 0;
+  if (typeof st.noBuff !== 'boolean') st.noBuff = false;
   return st;
 }
 
@@ -246,6 +252,11 @@ export function newState(n = 2, melee = false, ffa = false){
     dealt: Array.from({ length: n }, () => 0),
     // 슬롯별 닉네임. 서버가 채워 모두에게 전달한다 (그리기·결과 표시 전용)
     nick: Array.from({ length: n }, () => ''),
+    // 칼전 버프. 바닥에 뜬 것과 각자 가진 것
+    buffs: [],                                   // [{k, c, r}] 바닥에 놓인 버프
+    bf: Array.from({ length: n }, () => [0, 0, 0, 0]),   // 슬롯별 남은 틱 (종류별)
+    seed: 0,                                     // 결정론적 난수 씨앗 (서버가 정한다)
+    noBuff: false,                               // 노버프전인가
 
     phase: PH_READY, timer: 0, clock: 0,
     rdy: readyLimit(melee),   // 준비 단계 남은 틱. 0이 되면 자동으로 시작한다
@@ -375,6 +386,19 @@ function killFx(s, p){
 }
 
 // 가한 피해를 더한다. **남은 체력을 넘겨 세지 않는다** — 10 남은 상대를 40으로 때려도 10만 인정
+// **결정론적 난수.** 서버와 클라가 같은 자리에 버프를 띄워야 하므로
+// Math.random 을 쓰면 안 된다. 틱과 씨앗만으로 값이 정해진다
+export function rnd(s, salt = 0){
+  let h = ((s.seed | 0) ^ ((s.tick | 0) * 2654435761) ^ (salt * 40503)) >>> 0;
+  h ^= h >>> 15; h = Math.imul(h, 2246822507) >>> 0;
+  h ^= h >>> 13; h = Math.imul(h, 3266489909) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+// 무적 버프 중인가. **피해가 들어가는 모든 곳에서 본다** —
+// 한 군데라도 빠뜨리면 그 공격만 뚫려서 버그로 보인다
+export const isInvul = (s, i) => !!(s.bf && s.bf[i] && s.bf[i][BUFF.INVUL] > 0);
+
 export function addDealt(s, by, amount){
   if (!Array.isArray(s.dealt) || by < 0 || by >= s.n) return;
   s.dealt[by] += Math.max(0, amount);
@@ -392,6 +416,7 @@ export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
   for (let i = 0; i < s.n; i++){
     const p = s.p[i];
     if (s.off && s.off[i]) continue;        // 끊긴 사람은 유령
+    if (isInvul(s, i)) continue;            // 무적 버프
     if (byTeam >= 0 && teamOf(i, s.n) === byTeam) continue;
     if (!overlap(p.x, p.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
     if (p.invul > 0) continue;
@@ -511,7 +536,8 @@ export function step(s, inp){
       const q = s.off[i] ? NOIN : (inp[i] || NOIN);
       const pending = s.fastBy || s.bareBy;
       if (q.fastReq && !s.fast && !pending){ s.fastBy = i + 1; s.fastT = NEG_TICKS; s.negOk = []; }
-      if (q.bareReq && !s.bare && !s.melee && !pending){ s.bareBy = i + 1; s.bareT = NEG_TICKS; s.negOk = []; }
+      // [stated] 칼전에도 신청 가능. 칼전은 없앨 아이템이 없으므로 **버프를 끈다**
+      if (q.bareReq && !s.bare && !pending){ s.bareBy = i + 1; s.bareT = NEG_TICKS; s.negOk = []; }
 
       const by = s.fastBy || s.bareBy;
       if (!q.fastAns && !q.bareAns) continue;
@@ -528,7 +554,8 @@ export function step(s, inp){
       const need = foesOf(by).filter(v => !s.off[v]);
       if (need.every(v => s.negOk.includes(v))){
         if (s.fastBy) s.fast = true;
-        else { s.bare = true; s.items = []; }                 // 이미 깔아둔 것도 치운다
+        // 칼전은 없앨 아이템이 없으므로 **버프를 끈다** (= 노버프전)
+        else { s.bare = true; s.items = []; if (s.melee) s.noBuff = true; }
         s.fastBy = 0; s.bareBy = 0; s.fastT = 0; s.bareT = 0; s.negOk = [];
       }
     }
@@ -600,7 +627,10 @@ export function step(s, inp){
     if (s.phase === PH_PLAY){
       // 자유 이동. dx/dy 는 이동량(고정소수점). 기절 중엔 입력이 통째로 무시된다
       let dx = q.dx | 0, dy = q.dy | 0;
-      const cap = s.maxStep * (s.fast ? FAST_MUL : 1) * ((s.spdMul && s.spdMul[i]) || 1), len2 = dx*dx + dy*dy;
+      // 버프를 먹으면 그만큼 더 빨라진다
+      const bSpd = (s.bf && s.bf[i] && s.bf[i][BUFF.SPD] > 0) ? BUFF_DEF[BUFF.SPD].mul : 1;
+      const cap = s.maxStep * (s.fast ? FAST_MUL : 1) * ((s.spdMul && s.spdMul[i]) || 1) * bSpd,
+            len2 = dx*dx + dy*dy;
       if (len2 > cap*cap){                     // 대각선이 빨라지지 않도록 벡터 길이로 제한
         const k = cap / Math.sqrt(len2);
         dx = Math.round(dx * k); dy = Math.round(dy * k);
@@ -744,10 +774,14 @@ export function step(s, inp){
       // 자동 공격. 칼전은 스틱만으로 조작한다
       if (p.stun > 0){ p.atk = 0; continue; }       // 굳은 동안은 못 휘두른다
       if (p.shield > 0) continue;                   // 방패를 든 동안은 공격이 안 나간다
-      if (p.atk === 0 && p.cool === 0){ p.atk = atkT; p.cool = mCool; }
+      // 공격 속도 버프: 휘두르는 동작과 쿨을 그만큼 줄인다 (슬롯마다 다르다)
+      const bAtk = (s.bf && s.bf[i] && s.bf[i][BUFF.ATK] > 0) ? BUFF_DEF[BUFF.ATK].mul : 1;
+      const myAtkT = Math.max(2, Math.round(atkT / bAtk));
+      const myHit = Math.max(1, Math.round(atkH / bAtk));
+      if (p.atk === 0 && p.cool === 0){ p.atk = myAtkT; p.cool = Math.max(1, Math.round(mCool / bAtk)); }
       if (p.atk > 0){
         p.atk--;
-        if (p.atk === atkT - atkH){                 // 모션 중간에 한 번만 판정
+        if (p.atk === myAtkT - myHit){              // 모션 중간에 한 번만 판정
           // 판정 상자는 **바라보는 쪽 한 칸**. 좌우로도 벨 수 있다
           const cwF = Math.round(GRID_CW * FP), chF = Math.round(GRID_CH * FP);
           let hx = p.x, hy = p.y, hw = PWf, hh = PHf;
@@ -762,6 +796,7 @@ export function step(s, inp){
             // 슬롯 번호가 앞선 사람이 먼저 죽여서 상대가 휘두를 기회를 잃는다 —
             // 같은 틱에 서로 베어도 항상 한쪽만 죽고 4%가 남았던 원인
             if (hp0[v] <= 0 || s.off[v]) continue;   // 끊긴 사람은 유령 — 칼도 통과
+            if (isInvul(s, v)) continue;             // 무적 버프
             if (!overlap(t.x, t.y, PWf, PHf, hx, hy, hw, hh)) continue;
             // 방패로 막았는가 — **마주 보고 있을 때만** 막힌다. 등 뒤는 못 막는다
             if (t.shield > 0 && t.face === FACE_OPP[p.face]){
@@ -790,6 +825,7 @@ export function step(s, inp){
       for (let v = 0; v < s.n; v++){
         const t = s.p[v];
         if (t.hp <= 0 || s.off[v]) continue;                          // 끊긴 사람은 유령
+        if (isInvul(s, v)) continue;                                  // 무적 버프
         if (fireTeam >= 0 && teamOf(v, s.n) === fireTeam) continue;   // 자해·아군 오사 없음
         if (!overlap(t.x, t.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
         const was = t.hp;
@@ -805,8 +841,10 @@ export function step(s, inp){
   // 폭발 연출 수명
   for (let i = s.fx.length - 1; i >= 0; i--) if (--s.fx[i].t <= 0) s.fx.splice(i, 1);
 
-  // 전투 중: 클릭 없이 coolT 간격 자동 발사 (연습 모드·칼전에선 쏘지 않는다)
-  if (!s.solo && !s.melee)
+  // 전투 중: 클릭 없이 coolT 간격 자동 발사 (칼전은 총이 없다).
+  // **연습 모드도 쏜다** — 총격전은 조준·회피가 전부인데 총알이 없으면 연습이 안 된다.
+  // 허수아비는 죽어도 체력이 되돌아가므로 계속 연습할 수 있다
+  if (!s.melee)
   for (let i = 0; i < s.n; i++){
     const p = s.p[i];
     if (p.hp <= 0) continue;                   // 죽으면 관전
@@ -865,6 +903,7 @@ export function step(s, inp){
         const t = s.p[i];
         if (t.hp <= 0 || teamOf(i, s.n) === myTeam) continue;
         if (s.off[i]) continue;              // 끊긴 사람은 유령 — 총알이 통과한다
+        if (isInvul(s, i)) continue;         // 무적 버프
         const hx = snap && snap[i] ? snap[i][0] : t.x;
         const hy = snap && snap[i] ? snap[i][1] : t.y;
         if (!overlap(b.x,b.y,BWf,BHf, hx,hy,PWf,PHf)) continue;
@@ -896,6 +935,55 @@ export function step(s, inp){
     }
   }
 
+  // ── 칼전 버프 ────────────────────────────────────────────
+  // [stated] 칸에 무작위로 뜨고 밟으면 얻는다. 개인전에도 넣는다.
+  // **결정론적 난수**를 쓴다 — 서버와 클라가 같은 자리에 띄워야 한다
+  if (s.melee && !s.noBuff && !s.solo && s.phase === PH_PLAY){
+    // 뜨기
+    if (s.buffs.length < BUFF_MAX && s.tick > 0 && s.tick % BUFF_EVERY === 0){
+      const kind = rnd(s, 1) % BUFF_KINDS;
+      // 아무도 없고 아이템·다른 버프도 없는 칸을 고른다
+      for (let try_ = 0; try_ < 24; try_++){
+        const c = rnd(s, 10 + try_) % GRID_COLS;
+        const r = rnd(s, 40 + try_) % GRID_ROWS;
+        if (!cellUsable(c, r)) continue;
+        if (s.buffs.some(b => b.c === c && b.r === r)) continue;
+        if (s.items.some(it => it.c === c && it.r === r)) continue;
+        let onSomeone = false;
+        for (let i = 0; i < s.n; i++){
+          if (s.p[i].hp <= 0) continue;
+          if (overlap(s.p[i].x, s.p[i].y, PWf, PHf,
+                      Math.round(cellX(c) * FP), Math.round(cellY(r) * FP),
+                      Math.round(GRID_CW * FP), Math.round(GRID_CH * FP))){ onSomeone = true; break; }
+        }
+        if (onSomeone) continue;
+        s.buffs.push({ k: kind, c, r });
+        break;
+      }
+    }
+    // 먹기 — 밟으면 즉시
+    for (let bi = s.buffs.length - 1; bi >= 0; bi--){
+      const b = s.buffs[bi];
+      const bx = Math.round(cellX(b.c) * FP), by = Math.round(cellY(b.r) * FP);
+      const bw = Math.round(GRID_CW * FP), bh = Math.round(GRID_CH * FP);
+      for (let i = 0; i < s.n; i++){
+        const p = s.p[i];
+        if (p.hp <= 0 || s.off[i]) continue;
+        if (!overlap(p.x, p.y, PWf, PHf, bx, by, bw, bh)) continue;
+        const def = BUFF_DEF[b.k];
+        if (b.k === BUFF.HEAL) p.hp = Math.min(MAXHP, p.hp + Math.round(MAXHP * def.mul));
+        else s.bf[i][b.k] = def.ticks;            // 같은 버프를 또 먹으면 시간이 새로 찬다
+        s.buffs.splice(bi, 1);
+        s.fx.push({ c: b.c, r: b.r, t: 18, k: 1 });   // 먹은 표시
+        break;
+      }
+    }
+    // 남은 시간 줄이기
+    for (let i = 0; i < s.n; i++)
+      for (let k = 0; k < BUFF_KINDS; k++)
+        if (s.bf[i][k] > 0) s.bf[i][k]--;
+  }
+
   // 제한 시간. 다 되면 체력이 많은 쪽 승, 같으면 무승부
   if (!s.solo && !s.over && s.phase === PH_PLAY && s.clock > 0 && --s.clock === 0){
     s.over = true; s.phase = PH_OVER;
@@ -911,6 +999,9 @@ export function checksum(s){
   setArena(s.n, s.melee, s.ffa);
   let h = s.tick + s.maxStep + s.bulletV + s.coolT + s.phase * 7 + s.timer + s.clock;
   h = (h*31 + (s.rdy | 0)) | 0;
+  h = (h*31 + (s.seed | 0) + (s.noBuff ? 7 : 0)) | 0;
+  for (const b of s.buffs) h = (h*31 + b.k*5 + b.c*11 + b.r*17) | 0;
+  for (const row of s.bf) for (const v of row) h = (h*31 + v) | 0;
   for (const p of s.p) h = (h*31 + p.x + p.y*3 + p.hp*7 + p.cool*3 + p.invul) | 0;
   for (const b of s.bullets) h = (h*31 + b.x + b.y + b.o) | 0;
   for (const c of s.covers) h = (h*31 + c.hp) | 0;

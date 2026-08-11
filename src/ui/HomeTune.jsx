@@ -42,7 +42,7 @@ export default function HomeTune({ onClose }){
     <div className={'htune' + (wide ? ' wide' : '') + (fold ? ' fold' : '')}
          style={{ left: pos.x, top: pos.y }}>
       <div className="htune-top" onPointerDown={grab}>
-        <span onClick={() => setFold(f => !f)}>{fold ? '배치 ▸' : '배치 ▾'}</span>
+        <span onClick={() => setFold(f => !f)}>{fold ? t('home.tuneFold') : t('home.tuneOpen')}</span>
         {!fold && <button onPointerDown={e => e.stopPropagation()} onClick={() => setWide(w => !w)}>
           {wide ? t('common.narrow') : t('common.wide')}
         </button>}

@@ -30,25 +30,25 @@ function foeOf(s, me){
 export const AI_STAGES = [
   //                        방어                              공격
   //          react horizon danger speed  aim  push slop | thrGap aimErr chargeErr combo
-  { name: '연습',   react: 900, horizon: 18,  danger: 9,  speed: 0.35, aim: 0.1, push: 0.1, slop: 14.0,
+  { nameKey: 'ai.s1',   react: 900, horizon: 18,  danger: 9,  speed: 0.35, aim: 0.1, push: 0.1, slop: 14.0,
     thrGap: 9000, aimErr: 2.4, chargeErr: 0.35, combo: 0.0, lead: 0.0 , timing: 0.0 , mul: 0.8 , engage: 0.04 , cool: 1.25 },
-  { name: '초보',   react: 807, horizon: 23,  danger: 10, speed: 0.417, aim: 0.153, push: 0.133, slop: 12.0,
+  { nameKey: 'ai.s2',   react: 807, horizon: 23,  danger: 10, speed: 0.417, aim: 0.153, push: 0.133, slop: 12.0,
     thrGap: 8333, aimErr: 2.133, chargeErr: 0.303, combo: 0.0, lead: 0.0 , timing: 0.04 , mul: 0.833 , engage: 0.06 , cool: 1.217 },
-  { name: '견습',   react: 713, horizon: 29,  danger: 10, speed: 0.483, aim: 0.213, push: 0.167, slop: 10.333,
+  { nameKey: 'ai.s3',   react: 713, horizon: 29,  danger: 10, speed: 0.483, aim: 0.213, push: 0.167, slop: 10.333,
     thrGap: 7667, aimErr: 1.867, chargeErr: 0.26, combo: 0.0, lead: 0.0 , timing: 0.087 , mul: 0.867 , engage: 0.08 , cool: 1.183 },
-  { name: '숙련',   react: 620, horizon: 36,  danger: 11, speed: 0.55, aim: 0.28, push: 0.2, slop: 9.0,
+  { nameKey: 'ai.s4',   react: 620, horizon: 36,  danger: 11, speed: 0.55, aim: 0.28, push: 0.2, slop: 9.0,
     thrGap: 7000, aimErr: 1.6, chargeErr: 0.22, combo: 0.0, lead: 0.0 , timing: 0.14 , mul: 0.9 , engage: 0.1 , cool: 1.15 },
-  { name: '베테랑', react: 540, horizon: 44,  danger: 12, speed: 0.61, aim: 0.347, push: 0.253, slop: 7.667,
+  { nameKey: 'ai.s5', react: 540, horizon: 44,  danger: 12, speed: 0.61, aim: 0.347, push: 0.253, slop: 7.667,
     thrGap: 6333, aimErr: 1.333, chargeErr: 0.187, combo: 0.133, lead: 0.0 , timing: 0.207 , mul: 0.94 , engage: 0.12 , cool: 1.117 },
-  { name: '정예',   react: 467, horizon: 53,  danger: 12, speed: 0.667, aim: 0.413, push: 0.303, slop: 6.333,
+  { nameKey: 'ai.s6',   react: 467, horizon: 53,  danger: 12, speed: 0.667, aim: 0.413, push: 0.303, slop: 6.333,
     thrGap: 5667, aimErr: 1.1, chargeErr: 0.157, combo: 0.25, lead: 0.0 , timing: 0.28 , mul: 0.973 , engage: 0.14 , cool: 1.083 },
-  { name: '저격수', react: 400, horizon: 62,  danger: 13, speed: 0.72, aim: 0.48, push: 0.35, slop: 5.0,
+  { nameKey: 'ai.s7', react: 400, horizon: 62,  danger: 13, speed: 0.72, aim: 0.48, push: 0.35, slop: 5.0,
     thrGap: 5000, aimErr: 0.9, chargeErr: 0.13, combo: 0.35, lead: 0.0 , timing: 0.36 , mul: 1.0 , engage: 0.16 , cool: 1.05 },
-  { name: '교관',   react: 340, horizon: 73, danger: 14, speed: 0.773, aim: 0.547, push: 0.397, slop: 4.333,
+  { nameKey: 'ai.s8',   react: 340, horizon: 73, danger: 14, speed: 0.773, aim: 0.547, push: 0.397, slop: 4.333,
     thrGap: 4467, aimErr: 0.767, chargeErr: 0.11, combo: 0.45, lead: 0.0 , timing: 0.453 , mul: 1.027 , engage: 0.173 , cool: 1.017 },
-  { name: '지휘관', react: 287, horizon: 84, danger: 14, speed: 0.823, aim: 0.613, push: 0.447, slop: 3.667,
+  { nameKey: 'ai.s9', react: 287, horizon: 84, danger: 14, speed: 0.823, aim: 0.613, push: 0.447, slop: 3.667,
     thrGap: 3933, aimErr: 0.633, chargeErr: 0.09, combo: 0.55, lead: 0.0 , timing: 0.547 , mul: 1.053 , engage: 0.187 , cool: 0.98 },
-  { name: '전설',   react: 240,  horizon: 95, danger: 15, speed: 0.87, aim: 0.68, push: 0.5, slop: 3.0,
+  { nameKey: 'ai.s10',   react: 240,  horizon: 95, danger: 15, speed: 0.87, aim: 0.68, push: 0.5, slop: 3.0,
     thrGap: 3400, aimErr: 0.5, chargeErr: 0.07, combo: 0.65, lead: 0.0 , timing: 0.64 , mul: 1.08 , engage: 0.2 , cool: 0.94 }
 ];
 
@@ -151,6 +151,26 @@ export function createAI(stage = 1){
 
       // 칼전: 총알도 엄폐물도 없다. 붙어서 때리고, 쿨 동안은 조금 물러난다
       if (s.melee){
+        // **가까운 버프가 있으면 먼저 줍는다.** 안 그러면 AI전에서 사람만 버프를 먹어
+        // 일방적이 된다. 단계가 낮을수록 덜 챙긴다(멀리 있는 건 무시)
+        // **단계가 낮으면 잘 못 챙긴다.** 모두가 똑같이 주우면 버프가 실력 차이를 덮어
+        // 1단계와 4단계가 비슷해진다 (검사기가 이걸 잡았다)
+        if (s.buffs && s.buffs.length && p.aim > 0.25){
+          const range = GRID_CH * FP * (1 + p.aim * 8);
+          let best = null, bestD = range;
+          for (const b of s.buffs){
+            const bx = Math.round((cellX(b.c) + GRID_CW / 2) * FP);
+            const by = Math.round((cellY(b.r) + GRID_CH / 2) * FP);
+            const d = Math.abs(bx - my.x) + Math.abs(by - my.y);
+            if (d < bestD){ bestD = d; best = { bx, by }; }
+          }
+          if (best){
+            const gx = best.bx - my.x, gy = best.by - my.y;
+            const len = Math.max(1, Math.hypot(gx, gy));
+            return { vx: gx / len * p.speed * (p.mul || 1),
+                     vy: gy / len * p.speed * (p.mul || 1) };
+          }
+        }
         // 좌우로도 벨 수 있으므로, 세로·가로 중 더 가까운 축으로 붙는다
         const reach = GRID_CH * FP;
         const dxc = foe.x - my.x, dyc = foe.y - my.y;

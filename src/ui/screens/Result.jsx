@@ -12,7 +12,7 @@ const LABEL = { win: 'res.win', lose: 'res.lose', draw: 'res.draw' };
 function name(r, sum){
   if (r.nick) return r.nick;
   if (r.self) return t('common.me');
-  if (sum.ffa) return `${r.slot + 1}번`;
+  if (sum.ffa) return t('res.slotN', { n: r.slot + 1 });
   const same = sum.rows.filter(x => x.mine === r.mine && !x.self);
   const idx = same.findIndex(x => x.slot === r.slot) + 1;
   const base = r.mine ? t('res.mate') : t('res.foe');

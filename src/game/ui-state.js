@@ -110,8 +110,15 @@ export function uiPrompt(st, slot, online){
     if (!st.fast) offer.push('fast');
     if (!st.bare && !st.melee) offer.push('bare');   // 칼전은 원래 아이템이 없다
   }
-  return { pre: true, banner, ask, waiting, offer };
+  return { pre: true, banner, ask, waiting, offer, melee: !!st.melee };
 }
 
 // 신청 문구를 번역해서 돌려준다 (표는 열쇠만 담고 있다)
-export const negText = (kind, part) => t((NEG_LABEL[kind] && NEG_LABEL[kind][part]) || part);
+// 칼전에서는 노템전이 곧 **노버프전**이다 (없앨 아이템이 없으므로 버프를 끈다)
+export const negText = (kind, part, melee = false) => {
+  const key = (melee && kind === 'bare')
+    ? { title: 'ready.nobufAsk', desc: 'ready.nobufNote', btn: 'ready.nobufReq',
+        on: 'ready.nobufOn', wait: 'ready.nobufSent' }[part]
+    : (NEG_LABEL[kind] && NEG_LABEL[kind][part]);
+  return t(key || part);
+};

@@ -71,7 +71,7 @@ export default function Matching({ session, onCancel, onMatched }){
           <strong>{code}</strong>
           <span className="hint">
             친구에게 알려주면 이 코드로 들어온다
-            {session?.n > 2 ? ` (${session.n}명 필요)` : ''}
+            {session?.n > 2 ? ' ' + t('match.needN', { n: session.n }) : ''}
           </span>
         </div>
       )}
@@ -89,7 +89,7 @@ export default function Matching({ session, onCancel, onMatched }){
                   disabled={taken || lobby.myColor != null}
                   style={{ background: TEAMS[c].m }}
                   onClick={() => setColor(c)}
-                  aria-label={'색 ' + (c + 1)} />
+                  aria-label={t('pvp.colorN', { n: c + 1 })} />
               );
             })}
           </div>

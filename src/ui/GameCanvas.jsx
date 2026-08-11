@@ -125,24 +125,24 @@ export default function GameCanvas({ session, onExit, onFinish }){
       {/* 전투 전 안내·신청은 prompt() 하나가 정한다. 종류마다 마크업을 따로 쓰면
            한쪽만 틀리게 되므로(실제로 그래서 노템전 창이 안 떴다) 한 갈래로 그린다 */}
       {(ready.prompt?.banner || []).map(k => (
-        <div key={k} className="link-note ui-overlay fast">{negText(k, 'on')}</div>
+        <div key={k} className="link-note ui-overlay fast">{negText(k, 'on', ready.prompt?.melee)}</div>
       ))}
       {(ready.prompt?.offer || []).map((k, i) => (
         <button key={k} className={'fastbtn ui-overlay' + (i ? ' bare' : '')}
                 onClick={() => gameRef.current?.request(k)}>
-          {negText(k, 'btn')}
+          {negText(k, 'btn', ready.prompt?.melee)}
         </button>
       ))}
       {ready.prompt?.waiting && (
         <div className="link-note ui-overlay">
-          {negText(ready.prompt.waiting.kind, 'wait')} · {t('ready.waitPeer', { n: ready.prompt.waiting.sec })}
+          {negText(ready.prompt.waiting.kind, 'wait', ready.prompt?.melee)} · {t('ready.waitPeer', { n: ready.prompt.waiting.sec })}
         </div>
       )}
       {ready.prompt?.ask && (
         <div className="modal-back">
           <div className="modal ask">
-            <p className="ask-t">{negText(ready.prompt.ask.kind, 'title')}</p>
-            <p className="ask-d">{negText(ready.prompt.ask.kind, 'desc')}</p>
+            <p className="ask-t">{negText(ready.prompt.ask.kind, 'title', ready.prompt?.melee)}</p>
+            <p className="ask-d">{negText(ready.prompt.ask.kind, 'desc', ready.prompt?.melee)}</p>
             <p className="ask-d">{ready.prompt.ask.sec}초 안에 답하지 않으면 그냥 진행됩니다.</p>
             <div className="ask-row">
               <button className="menu-btn ghost"
@@ -170,7 +170,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
       )}
       {placing && ready.me && !ready.peer && (
         <div className="link-note ui-overlay">
-          {ready.cnt ? `다른 사람 기다리는 중… 준비 ${ready.cnt.go}/${ready.cnt.n}` : t('match.others')}
+          {ready.cnt ? t('ready.waitN', { a: ready.cnt.go, b: ready.cnt.n }) : t('match.others')}
           {SHOW_NETINFO && ready.srv && (
             <span className="sub">
               서버 확정 · 나 {ready.srv.me ? 'O' : 'X'} / 나머지 {ready.srv.peer ? 'O' : 'X'}
@@ -193,7 +193,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
       )}
       {placing && !ready.me && ready.peer && (
         <div className="link-note ui-overlay">
-          {ready.cnt ? `나만 남았다 · 준비 ${ready.cnt.go}/${ready.cnt.n}` : t('ready.waitMe')}
+          {ready.cnt ? t('ready.meOnly', { a: ready.cnt.go, b: ready.cnt.n }) : t('ready.waitMe')}
         </div>
       )}
       <TunePanel gameRef={gameRef} />

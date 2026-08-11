@@ -60,7 +60,7 @@ export default function AiStages({ onBack, onStart, onMelee }){
         <span className="spacer" />
       </header>
 
-      <p className="hint record">{p.wins}승 {p.losses}패 {p.draws}무</p>
+      <p className="hint record">{t('ai.record', { w: p.wins, l: p.losses, d: p.draws })}</p>
 
       <div className="mode-row">
         <button className={'menu-btn mode' + (n === 2 ? ' on' : '')} onClick={() => setN(2)}>{t('mode.1v1')}</button>  {/* ok: 버튼 강조용 */}
@@ -80,7 +80,7 @@ export default function AiStages({ onBack, onStart, onMelee }){
               onClick={() => onStart(stage, n)}
             >
               <span className="no">{stage}</span>
-              <span className="nm">{s.name}</span>
+              <span className="nm">{t(s.nameKey)}</span>
               <span className="st">{!open ? t('ai.locked') : done ? t('ai.clear') : t('ai.challenge')}</span>
             </button>
           );

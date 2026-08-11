@@ -87,17 +87,28 @@ console.log('값 자리표가 두 언어에서 같다');
 
 console.log('화면에 한국어가 박혀 있지 않다');
 {
-  const ui = files.filter(p => p.includes('/ui/') || p.endsWith('ui-state.js') || p.endsWith('rank.js'));
+  // **캔버스(render.js)와 템플릿 문자열(백틱)도 본다.**
+  // 처음엔 JSX 텍스트만 봐서 AI 단계 이름·전적·캔버스 문구를 통째로 놓쳤다
+  const ui = files.filter(p => p.includes('/ui/') || p.endsWith('ui-state.js')
+    || p.endsWith('rank.js') || p.endsWith('render.js') || p.endsWith('ai.js'));
   const left = [];
   for (const p of ui){
     let src = fs.readFileSync(p, 'utf8');
     src = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
     src = src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
-    for (const m of src.matchAll(/>([^<>{}\n]*[가-힣][^<>{}\n]*)</g)){
-      const s = m[1].trim();
-      // 디버그 표시(서버 확정 등)는 번역하지 않는다
-      if (s && !/서버 확정|나머지/.test(s)) left.push(`${path.relative('.', p)} → ${s.slice(0, 30)}`);
-    }
+    const pats = [
+      />([^<>{}\n]*[가-힣][^<>{}\n]*)</g,     // JSX 텍스트
+      /`([^`]*[가-힣][^`]*)`/g,                // 템플릿 문자열
+      /'([^'\n]*[가-힣][^'\n]*)'/g,           // 문자열 (캔버스 등)
+      /"([^"\n]*[가-힣][^"\n]*)"/g
+    ];
+    for (const re of pats)
+      for (const m of src.matchAll(re)){
+        const s = m[1].trim();
+        // 디버그 표시는 번역하지 않는다
+        if (s && !/서버 확정|나머지|디버그/.test(s))
+          left.push(`${path.relative('.', p)} → ${s.slice(0, 30)}`);
+      }
   }
   assert(left.length === 0, `아직 박힌 문구:\n    ${left.join('\n    ')}`);
 }

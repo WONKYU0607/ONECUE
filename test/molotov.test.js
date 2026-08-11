@@ -41,14 +41,14 @@ console.log('불 안에 서 있으면 탄다');
 {
   const s = newState(2);
   s.phase = PH_PLAY;
-  s.solo = true;                                   // 총알은 빼고 불만 본다
+                                     // 총알은 빼고 불만 본다
   const fr = { c: 2, r: ROW_MIN[1] + 2, t: FIRE_TICKS };
   s.fire.push(fr);
   // 슬롯1(위 팀)을 불 한가운데로
   s.p[1].x = Math.round((cellX(fr.c) + 2) * FP);
   s.p[1].y = Math.round((cellY(fr.r) + 1) * FP);
   const hp0 = s.p[1].hp, farHp0 = s.p[0].hp;
-  for (let t = 0; t < FIRE_DMG_EVERY * 3 + 2; t++) step(s, IN(2));
+  for (let t = 0; t < FIRE_DMG_EVERY * 3 + 2; t++){ step(s, IN(2)); s.bullets.length = 0; }
   const lost = hp0 - s.p[1].hp;
   assert(lost >= FIRE_DAMAGE * 2, `불 안에서 계속 닳는다 (${lost})`);
   assert(s.p[0].hp === farHp0, '불 밖은 멀쩡');
@@ -57,10 +57,10 @@ console.log('불 안에 서 있으면 탄다');
 console.log('불 밖으로 나가면 안 닳는다');
 {
   const s = newState(2);
-  s.phase = PH_PLAY; s.solo = true;
+  s.phase = PH_PLAY; 
   s.fire.push({ c: 2, r: ROW_MIN[1] + 2, t: FIRE_TICKS });
   const hp0 = s.p[1].hp;                            // 슬롯1은 자기 시작 위치(불에서 멀다)
-  for (let t = 0; t < FIRE_DMG_EVERY * 3 + 2; t++) step(s, IN(2));
+  for (let t = 0; t < FIRE_DMG_EVERY * 3 + 2; t++){ step(s, IN(2)); s.bullets.length = 0; }
   assert(s.p[1].hp === hp0, '떨어져 있으면 안 닳는다');
 }
 
@@ -98,7 +98,7 @@ console.log('자해·아군 오사가 없다');
 {
   const { teamOf } = await import('../src/game/config.js');
   const s = newState(4);
-  s.phase = PH_PLAY; s.solo = true;             // 총알은 빼고 불만 본다
+  s.phase = PH_PLAY;              // 총알은 빼고 불만 본다
   // **상대(위 팀)는 자기 영역 밖으로 못 나온다.** 불을 위 팀 자리에 놓고,
   // 아래 팀은 화면 뒤집기와 무관하게 같은 칸에 세워 자해·오사만 본다
   const fr = { c: 3, r: ROW_MIN[1] + 2, t: FIRE_TICKS, by: 0 };
@@ -108,7 +108,7 @@ console.log('자해·아군 오사가 없다');
     s.p[i].y = Math.round((cellY(fr.r) + 1) * FP);
   }
   const hp0 = s.p.map(p => p.hp);
-  for (let t = 0; t < FIRE_DMG_EVERY * 4 + 2; t++) step(s, IN(4));
+  for (let t = 0; t < FIRE_DMG_EVERY * 4 + 2; t++){ step(s, IN(4)); s.bullets.length = 0; }
   assert(s.p[0].hp === hp0[0], `던진 사람은 자기 불에 안 탄다 (${s.p[0].hp})`);
   assert(s.p[1].hp === hp0[1], `같은 팀도 안 탄다 (${s.p[1].hp})`);
   assert(s.p[2].hp < hp0[2], `상대 팀은 탄다 (${s.p[2].hp})`);
@@ -118,7 +118,7 @@ console.log('자해·아군 오사가 없다');
 console.log('개인전은 던진 사람만 무사하다');
 {
   const s = newState(4, false, true);            // ffa
-  s.phase = PH_PLAY; s.solo = true;
+  s.phase = PH_PLAY; 
   const fr = { c: 3, r: ROW_MIN[1] + 2, t: FIRE_TICKS, by: 0 };
   s.fire.push(fr);
   for (const i of [0, 1, 2]){
@@ -126,7 +126,7 @@ console.log('개인전은 던진 사람만 무사하다');
     s.p[i].y = Math.round((cellY(fr.r) + 1) * FP);
   }
   const hp0 = s.p.map(p => p.hp);
-  for (let t = 0; t < FIRE_DMG_EVERY * 4 + 2; t++) step(s, IN(4));
+  for (let t = 0; t < FIRE_DMG_EVERY * 4 + 2; t++){ step(s, IN(4)); s.bullets.length = 0; }
   assert(s.p[0].hp === hp0[0], '던진 사람은 안 탄다');
   assert(s.p[1].hp < hp0[1] && s.p[2].hp < hp0[2], '개인전은 나머지 전부 탄다');
 }

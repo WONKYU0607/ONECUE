@@ -61,6 +61,23 @@ export const RENDER_MAXJUMP = 30 * FP; // 이보다 크게 튀면 보간 생략 
 // 12틱(0.2초)이면 총알·불(12틱)·칼(30틱)이 전부 들어가면서
 // 한 번의 폭발이 여러 번 세지는 것만 막는다
 export const INVUL_T = 12, FLASH_T = 15;
+
+// ── 칼전 버프 ────────────────────────────────────────────────
+// [stated] 칼전 칸에 무작위로 버프가 뜨고, 밟으면 그 캐릭터가 얻는다.
+// 칼전은 배치도 투척물도 없어 판이 처음부터 끝까지 똑같이 흐르는데,
+// 버프가 뜨면 맵에 나갈 이유가 생겨 숨어 다니는 게 손해가 된다
+export const BUFF = { SPD: 0, ATK: 1, INVUL: 2, HEAL: 3 };
+export const BUFF_DEF = [
+  { key: 'spd',   mul: 1.5, ticks: 8 * 60 },   // 이동 1.5배 8초
+  { key: 'atk',   mul: 1.5, ticks: 8 * 60 },   // 공격 1.5배 8초
+  { key: 'invul', mul: 1,   ticks: 3 * 60 },   // 무적 3초
+  { key: 'heal',  mul: 0.25, ticks: 0 }        // 체력 25% 회복 (즉시)
+];
+// **칼전은 10초 안팎에 끝난다** (무적을 줄인 뒤로 빨라졌다).
+// 12초마다면 대부분 판에서 버프를 한 번도 못 본다 → 4초로
+export const BUFF_EVERY = 4 * 60;
+export const BUFF_MAX = 2;           // 바닥에 동시에 최대 2개
+export const BUFF_KINDS = BUFF_DEF.length;
 // [stated] 준비 단계 제한 시간. **상대가 준비완료를 안 누르면 영원히 시작이 안 됐다.**
 // 총격전은 설치할 게 있어 15초, 칼전은 놓을 게 없어 10초
 export const READY_TICKS = 15 * 60;
@@ -358,7 +375,7 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 59;
+export const PROTO_VER = 60;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

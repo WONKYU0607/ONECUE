@@ -11,6 +11,7 @@ import { RS, computeLayout, stickGeom, shieldBtn } from './layout.js';
 import { resultFor } from './ui-state.js';
 import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
+import { t, getLang } from '../i18n/index.js';
 
 // 스프라이트 시트의 한 칸 크기 (원본은 14x16 고정)
 // 캐릭터 시트. 6색 전부 프레임(42x48)을 꽉 채워야 **화면에서 크기가 같다**.
@@ -59,6 +60,10 @@ export function createRenderer(canvas){
   const flashfx = getImage('flashfx');
   const throwImg = THROW_DEF.map(d => getImage(d.key));
   const fireImg = getImage('fire');
+  const buffImgKo = getImage('buffs');
+  const buffImgEn = getImage('buffsEn');
+  // 언어에 따라 고른다. 영어판이 아직 안 받아졌으면 한국어판으로 (빈 화면보다 낫다)
+  const buffSheet = () => (getLang() === 'ko' ? buffImgKo : (buffImgEn || buffImgKo));
 
   let uiH = 86, totalH = H + uiH, scale = 1;
 
@@ -185,12 +190,54 @@ export function createRenderer(canvas){
     ctx.fillText(String(left), cx, cy);
     ctx.font = '900 ' + (7 * RS) + 'px ' + GF;
     ctx.lineWidth = 4 * RS;
-    const msg = '준비하세요';
+    const msg = t('ready.getReady');
     ctx.strokeText(msg, cx, cy + 22 * RS);
     ctx.fillStyle = 'rgba(220,234,246,0.8)';
     ctx.fillText(msg, cx, cy + 22 * RS);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
+  // 바닥에 뜬 버프. 칸 하나에 맞춰 그리고 살짝 떠오르게 흔든다
+  const BUFF_PX = 72;
+  function drawBuffs(s){
+    const buffImg = buffSheet();
+    if (!buffImg || !s.buffs || !s.buffs.length) return;
+    for (const b of s.buffs){
+      const x = cellX(b.c), y = fy(cellY(b.r), GRID_CH);
+      const bob = Math.sin(s.tick / 12 + b.c + b.r) * 0.8;
+      const w = GRID_CW * 0.86, h = GRID_CH * 0.86;
+      ctx.drawImage(buffImg, b.k * BUFF_PX, 0, BUFF_PX, BUFF_PX,
+        Math.round((x + (GRID_CW - w) / 2) * RS),
+        Math.round((y + (GRID_CH - h) / 2 + bob) * RS),
+        Math.round(w * RS), Math.round(h * RS));
+    }
+  }
+
+  // 내가 가진 버프 — 화면 위쪽에 남은 시간과 함께
+  function drawMyBuffs(s){
+    const buffImg = buffSheet();
+    if (!buffImg || !s.bf) return;
+    const mine = s.bf[SELF.slot];
+    if (!mine) return;
+    const list = [];
+    for (let k = 0; k < mine.length; k++) if (mine[k] > 0) list.push([k, mine[k]]);
+    if (!list.length) return;
+    const sz = 11, gap = 2;
+    let x = W / 2 - (list.length * (sz + gap) - gap) / 2;
+    for (const [k, left] of list){
+      ctx.drawImage(buffImg, k * BUFF_PX, 0, BUFF_PX, BUFF_PX,
+        Math.round(x * RS), Math.round(3 * RS), Math.round(sz * RS), Math.round(sz * RS));
+      ctx.font = '900 ' + (5 * RS) + 'px ' + GF;
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 2.5 * RS; ctx.strokeStyle = 'rgba(6,8,14,0.9)';
+      const t2 = String(Math.ceil(left / 60));
+      ctx.strokeText(t2, (x + sz / 2) * RS, (3 + sz + 5) * RS);
+      ctx.fillStyle = '#e8e8f0';
+      ctx.fillText(t2, (x + sz / 2) * RS, (3 + sz + 5) * RS);
+      ctx.textAlign = 'left';
+      x += sz + gap;
+    }
+  }
+
   function drawPanel(s, stick){
     px(0, H, W, uiH, '#0d0d16');
     px(0, H, W, 0.6, 'rgba(78,201,240,0.55)');
@@ -313,7 +360,10 @@ export function createRenderer(canvas){
       const x = (rx[i] !== undefined ? rx[i] : p.x) / FP;
       const y = (ry[i] !== undefined ? ry[i] : p.y) / FP;
       const bx = x + (ARENA.pw - BW) / 2;
-      const by = fy(y, ARENA.ph) - BH - 2.2;   // "나" 표시가 있던 자리
+      // 머리 위가 기본. **화면 밖으로 나가면 발밑으로 뒤집는다** —
+      // 상대가 맨 끝 줄에 서면 y가 음수가 되어 체력바가 통째로 잘렸다
+      const top = fy(y, ARENA.ph);
+      const by = top - BH - 2.2 < 0.5 ? top + ARENA.ph + 1.2 : top - BH - 2.2;
       px(bx - 0.35, by - 0.35, BW + 0.7, BH + 0.7, 'rgba(8,10,16,0.78)');   // 테두리
       px(bx, by, BW, BH, 'rgba(255,255,255,0.82)');   // 바탕을 밝게 (어두운 색도 줄어드는 게 보이게)
       const w = BW * Math.max(0, p.hp) / MAXHP;
@@ -345,9 +395,10 @@ export function createRenderer(canvas){
     ctx.font = '900 ' + (6.5 * RS) + 'px ' + GF;
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
     ctx.lineWidth = 3 * RS; ctx.strokeStyle = 'rgba(8,8,14,0.92)';
-    ctx.strokeText('나', cx * RS, base * RS);
+    const meTxt = t('common.me');
+    ctx.strokeText(meTxt, cx * RS, base * RS);
     ctx.fillStyle = '#ffe9a8';
-    ctx.fillText('나', cx * RS, base * RS);
+    ctx.fillText(meTxt, cx * RS, base * RS);
     ctx.textAlign = 'left';
   }
 
@@ -693,6 +744,8 @@ export function createRenderer(canvas){
     drawOffline(s, rx, ry);
     drawProjectiles(s, a);
     drawFire(s);
+    drawBuffs(s);
+    drawMyBuffs(s);
     drawFx(s);
     drawReadyTimer(s);
     if (j) drawJuice(j);
@@ -716,7 +769,8 @@ export function createRenderer(canvas){
       const big = label.length > 2;
       ctx.font = '900 ' + ((big ? 16 : 48) * RS) + 'px ' + GF;
       ctx.fillStyle = '#e8e8f0';
-      ctx.fillText(label, W/2*RS, (H/2 + (big ? 6 : 16))*RS);
+      // **중앙선을 피해 위쪽에 그린다.** H/2에 두면 가운데 선에 글자가 물린다
+      ctx.fillText(label, W/2*RS, (H * 0.30 + (big ? 6 : 16)) * RS);
       ctx.font = '700 ' + (8*RS) + 'px ' + GF;
     }
     if (s.phase === PH_OVER){

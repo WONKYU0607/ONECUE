@@ -15,9 +15,11 @@ const play = solo => {
 console.log('연습 모드');
 {
   const s = play(true);
-  for (let i = 0; i < 600; i++) step(s, IN({}, {}));
-  assert(s.bullets.length === 0, '총알이 하나도 안 나간다');
-  assert(s.p[0].hp === MAXHP && s.p[1].hp === MAXHP, '체력이 안 깎인다');
+  // [stated] 총격전 연습에서 총알이 안 나가면 연습이 안 된다 (조준·회피가 전부다).
+  // 예전엔 `!s.solo` 로 막아뒀는데, 허수아비가 죽어도 되살아나므로 쏴도 된다
+  let seen = 0;
+  for (let i = 0; i < 600; i++){ step(s, IN({}, {})); seen = Math.max(seen, s.bullets.length); }
+  assert(seen > 0, `총알이 나간다 (최대 ${seen}발)`);
   assert(s.phase === PH_PLAY, '10초가 지나도 전투 중');
 
   // 제한 시간이 지나도 안 끝난다
@@ -29,7 +31,9 @@ console.log('연습 모드');
   for (let i = 0; i < 30; i++) step(s, IN({ dx: Math.round(3*FP) }, {}));
   assert(s.p[0].x > x0, '이동은 정상');
 
-  // 투척도 된다
+  // 투척도 된다. **체력을 채워두고 본다** — 앞에서 총알을 주고받아 죽어 있으면
+  // 던지기가 막힌다(죽은 사람은 못 던진다). 연습은 죽어도 되살아나므로 실제로는 문제없다
+  s.p[0].hp = MAXHP;
   step(s, IN({ thr: { k: THROW.NADE, ch: 60 } }, {}));
   assert(s.proj.length === 1, '수류탄 던지기 가능');
   for (let i = 0; i < FLY_TICKS + FUSE_TICKS + 5; i++) step(s, IN({}, {}));

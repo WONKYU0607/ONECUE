@@ -84,4 +84,26 @@ console.log('스틱 세기 곡선');
   const d = stickVector({ x: g.cx + g.r * 0.9, y: g.cy - g.r * 0.9 }, uiH);
   assert(Math.abs(Math.hypot(d.nx, d.ny) - 1) < 0.001, '대각선 끝도 크기 1');
 }
+
+console.log('방패 버튼 — 가운데, 어디와도 안 겹친다');
+{
+  const { shieldBtn, padRect, uiBoxRect, stickGeom } = await import('../src/game/layout.js');
+  const { setArena } = await import('../src/game/config.js');
+  // [stated] 맨 아래에 붙어 있어 누르기 불편하다 → 세로 가운데로
+  for (const [n, ffa, nm] of [[2, false, '칼전 1대1'], [4, false, '칼전 2대2'],
+                              [6, false, '칼전 3대3'], [6, true, '개인전 6인']]){
+    setArena(n, true, ffa);
+    const pd = padRect(86), b = shieldBtn(86), rb = uiBoxRect(86), g = stickGeom(86);
+    const mid = pd.y + pd.h / 2;
+    assert(Math.abs((b.y + b.h / 2) - mid) < 1, `  ${nm}: 세로 가운데 (${(b.y + b.h / 2).toFixed(0)} vs ${mid.toFixed(0)})`);
+    assert(b.y >= pd.y && b.y + b.h <= pd.y + pd.h, `  ${nm}: 패드 안에 들어간다`);
+    // 준비 버튼과 안 겹친다
+    const hit = !(b.y + b.h <= rb.y || b.y >= rb.y + rb.h)
+             && !(b.x + b.w <= rb.x || b.x >= rb.x + rb.w);
+    assert(!hit, `  ${nm}: 준비 버튼과 안 겹친다`);
+    // 스틱과도 가로로 떨어져 있다
+    assert(b.x + b.w < g.cx - g.r, `  ${nm}: 스틱과 안 겹친다`);
+  }
+}
+
 console.log('layout.test.js 통과');

@@ -12,7 +12,11 @@ export const ASSET_SRC = {
   flash:      'assets/flash.webp',
   flashfx:    'assets/flashfx.webp',
   molotov:    'assets/molotov.webp',   // 화염병 아이콘
-  fire:       'assets/fire.webp'       // 화염병 불꽃 (칸마다 하나씩 그린다)
+  fire:       'assets/fire.webp',      // 화염병 불꽃 (칸마다 하나씩 그린다)
+  buffs:      'assets/buffs.webp',     // 칼전 버프 4종 (72px 정사각, 이속·공속·무적·회복)
+  // 무적 아이콘에만 '3초'라는 글자가 들어가 언어별로 한 벌씩 둔다.
+  // 나머지 셋(x1.5, 25%)은 숫자라 언어와 무관하므로 같은 그림을 쓴다
+  buffsEn:    'assets/buffs-en.webp'
 };
 
 const cache = {};

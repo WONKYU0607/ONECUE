@@ -117,7 +117,7 @@ export default function PvpMenu({ onBack, onStart }){
                   className={'swatch' + (color === c ? ' on' : '')}
                   style={{ background: TEAMS[c].m }}
                   onClick={() => setColor(c)}
-                  aria-label={'색 ' + (c + 1)} />
+                  aria-label={t('pvp.colorN', { n: c + 1 })} />
               ))}
             </div>
             <p className="hint">{t('pvp.colorNote')}</p>

@@ -160,14 +160,21 @@ console.log('칼전은 답이 없어도 제한 시간 뒤 시작한다');
   assert(w.srv.s.phase === PH_PLAY, '그 뒤 준비완료로 시작할 수 있다');
 }
 
-console.log('칼전엔 노템전이 없다 (원래 아이템이 없다)');
+console.log('칼전도 노템전을 신청할 수 있다 — 버프를 끄는 뜻이다');
 {
+  // [stated] 칼전엔 없앨 아이템이 없으므로 노템전 = **노버프전**.
+  // 예전엔 `!s.melee` 조건이 있어 신청 자체가 무시됐다
   const w = world(true);
   w.run(60);
   SELF.slot = 0; SELF.n = 2;
   w.cs[0].requestBare(0);
   w.run(20);
-  assert(w.srv.s.bareBy === 0 && w.srv.s.bare === false, '칼전에선 노템전 신청이 무시된다');
+  assert(w.srv.s.bareBy === 1, `칼전에서도 신청이 간다 (bareBy ${w.srv.s.bareBy})`);
+  // 상대가 수락하면 버프가 꺼진다
+  w.cs[1].answerBare(1, true);
+  w.run(20);
+  assert(w.srv.s.bare === true, '수락하면 켜진다');
+  assert(w.srv.s.noBuff === true, '칼전이면 버프가 꺼진다');
 }
 
 console.log('칼전은 준비완료를 누르면 바로 시작한다');
