@@ -63,6 +63,53 @@ console.log('홈에서는 종료 확인 창이 뜬다');
   assert(/quit\.appTitle/.test(fs.readFileSync('src/i18n/ko.js', 'utf8')), '문구가 있다');
 }
 
+console.log('브라우저 뒤로가기를 두 번 눌러도 안 나간다');
+{
+  // [stated] "뒤로가기 1번은 잘 먹는데 2번 누르면 그냥 브라우저가 나가짐"
+  //
+  // 원인: 크롬은 **사용자 조작 없이 만든 기록을 뒤로가기 때 건너뛰고** popstate 도 안 띄운다.
+  // 게다가 뒤로가기가 한 번 일어나면 그 전 조작은 새 기록에 인정되지 않는다.
+  // popstate 안에서 다시 push 하던 방식이 정확히 여기 걸렸다.
+  //
+  // 크롬 동작을 흉내 내서 검사한다 — 코드만 읽어서는 절대 안 드러난다
+  const makeChrome = () => {
+    const stack = [{ skippable: false }];
+    let actUsable = false; const on = {};
+    return {
+      gesture(){ actUsable = true; stack.forEach(e => { e.skippable = false; }); },
+      pushState(){ stack.push({ skippable: !actUsable }); },
+      addEventListener(k, f){ (on[k] = on[k] || []).push(f); },
+      fireEvent(k){ (on[k] || []).forEach(f => f({})); },
+      back(){
+        actUsable = false;
+        while (stack.length > 1){
+          const gone = stack.pop();
+          if (!gone.skippable){ (on.popstate || []).forEach(f => f({})); return true; }
+        }
+        return false;                      // 사이트를 나갔다
+      }
+    };
+  };
+  const c = makeChrome();
+  globalThis.history = { pushState: () => c.pushState() };
+  globalThis.window = { addEventListener: (k, f) => c.addEventListener(k, f) };
+  const mod = await import('../src/state/back.js?fresh=' + Date.now());
+  await mod.initBack();
+  c.gesture();                              // 진입창 탭
+  mod.setBackHandler(() => true);
+  for (let i = 1; i <= 5; i++){
+    assert(c.back() === true, `  ${i}번째 뒤로가기에도 사이트에 남는다`);
+    c.gesture();                            // 실제 탭 (브라우저가 조작으로 인정)
+    c.fireEvent('pointerdown');             // 우리 코드가 여유분을 채운다
+  }
+  // popstate 안에서 다시 쌓으면 안 된다 (그게 원인이었다)
+  const src = fs.readFileSync('src/state/back.js', 'utf8');
+  const pop = src.slice(src.indexOf("addEventListener('popstate'"));
+  assert(!/pushState/.test(pop.slice(0, 300)),
+    'popstate 안에서 pushState 하지 않는다 (건너뛸 기록이 된다)');
+  assert(/pointerdown/.test(src), '누를 때 여유분을 채운다');
+}
+
 console.log('화면 안의 단계부터 돌아간다');
 {
   // [stated] "해당 단계에서 그 전 단계로 뒤로가져야 하는데 바로 홈으로 나감"
