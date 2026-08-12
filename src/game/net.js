@@ -97,8 +97,8 @@ import {
   teamOf,
   teamYMax,
   teamYMin,
-  wallIdx
-} from './config.js';
+  wallIdx,
+  BUFF, BUFF_DEF} from './config.js';
 import {
   NOIN,
   allPlaced,
@@ -372,7 +372,15 @@ export class Client {
         //    (60fps가 아닌 기기는 이동이 느려진다. 30fps에서 43%, 90fps에서 10% 손실)
         //  - 남은 틱은 0이 되어 움직임이 뚝뚝 끊기고, 그걸 상대가 외삽으로 이어붙여 더 튄다
         // → 틱마다 maxStep까지만 싣고 **나머지는 다음 틱으로 넘긴다**
-        const cap = Math.max(1, (this.pred.maxStep || stepCap()) * (this.pred.fast ? FAST_MUL : 1));
+        // **버프도 곱해야 한다.** 여기서 다시 자르기 때문에, game.js 가 1.5배로
+        // 키워 보내도 이 cap 이 1.0배면 도로 깎여 이속 버프가 통째로 사라진다
+        // **시뮬의 상한과 정확히 같은 식이어야 한다.** 여기가 더 작으면 그만큼이
+        // 통째로 사라진다 — 버프(bSpd)와 AI 배율(spdMul)이 각각 이 이유로 안 먹었다
+        const bf = this.pred.bf && this.pred.bf[pid];
+        const bSpd = (bf && bf[BUFF.SPD] > 0) ? BUFF_DEF[BUFF.SPD].mul : 1;
+        const aiMul = (this.pred.spdMul && this.pred.spdMul[pid]) || 1;
+        const cap = Math.max(1, (this.pred.maxStep || stepCap())
+          * (this.pred.fast ? FAST_MUL : 1) * aiMul * bSpd);
         let dx = q.dx, dy = q.dy;
         const len = Math.sqrt(dx*dx + dy*dy);
         if (len > cap){ const k = cap / len; dx = Math.round(dx * k); dy = Math.round(dy * k); }

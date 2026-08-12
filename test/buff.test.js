@@ -165,10 +165,46 @@ console.log('이속 버프가 실제로 빠르다');
       `  ${ticks}틱: ${BUFF_DEF[BUFF.SPD].mul}배 (${r.toFixed(2)})`);
   }
   // 클라 쪽에도 버프가 반영되는가
-  const gj = (await import('fs')).readFileSync('src/game/game.js', 'utf8');
+  const fs2 = await import('fs');
+  const gj = fs2.readFileSync('src/game/game.js', 'utf8');
   assert(/spdBuff/.test(gj), 'game.js 가 버프를 곱한다');
   assert(/const sp = stepCap\(\)[^;]*bSpd/.test(gj), '사람 입력에 곱한다');
   assert(/aSp = sp \* spdBuff/.test(gj), 'AI 입력에도 곱한다');
+
+  // **전송 상한과 시뮬 상한이 같은 인자를 곱해야 한다.**
+  // 전송 쪽이 작으면 그만큼이 통째로 사라진다 — 이속 버프(bSpd)와
+  // AI 배율(spdMul)이 각각 이 이유로 안 먹었다. 8~10단계 AI도 1.08배가 1.0으로 깎였다
+  const simSrc = fs2.readFileSync('src/game/sim.js', 'utf8');
+  const netSrc = fs2.readFileSync('src/game/net.js', 'utf8');
+  const simCap = simSrc.match(/const cap = s\.maxStep[^,]+/)[0];
+  const netCap = netSrc.match(/const cap = Math\.max\(1,[\s\S]{0,220}?\);/)[0];
+  for (const [nm, re] of [['2배속', /FAST_MUL/], ['AI배율', /spdMul|aiMul/], ['이속버프', /bSpd/]])
+    assert(re.test(simCap) === re.test(netCap),
+      `  상한이 ${nm}을 같이 본다 (시뮬 ${re.test(simCap)} / 전송 ${re.test(netCap)})`);
+}
+
+console.log('공격 속도 버프가 실제로 더 자주 때린다');
+{
+  setArena(2, true);
+  const run = withBuff => {
+    const s = play(2, false);
+    s.p[0].x = s.p[1].x;
+    s.p[0].y = s.p[1].y + Math.round(12 * FP);
+    s.p[0].face = 0;
+    let hits = 0;
+    for (let t = 0; t < 300; t++){
+      if (withBuff) s.bf[0][BUFF.ATK] = 99999;   // **step 전에** 켜둔다
+      s.p[1].hp = MAXHP;                          // 죽으면 판이 끝나 못 잰다
+      const q = IN(2); q[0].atk = 1;
+      step(s, q);
+      if (s.p[1].hp < MAXHP) hits++;
+    }
+    return hits;
+  };
+  const a = run(false), b = run(true);
+  const r = b / a;
+  assert(Math.abs(r - BUFF_DEF[BUFF.ATK].mul) < 0.1,
+    `${BUFF_DEF[BUFF.ATK].mul}배로 때린다 (${a}회 → ${b}회, ${r.toFixed(2)}배)`);
 }
 
 console.log('무적 아이콘은 언어별로 한 벌씩');

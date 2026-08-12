@@ -425,3 +425,12 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .lang-btn{padding:5px 10px;background:#141c2c;color:#9fb0c2;border:1px solid #35506b;
   font:700 12px var(--gf);cursor:pointer}
 .lang-btn.on{background:#1d3a52;color:#ffe9a8;border-color:#5a96c8}
+
+/* 나가기 확인 창 */
+.quit-ask{width:min(300px,86vw)}
+.quit-ask .ask-row{display:flex;gap:8px;margin-top:12px}
+.quit-ask .ask-row .menu-btn{flex:1 1 0;min-width:0}
+/* 홈에서 뒤로가기 한 번 눌렀을 때 */
+.exit-hint{position:fixed;left:50%;bottom:8%;transform:translateX(-50%);z-index:60;
+  margin:0;padding:8px 16px;background:rgba(8,14,26,.92);border:1px solid #5a96c8;
+  font:700 13px var(--gf);color:#dceaf6;white-space:nowrap}

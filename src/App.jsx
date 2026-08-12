@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Splash from './ui/screens/Splash.jsx';
 import Home from './ui/screens/Home.jsx';
 import AiStages from './ui/screens/AiStages.jsx';
@@ -10,7 +10,9 @@ import SettingsModal from './ui/SettingsModal.jsx';
 import HelpModal from './ui/HelpModal.jsx';
 import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings, setSetting } from './state/settings.js';
-import { onLangChange } from './i18n/index.js';
+import { onLangChange, t } from './i18n/index.js';
+import { initBack, setBackHandler } from './state/back.js';
+import QuitAsk from './ui/QuitAsk.jsx';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -31,6 +33,35 @@ export default function App(){
   const [score, setScore] = useState(null);       // 이번 판 점수 변화 (PVP만)
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [askQuit, setAskQuit] = useState(false);   // 게임 중 나가기 확인
+  const [exitHint, setExitHint] = useState(false); // 홈에서 "한 번 더" 안내
+
+  // 하단 뒤로가기. **위에 뜬 것부터 닫고**, 마지막에 홈에서 두 번 눌러야 나간다.
+  // 한 번에 꺼지면 매칭 중이던 것도 날아가므로 반드시 두 단계로 둔다
+  const exitAt = useRef(0);
+  useEffect(() => { initBack(); }, []);
+  useEffect(() => {
+    setBackHandler(() => {
+      if (askQuit){ setAskQuit(false); return true; }
+      if (showHelp){ setShowHelp(false); return true; }
+      if (showSettings){ setShowSettings(false); return true; }
+      if (screen === 'game'){ setAskQuit(true); return true; }
+      if (screen === 'matching'){ goHome(); return true; }
+      if (screen === 'result' || screen === 'ai' || screen === 'practice' || screen === 'pvp'){
+        goHome(); return true;
+      }
+      if (screen === 'home'){
+        // 두 번 눌러야 나간다 (2초 안에)
+        const now = Date.now();
+        if (now - exitAt.current < 2000) return false;   // 두 번째 → 앱 종료
+        exitAt.current = now;
+        setExitHint(true);
+        setTimeout(() => setExitHint(false), 2000);
+        return true;
+      }
+      return true;
+    });
+  }, [screen, showHelp, showSettings, askQuit, goHome]);
 
   useEffect(() => {
     const st = getSettings();
@@ -109,6 +140,10 @@ export default function App(){
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} onAgain={again} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      {askQuit && <QuitAsk pvp={session?.kind === 'pvp'}
+                           onQuit={() => { setAskQuit(false); goHome(); }}
+                           onStay={() => setAskQuit(false)} />}
+      {exitHint && <p className="exit-hint">{t('quit.again')}</p>}
     </>
   );
 }
