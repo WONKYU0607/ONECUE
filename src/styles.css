@@ -189,13 +189,22 @@ font:900 19px/1 var(--gf);letter-spacing:3px;text-align:center;padding:0 4px}
 .help-row .k{flex:0 0 54px;color:#8fd8ff;font:900 12px var(--gf)}
 .help-row .v{flex:1 1 0;min-width:0;color:#c8c8da;font:700 12px/1.6 var(--gf)}
 .help-ok{margin:10px 14px 14px}
+/* 신청 버튼. **폭·높이를 고정한다** — 문구 길이에 따라 늘어나면 두 줄로 접혀
+   아래 버튼과 겹친다(영어는 한국어의 2.5배까지 길어진다).
+   글자는 칸에 맞춰 자동으로 줄어든다 */
 .fastbtn{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:22;
-padding:8px 16px;background:rgba(18,18,28,.92);border:2px solid #8f6ef0;color:#c3adff;
-font:900 14px var(--gf);letter-spacing:2px;cursor:pointer}
+width:min(260px,76vw);height:38px;padding:0 10px;box-sizing:border-box;
+display:flex;align-items:center;justify-content:center;
+background:rgba(18,18,28,.92);border:2px solid #8f6ef0;color:#c3adff;
+font-family:var(--gf);font-weight:900;font-size:14px;letter-spacing:2px;cursor:pointer;
+white-space:nowrap;overflow:hidden}
+/* 긴 문구는 글씨를 줄여 한 줄에 담는다 */
+.fastbtn > span{display:block;width:100%;text-align:center;
+transform-origin:center;white-space:nowrap}
 .fastbtn:active{background:#8f6ef0;color:#12121c}
 .link-note.fast{border-color:#8f6ef0;color:#c3adff}
 /* 노템전은 2배속과 색을 갈라서 뭘 신청받았는지 바로 알게 한다 */
-.fastbtn.bare{top:110px;border-color:#f0a81e;color:#f0c86e}
+.fastbtn.bare{top:108px;border-color:#f0a81e;color:#f0c86e}
 .fastbtn.bare:active{background:#f0a81e;color:#12121c}
 .modal.ask{width:min(340px,88vw);padding:18px 16px}
 .ask-t{font:900 15px/1.6 var(--gf);color:#e8e8f0;margin:0 0 6px}

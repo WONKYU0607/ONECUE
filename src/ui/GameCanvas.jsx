@@ -6,6 +6,7 @@ import TunePanel from './TunePanel.jsx';
 import { getConnection, disconnect, getRoomInfo } from '../net/connection.js';
 import { getSettings } from '../state/settings.js';
 import { t } from '../i18n/index.js';
+import FitText from './FitText.jsx';
 
 // 캔버스를 마운트하고 게임을 붙였다 떼는 얇은 껍데기.
 // 게임 루프 상태는 ref에만 두고, React state는 "페이즈"처럼 드물게 바뀌는 것만 쓴다.
@@ -132,7 +133,7 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
       {(ready.prompt?.offer || []).map((k, i) => (
         <button key={k} className={'fastbtn ui-overlay' + (i ? ' bare' : '')}
                 onClick={() => gameRef.current?.request(k)}>
-          {negText(k, 'btn', ready.prompt?.melee)}
+          <FitText>{negText(k, 'btn', ready.prompt?.melee)}</FitText>
         </button>
       ))}
       {ready.prompt?.waiting && (

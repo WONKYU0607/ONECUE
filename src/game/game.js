@@ -1,6 +1,6 @@
 import {
   FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH, setArena,
-  stepCap, bulletFP, coolTicks, clampi, BUFF, BUFF_DEF} from './config.js';
+  stepCap, bulletFP, coolTicks, clampi, BUFF, BUFF_DEF, FAST_MUL} from './config.js';
 import { Loopback, Server, Client } from './net.js';
 import { createRenderer } from './render.js';
 import { attachInput } from './input.js';
@@ -301,8 +301,11 @@ export function createGame(canvas, opts = {}){
     // 스틱 기울기 -> 이동량 (전 방향 자유 이동)
     // **버프를 여기서도 곱해야 한다.** 시뮬의 cap 은 상한일 뿐이라
     // 클라가 1.0배로 보내면 1.5배가 될 수 없다 — 이걸 빠뜨려 이속 버프가 안 먹었다
+    // **2배속도 곱해야 한다.** 시뮬·전송 상한에는 FAST_MUL 이 있는데 여기만 빠져서,
+    // 2배속인데 클라는 1배로 보내고 있었다 (상한만 열려 있어 효과가 없었다)
     const bSpd = spdBuff(client.pred, SELF.slot);
-    const sp = stepCap() / FP * 60 * bSpd;          // 최대 속도(px/초)
+    const fastMul = client.pred.fast ? FAST_MUL : 1;
+    const sp = stepCap() / FP * 60 * fastMul * bSpd;   // 최대 속도(px/초)
     const { stick, keys } = input;
     let vx = stick.nx, vy = stick.ny;
     let kx = 0, ky = 0;
