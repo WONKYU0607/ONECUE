@@ -1,7 +1,6 @@
 import {
   FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH, setArena,
-  stepCap, bulletFP, coolTicks, clampi
-} from './config.js';
+  stepCap, bulletFP, coolTicks, clampi, BUFF, BUFF_DEF} from './config.js';
 import { Loopback, Server, Client } from './net.js';
 import { createRenderer } from './render.js';
 import { attachInput } from './input.js';
@@ -18,6 +17,10 @@ import { padRect, paletteSlots, uiBoxRect } from './layout.js';
 import { uiPrompt, resultFor, matchSummary } from './ui-state.js';
 import { CHARGE_MAX_MS, PH_PLAY, THROW } from './config.js';
 import { t } from '../i18n/index.js';
+
+// 이속 버프 배율. 시뮬과 **같은 값**을 써야 예측이 어긋나지 않는다
+const spdBuff = (st, slot) =>
+  (st && st.bf && st.bf[slot] && st.bf[slot][BUFF.SPD] > 0) ? BUFF_DEF[BUFF.SPD].mul : 1;
 
 // 게임 한 판을 만들고 rAF 루프를 돌린다.
 // React는 이 함수 하나만 호출하고, 언마운트 때 stop()만 부르면 된다.
@@ -296,7 +299,10 @@ export function createGame(canvas, opts = {}){
     lastNow = now;
 
     // 스틱 기울기 -> 이동량 (전 방향 자유 이동)
-    const sp = stepCap() / FP * 60;                 // 최대 속도(px/초)
+    // **버프를 여기서도 곱해야 한다.** 시뮬의 cap 은 상한일 뿐이라
+    // 클라가 1.0배로 보내면 1.5배가 될 수 없다 — 이걸 빠뜨려 이속 버프가 안 먹었다
+    const bSpd = spdBuff(client.pred, SELF.slot);
+    const sp = stepCap() / FP * 60 * bSpd;          // 최대 속도(px/초)
     const { stick, keys } = input;
     let vx = stick.nx, vy = stick.ny;
     let kx = 0, ky = 0;
@@ -375,7 +381,9 @@ export function createGame(canvas, opts = {}){
       const me = client.pred.p[slot];
       if (!brain || !me || me.hp <= 0) continue;   // 아직 없거나 죽은 AI는 건너뛴다
       const a = brain.think(client.pred, slot, dt, now);
-      if (a.vx || a.vy) client.input(slot, a.vx * sp * dt, a.vy * sp * dt, 0);
+      // AI도 같이 (안 그러면 사람만 버프 효과를 본다)
+      const aSp = sp * spdBuff(client.pred, slot);
+      if (a.vx || a.vy) client.input(slot, a.vx * aSp * dt, a.vy * aSp * dt, 0);
       if (a.thr && canThrow(client.pred, slot, a.thr.k)) client.throwItem(slot, a.thr.k, a.thr.ch);
       if (a.sh) client.raiseShield(slot);
     }

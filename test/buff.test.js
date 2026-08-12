@@ -140,6 +140,37 @@ console.log('상태 전송·체크섬');
   assert(fixed.bf.length === 4, '인원수만큼');
 }
 
+console.log('이속 버프가 실제로 빠르다');
+{
+  // **클라가 보내는 입력에도 버프를 곱해야 한다.** 시뮬의 cap 은 상한일 뿐이라
+  // 1.0배로 보내면 1.5배가 될 수 없다 — 이걸 빠뜨려 실제 플레이에서 안 빨라졌다
+  setArena(2, true);
+  const run = (withBuff, ticks) => {
+    const s = play(2, false);
+    if (withBuff) s.bf[0][BUFF.SPD] = 600;
+    const y0 = s.p[0].y;
+    for (let t = 0; t < ticks; t++){
+      const mul = (s.bf[0][BUFF.SPD] > 0) ? BUFF_DEF[BUFF.SPD].mul : 1;
+      const q = IN(2);
+      q[0].dy = -Math.round(s.maxStep * mul);
+      step(s, q);
+    }
+    return Math.abs(s.p[0].y - y0);
+  };
+  // 가로는 아레나가 좁아 벽에 막힌다. **세로로** 재야 한다
+  for (const ticks of [10, 20, 30]){
+    const a = run(false, ticks), b = run(true, ticks);
+    const r = b / a;
+    assert(Math.abs(r - BUFF_DEF[BUFF.SPD].mul) < 0.02,
+      `  ${ticks}틱: ${BUFF_DEF[BUFF.SPD].mul}배 (${r.toFixed(2)})`);
+  }
+  // 클라 쪽에도 버프가 반영되는가
+  const gj = (await import('fs')).readFileSync('src/game/game.js', 'utf8');
+  assert(/spdBuff/.test(gj), 'game.js 가 버프를 곱한다');
+  assert(/const sp = stepCap\(\)[^;]*bSpd/.test(gj), '사람 입력에 곱한다');
+  assert(/aSp = sp \* spdBuff/.test(gj), 'AI 입력에도 곱한다');
+}
+
 console.log('무적 아이콘은 언어별로 한 벌씩');
 {
   const fs = await import('fs');
