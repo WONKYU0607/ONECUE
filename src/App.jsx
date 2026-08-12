@@ -139,7 +139,8 @@ export default function App(){
       {screen === 'practice' && <PracticeMenu onBack={goHome} onStart={startPractice} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toGame} />}
-      {screen === 'game'     && <GameCanvas session={session} onExit={goHome} onFinish={onFinish} />}
+      {screen === 'game'     && <GameCanvas session={session} onExit={goHome}
+                                          onBack={() => setAskQuit(true)} onFinish={onFinish} />}
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} onAgain={again} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}

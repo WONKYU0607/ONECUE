@@ -177,10 +177,30 @@ console.log('이속 버프가 실제로 빠르다');
   const simSrc = fs2.readFileSync('src/game/sim.js', 'utf8');
   const netSrc = fs2.readFileSync('src/game/net.js', 'utf8');
   const simCap = simSrc.match(/const cap = s\.maxStep[^,]+/)[0];
-  const netCap = netSrc.match(/const cap = Math\.max\(1,[\s\S]{0,220}?\);/)[0];
-  for (const [nm, re] of [['2배속', /FAST_MUL/], ['AI배율', /spdMul|aiMul/], ['이속버프', /bSpd/]])
+  const netCap = netSrc.slice(netSrc.indexOf('const sBf ='), netSrc.indexOf('let dx = q.dx'));
+  for (const [nm, re] of [['2배속', /FAST_MUL/], ['AI배율', /spdMul|aiMul/]])
     assert(re.test(simCap) === re.test(netCap),
       `  상한이 ${nm}을 같이 본다 (시뮬 ${re.test(simCap)} / 전송 ${re.test(netCap)})`);
+  // 버프도 같이 봐야 한다 (작으면 사라지고, 크면 프레임률 손실이 난다)
+  assert(/bSpd/.test(netCap), '  전송 상한이 이속 버프를 본다');
+  // **확정 상태를 본다.** 예측을 보면 기기마다 먹은 시점이 달라 보내는 양이 갈리고,
+  // 그 차이가 화면에 남는다 (폰·PC가 다르게 보이던 원인)
+  assert(!/pred\.bf/.test(netCap), '  예측 상태를 보지 않는다');
+  assert(/this\.s\.bf/.test(netCap), '  확정 상태를 본다');
+}
+
+console.log('상대 화면에서도 빨라 보인다');
+{
+  // [stated] "내 폰에서는 빨라지는데 상대방이 보기에는 안 빨라 보인다"
+  // 원인: 화면 보정 상한(updateRender)이 1.0배 고정이라, 상대가 1.5배로 움직여도
+  // 화면은 1.0배까지만 따라가 틱마다 계속 뒤처졌다
+  const netSrc = (await import('fs')).readFileSync('src/game/net.js', 'utf8');
+  const blk = netSrc.slice(netSrc.indexOf('updateRender('), netSrc.indexOf('setCfg(cfg)'));
+  assert(/BUFF\.SPD/.test(blk), '보정 상한이 이속 버프를 본다');
+  assert(/spdMul/.test(blk), '보정 상한이 AI 배율도 본다');
+  assert(/FAST_MUL/.test(blk), '보정 상한이 2배속도 본다');
+  // 슬롯마다 달라야 한다 (한 명만 버프를 먹을 수 있다)
+  assert(/capOf\(i\)/.test(blk), '사람마다 따로 계산한다');
 }
 
 console.log('공격 속도 버프가 실제로 더 자주 때린다');

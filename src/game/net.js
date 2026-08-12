@@ -374,15 +374,16 @@ export class Client {
         // → 틱마다 maxStep까지만 싣고 **나머지는 다음 틱으로 넘긴다**
         // **버프도 곱해야 한다.** 여기서 다시 자르기 때문에, game.js 가 1.5배로
         // 키워 보내도 이 cap 이 1.0배면 도로 깎여 이속 버프가 통째로 사라진다
-        // 여기서 자르는 건 **한 틱에 실을 수 있는 최대치**를 정하는 것뿐이다.
-        // 실제 판정은 시뮬이 자기 상태로 정확히 자르므로, 여기서는 **일어날 수 있는
-        // 가장 큰 값**을 쓴다:
-        //  - 작게 잡으면 그만큼이 영영 사라진다 (이속 버프·AI 배율이 이 이유로 안 먹었다)
-        //  - 예측 상태(this.pred)를 보면 기기마다 버프 시점이 달라 보내는 양이 갈리고,
-        //    그 차이가 화면에 남는다 (폰과 PC가 다르게 보이던 원인)
-        const aiMul = (this.pred.spdMul && this.pred.spdMul[pid]) || 1;
-        const cap = Math.max(1, (this.pred.maxStep || stepCap())
-          * (this.pred.fast ? FAST_MUL : 1) * aiMul * BUFF_DEF[BUFF.SPD].mul);
+        // 한 틱에 실을 수 있는 최대치. **시뮬의 상한과 정확히 같아야 한다**:
+        //  - 작으면 그만큼이 영영 사라진다 (이속 버프·AI 배율이 이 이유로 안 먹었다)
+        //  - 크면 한 틱에 과하게 실려 시뮬이 자를 때 사라진다 (프레임률 손실)
+        // **확정 상태(this.s)를 본다.** 예측을 보면 기기마다 버프 시점이 달라
+        // 보내는 양이 갈리고, 그 차이가 화면에 남는다 (폰과 PC가 다르게 보이던 원인)
+        const sBf = this.s.bf && this.s.bf[pid];
+        const bSpd = (sBf && sBf[BUFF.SPD] > 0) ? BUFF_DEF[BUFF.SPD].mul : 1;
+        const aiMul = (this.s.spdMul && this.s.spdMul[pid]) || 1;
+        const cap = Math.max(1, (this.s.maxStep || this.pred.maxStep || stepCap())
+          * (this.s.fast ? FAST_MUL : 1) * aiMul * bSpd);
         let dx = q.dx, dy = q.dy;
         const len = Math.sqrt(dx*dx + dy*dy);
         if (len > cap){ const k = cap / len; dx = Math.round(dx * k); dy = Math.round(dy * k); }
@@ -523,7 +524,14 @@ export class Client {
     // 칼전만 2배로 뒀다가 "상대만 엄청 빠르게 보인다"는 지적을 받고 되돌렸다.
     // 몸 겹침이 조금 늘어나는 건 감수한다 — 빨라 보이는 쪽이 훨씬 거슬린다
     const capMul = 1.0;
-    const cap = capMul * (this.pred.maxStep || stepCap()) * (this.pred.fast ? FAST_MUL : 1);
+    // **버프를 먹은 사람은 그만큼 빨리 따라가야 한다.**
+    // 이 상한이 1.0배 고정이라, 상대가 1.5배로 움직여도 화면은 1.0배까지만 따라가
+    // 계속 뒤처진 채로 보였다 — "내 폰에선 빨라지는데 상대가 보기엔 안 빨라 보인다"
+    const base = capMul * (this.pred.maxStep || stepCap()) * (this.pred.fast ? FAST_MUL : 1);
+    const capOf = i => base
+      * (((this.pred.spdMul && this.pred.spdMul[i]) || 1))
+      * ((this.pred.bf && this.pred.bf[i] && this.pred.bf[i][BUFF.SPD] > 0)
+          ? BUFF_DEF[BUFF.SPD].mul : 1);
     const rt = this.renderTick(dt);
     const mrt = this.myTick(dt);
     // **모두 같은 시각(현재)으로 그린다.** 한 화면에 두 시각을 섞으면 반드시 어긋난다:
@@ -561,7 +569,7 @@ export class Client {
         gy = at ? at[1] : this.pred.p[i].y;
       }
       // 보정이 들어와도 순간이동하지 않도록 한 프레임 이동량에 상한을 둔다
-      const lim = cap * Math.max(1, dt * 60);
+      const lim = capOf(i) * Math.max(1, dt * 60);   // 버프를 먹은 사람은 더 빨리 따라간다
       const ddx = gx - this.rx[i], ddy = gy - this.ry[i];
       const dd = Math.sqrt(ddx * ddx + ddy * ddy);
       if (dd > lim){ gx = this.rx[i] + ddx * lim / dd; gy = this.ry[i] + ddy * lim / dd; }

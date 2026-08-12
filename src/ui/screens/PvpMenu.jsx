@@ -29,11 +29,11 @@ export default function PvpMenu({ onBack, onStart }){
     if (step === 'color') return setStep(pending?.ffa ? 'ffa' : 'n');
     setStep('how');
   };
-  // 하단 뒤로가기가 **단계 안에서** 먼저 돌아가게 등록한다
-  useEffect(() => {
-    setInnerBack(() => { if (step === 'mode') return false; back(); return true; });
-    return () => setInnerBack(null);
-  });
+  // 하단 뒤로가기가 **단계 안에서** 먼저 돌아가게 한다.
+  // effect 가 아니라 **렌더 중에** 덮어쓴다 — effect 순서에 기대면
+  // App 이 먼저 물어볼 때 옛 단계를 붙든 함수가 돌아간다
+  setInnerBack(() => { if (step === 'mode') return false; back(); return true; });
+  useEffect(() => () => setInnerBack(null), []);   // 화면을 떠날 때만 지운다
 
   const title =
     step === 'mode' ? t('mode.pvp')

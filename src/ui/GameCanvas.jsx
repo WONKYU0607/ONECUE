@@ -9,7 +9,9 @@ import { t } from '../i18n/index.js';
 
 // 캔버스를 마운트하고 게임을 붙였다 떼는 얇은 껍데기.
 // 게임 루프 상태는 ref에만 두고, React state는 "페이즈"처럼 드물게 바뀌는 것만 쓴다.
-export default function GameCanvas({ session, onExit, onFinish }){
+// **화면 안 '‹' 와 하단 뒤로가기는 같은 동작이어야 한다.**
+// 예전엔 '‹' 가 확인 없이 바로 나가서, 나가기 창이 안 뜬다는 신고를 받았다
+export default function GameCanvas({ session, onExit, onBack, onFinish }){
   const canvasRef = useRef(null);
   const gameRef = useRef(null);
   const [phase, setPhase] = useState(PH_READY);
@@ -106,7 +108,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
         </div>
       )}
       <button className="icon-btn top-left ui-overlay"
-              onClick={() => { disconnect(); onExit(); }} aria-label={t('common.leave')}>‹</button>
+              onClick={onBack} aria-label={t('common.leave')}>‹</button>
       {link.self === 'noconn' && (
         <div className="link-note ui-overlay">{t('link.noconn')}</div>
       )}
