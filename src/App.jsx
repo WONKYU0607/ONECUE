@@ -11,7 +11,7 @@ import HelpModal from './ui/HelpModal.jsx';
 import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings, setSetting } from './state/settings.js';
 import { onLangChange, t } from './i18n/index.js';
-import { initBack, setBackHandler } from './state/back.js';
+import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf } from './state/tickets.js';
@@ -33,7 +33,8 @@ export default function App(){
   const [score, setScore] = useState(null);       // 이번 판 점수 변화 (PVP만)
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [askQuit, setAskQuit] = useState(false);   // 게임 중 나가기 확인
+  const [askQuit, setAskQuit] = useState(false);
+  const [askExit, setAskExit] = useState(false);   // 홈에서 앱을 닫을까   // 게임 중 나가기 확인
   const [exitHint, setExitHint] = useState(false); // 홈에서 "한 번 더" 안내
 
 
@@ -57,26 +58,25 @@ export default function App(){
   useEffect(() => { initBack(); }, []);
   useEffect(() => {
     setBackHandler(() => {
+      if (askExit){ setAskExit(false); return true; }
       if (askQuit){ setAskQuit(false); return true; }
       if (showHelp){ setShowHelp(false); return true; }
       if (showSettings){ setShowSettings(false); return true; }
       if (screen === 'game'){ setAskQuit(true); return true; }
       if (screen === 'matching'){ goHome(); return true; }
+      // **화면 안에 단계가 있으면 거기부터 돌아간다** (PVP 색 고르기 → 모드 고르기 → 홈).
+      // 이걸 안 물어보면 어느 단계에 있든 통째로 홈으로 나가버린다
+      if (tryInnerBack()) return true;
       if (screen === 'result' || screen === 'ai' || screen === 'practice' || screen === 'pvp'){
         goHome(); return true;
       }
-      if (screen === 'home'){
-        // 두 번 눌러야 나간다 (2초 안에)
-        const now = Date.now();
-        if (now - exitAt.current < 2000) return false;   // 두 번째 → 앱 종료
-        exitAt.current = now;
-        setExitHint(true);
-        setTimeout(() => setExitHint(false), 2000);
-        return true;
-      }
+      // [stated] 홈에서도 **종료 확인 창**이 떠야 한다.
+      // 예전엔 "한 번 더 누르면 종료" 안내만 띄워서, 창을 기대한 사용자에게는
+      // 아무 일도 안 일어난 것처럼 보였다
+      if (screen === 'home'){ setAskExit(true); return true; }
       return true;
     });
-  }, [screen, showHelp, showSettings, askQuit, goHome]);
+  }, [screen, showHelp, showSettings, askQuit, askExit, goHome]);
   const startPvp  = useCallback(() => setScreen('pvp'), []);
   const beginPvp  = useCallback(opt => {
     disconnect();
@@ -143,6 +143,9 @@ export default function App(){
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} onAgain={again} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      {askExit && <QuitAsk exit
+                           onQuit={() => { setAskExit(false); exitApp(); }}
+                           onStay={() => setAskExit(false)} />}
       {askQuit && <QuitAsk pvp={session?.kind === 'pvp'}
                            onQuit={() => { setAskQuit(false); goHome(); }}
                            onStay={() => setAskQuit(false)} />}

@@ -187,4 +187,7 @@ export default {
   'quit.yes': 'Leave',
   'quit.no': 'Keep playing',
   'quit.again': 'Press back again to exit',
+  'quit.appTitle': 'Exit the app?',
+  'quit.appDesc': 'You will return to your home screen.',
+  'ready.askTimeout': 'If you do not answer in {n}s, the match starts as normal.',
 };

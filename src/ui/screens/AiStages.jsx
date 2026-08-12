@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AI_STAGES } from '../../game/ai.js';
 import { isUnlocked, isCleared, getProgress, modeKey } from '../../state/progress.js';
 import { t } from '../../i18n/index.js';
+import { setInnerBack } from '../../state/back.js';
 
 // AI 모드 스테이지 선택. 앞 단계를 깨야 다음이 열린다
 export default function AiStages({ onBack, onStart, onMelee }){
@@ -9,6 +10,11 @@ export default function AiStages({ onBack, onStart, onMelee }){
   const [n, setN] = useState(2);   // 2 = 1대1, 4 = 2대2, 6 = 3대3
   // 한 화면에 다 깔지 않고 모드를 먼저 고르게 한다 (PVP와 같은 흐름)
   const [mode, setMode] = useState(null);     // null | 'gun' | 'melee'
+  // 단계 안에서 먼저 돌아간다 (총/칼 고르기 → 모드 고르기 → 홈)
+  useEffect(() => {
+    setInnerBack(() => { if (!mode) return false; setMode(null); return true; });
+    return () => setInnerBack(null);
+  });
   // 모드마다 진행도가 따로다. n(인원수)과 총격/칼전으로 갈린다
   const key = modeKey(n, mode === 'melee');
   const p = getProgress(key);

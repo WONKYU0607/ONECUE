@@ -7,6 +7,24 @@
 // 그래야 앱을 빌드하기 전에 웹에서 미리 확인할 수 있다.
 let handler = null;
 let armed = false;
+// 화면 안에도 단계가 있다(PVP 메뉴의 색 고르기, AI의 총/칼 고르기 등).
+// **그 화면이 자기 뒤로가기를 여기 등록**하고, App 이 먼저 물어본다.
+// 안 그러면 어느 단계에 있든 통째로 홈으로 나가버린다
+let inner = null;
+export function setInnerBack(fn){ inner = fn; }
+
+/** 앱을 닫는다. 웹에서는 닫을 방법이 없어 아무 일도 안 일어난다 */
+export function exitApp(){
+  try {
+    const App = globalThis.Capacitor?.Plugins?.App;
+    if (App?.exitApp){ App.exitApp(); return true; }
+  } catch { /* 무시 */ }
+  return false;
+}
+export function tryInnerBack(){
+  if (!inner) return false;
+  try { return !!inner(); } catch { return false; }
+}
 
 /** 뒤로가기를 처리할 함수를 등록한다. true를 돌려주면 앱을 안 닫는다 */
 export function setBackHandler(fn){ handler = fn; }

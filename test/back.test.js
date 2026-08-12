@@ -50,16 +50,32 @@ console.log('게임 중에는 확인 창을 띄운다');
   assert(/onQuit/.test(ask) && /onStay/.test(ask), '나가기·계속하기 둘 다 있다');
 }
 
-console.log('홈에서는 두 번 눌러야 나간다');
+console.log('홈에서는 종료 확인 창이 뜬다');
 {
+  // [stated] "홈에서 뒤로가기 눌러도 게임을 종료하시겠습니까 UI 안 나옴"
+  // 예전엔 "한 번 더 누르면 종료" 안내만 띄워서, 창을 기대한 사용자에게는
+  // 아무 일도 안 일어난 것처럼 보였다
   const body = app.slice(app.indexOf('setBackHandler'), app.indexOf('}, [screen'));
-  assert(/exitAt/.test(body), '마지막으로 누른 시각을 기억한다');
-  // **시간 비교가 실제로 있어야 한다.** `return false` 만 보면
-  // 한 번에 꺼지도록 되돌려도 통과해버린다
-  assert(/now - exitAt\.current < \d+/.test(body), '2초 안에 두 번 눌렀는지 본다');
-  assert(/exitAt\.current = now/.test(body), '누른 시각을 갱신한다');
-  assert(/setExitHint\(true\)/.test(body), '첫 번째엔 안내를 띄운다');
-  assert(/quit\.again/.test(app), '"한 번 더 누르면" 안내가 있다');
+  assert(/screen === 'home'/.test(body), '홈을 따로 처리한다');
+  assert(/setAskExit\(true\)/.test(body), '확인 창을 띄운다');
+  assert(/askExit && <QuitAsk exit/.test(app), '창이 실제로 그려진다');
+  assert(/exitApp\(\)/.test(app), '"예"를 누르면 앱을 닫는다');
+  assert(/quit\.appTitle/.test(fs.readFileSync('src/i18n/ko.js', 'utf8')), '문구가 있다');
+}
+
+console.log('화면 안의 단계부터 돌아간다');
+{
+  // [stated] "해당 단계에서 그 전 단계로 뒤로가져야 하는데 바로 홈으로 나감"
+  const body = app.slice(app.indexOf('setBackHandler'), app.indexOf('}, [screen'));
+  assert(/tryInnerBack\(\)/.test(body), 'App 이 화면 안 뒤로가기를 먼저 묻는다');
+  // 홈으로 보내기 **전에** 물어야 한다
+  assert(body.indexOf('tryInnerBack') < body.indexOf("screen === 'result'"),
+    '홈으로 보내기 전에 묻는다');
+  for (const f of ['src/ui/screens/PvpMenu.jsx', 'src/ui/screens/AiStages.jsx']){
+    const src = fs.readFileSync(f, 'utf8');
+    assert(/setInnerBack\(/.test(src), `  ${f} 가 자기 단계를 등록한다`);
+    assert(/setInnerBack\(null\)/.test(src), `  ${f} 가 떠날 때 지운다`);
+  }
 }
 
 console.log('문구가 두 언어에 다 있다');

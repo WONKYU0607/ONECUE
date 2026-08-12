@@ -64,14 +64,23 @@ console.log('모듈 최상단에서 t()를 부르지 않는다');
 {
   const bad = [];
   for (const p of files){
+    // **함수 안인지, 최상단 자료 표 안인지 구분해야 한다.**
+    // 괄호 깊이만 보면 `const LABEL = { a: t('x') }` 가 깊이 1이라 함수 안으로 오해한다 —
+    // 실제로 Matching.jsx 의 LABEL 표를 이렇게 놓쳤다.
+    // 최상단에서 시작한 `const/let/var … =` 선언이 끝날 때까지는 여전히 최상단으로 본다
     const lines = fs.readFileSync(p, 'utf8').split('\n');
-    let depth = 0;
+    let depth = 0, topDecl = false;
     lines.forEach((ln, i) => {
       const code = ln.replace(/\/\/.*/, '');
-      if (depth === 0 && /\bt\(\s*'/.test(code) && !code.trim().startsWith('import'))
+      const atTop = depth === 0 || topDecl;
+      if (atTop && /\bt\(\s*'/.test(code) && !code.trim().startsWith('import'))
         bad.push(`${path.relative('.', p)}:${i + 1}`);
+      // 최상단에서 값 선언이 시작되면(함수가 아니면) 그 안도 최상단으로 친다
+      if (depth === 0 && /^\s*(export\s+)?(const|let|var)\s+\w+\s*=/.test(code)
+          && !/=>|function/.test(code)) topDecl = true;
       depth = Math.max(0, depth + (code.split('{').length - 1) + (code.split('(').length - 1)
                               - (code.split('}').length - 1) - (code.split(')').length - 1));
+      if (depth === 0) topDecl = false;
     });
   }
   assert(bad.length === 0, `최상단 호출:\n    ${bad.join('\n    ')}`);

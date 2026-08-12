@@ -374,13 +374,15 @@ export class Client {
         // → 틱마다 maxStep까지만 싣고 **나머지는 다음 틱으로 넘긴다**
         // **버프도 곱해야 한다.** 여기서 다시 자르기 때문에, game.js 가 1.5배로
         // 키워 보내도 이 cap 이 1.0배면 도로 깎여 이속 버프가 통째로 사라진다
-        // **시뮬의 상한과 정확히 같은 식이어야 한다.** 여기가 더 작으면 그만큼이
-        // 통째로 사라진다 — 버프(bSpd)와 AI 배율(spdMul)이 각각 이 이유로 안 먹었다
-        const bf = this.pred.bf && this.pred.bf[pid];
-        const bSpd = (bf && bf[BUFF.SPD] > 0) ? BUFF_DEF[BUFF.SPD].mul : 1;
+        // 여기서 자르는 건 **한 틱에 실을 수 있는 최대치**를 정하는 것뿐이다.
+        // 실제 판정은 시뮬이 자기 상태로 정확히 자르므로, 여기서는 **일어날 수 있는
+        // 가장 큰 값**을 쓴다:
+        //  - 작게 잡으면 그만큼이 영영 사라진다 (이속 버프·AI 배율이 이 이유로 안 먹었다)
+        //  - 예측 상태(this.pred)를 보면 기기마다 버프 시점이 달라 보내는 양이 갈리고,
+        //    그 차이가 화면에 남는다 (폰과 PC가 다르게 보이던 원인)
         const aiMul = (this.pred.spdMul && this.pred.spdMul[pid]) || 1;
         const cap = Math.max(1, (this.pred.maxStep || stepCap())
-          * (this.pred.fast ? FAST_MUL : 1) * aiMul * bSpd);
+          * (this.pred.fast ? FAST_MUL : 1) * aiMul * BUFF_DEF[BUFF.SPD].mul);
         let dx = q.dx, dy = q.dy;
         const len = Math.sqrt(dx*dx + dy*dy);
         if (len > cap){ const k = cap / len; dx = Math.round(dx * k); dy = Math.round(dy * k); }

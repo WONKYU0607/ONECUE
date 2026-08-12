@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TEAMS } from '../../game/config.js';
 import { leftFor, maxFor } from '../../state/tickets.js';
 import { t } from '../../i18n/index.js';
+import { setInnerBack } from '../../state/back.js';
 
 // PVP 진입. 화면마다 버튼 두세 개만 보이도록 단계로 내려간다.
 //   모드(총격전·칼전) → 방식(랜덤·방 만들기·코드) → 인원수(1대1·2대2)
@@ -28,6 +29,12 @@ export default function PvpMenu({ onBack, onStart }){
     if (step === 'color') return setStep(pending?.ffa ? 'ffa' : 'n');
     setStep('how');
   };
+  // 하단 뒤로가기가 **단계 안에서** 먼저 돌아가게 등록한다
+  useEffect(() => {
+    setInnerBack(() => { if (step === 'mode') return false; back(); return true; });
+    return () => setInnerBack(null);
+  });
+
   const title =
     step === 'mode' ? t('mode.pvp')
     : step === 'how' ? modeName

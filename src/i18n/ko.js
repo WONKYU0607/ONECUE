@@ -187,4 +187,7 @@ export default {
   'quit.yes': '나가기',
   'quit.no': '계속하기',
   'quit.again': '한 번 더 누르면 종료됩니다',
+  'quit.appTitle': '앱을 종료하시겠습니까?',
+  'quit.appDesc': '홈 화면으로 돌아갑니다.',
+  'ready.askTimeout': '{n}초 안에 답하지 않으면 그냥 진행됩니다.',
 };

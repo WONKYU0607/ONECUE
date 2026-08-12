@@ -143,7 +143,7 @@ export default function GameCanvas({ session, onExit, onFinish }){
           <div className="modal ask">
             <p className="ask-t">{negText(ready.prompt.ask.kind, 'title', ready.prompt?.melee)}</p>
             <p className="ask-d">{negText(ready.prompt.ask.kind, 'desc', ready.prompt?.melee)}</p>
-            <p className="ask-d">{ready.prompt.ask.sec}초 안에 답하지 않으면 그냥 진행됩니다.</p>
+            <p className="ask-d">{t('ready.askTimeout', { n: ready.prompt.ask.sec })}</p>
             <div className="ask-row">
               <button className="menu-btn ghost"
                       onClick={() => gameRef.current?.answer(ready.prompt.ask.kind, false)}>{t('common.decline')}</button>

@@ -4,15 +4,17 @@ import { TEAMS } from '../../game/config.js';
 import { spendFor } from '../../state/tickets.js';
 import { t } from '../../i18n/index.js';
 
+// **열쇠만 담는다.** 여기서 t()를 부르면 파일을 읽을 때 한 번만 계산돼
+// 언어를 바꿔도 안 바뀐다
 const LABEL = {
-  team:       t('match.pickTeam'),
-  waking:     t('match.waking'),
-  connecting: t('match.connecting'),
-  retrying:   t('match.waking'),
-  hosting:    t('match.friend'),
-  waiting:    t('match.searching'),
-  matched:    t('match.found'),
-  error:      t('match.failed')
+  team:       'match.pickTeam',
+  waking:     'match.waking',
+  connecting: 'match.connecting',
+  retrying:   'match.waking',
+  hosting:    'match.friend',
+  waiting:    'match.searching',
+  matched:    'match.found',
+  error:      'match.failed'
 };
 
 export default function Matching({ session, onCancel, onMatched }){
@@ -63,7 +65,7 @@ export default function Matching({ session, onCancel, onMatched }){
   return (
     <div className="screen center">
       {stage !== 'error' && <div className="spinner" />}
-      <p className="big">{LABEL[stage] || t('match.connect')}</p>
+      <p className="big">{t(LABEL[stage] || 'match.connect')}</p>
 
       {code && (
         <div className="roomcode">
