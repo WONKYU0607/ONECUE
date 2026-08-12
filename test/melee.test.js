@@ -371,34 +371,22 @@ console.log('방패로 막으면 상대가 굳는다');
 
 console.log('2배속');
 {
-  const { PH_COUNT, FAST_MUL, SHIELD_TICKS, STUN_TICKS } = await import('../src/game/config.js');
-  // 준비 단계에서 신청·수락한다 (화면이 멈춰 있어 시간 압박이 없다)
+  const { FAST_MUL } = await import('../src/game/config.js');
+  // [stated] 칼전에는 2배속을 안 쓴다 — 버프(이속 1.5 · 공속 1.5)만으로 충분히 빠르다.
+  // 둘이 곱해지면 이동 3배 · 칼 주기 3배가 되어 과했다
   const s = newState(2, true);
   step(s, IN(2));
   const q = IN(2); q[0].fastReq = 1;
   step(s, q);
-  assert(s.fastBy === 1, '신청이 들어간다');
-  for (let t = 0; t < 30; t++) step(s, IN(2));
-  assert(s.fastBy === 1, '기다리는 동안 신청이 유지된다');
-  const q2 = IN(2); q2[1].fastAns = 1;
-  step(s, q2);
-  assert(s.fast === true && s.fastBy === 0, '수락하면 켜진다');
-  const g2 = IN(2); for (const q of g2) q.go = 1;
-  step(s, g2);
-  for (let t = 0; t < 400 && s.phase !== PH_PLAY; t++) step(s, IN(2));
-  assert(s.phase === PH_PLAY, '준비완료하면 전투 시작');
-
-  // 칼·방패 수치도 절반이어야 한다 (이동만 빨라지면 2배속이 아니다)
-  s.p[0].x = Math.round(90 * FP); s.p[0].y = Math.round(150 * FP); s.p[0].face = 0;
-  s.p[1].x = s.p[0].x; s.p[1].y = s.p[0].y - Math.round(GRID_CH * FP); s.p[1].face = 1;
-  s.p[0].atk = 0; s.p[0].cool = 0;
-  step(s, IN(2));
-  assert(s.p[0].atk === Math.round(ATK_TICKS / FAST_MUL) - 1, `휘두르는 시간이 절반 (${s.p[0].atk + 1})`);
-  const q3 = IN(2); q3[1].sh = 1;
-  step(s, q3);
-  assert(s.p[1].shield === Math.round(SHIELD_TICKS / FAST_MUL), '방패도 절반');
-  for (let t = 0; t < ATK_TICKS + 4; t++) step(s, IN(2));
-  assert(s.p[0].stun > 0 && s.p[0].stun <= Math.round(STUN_TICKS / FAST_MUL), '기절도 절반');
+  assert(s.fastBy === 0, `칼전에선 신청이 무시된다 (fastBy ${s.fastBy})`);
+  assert(s.fast === false, '2배속이 안 켜진다');
+  // 총격전은 그대로 된다
+  const g = newState(2, false);
+  step(g, IN(2));
+  const q2 = IN(2); q2[0].fastReq = 1;
+  step(g, q2);
+  assert(g.fastBy === 1, '총격전은 여전히 신청된다');
+  assert(FAST_MUL === 2, '2배속 배율은 그대로 2');
 }
 
 console.log('죽어도 폭발 연출이 없다');

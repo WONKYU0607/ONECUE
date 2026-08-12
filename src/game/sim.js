@@ -535,7 +535,9 @@ export function step(s, inp){
     for (let i = 0; i < s.n; i++){
       const q = s.off[i] ? NOIN : (inp[i] || NOIN);
       const pending = s.fastBy || s.bareBy;
-      if (q.fastReq && !s.fast && !pending){ s.fastBy = i + 1; s.fastT = NEG_TICKS; s.negOk = []; }
+      // 칼전은 2배속을 받지 않는다. **버튼만 없애면 고친 클라가 신청할 수 있어**
+      // 여기서도 막는다
+      if (q.fastReq && !s.fast && !s.melee && !pending){ s.fastBy = i + 1; s.fastT = NEG_TICKS; s.negOk = []; }
       // [stated] 칼전에도 신청 가능. 칼전은 없앨 아이템이 없으므로 **버프를 끈다**
       if (q.bareReq && !s.bare && !pending){ s.bareBy = i + 1; s.bareT = NEG_TICKS; s.negOk = []; }
 

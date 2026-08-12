@@ -265,6 +265,11 @@ export class Server {
 const FOLLOW_RATE = 26;
 export const MAX_PLAYERS = 6;   // 지금 최대 인원 (3대3 / 개인전 6인)
 const SMOOTH_RATE = 90;   // 상대 예측 오차를 녹이는 속도 (클수록 빨리 붙는다)
+// 화면 시계가 목표를 따라가는 속도. 뒤처지면 살짝 빨리, 앞서면 살짝 늦게 흐른다.
+// **자르지 않는 게 핵심** — 자르면 그 프레임이 통째로 멈춰 끊겨 보인다.
+// 최대 ±12%만 조절하므로 눈에는 안 띈다
+const tickRate = (err, soft) => 1 + Math.max(-0.12, Math.min(0.12, err / Math.max(0.5, soft) * 0.12));
+
 export const RENDER_BUF = 2;   // 상대를 확정 기록보다 이만큼 뒤에서 그린다 (renderTick과 같은 값)
 
 // ================= CLIENT =================
@@ -471,15 +476,20 @@ export class Client {
   // 상대를 그릴 시각. 실시간으로 굴리되 확정 기록 범위 안에 잡아둔다.
   // BUF만큼 뒤에서 그려야 다음 확정 프레임이 조금 늦어도 화면이 안 끊긴다
   renderTick(dt){
-    const BUF = RENDER_BUF;
+    // **지연이 크면 버퍼를 늘린다.** 2틱 고정이면 기록이 늦게 도착할 때
+    // 그릴 게 없어 멈췄다가, 도착하면 확 따라잡는다.
+    // 편도 지연만큼 여유를 두면 도착 전에 끊기지 않는다.
+    // (상한 8틱 = 133ms — 더 늘리면 상대가 너무 과거로 보인다)
+    const lag = this.rtt > 0 ? Math.min(8, Math.round(this.rtt / 2 / (1000 / 60))) : 0;
+    const BUF = RENDER_BUF + lag;
     if (!this.hist.length) return this.rt;
     const newest = this.hist[this.hist.length - 1].tick;
     const oldest = this.hist[0].tick;
     const want = newest - BUF;
     if (this.rt === null){ this.rt = want; return this.rt; }
-    this.rt += dt * 60;                                   // 화면은 실시간으로 흐른다
-    if (this.rt > want) this.rt -= (this.rt - want) * 0.2; // 앞서가면 살살 늦춘다
-    if (this.rt < want - 6) this.rt = want - 6;            // 너무 뒤처지면 당긴다
+    // 목표(want)에 맞춰 흐르는 속도를 미세 조절한다. 자르거나 튀지 않는다
+    this.rt += dt * 60 * tickRate(want - this.rt, 1.5);
+    if (this.rt < want - 12) this.rt = want - 12;          // 너무 벌어지면 당긴다
     if (this.rt < oldest) this.rt = oldest;
     return this.rt;
   }
@@ -489,9 +499,13 @@ export class Client {
     if (!this.mhist.length) return this.mrt;
     const newest = this.mhist[this.mhist.length - 1].tick;
     if (this.mrt === null){ this.mrt = newest; return this.mrt; }
-    this.mrt += dt * 60;
-    if (this.mrt > newest) this.mrt = newest;
-    if (this.mrt < newest - 1.5) this.mrt = newest - 1.5;
+    // **잘라내지 않고 속도를 미세하게 조절한다.** `mrt = newest` 로 자르면
+    // 서버 틱이 늦게 오는 프레임마다 화면이 통째로 멈춰 뚝뚝 끊긴다 —
+    // 지연이 흔들리는 무선에서 특히 심하다(흔들림 10% → 0%대).
+    // 목표보다 뒤처지면 조금 빨리, 앞서면 조금 늦게 흐르게 해 **끊김 없이** 맞춘다
+    this.mrt += dt * 60 * tickRate(newest - this.mrt, 0.6);
+    if (this.mrt > newest) this.mrt = newest;          // 미래는 그릴 수 없다
+    if (this.mrt < newest - 6) this.mrt = newest - 6;  // 너무 벌어지면 당긴다
     return this.mrt;
   }
   // 확정 기록에서 그 시각의 위치를 뽑는다 (두 기록 사이는 선형 보간)
@@ -569,7 +583,11 @@ export class Client {
         gy = at ? at[1] : this.pred.p[i].y;
       }
       // 보정이 들어와도 순간이동하지 않도록 한 프레임 이동량에 상한을 둔다
-      const lim = capOf(i) * Math.max(1, dt * 60);   // 버프를 먹은 사람은 더 빨리 따라간다
+      // **프레임 시간에 정확히 비례해야 한다.** `Math.max(1, …)` 은 60fps 미만만
+      // 생각한 것이라, 90fps 에서 1.5배 · 120fps 에서 2배로 상한이 부풀려졌다 —
+      // 고주사율 폰에서 상대가 두 배로 빨라 보이던 원인.
+      // 아주 낮은 프레임률에서 0 이 되지 않게 바닥만 둔다
+      const lim = capOf(i) * Math.max(0.2, dt * 60);
       const ddx = gx - this.rx[i], ddy = gy - this.ry[i];
       const dd = Math.sqrt(ddx * ddx + ddy * ddy);
       if (dd > lim){ gx = this.rx[i] + ddx * lim / dd; gy = this.ry[i] + ddy * lim / dd; }

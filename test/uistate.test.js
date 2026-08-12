@@ -26,8 +26,10 @@ console.log('칼전 카운트다운 — 여기서 안 뜨는 게 예전 버그�
   assert(s.phase === PH_READY, '칼전도 준비 단계가 있다 (설치만 자동)');
   const r = P(s);
   assert(r.pre === true, '**카운트다운도 전투 전 단계다**');
-  assert(r.offer.includes('fast'), '2배속 신청 버튼이 뜬다');
-  assert(!r.offer.includes('bare'), '칼전엔 노템전이 없다');
+  assert(!r.offer.includes('fast'), '칼전엔 2배속 버튼이 없다 (버프로 충분히 빠르다)');
+  // [stated] 칼전에도 신청할 수 있다 — 없앨 아이템이 없으므로 **버프를 끈다**.
+  // 예전엔 이 목록에 melee 조건이 남아 시뮬은 받는데 버튼이 안 떴다
+  assert(r.offer.includes('bare'), '칼전에도 노버프전 신청 버튼이 뜬다');
 }
 
 console.log('상대가 신청하면 나에게 창이 뜬다');
@@ -47,9 +49,10 @@ console.log('상대가 신청하면 나에게 창이 뜬다');
   assert(negText('bare', 'title').length > 0, '문구가 비어 있지 않다');
 }
 
-console.log('2배속도 같은 방식');
+console.log('2배속도 같은 방식 (총격전 전용)');
 {
-  const s = newState(2, true);
+  // 칼전엔 2배속이 없으므로 총격전으로 본다
+  const s = newState(2, false);
   step(s, IN(2));
   const q = IN(2); q[0].fastReq = 1;
   step(s, q);

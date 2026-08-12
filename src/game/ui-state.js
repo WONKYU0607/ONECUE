@@ -107,8 +107,12 @@ export function uiPrompt(st, slot, online){
   // 신청 버튼은 온라인에서만, 이미 켜졌거나 뭔가 오가는 중이면 숨긴다
   const offer = [];
   if (online && !pending){
-    if (!st.fast) offer.push('fast');
-    if (!st.bare && !st.melee) offer.push('bare');   // 칼전은 원래 아이템이 없다
+    // [stated] 칼전에는 2배속을 안 쓴다 — 버프(이속 1.5 · 공속 1.5)만으로 충분히 빠르다.
+    // 둘이 곱해지면 이동 3배·칼 주기 3배가 되어 과했다
+    if (!st.fast && !st.melee) offer.push('fast');
+    // [stated] 칼전에도 신청할 수 있다 — 없앨 아이템이 없으므로 **버프를 끈다**.
+    // 시뮬은 열어놨는데 이 목록에 `!st.melee` 가 남아 버튼이 안 떴다
+    if (!st.bare) offer.push('bare');
   }
   return { pre: true, banner, ask, waiting, offer, melee: !!st.melee };
 }

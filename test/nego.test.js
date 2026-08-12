@@ -88,21 +88,27 @@ console.log('칼전 2배속 — 카운트다운 중에 신청한다');
   assert(w.srv.s.phase === PH_READY, '칼전도 준비 단계 (설치는 자동)');
   assert(w.srv.s.done.every(Boolean), '설치 완료는 자동');
 
+  // [stated] 칼전에는 2배속이 없다 — 버프만으로 충분히 빠르다.
+  // 대신 **노버프전**을 신청할 수 있다 (없앨 아이템이 없으므로 버프를 끈다)
   SELF.slot = 0; SELF.n = 2;
   w.cs[0].requestFast(0);
   w.run(20);
-  assert(w.srv.s.fastBy === 1, '준비 단계에서 신청이 들어간다');
-  assert(w.cs[1].pred.fastBy === 1, '**상대 클라까지 전달된다**');
+  assert(w.srv.s.fastBy === 0, '2배속 신청은 무시된다');
+
+  w.cs[0].requestBare(0);
+  w.run(20);
+  assert(w.srv.s.bareBy === 1, '준비 단계에서 노버프전 신청이 들어간다');
+  assert(w.cs[1].pred.bareBy === 1, '**상대 클라까지 전달된다**');
 
   // 답을 기다리는 동안 카운트가 멈춰야 한다 (안 그러면 3.8초 안에 못 누른다)
   w.run(150);
   assert(w.srv.s.phase === PH_READY, '준비 단계라 시간 압박이 없다');
 
   SELF.slot = 1;
-  w.cs[1].answerFast(1, true);
+  w.cs[1].answerBare(1, true);
   w.run(20);
-  assert(w.srv.s.fast === true, '수락하면 켜진다');
-  assert(w.cs[0].pred.fast === true && w.cs[1].pred.fast === true, '양쪽 클라 모두 켜진다');
+  assert(w.srv.s.bare === true, '수락하면 켜진다');
+  assert(w.srv.s.noBuff === true, '칼전이면 버프가 꺼진다');
   for (let i = 0; i < 2; i++){ SELF.slot = i; w.cs[i].setGo(i); }
   w.run(300);
   assert(w.srv.s.phase === PH_PLAY, '준비완료하면 전투 시작');
