@@ -36,6 +36,21 @@ export default function App(){
   const [askQuit, setAskQuit] = useState(false);   // 게임 중 나가기 확인
   const [exitHint, setExitHint] = useState(false); // 홈에서 "한 번 더" 안내
 
+
+  useEffect(() => {
+    const st = getSettings();
+    VIEW.grid = st.showGrid;
+    HAND.left = st.leftStick;
+  }, []);
+  // 처음 온 사람에게는 진입창이 끝난 뒤 조작 안내를 한 번 띄운다
+  const goHomeFirst = useCallback(() => {
+    if (!getSettings().seenHelp){ setSetting('seenHelp', true); setShowHelp(true); }
+  }, []);
+
+  const goHome    = useCallback(() => { disconnect(); setSession(null); setResult(null); setScreen('home'); }, []);
+
+  // **`goHome` 아래에 두어야 한다.** const 는 정의 전에 읽을 수 없어(TDZ),
+  // 위에 두면 화면이 뜨자마자 ReferenceError 로 앱이 통째로 죽는다
   // 하단 뒤로가기. **위에 뜬 것부터 닫고**, 마지막에 홈에서 두 번 눌러야 나간다.
   // 한 번에 꺼지면 매칭 중이던 것도 날아가므로 반드시 두 단계로 둔다
   const exitAt = useRef(0);
@@ -62,18 +77,6 @@ export default function App(){
       return true;
     });
   }, [screen, showHelp, showSettings, askQuit, goHome]);
-
-  useEffect(() => {
-    const st = getSettings();
-    VIEW.grid = st.showGrid;
-    HAND.left = st.leftStick;
-  }, []);
-  // 처음 온 사람에게는 진입창이 끝난 뒤 조작 안내를 한 번 띄운다
-  const goHomeFirst = useCallback(() => {
-    if (!getSettings().seenHelp){ setSetting('seenHelp', true); setShowHelp(true); }
-  }, []);
-
-  const goHome    = useCallback(() => { disconnect(); setSession(null); setResult(null); setScreen('home'); }, []);
   const startPvp  = useCallback(() => setScreen('pvp'), []);
   const beginPvp  = useCallback(opt => {
     disconnect();
