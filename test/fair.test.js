@@ -104,4 +104,37 @@ console.log('프레임당 상한이 프레임 시간에 비례한다');
     `바닥이 1 미만이어야 한다 (지금 ${m[1]}) — 1이면 120Hz 에서 2배가 된다`);
 }
 
+console.log('2배속에서 스틱 입력이 깎이지 않는다');
+{
+  // [stated] "2배속에서 내 캐릭터가 상대 화면보다 훨씬 느리게 움직인다"
+  // 원인: 2배속일 때 스틱 곡선을 1.5 → 3.0 으로 두 배로 만들었다.
+  // 곡선이 커지면 스틱을 끝까지 안 밀 때 입력이 확 줄어 —
+  // 80%만 밀면 세기가 28% 깎여 2배속인데 1.4배밖에 안 빨라졌다
+  const src = fs.readFileSync('src/game/layout.js', 'utf8');
+  const m = src.match(/const curve = ([^;]+);/);
+  assert(m, '곡선 계산을 찾았다');
+  assert(!/FAST/.test(m[1]), `곡선이 2배속을 안 본다 (${m[1].trim()})`);
+  // 어디까지 밀든 정확히 2배여야 한다
+  const curve = 1.5;
+  for (const push of [0.5, 0.8, 1.0]){
+    const normal = Math.pow(push, curve) * 1;
+    const fast = Math.pow(push, curve) * 2;
+    assert(Math.abs(fast / normal - 2) < 0.01,
+      `  스틱 ${push}: 정확히 2배 (${(fast / normal).toFixed(2)})`);
+  }
+}
+
+console.log('처음 접속했을 때 지연이 과하지 않다');
+{
+  // [stated] "PVP 제일 처음 시작할 때 1초 정도 렉 걸림"
+  // RTT 를 모르는 동안 최대 지연(24틱 = 400ms)으로 시작하고 있었다
+  const { MIN_DELAY, MAX_DELAY, JITTER_MS, TICK_MS } = await import('../src/game/config.js');
+  const src = fs.readFileSync('src/game/net.js', 'utf8');
+  assert(/GUESS/.test(src), 'RTT 를 모를 때 쓸 어림값이 있다');
+  assert(!/this\.rtt < 0 \? MAX_DELAY/.test(src), '최대 지연으로 시작하지 않는다');
+  const guess = Math.min(MAX_DELAY, Math.max(MIN_DELAY, Math.ceil((60 + JITTER_MS) / TICK_MS)));
+  assert(guess * TICK_MS < 150,
+    `첫 지연이 150ms 미만 (${(guess * TICK_MS).toFixed(0)}ms)`);
+}
+
 console.log('fair.test.js 통과');

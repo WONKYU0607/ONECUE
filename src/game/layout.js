@@ -144,9 +144,12 @@ export function stickVector(pt, uiH){
   const m = Math.hypot(nx, ny);
   if (m < dead()) return { nx: 0, ny: 0 };
   let mag = Math.min(1, (m - dead()) / Math.max(0.05, sat() - dead()));
-  // 2배속이면 곡선도 두 배(상한 3.0). 속도가 빠른 만큼 중앙 근처를 더 둔감하게 해야
-  // 미세 조정이 가능하다
-  const curve = Math.min(3, TUNE.curve.v * (FAST.on ? FAST_MUL : 1));
+  // [stated] 2배속에서 "내 캐릭터가 상대 화면보다 훨씬 느리게 움직인다"
+  // 원인: 2배속일 때 곡선을 1.5 → 3.0 으로 두 배로 만들고 있었다.
+  // 곡선이 커지면 스틱을 끝까지 안 밀 때 입력이 확 줄어든다 —
+  // 80%만 밀면 세기가 28% 깎여서, 2배속인데 1.4배밖에 안 빨라졌다.
+  // **곡선은 그대로 둔다.** 미세 조정은 속도 배율과 별개 문제다
+  const curve = TUNE.curve.v;
   mag = Math.pow(mag, curve);
   const k = mag / m;
   return { nx: nx * k, ny: ny * k };

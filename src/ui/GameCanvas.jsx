@@ -130,12 +130,16 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
       {(ready.prompt?.banner || []).map(k => (
         <div key={k} className="link-note ui-overlay fast">{negText(k, 'on', ready.prompt?.melee)}</div>
       ))}
-      {(ready.prompt?.offer || []).map((k, i) => (
-        <button key={k} className={'fastbtn ui-overlay' + (i ? ' bare' : '')}
-                onClick={() => gameRef.current?.request(k)}>
-          <FitText>{negText(k, 'btn', ready.prompt?.melee)}</FitText>
-        </button>
-      ))}
+      {(ready.prompt?.offer || []).length > 0 && (
+        <div className="fastwrap ui-overlay">
+          {(ready.prompt?.offer || []).map((k, i) => (
+            <button key={k} className={'fastbtn' + (i ? ' bare' : '')}
+                    onClick={() => gameRef.current?.request(k)}>
+              <FitText>{negText(k, 'btn', ready.prompt?.melee)}</FitText>
+            </button>
+          ))}
+        </div>
+      )}
       {ready.prompt?.waiting && (
         <div className="link-note ui-overlay">
           {negText(ready.prompt.waiting.kind, 'wait', ready.prompt?.melee)} · {t('ready.waitPeer', { n: ready.prompt.waiting.sec })}

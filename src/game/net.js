@@ -317,7 +317,13 @@ export class Client {
       this.frames.set(m.tick, m);
       this.svTick = m.tick; this.svAt = CLOCK.now();
       // 서버가 정한 공통 지연과, 내 실측 RTT로 계산한 최소 안전 지연 중 큰 값
-      const own = this.rtt < 0 ? MAX_DELAY
+      // [stated] "PVP 제일 처음 시작할 때 1초 정도 렉 걸림"
+      // 원인: RTT 를 모르는 동안 **최대 지연(24틱 = 400ms)** 으로 시작해
+      // 첫 ping 왕복이 끝날 때까지 조작이 그만큼 늦게 먹었다.
+      // 모를 때는 흔한 값(편도 60ms 정도)으로 시작하고, ping 이 오면 곧 정확해진다.
+      // 너무 작게 잡으면 첫 입력 몇 개가 늦어 버려지지만, 그건 곧 회복된다
+      const GUESS = clampi(Math.ceil((60 + JITTER_MS) / TICK_MS), MIN_DELAY, MAX_DELAY);
+      const own = this.rtt < 0 ? GUESS
                 : clampi(Math.ceil((this.rtt/2 + JITTER_MS) / TICK_MS), MIN_DELAY, MAX_DELAY);
       this.delay = Math.max(m.d, own);
       if (this.nextInputTick < 0 && this.rtt >= 0) this.nextInputTick = this.estServerTick(this.svAt) + this.delay;
