@@ -165,7 +165,9 @@ export function createAI(stage = 1){
             if (d < bestD){ bestD = d; best = { bx, by }; }
           }
           if (best){
-            const gx = best.bx - my.x, gy = best.by - my.y;
+            // **캐릭터 중심**이 칸 중심에 닿아야 먹는다. 좌상단 기준으로 가면
+            // 반 칸 어긋나 옆을 스치고 지나간다
+            const gx = best.bx - (my.x + (PWf >> 1)), gy = best.by - (my.y + (PHf >> 1));
             const len = Math.max(1, Math.hypot(gx, gy));
             return { vx: gx / len * p.speed * (p.mul || 1),
                      vy: gy / len * p.speed * (p.mul || 1) };

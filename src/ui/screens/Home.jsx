@@ -20,7 +20,9 @@ export default function Home({ onPvp, onAi, onPractice, onSettings, onHelp }){
         </button>
       </div>
 
-      <p className="ver">v0.1.0</p>
+      {/* **배포됐는지 눈으로 확인하는 표시.** 고칠 때마다 올린다 —
+          "덮었는데도 안 된다"가 옛 빌드 때문인지 바로 가려낼 수 있다 */}
+      <p className="ver">v0.2.0</p>
     </div>
   );
 }

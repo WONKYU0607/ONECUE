@@ -636,8 +636,6 @@ export function step(s, inp){
         dx = Math.round(dx * k); dy = Math.round(dy * k);
       }
       // 축을 따로 처리해야 벽에 붙어서도 옆으로 미끄러질 수 있다.
-      // 한 번에 처리하면 벽 모서리에 닿는 순간 완전히 멈춰버린다
-      // 축을 따로 처리해야 벽에 붙어서도 옆으로 미끄러질 수 있다.
       // 막히면 통째로 취소하지 말고 절반씩 줄여서 닿는 데까지 붙인다
       // (한 걸음이 남은 틈보다 크면 영영 다가가지 못한다)
       const oy = p.y, ox = p.x;
@@ -645,6 +643,21 @@ export function step(s, inp){
       // 바라보는 방향은 이동 입력을 따라간다. 멈추면 마지막 방향을 유지
       if (s.melee && (dx || dy)){
         p.face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 2 : 3) : (dy < 0 ? 0 : 1);
+      }
+      // **벽에 막힌 몫은 다른 축으로 넘긴다.** 대각선은 벡터 길이로 잘리는데,
+      // 가로가 벽에 막혀 버려지면 세로만 남아 느려진다 —
+      // 벽을 타고 올라갈 때 속도가 2.83 → 2.00 으로 떨어져 버벅이는 느낌이 났다
+      // **가로가 통째로 막혔으면 그 몫을 세로로 넘긴다.** 대각선은 벡터 길이로
+      // 잘리는데, 가로가 벽에 막혀 버려지면 세로만 남아 느려진다 —
+      // 벽을 타고 올라갈 때 2.83 → 2.00 으로 떨어져 버벅이는 느낌이 났다.
+      // **조금이라도 갈 수 있으면 손대지 않는다** (살짝 스쳤을 뿐인데 빨라지면 안 된다)
+      if (dx && dy){
+        const wi0 = wallIdx(p.y);
+        const freeX = dx < 0 ? Math.max(0, p.x - WALL_L[wi0]) : Math.max(0, WALL_R[wi0] - p.x);
+        if (freeX === 0){
+          const want = Math.min(cap, Math.abs(dx) + Math.abs(dy));
+          if (want > Math.abs(dy)) dy = Math.sign(dy) * Math.round(want);
+        }
       }
       // 위아래 끝은 x마다 다르다 (모서리는 잘리고 팻말 옆은 더 깊다)
       const lo = Math.max(teamYMin(tm), topSpan(p.x));
@@ -964,12 +977,16 @@ export function step(s, inp){
     // 먹기 — 밟으면 즉시
     for (let bi = s.buffs.length - 1; bi >= 0; bi--){
       const b = s.buffs[bi];
-      const bx = Math.round(cellX(b.c) * FP), by = Math.round(cellY(b.r) * FP);
-      const bw = Math.round(GRID_CW * FP), bh = Math.round(GRID_CH * FP);
+      // **중심끼리 가까워야 먹는다.** 상자 겹침으로 보면 살짝 스치기만 해도 참이라
+      // 칸 하나 거리(12px)에서 먹혔다 — "근처만 지나가도 먹은 소리가 난다"
+      const bcx = Math.round((cellX(b.c) + GRID_CW / 2) * FP);
+      const bcy = Math.round((cellY(b.r) + GRID_CH / 2) * FP);
+      const near = Math.round(GRID_CW * 0.5 * FP);      // 칸 반 칸 안쪽
       for (let i = 0; i < s.n; i++){
         const p = s.p[i];
         if (p.hp <= 0 || s.off[i]) continue;
-        if (!overlap(p.x, p.y, PWf, PHf, bx, by, bw, bh)) continue;
+        const pcx = p.x + (PWf >> 1), pcy = p.y + (PHf >> 1);
+        if (Math.abs(pcx - bcx) > near || Math.abs(pcy - bcy) > near) continue;
         const def = BUFF_DEF[b.k];
         if (b.k === BUFF.HEAL) p.hp = Math.min(MAXHP, p.hp + Math.round(MAXHP * def.mul));
         else s.bf[i][b.k] = def.ticks;            // 같은 버프를 또 먹으면 시간이 새로 찬다
