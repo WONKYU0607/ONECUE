@@ -126,6 +126,33 @@ console.log('화면에 한국어가 박혀 있지 않다');
   assert(left.length === 0, `아직 박힌 문구:\n    ${left.join('\n    ')}`);
 }
 
+console.log('번역 함수 t 를 가리지 않는다');
+{
+  // [stated] 3대3 팀 고르기에서 "E is not a function" 으로 터졌다.
+  // `[0,1].map(t => ... t('match.teamA') ...)` — 팀 번호를 t 로 받아
+  // 번역 함수가 가려졌고, 숫자를 함수로 부르게 됐다.
+  // **같은 범위 안에서 t 를 새로 묶고 t() 를 부르면** 반드시 터진다
+  const bad = [];
+  for (const p of files){
+    const src = fs.readFileSync(p, 'utf8');
+    if (!/from '[^']*i18n\/index\.js'/.test(src)) continue;
+    const lines = src.split('\n');
+    lines.forEach((ln, i) => {
+      // 화살표 함수 매개변수로 t 를 받는 곳
+      if (!/\(\s*t\s*\)?\s*=>/.test(ln) && !/\(\s*t\s*,/.test(ln)) return;
+      // 그 콜백 안(중괄호가 닫힐 때까지)에서 t() 를 부르는가
+      let depth = 0, started = false;
+      for (let j = i; j < Math.min(i + 40, lines.length); j++){
+        const code = lines[j].replace(/\/\/.*/, '');
+        for (const ch of code){ if (ch === '{'){ depth++; started = true; } else if (ch === '}') depth--; }
+        if (j > i && /\bt\('/.test(code)) bad.push(`${path.relative('.', p)}:${i + 1} → ${j + 1}줄`);
+        if (started && depth <= 0) break;
+      }
+    });
+  }
+  assert(bad.length === 0, `t 가 가려진 채 t() 를 부른다:\n    ${bad.join('\n    ')}`);
+}
+
 console.log('언어 자동 감지');
 {
   const idx = fs.readFileSync('src/i18n/index.js', 'utf8');

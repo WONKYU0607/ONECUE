@@ -96,17 +96,20 @@ export default function Matching({ session, onCancel, onMatched }){
             })}
           </div>
           <div className="teampick">
-            {[0, 1].map(t => {
-              const cnt = lobby.teams ? lobby.teams[t] : 0;
+            {/* **변수 이름을 t 로 쓰면 안 된다.** 번역 함수 t 가 가려져
+                안에서 번역 함수를 부를 때 숫자를 함수로 호출하게 된다
+                (3대3 팀 고르기에서 "E is not a function" 으로 터졌다) */}
+            {[0, 1].map(tm => {
+              const cnt = lobby.teams ? lobby.teams[tm] : 0;
               const need = lobby.need || 2;
-              const mine = lobby.mine === t;
+              const mine = lobby.mine === tm;
               const full = cnt >= need;
               return (
-                <button key={t}
+                <button key={tm}
                   className={'menu-btn teambtn' + (mine ? ' primary' : '') + (full && !mine ? ' off' : '')}
                   disabled={(full && !mine) || lobby.mine != null}
-                  onClick={() => pickTeam(t, color)}>
-                  <span className="t">{t === 0 ? t('match.teamA') : t('match.teamB')}</span>
+                  onClick={() => pickTeam(tm, color)}>
+                  <span className="t">{tm === 0 ? t('match.teamA') : t('match.teamB')}</span>
                 </button>
               );
             })}
