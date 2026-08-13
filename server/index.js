@@ -94,6 +94,14 @@ class Room {
   // 한 판에 한 번만 부르고, 실패해도 게임은 그대로 굴러간다
   // 빈 자리를 봇으로 채운다. **봇인 걸 드러내지 않는다** —
   // 이름을 사람과 같은 꼴(player##)로 지어 구분이 안 되게 한다
+  // 사람이 앉을 자리(앞쪽 humans 개)만 비워두고 나머지를 봇으로 채운다
+  addBotsFirst(humans, wants = []){
+    // **사람이 고른 색을 먼저 잡아둔다.** 봇이 먼저 앉으면 그 색을 가져가서
+    // 사람이 고른 색이 바뀐다
+    this.reserved = wants.filter(c => Number.isInteger(c) && c >= 0);
+    for (let i = humans; i < this.n; i++) this.seatBot(i);
+    this.reserved = [];
+  }
   addBots(){
     const st = this.server.s;
     this.server.bots = this.server.bots || [];
@@ -101,14 +109,30 @@ class Room {
       const seat = this.seats[i];
       if (seat && seat.sid) continue;                 // 사람이 앉은 자리
       if (this.server.bots.some(b => b.slot === i)) continue;
-      seat.sid = 'bot:' + this.id + ':' + i;          // 자리를 잡아둔다 (다른 사람이 못 앉게)
-      seat.bot = true;
-      st.nick[i] = 'player' + (10 + Math.floor(Math.random() * 89));
-      if (st.color) st.color[i] = this.freeColor();
-      setOff(st, i, false);
-      // 단계는 전투가 시작될 때 사람 점수에 맞춰 정한다. 그전엔 중간값
-      this.server.bots.push({ slot: i, ai: createAI(5), stage: 5 });
+      this.seatBot(i);
     }
+  }
+  // 한 자리를 봇으로 만든다
+  seatBot(i){
+    const st = this.server.s;
+    const seat = this.seats[i];
+    if (!seat || seat.sid) return;
+    this.server.bots = this.server.bots || [];
+    if (this.server.bots.some(b => b.slot === i)) return;
+    seat.sid = 'bot:' + this.id + ':' + i;          // 자리를 잡아둔다 (다른 사람이 못 앉게)
+    seat.bot = true;
+    if (!Array.isArray(st.nick)) st.nick = new Array(this.n).fill('');
+    st.nick[i] = 'player' + (10 + Math.floor(Math.random() * 89));
+    if (st.color){
+      let c = this.freeColor();
+      // 사람이 찜한 색은 피한다
+      for (let k = 0; k < COLOR_COUNT && (this.reserved || []).includes(c); k++)
+        c = (c + 1) % COLOR_COUNT;
+      st.color[i] = c;
+    }
+    setOff(st, i, false);
+    // 단계는 전투가 시작될 때 사람 점수에 맞춰 정한다. 그전엔 중간값
+    this.server.bots.push({ slot: i, ai: createAI(5), stage: 5 });
   }
 
   // 사람 점수에 맞춰 봇 단계를 정한다. 점수를 모르면 중간값 그대로
@@ -198,8 +222,10 @@ class Room {
   }
   // 팀 선택 중인 사람들에게 현재 인원 구성을 알린다
   sendLobby(){
-    // 개인전은 팀을 고를 게 없다. 보내면 클라가 팀 선택 화면을 띄운다
-    if (this.ffa) return;
+    // **팀을 고를 일이 없으면 보내지 않는다.** 보내면 클라가 팀 선택 화면을 띄우고
+    // 거기서 멈춘다. 개인전뿐 아니라 **1대1도 팀이 없고**, 봇으로 채운 방도
+    // 이미 자리가 다 찼으므로 고를 게 없다
+    if (this.ffa || this.n <= 2 || this.hasBots) return;
     const c = this.teamCounts();
     const taken = Array.from({ length: COLOR_COUNT }, (_, c) => c).filter(c => this.colorTaken(c));
     const raw = { t: 'lobby', teams: c, need: this.n / 2, taken };
@@ -365,9 +391,10 @@ function fillWithBots(key){
   room.hasBots = true;
   rooms.set(room.id, room);
   for (const ws of picked){ ws.room = room; }
-  // 사람 먼저 앉히고 (팀전도 봇이 있으면 팀 고르기 없이 바로 시작한다)
+  // **봇을 먼저 앉힌 뒤 사람을 앉힌다.** join 이 곧바로 상태를 내려보내므로,
+  // 사람을 먼저 앉히면 봇 이름이 비어 있는 상태가 나가고 그대로 남는다
+  room.addBotsFirst(picked.length, picked.map(w => w.wantColor));
   for (const ws of picked) room.join(ws, ws.sid, undefined, ws.wantColor, ws.nick);
-  room.addBots();
   console.log(`봇 채움: room ${room.id} ${key} (사람 ${picked.length}/${n})`);
 }
 

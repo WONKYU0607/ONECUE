@@ -83,12 +83,12 @@ export default function PvpMenu({ onBack, onStart }){
               <span className="tkn"><span className="tk-ico" />{tk()}</span>
             </button>
             <button className={'menu-btn' + (out() ? ' off' : '')}
-                    onClick={guard(false, () => onStart({ mode: how, n: 4, melee }))}>
+                    onClick={guard(false, () => { setPending({ mode: how, n: 4, melee }); setStep('color'); })}>
               <span className="t">2 vs 2</span>
               <span className="tkn"><span className="tk-ico" />{tk()}</span>
             </button>
             <button className={'menu-btn' + (out() ? ' off' : '')}
-                    onClick={guard(false, () => onStart({ mode: how, n: 6, melee }))}>
+                    onClick={guard(false, () => { setPending({ mode: how, n: 6, melee }); setStep('color'); })}>
               <span className="t">3 vs 3</span>
               <span className="tkn"><span className="tk-ico" />{tk()}</span>
             </button>

@@ -88,4 +88,29 @@ console.log('실제 서버 — 혼자 기다리면 판이 열린다');
   } finally { await new Promise(r => setTimeout(r, 150)); proc.kill(); }
 }
 
+console.log('모든 모드가 팀 화면 없이 바로 시작한다');
+{
+  // [stated] "1대1인데도 팀을 고르라는 UI 가 뜨고 진행 안 됨"
+  // 원인: sendLobby 가 개인전만 걸렀다. **1대1도 팀이 없고**, 봇으로 채운 방은
+  // 이미 자리가 다 차서 고를 게 없다
+  const srv = fs.readFileSync('server/index.js', 'utf8');
+  const lob = srv.slice(srv.indexOf('sendLobby(){'), srv.indexOf('sendLobby(){') + 400);
+  assert(/this\.n <= 2/.test(lob), '1대1은 팀 화면을 안 보낸다');
+  assert(/this\.hasBots/.test(lob), '봇으로 채운 방도 안 보낸다');
+
+  // 팀전도 메뉴에서 색을 고른다 (팀 화면이 없어졌으므로)
+  const menu = fs.readFileSync('src/ui/screens/PvpMenu.jsx', 'utf8');
+  for (const n of [2, 4, 6])
+    assert(new RegExp(`n: ${n}, melee \\}\\); setStep\\('color'\\)`).test(menu),
+      `  ${n}인전도 색을 고른다`);
+}
+
+console.log('봇이 사람 색을 뺏지 않는다');
+{
+  // 봇을 먼저 앉히므로, 사람이 고른 색을 미리 잡아두지 않으면 뺏긴다
+  const srv = fs.readFileSync('server/index.js', 'utf8');
+  assert(/reserved/.test(srv), '사람이 고른 색을 잡아둔다');
+  assert(/addBotsFirst\(picked\.length, picked\.map/.test(srv), '고른 색을 넘겨준다');
+}
+
 console.log('bot.test.js 통과');
