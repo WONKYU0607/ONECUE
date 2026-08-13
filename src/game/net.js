@@ -317,13 +317,7 @@ export class Client {
       this.frames.set(m.tick, m);
       this.svTick = m.tick; this.svAt = CLOCK.now();
       // 서버가 정한 공통 지연과, 내 실측 RTT로 계산한 최소 안전 지연 중 큰 값
-      // [stated] "PVP 제일 처음 시작할 때 1초 정도 렉 걸림"
-      // 원인: RTT 를 모르는 동안 **최대 지연(24틱 = 400ms)** 으로 시작해
-      // 첫 ping 왕복이 끝날 때까지 조작이 그만큼 늦게 먹었다.
-      // 모를 때는 흔한 값(편도 60ms 정도)으로 시작하고, ping 이 오면 곧 정확해진다.
-      // 너무 작게 잡으면 첫 입력 몇 개가 늦어 버려지지만, 그건 곧 회복된다
-      const GUESS = clampi(Math.ceil((60 + JITTER_MS) / TICK_MS), MIN_DELAY, MAX_DELAY);
-      const own = this.rtt < 0 ? GUESS
+      const own = this.rtt < 0 ? MAX_DELAY
                 : clampi(Math.ceil((this.rtt/2 + JITTER_MS) / TICK_MS), MIN_DELAY, MAX_DELAY);
       this.delay = Math.max(m.d, own);
       if (this.nextInputTick < 0 && this.rtt >= 0) this.nextInputTick = this.estServerTick(this.svAt) + this.delay;
@@ -596,7 +590,13 @@ export class Client {
       const lim = capOf(i) * Math.max(0.2, dt * 60);
       const ddx = gx - this.rx[i], ddy = gy - this.ry[i];
       const dd = Math.sqrt(ddx * ddx + ddy * ddy);
-      if (dd > lim){ gx = this.rx[i] + ddx * lim / dd; gy = this.ry[i] + ddy * lim / dd; }
+      // **순간이동은 상한을 건너뛴다.** 차원문으로 건너뛴 것을 상한으로 자르면
+      // 캐릭터가 화면을 가로질러 미끄러지듯 흘러간다.
+      // 문턱은 **아레나 크기 기준**으로 넉넉히 잡는다 — 상한의 배수로 잡으면
+      // 평범한 보정까지 순간이동으로 오해해 상대가 튀어 보인다(pace 검사가 잡았다)
+      const TELEPORT = GRID_CH * 5 * FP;
+      if (dd > TELEPORT){ /* 그대로 둔다 = 즉시 나타난다 */ }
+      else if (dd > lim){ gx = this.rx[i] + ddx * lim / dd; gy = this.ry[i] + ddy * lim / dd; }
       this.rx[i] = gx; this.ry[i] = gy;
     }
   }

@@ -42,6 +42,7 @@ import {
   INVUL_T,
   readyLimit,
   BUFF, BUFF_DEF, BUFF_EVERY, BUFF_MAX, BUFF_KINDS,
+  PORTAL_N, PORTAL_EVERY,
   INV_SLOTS,
   ITEM,
   ITEM_DEF,
@@ -177,6 +178,9 @@ export function normalizeState(st){
   if (!Array.isArray(st.bf) || st.bf.length !== (st.n || 2))
     st.bf = Array.from({ length: st.n || 2 }, (_, i) => (st.bf && st.bf[i]) || [0, 0, 0, 0]);
   if (typeof st.seed !== 'number') st.seed = 0;
+  if (!Array.isArray(st.portals)) st.portals = [];
+  if (!Array.isArray(st.onPort) || st.onPort.length !== (st.n || 2))
+    st.onPort = Array.from({ length: st.n || 2 }, () => -1);
   if (typeof st.noBuff !== 'boolean') st.noBuff = false;
   return st;
 }
@@ -256,6 +260,8 @@ export function newState(n = 2, melee = false, ffa = false){
     buffs: [],                                   // [{k, c, r}] 바닥에 놓인 버프
     bf: Array.from({ length: n }, () => [0, 0, 0, 0]),   // 슬롯별 남은 틱 (종류별)
     seed: 0,                                     // 결정론적 난수 씨앗 (서버가 정한다)
+    portals: [],                                 // 차원문 [{c,r}] — 칼전만
+    onPort: Array.from({ length: n }, () => -1), // 지금 밟고 있는 차원문 (-1이면 없음)
     noBuff: false,                               // 노버프전인가
 
     phase: PH_READY, timer: 0, clock: 0,
@@ -950,6 +956,58 @@ export function step(s, inp){
     }
   }
 
+  // ── 칼전 차원문 ──────────────────────────────────────────
+  // [stated] 하나로 들어가면 다른 하나로 나온다. 쿨타임 없음 · 양방향 ·
+  // 항상 열려 있고 위치만 10초마다 바뀐다
+  if (s.melee && !s.solo && s.phase === PH_PLAY){
+    // 자리 옮기기 (처음 한 번 + 주기마다)
+    if (!s.portals.length || s.tick % PORTAL_EVERY === 0){
+      const next = [];
+      for (let k = 0; k < PORTAL_N; k++){
+        // 시도를 넉넉히 준다. 모자라면 새 자리를 못 찾아 옛 자리가 그대로 남는다
+        for (let try_ = 0; try_ < 80; try_++){
+          const c = rnd(s, 200 + k * 200 + try_) % GRID_COLS;
+          const r = rnd(s, 3000 + k * 200 + try_) % GRID_ROWS;
+          if (!cellUsable(c, r)) continue;
+          // 두 문이 붙어 있으면 타는 의미가 없다. 세로로 멀찍이 떨어뜨린다
+          if (next.some(q => Math.abs(q.r - r) < 6)) continue;
+          if (s.items.some(it => it.c === c && it.r === r)) continue;
+          if (s.buffs.some(b => b.c === c && b.r === r)) continue;
+          next.push({ c, r });
+          break;
+        }
+      }
+      if (next.length === PORTAL_N) s.portals = next;
+    }
+    // 타기 — 밟으면 짝으로 나온다
+    if (s.portals.length === PORTAL_N){
+      for (let i = 0; i < s.n; i++){
+        const p = s.p[i];
+        if (p.hp <= 0 || s.off[i]){ s.onPort[i] = -1; continue; }
+        const pcx = p.x + (PWf >> 1), pcy = p.y + (PHf >> 1);
+        let on = -1;
+        for (let k = 0; k < PORTAL_N; k++){
+          const g = s.portals[k];
+          const gx = Math.round((cellX(g.c) + GRID_CW / 2) * FP);
+          const gy = Math.round((cellY(g.r) + GRID_CH / 2) * FP);
+          const near = Math.round(GRID_CW * 0.5 * FP);
+          if (Math.abs(pcx - gx) <= near && Math.abs(pcy - gy) <= near){ on = k; break; }
+        }
+        // **나온 자리에서 바로 다시 타면 무한 반복이 된다.**
+        // 한 번 벗어나야 다시 탈 수 있다 (쿨타임이 아니라 반복 방지)
+        if (on >= 0 && s.onPort[i] < 0){
+          const to = s.portals[(on + 1) % PORTAL_N];
+          p.x = Math.round((cellX(to.c) + GRID_CW / 2) * FP) - (PWf >> 1);
+          p.y = Math.round((cellY(to.r) + GRID_CH / 2) * FP) - (PHf >> 1);
+          s.onPort[i] = (on + 1) % PORTAL_N;       // 나온 문을 밟고 있는 상태
+          s.fx.push({ c: to.c, r: to.r, t: 20, k: 3 });   // 나오는 연출
+        } else {
+          s.onPort[i] = on;
+        }
+      }
+    }
+  }
+
   // ── 칼전 버프 ────────────────────────────────────────────
   // [stated] 칸에 무작위로 뜨고 밟으면 얻는다. 개인전에도 넣는다.
   // **결정론적 난수**를 쓴다 — 서버와 클라가 같은 자리에 띄워야 한다
@@ -1022,6 +1080,8 @@ export function checksum(s){
   h = (h*31 + (s.rdy | 0)) | 0;
   h = (h*31 + (s.seed | 0) + (s.noBuff ? 7 : 0)) | 0;
   for (const b of s.buffs) h = (h*31 + b.k*5 + b.c*11 + b.r*17) | 0;
+  for (const g of s.portals) h = (h*31 + g.c*13 + g.r*19) | 0;
+  for (const v of s.onPort) h = (h*31 + v) | 0;
   for (const row of s.bf) for (const v of row) h = (h*31 + v) | 0;
   for (const p of s.p) h = (h*31 + p.x + p.y*3 + p.hp*7 + p.cool*3 + p.invul) | 0;
   for (const b of s.bullets) h = (h*31 + b.x + b.y + b.o) | 0;

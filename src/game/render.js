@@ -62,6 +62,7 @@ export function createRenderer(canvas){
   const fireImg = getImage('fire');
   const buffImgKo = getImage('buffs');
   const buffImgEn = getImage('buffsEn');
+  const portalImg = getImage('portal');
   // 언어에 따라 고른다. 영어판이 아직 안 받아졌으면 한국어판으로 (빈 화면보다 낫다)
   const buffSheet = () => (getLang() === 'ko' ? buffImgKo : (buffImgEn || buffImgKo));
 
@@ -196,6 +197,36 @@ export function createRenderer(canvas){
     ctx.fillText(msg, cx, cy + 22 * RS);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
+  // 차원문. 두 문은 색이 달라 어디로 나올지 알 수 있다 (보라 ↔ 하늘).
+  // 그림이 아직 안 받아졌으면 고리로 대신 그린다
+  const PORTAL_PX = 96;
+  function drawPortals(s){
+    if (!s.portals || !s.portals.length) return;
+    for (let k = 0; k < s.portals.length; k++){
+      const g = s.portals[k];
+      const cx = cellX(g.c) + GRID_CW / 2;
+      const cy = fy(cellY(g.r) + GRID_CH / 2, 0);
+      if (isReady(portalImg)){
+        // 살짝 커졌다 작아지며 도는 느낌
+        const puls = 1 + Math.sin(s.tick / 18 + k * 2) * 0.06;
+        const w = GRID_CW * 1.8 * puls, h = GRID_CH * 1.8 * puls;
+        ctx.drawImage(portalImg, k * PORTAL_PX, 0, PORTAL_PX, PORTAL_PX,
+          Math.round((cx - w / 2) * RS), Math.round((cy - h / 2) * RS),
+          Math.round(w * RS), Math.round(h * RS));
+        continue;
+      }
+      for (let n = 0; n < 3; n++){
+        const ph = ((s.tick / 40) + n / 3) % 1;
+        const rad = GRID_CW * (0.62 - ph * 0.42);
+        ctx.beginPath();
+        ctx.arc(cx * RS, cy * RS, Math.max(0.5, rad) * RS, 0, Math.PI * 2);
+        ctx.lineWidth = 1.8 * RS;
+        ctx.strokeStyle = (k === 0 ? 'rgba(150,110,255,' : 'rgba(90,220,255,') + (0.75 * (1 - ph)).toFixed(3) + ')';
+        ctx.stroke();
+      }
+    }
+  }
+
   // 바닥에 뜬 버프. 칸 하나에 맞춰 그리고 살짝 떠오르게 흔든다
   const BUFF_PX = 72;
   function drawBuffs(s){
@@ -217,6 +248,16 @@ export function createRenderer(canvas){
   function drawBuffPop(s){
     if (!s.fx || !s.fx.length) return;
     for (const f of s.fx){
+      if ((f.k || 0) === 3){                       // 차원문에서 나오는 연출
+        const age3 = 20 - f.t, k3 = Math.max(0, Math.min(1, age3 / 20));
+        const cx3 = cellX(f.c) + GRID_CW / 2, cy3 = fy(cellY(f.r) + GRID_CH / 2, 0);
+        ctx.beginPath();
+        ctx.arc(cx3 * RS, cy3 * RS, GRID_CW * (0.2 + k3 * 1.1) * RS, 0, Math.PI * 2);
+        ctx.lineWidth = 2.2 * RS * (1 - k3);
+        ctx.strokeStyle = 'rgba(160,200,255,' + (0.9 * (1 - k3)).toFixed(3) + ')';
+        ctx.stroke();
+        continue;
+      }
       if ((f.k || 0) !== 2) continue;
       const age = 20 - f.t;
       const k = Math.max(0, Math.min(1, age / 20));
@@ -503,7 +544,7 @@ export function createRenderer(canvas){
   function drawFx(s){
     if (!s.fx || !s.fx.length) return;
     for (const f of s.fx){
-      if ((f.k || 0) === 2) continue;      // 버프 먹기는 drawBuffPop 이 따로 그린다
+      if ((f.k || 0) === 2 || (f.k || 0) === 3) continue;   // 버프·차원문은 따로 그린다
       const isFlash = (f.k || 0) === 1;
       const img = isFlash ? flashfx : boom;
       if (!isReady(img)) continue;
@@ -794,6 +835,7 @@ export function createRenderer(canvas){
     drawInvulAura(s, rx, ry);
     drawProjectiles(s, a);
     drawFire(s);
+    drawPortals(s);
     drawBuffs(s);
     drawBuffPop(s);
     drawMyBuffs(s);

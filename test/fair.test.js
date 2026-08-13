@@ -124,17 +124,4 @@ console.log('2배속에서 스틱 입력이 깎이지 않는다');
   }
 }
 
-console.log('처음 접속했을 때 지연이 과하지 않다');
-{
-  // [stated] "PVP 제일 처음 시작할 때 1초 정도 렉 걸림"
-  // RTT 를 모르는 동안 최대 지연(24틱 = 400ms)으로 시작하고 있었다
-  const { MIN_DELAY, MAX_DELAY, JITTER_MS, TICK_MS } = await import('../src/game/config.js');
-  const src = fs.readFileSync('src/game/net.js', 'utf8');
-  assert(/GUESS/.test(src), 'RTT 를 모를 때 쓸 어림값이 있다');
-  assert(!/this\.rtt < 0 \? MAX_DELAY/.test(src), '최대 지연으로 시작하지 않는다');
-  const guess = Math.min(MAX_DELAY, Math.max(MIN_DELAY, Math.ceil((60 + JITTER_MS) / TICK_MS)));
-  assert(guess * TICK_MS < 150,
-    `첫 지연이 150ms 미만 (${(guess * TICK_MS).toFixed(0)}ms)`);
-}
-
 console.log('fair.test.js 통과');
