@@ -1,8 +1,7 @@
 import {
   FP, WALL_L, WALL_R, wallIdx, PH_PLAY, THROW,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CW, GRID_CH, GRID_X0, GRID_Y0,
-  ATK_TICKS, ATK_HIT, FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX, PHf, PWf
-} from './config.js';
+  ATK_TICKS, ATK_HIT, FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX, PHf, PWf, MAXHP, BUFF, PORTAL_N} from './config.js';
 
 // 노릴 상대. 2대2에서는 살아 있는 적 중 가로로 가장 가까운 쪽을 본다.
 // (1대1이면 결과가 예전과 같은 그 한 명)
@@ -27,29 +26,36 @@ function foeOf(s, me){
 //  slop    : 목표 지점에 섞는 오차(px). 낮은 단계일수록 엉뚱한 데로 감
 //  push    : 앞으로 나서려는 정도 (0~1)
 // lead: 상대 이동을 얼마나 앞질러 조준하는지 (0=현재 위치, 1=완전 예측)
+//
+// 칼전 전용 값 (총격전 값만으로는 단계가 거의 안 갈렸다 — aim·speed·mul 셋만 썼다)
+//  mOrbit : 정면으로만 붙지 않고 옆으로 도는 정도
+//  mSpace : 칼 쿨 동안 거리를 벌렸다 다시 붙는 정도
+//  mGuard : 상대 모션을 읽고 방패를 드는 정도
+//  mBait  : 접근하는 척하다 빠지는 정도
+//  mPort  : 차원문을 쓰는 정도 (불리하면 도망, 유리하면 추격)
 export const AI_STAGES = [
   //                        방어                              공격
   //          react horizon danger speed  aim  push slop | thrGap aimErr chargeErr combo
   { nameKey: 'ai.s1',   react: 900, horizon: 18,  danger: 9,  speed: 0.35, aim: 0.1, push: 0.1, slop: 14.0,
-    thrGap: 9000, aimErr: 2.4, chargeErr: 0.35, combo: 0.0, lead: 0.0 , timing: 0.0 , mul: 0.8 , engage: 0.04 , cool: 1.25 },
+    thrGap: 9000, aimErr: 2.4, chargeErr: 0.35, combo: 0.0, lead: 0.0 , timing: 0.0 , mul: 0.8 , engage: 0.04 , cool: 1.25 , mOrbit: 0.050, mSpace: 0.000, mGuard: 0.020, mBait: 0.000, mPort: 0.0 },
   { nameKey: 'ai.s2',   react: 807, horizon: 23,  danger: 10, speed: 0.417, aim: 0.153, push: 0.133, slop: 12.0,
-    thrGap: 8333, aimErr: 2.133, chargeErr: 0.303, combo: 0.0, lead: 0.0 , timing: 0.04 , mul: 0.833 , engage: 0.06 , cool: 1.217 },
+    thrGap: 8333, aimErr: 2.133, chargeErr: 0.303, combo: 0.0, lead: 0.0 , timing: 0.04 , mul: 0.833 , engage: 0.06 , cool: 1.217 , mOrbit: 0.072, mSpace: 0.013, mGuard: 0.120, mBait: 0.017, mPort: 0.078 },
   { nameKey: 'ai.s3',   react: 713, horizon: 29,  danger: 10, speed: 0.483, aim: 0.213, push: 0.167, slop: 10.333,
-    thrGap: 7667, aimErr: 1.867, chargeErr: 0.26, combo: 0.0, lead: 0.0 , timing: 0.087 , mul: 0.867 , engage: 0.08 , cool: 1.183 },
+    thrGap: 7667, aimErr: 1.867, chargeErr: 0.26, combo: 0.0, lead: 0.0 , timing: 0.087 , mul: 0.867 , engage: 0.08 , cool: 1.183 , mOrbit: 0.094, mSpace: 0.027, mGuard: 0.220, mBait: 0.033, mPort: 0.156 },
   { nameKey: 'ai.s4',   react: 620, horizon: 36,  danger: 11, speed: 0.55, aim: 0.28, push: 0.2, slop: 9.0,
-    thrGap: 7000, aimErr: 1.6, chargeErr: 0.22, combo: 0.0, lead: 0.0 , timing: 0.14 , mul: 0.9 , engage: 0.1 , cool: 1.15 },
+    thrGap: 7000, aimErr: 1.6, chargeErr: 0.22, combo: 0.0, lead: 0.0 , timing: 0.14 , mul: 0.9 , engage: 0.1 , cool: 1.15 , mOrbit: 0.117, mSpace: 0.040, mGuard: 0.320, mBait: 0.050, mPort: 0.233 },
   { nameKey: 'ai.s5', react: 540, horizon: 44,  danger: 12, speed: 0.61, aim: 0.347, push: 0.253, slop: 7.667,
-    thrGap: 6333, aimErr: 1.333, chargeErr: 0.187, combo: 0.133, lead: 0.0 , timing: 0.207 , mul: 0.94 , engage: 0.12 , cool: 1.117 },
+    thrGap: 6333, aimErr: 1.333, chargeErr: 0.187, combo: 0.133, lead: 0.0 , timing: 0.207 , mul: 0.94 , engage: 0.12 , cool: 1.117 , mOrbit: 0.139, mSpace: 0.053, mGuard: 0.420, mBait: 0.067, mPort: 0.311 },
   { nameKey: 'ai.s6',   react: 467, horizon: 53,  danger: 12, speed: 0.667, aim: 0.413, push: 0.303, slop: 6.333,
-    thrGap: 5667, aimErr: 1.1, chargeErr: 0.157, combo: 0.25, lead: 0.0 , timing: 0.28 , mul: 0.973 , engage: 0.14 , cool: 1.083 },
+    thrGap: 5667, aimErr: 1.1, chargeErr: 0.157, combo: 0.25, lead: 0.0 , timing: 0.28 , mul: 0.973 , engage: 0.14 , cool: 1.083 , mOrbit: 0.161, mSpace: 0.067, mGuard: 0.520, mBait: 0.083, mPort: 0.389 },
   { nameKey: 'ai.s7', react: 400, horizon: 62,  danger: 13, speed: 0.72, aim: 0.48, push: 0.35, slop: 5.0,
-    thrGap: 5000, aimErr: 0.9, chargeErr: 0.13, combo: 0.35, lead: 0.0 , timing: 0.36 , mul: 1.0 , engage: 0.16 , cool: 1.05 },
+    thrGap: 5000, aimErr: 0.9, chargeErr: 0.13, combo: 0.35, lead: 0.0 , timing: 0.36 , mul: 1.0 , engage: 0.16 , cool: 1.05 , mOrbit: 0.183, mSpace: 0.080, mGuard: 0.620, mBait: 0.100, mPort: 0.467 },
   { nameKey: 'ai.s8',   react: 340, horizon: 73, danger: 14, speed: 0.773, aim: 0.547, push: 0.397, slop: 4.333,
-    thrGap: 4467, aimErr: 0.767, chargeErr: 0.11, combo: 0.45, lead: 0.0 , timing: 0.453 , mul: 1.027 , engage: 0.173 , cool: 1.017 },
+    thrGap: 4467, aimErr: 0.767, chargeErr: 0.11, combo: 0.45, lead: 0.0 , timing: 0.453 , mul: 1.027 , engage: 0.173 , cool: 1.017 , mOrbit: 0.206, mSpace: 0.093, mGuard: 0.720, mBait: 0.117, mPort: 0.544 },
   { nameKey: 'ai.s9', react: 287, horizon: 84, danger: 14, speed: 0.823, aim: 0.613, push: 0.447, slop: 3.667,
-    thrGap: 3933, aimErr: 0.633, chargeErr: 0.09, combo: 0.55, lead: 0.0 , timing: 0.547 , mul: 1.053 , engage: 0.187 , cool: 0.98 },
+    thrGap: 3933, aimErr: 0.633, chargeErr: 0.09, combo: 0.55, lead: 0.0 , timing: 0.547 , mul: 1.053 , engage: 0.187 , cool: 0.98 , mOrbit: 0.228, mSpace: 0.107, mGuard: 0.820, mBait: 0.133, mPort: 0.622 },
   { nameKey: 'ai.s10',   react: 240,  horizon: 95, danger: 15, speed: 0.87, aim: 0.68, push: 0.5, slop: 3.0,
-    thrGap: 3400, aimErr: 0.5, chargeErr: 0.07, combo: 0.65, lead: 0.0 , timing: 0.64 , mul: 1.08 , engage: 0.2 , cool: 0.94 }
+    thrGap: 3400, aimErr: 0.5, chargeErr: 0.07, combo: 0.65, lead: 0.0 , timing: 0.64 , mul: 1.08 , engage: 0.2 , cool: 0.94 , mOrbit: 0.250, mSpace: 0.120, mGuard: 0.920, mBait: 0.150, mPort: 0.7 },
 ];
 
 const HALF = 7 * FP;        // 캐릭터 가로 절반
@@ -59,6 +65,8 @@ const MID  = 8 * FP;        // 세로 중앙 오프셋
 export function createAI(stage = 1){
   const p = AI_STAGES[Math.max(0, Math.min(AI_STAGES.length - 1, stage - 1))];
   let targetX = null, nextPlan = 0;
+  let mNext = 0, mvx = 0, mvy = 0;   // 칼전: 다음 판단 시각과 그때 정한 방향
+  let goal = null, goalAt = 0, goalFoe = -1;   // 칼전: 지금 노리는 것
   let wander = 0, wanderT = 0;
   let nextThrow = 2500 + Math.random() * 2500;   // 처음 던지기까지
   let aimKind = -1, aimErrC = 0, aimErrR = 0, aimSince = 0;   // 이번 투척의 목표와 오차
@@ -149,60 +157,119 @@ export function createAI(stage = 1){
       const my = s.p[me], foe = foeOf(s, me);
       if (!foe) return { vx: 0, vy: 0 };
 
-      // 칼전: 총알도 엄폐물도 없다. 붙어서 때리고, 쿨 동안은 조금 물러난다
+      // 칼전: 총알도 엄폐물도 없다.
+      //
+      // **무엇을 할지 먼저 정하고 그 다음에 움직인다.**
+      // 예전엔 값(옆돌기·거리)만 단계별로 흔들었는데, 그건 강함으로 이어지지 않았다 —
+      // 실측에서 옆돌기는 영향이 거의 없고 방패는 오히려 손해였다.
+      // 판단(회복할까·버프를 챙길까·누굴 칠까·차원문을 탈까)이 실력을 가른다
       if (s.melee){
-        // **가까운 버프가 있으면 먼저 줍는다.** 안 그러면 AI전에서 사람만 버프를 먹어
-        // 일방적이 된다. 단계가 낮을수록 덜 챙긴다(멀리 있는 건 무시)
-        // **단계가 낮으면 잘 못 챙긴다.** 모두가 똑같이 주우면 버프가 실력 차이를 덮어
-        // 1단계와 4단계가 비슷해진다 (검사기가 이걸 잡았다)
-        if (s.buffs && s.buffs.length && p.aim > 0.25){
-          const range = GRID_CH * FP * (1 + p.aim * 8);
-          let best = null, bestD = range;
-          for (const b of s.buffs){
-            const bx = Math.round((cellX(b.c) + GRID_CW / 2) * FP);
-            const by = Math.round((cellY(b.r) + GRID_CH / 2) * FP);
-            const d = Math.abs(bx - my.x) + Math.abs(by - my.y);
-            if (d < bestD){ bestD = d; best = { bx, by }; }
-          }
-          if (best){
-            // **캐릭터 중심**이 칸 중심에 닿아야 먹는다. 좌상단 기준으로 가면
-            // 반 칸 어긋나 옆을 스치고 지나간다
-            const gx = best.bx - (my.x + (PWf >> 1)), gy = best.by - (my.y + (PHf >> 1));
-            const len = Math.max(1, Math.hypot(gx, gy));
-            return { vx: gx / len * p.speed * (p.mul || 1),
-                     vy: gy / len * p.speed * (p.mul || 1) };
-          }
-        }
-        // 좌우로도 벨 수 있으므로, 세로·가로 중 더 가까운 축으로 붙는다
         const reach = GRID_CH * FP;
-        const dxc = foe.x - my.x, dyc = foe.y - my.y;
-        // 상대가 곧 칼을 휘두르면 방패를 든다. 단계가 높을수록 잘 읽는다
-        // (판정이 모션 중간에 나오므로 그 전에 눌러야 막힌다)
-        const foeSwing = (foe.atk || 0) > 0 && (foe.atk || 0) > ATK_TICKS - ATK_HIT;
-        const guard = foeSwing && my.shCool === 0 && Math.random() < p.aim * 0.5;
-        // 세로·가로 중 더 가까운 축으로 붙는다
-        if (Math.abs(dxc) > Math.abs(dyc) * 1.3){
-          const swinging2 = (my.atk || 0) > 0;
-          const want2 = (my.cool > 0 && !swinging2) ? reach * 1.4 : reach * 0.5;
-          const gapX = Math.abs(dxc) - PWf;
-          const vx2 = gapX > want2 ? Math.sign(dxc) : (gapX < want2 - reach * 0.3 ? -Math.sign(dxc) : 0);
-          const vy2 = Math.abs(dyc) < PHf * 0.5 ? 0 : Math.sign(dyc);
-          return { vx: vx2 * p.speed * (p.mul || 1), vy: vy2 * p.speed * (p.mul || 1), sh: guard ? 1 : 0 };
+        const cx = my.x + (PWf >> 1), cy = my.y + (PHf >> 1);
+        const dist2 = (ax2, ay2) => Math.hypot(ax2 - cx, ay2 - cy);
+        const cellCenter = g => [Math.round((cellX(g.c) + GRID_CW / 2) * FP),
+                                 Math.round((cellY(g.r) + GRID_CH / 2) * FP)];
+
+        // ── 1) 목표를 정한다 (단계가 낮을수록 드물게·서툴게) ──
+        if (now >= goalAt){
+          goalAt = now + p.react * (1.4 - 0.8 * (p.aim || 0));
+          const hurt = my.hp / MAXHP;
+          let best = null;
+
+          // 회복이 급하면 회복 버프를 최우선으로. 낮은 단계는 이 판단을 못 한다
+          if (hurt < 0.5 && (p.aim || 0) > 0.2){
+            for (const b of (s.buffs || [])) if (b.k === BUFF.HEAL){
+              const [bx, by] = cellCenter(b);
+              best = { x: bx, y: by, w: 1e9 - dist2(bx, by) };
+            }
+          }
+          // 그 밖의 버프 — 단계가 높을수록 멀리 있는 것도 챙긴다
+          const grab = reach * (2 + 14 * (p.aim || 0));
+          if (!best) for (const b of (s.buffs || [])){
+            const [bx, by] = cellCenter(b);
+            const d = dist2(bx, by);
+            if (d > grab) continue;
+            const w = (grab - d) * (b.k === BUFF.HEAL ? 1.6 : 1.0);
+            if (!best || w > best.w) best = { x: bx, y: by, w };
+          }
+          // 적 — 단계가 높을수록 **약한 쪽**을 고른다 (낮은 단계는 가까운 쪽)
+          let foeBest = null;
+          for (let v = 0; v < s.n; v++){
+            if (v === me || s.p[v].hp <= 0 || s.off[v]) continue;
+            if (teamOf(v, s.n) === teamOf(me, s.n)) continue;
+            const t2 = s.p[v];
+            const d = dist2(t2.x + (PWf >> 1), t2.y + (PHf >> 1));
+            // 약한 적을 노리는 정도. 굳어 있는 적은 더 노린다
+            const weak = (1 - t2.hp / MAXHP) * (p.aim || 0) * 3 * reach;
+            const stunned = (t2.stun > 0 ? reach * 2 : 0) * (p.aim || 0);
+            // **팀전은 몰아쳐야 한다.** 아군이 이미 붙어 있는 적을 같이 치면
+            // 빨리 눕힐 수 있다. 각자 다른 적을 쫓으면 오래 끌려 손해다
+            let mates = 0;
+            if (s.n > 2) for (let u = 0; u < s.n; u++){
+              if (u === me || s.p[u].hp <= 0) continue;
+              if (teamOf(u, s.n) !== teamOf(me, s.n)) continue;
+              const md = Math.hypot(s.p[u].x - t2.x, s.p[u].y - t2.y);
+              if (md < reach * 2.5) mates++;
+            }
+            const focus = mates * reach * 2.5 * (p.aim || 0);
+            const w = -d + weak + stunned + focus;
+            if (!foeBest || w > foeBest.w) foeBest = { x: t2.x + (PWf >> 1), y: t2.y + (PHf >> 1), w, foe: v };
+          }
+          goal = best && !foeBest ? best
+               : best && best.w > reach * 4 ? best      // 값이 큰 버프면 먼저 줍는다
+               : foeBest || best;
+          goalFoe = goal && goal.foe !== undefined ? goal.foe : -1;
         }
-        const up = dyc < 0;                               // 상대가 위에 있으면 위를 본다
-        const gap = up ? my.y - (foe.y + PHf) : foe.y - (my.y + PHf);
-        const lined = Math.abs(dxc) < PWf * 0.7;          // 같은 세로줄에 섰는가
-        // 칼이 닿으면 휘두른다. 쿨 중이면 조금 떨어져서 기다린다.
-        // 단, **휘두르는 모션 중에는 물러나면 안 된다** — 판정이 모션 중간에 나므로
-        // 바로 빠지면 자기 칼을 자기가 피한다
-        const swinging = (my.atk || 0) > 0;
-        const want = (my.cool > 0 && !swinging) ? reach * 1.4 : reach * 0.5;
-        let vy = 0;
-        if (!lined) vy = 0;                                // 가로를 먼저 맞춘다
-        else if (gap > want + reach * 0.15) vy = up ? -1 : 1;
-        else if (gap < want - reach * 0.15) vy = up ? 1 : -1;
-        const vx = Math.abs(dxc) < PWf * 0.35 ? 0 : Math.sign(dxc);
-        return { vx: vx * p.speed * (p.mul || 1), vy: vy * p.speed * (p.mul || 1), sh: guard ? 1 : 0 };
+        if (!goal) return { vx: 0, vy: 0 };
+
+        // ── 2) 차원문이 지름길이면 탄다 ──
+        let gx0 = goal.x, gy0 = goal.y;
+        if ((p.mPort || 0) > 0 && (s.portals || []).length === PORTAL_N){
+          const direct = dist2(goal.x, goal.y);
+          for (let k2 = 0; k2 < PORTAL_N; k2++){
+            const [ax3, ay3] = cellCenter(s.portals[k2]);
+            const [bx3, by3] = cellCenter(s.portals[(k2 + 1) % PORTAL_N]);
+            const via = dist2(ax3, ay3) + Math.hypot(goal.x - bx3, goal.y - by3);
+            // **확실히 많이 가까울 때만 탄다.** 조금 가까운 정도로 타면
+            // 팀전에서 아군과 흩어져 몰아치기가 깨진다(8단계부터 무너졌다)
+            if (via < direct * 0.55){ gx0 = ax3; gy0 = ay3; break; }
+          }
+        }
+
+        // ── 3) 목표로 간다 ──
+        const tdx = gx0 - cx, tdy = gy0 - cy;
+        const tdist = Math.max(1, Math.hypot(tdx, tdy));
+        let ax = tdx / tdist, ay = tdy / tdist;
+
+        // 적이 목표면 거리를 잰다: 칼이 준비됐으면 붙고, 쿨이면 살짝 뺀다
+        const foeT = goalFoe >= 0 ? s.p[goalFoe] : null;
+        let guard = false;
+        if (foeT){
+          const swinging = (my.atk || 0) > 0;
+          const cooling = my.cool > 0 && !swinging;
+          const want = cooling ? reach * (1.0 + 0.5 * (p.mSpace || 0)) : reach * 0.55;
+          const err = (tdist - want) / reach;
+          const k3 = Math.max(-1, Math.min(1, err * 1.6));
+          ax *= k3; ay *= k3;
+          // 붙어 있을 때만 옆으로 돈다
+          if (tdist < reach * 2.2){
+            const side = (me % 2 ? 1 : -1) * (Math.floor(now / 1400) % 2 ? 1 : -1);
+            ax += (-tdy / tdist) * side * (p.mOrbit || 0);
+            ay += ( tdx / tdist) * side * (p.mOrbit || 0);
+          }
+          // 상대가 휘두르면 방패 (마주 본 축일 때만 의미가 있다)
+          const foeSwing = (foeT.atk || 0) > ATK_TICKS - ATK_HIT;
+          guard = foeSwing && tdist < reach * 1.6 && my.shCool === 0 && my.shield === 0
+               && (Math.abs(tdx) > Math.abs(tdy)) === (my.face >= 2)
+               && Math.random() < (p.mGuard || 0) * 0.5;
+        }
+        const alen = Math.hypot(ax, ay);
+        if (alen > 1){ ax /= alen; ay /= alen; }
+        // 낮은 단계는 반응이 굼떠 옛 방향으로 계속 간다
+        if (now >= mNext){ mNext = now + p.react * 0.5; mvx = ax; mvy = ay; }
+        return { vx: mvx * p.speed * (p.mul || 1),
+                 vy: mvy * p.speed * (p.mul || 1),
+                 sh: guard ? 1 : 0 };
       }
 
       const myCx = my.x + HALF;

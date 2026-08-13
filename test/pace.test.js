@@ -157,3 +157,26 @@ console.log('내 캐릭터와 상대 캐릭터가 둘 다 매끄럽다 (진짜 �
 }
 
 console.log('pace.test.js 통과');
+
+console.log('시작하자마자 렉이 걸리지 않는다');
+{
+  // [stated] "매칭에서 한참 기다리는데 왜 시작할 때 렉이 걸리나"
+  // 원인 둘:
+  //  ① ping 을 게임 화면에서만 보내서, 시작하는 순간 RTT 를 몰라 최대 지연(400ms)으로 출발
+  //  ② nextInputTick 이 한 번 밀리면 1틱씩만 줄어 정상으로 오는 데 3초 넘게 걸림
+  const fs = await import('fs');
+  const net = fs.readFileSync('src/game/net.js', 'utf8');
+  const srv = fs.readFileSync('server/index.js', 'utf8');
+
+  // ① 매칭 중에도 잰다
+  assert(/startPing\(\)/.test(net), '접속되면 바로 왕복 시간을 재기 시작한다');
+  assert(/this\.rtt = \(net && net\.rtt > 0\)/.test(net), '게임이 시작될 때 그 값을 물려받는다');
+  assert(/m\.t === 'p' && m\.pre/.test(srv), '서버가 자리에 앉기 전에도 답한다');
+
+  // ② 너무 앞서면 당겨온다
+  const send = net.slice(net.indexOf('sendInputs(now){'), net.indexOf('sendInputs(now){') + 900);
+  assert(/aheadNow/.test(send), '입력 틱이 너무 앞서면 당겨온다');
+  assert(/this\.nextInputTick -=/.test(send), '실제로 줄인다');
+}
+
+console.log('pace.test.js 통과');

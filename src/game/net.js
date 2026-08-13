@@ -144,7 +144,28 @@ export class WsTransport {
     this.closed = false;
     this.tries = 0;
     this.maxDelay = opts.maxDelay || 8000;
+    // **매칭 중에도 왕복 시간을 재둔다.** 예전엔 게임 화면이 뜬 뒤에야 재기 시작해서,
+    // 시작하는 바로 그 순간에 RTT 를 모르고 최대 지연(400ms)으로 출발했다 —
+    // 매칭에서 몇 초씩 기다리는데도 시작하자마자 렉이 걸리던 이유
+    this.rtt = -1;
+    this.pings = new Map();
+    this.pingId = 1;
+    this.pingTimer = null;
   }
+  // 접속되면 곧바로 재기 시작한다
+  startPing(){
+    if (this.pingTimer) return;
+    const beat = () => {
+      if (this.closed || !this.ws || this.ws.readyState !== 1) return;
+      const id = this.pingId++;
+      this.pings.set(id, CLOCK.now());
+      try { this.ws.send(JSON.stringify({ t: 'p', id, pre: 1 })); } catch { /* 무시 */ }
+      if (this.pings.size > 8) this.pings.clear();
+    };
+    beat();
+    this.pingTimer = setInterval(beat, 700);
+  }
+  stopPing(){ if (this.pingTimer){ clearInterval(this.pingTimer); this.pingTimer = null; } }
   connect(){
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(this.url);
@@ -152,12 +173,20 @@ export class WsTransport {
       ws.onopen = () => {
         this.tries = 0;
         this.onStatus('open');
+        this.startPing();
         for (const m of this.queue) ws.send(m);
         this.queue.length = 0;
         resolve();
       };
       ws.onmessage = e => {
         let m; try { m = JSON.parse(e.data); } catch { return; }
+        // 매칭 중에 보낸 ping 의 답. 여기서 미리 왕복 시간을 재둔다
+        if (m.t === 'p' && this.pings.has(m.id)){
+          const t0 = this.pings.get(m.id);
+          this.pings.delete(m.id);
+          const r = CLOCK.now() - t0;
+          this.rtt = this.rtt < 0 ? r : this.rtt * 0.6 + r * 0.4;
+        }
         if (this.toClient) this.toClient(m);
       };
       ws.onclose = () => {
@@ -246,6 +275,20 @@ export class Server {
       const t = this.s.tick + 1;
       const f = this.inbox.get(t) || [];
       const inp = Array.from({ length: this.n }, (_, i) => f[i] || NOIN);   // 미도착 입력은 무입력
+      // **빈 자리는 서버가 AI로 채운다.** 사람이 모자라도 판이 열리게 하려는 것.
+      // AI 는 반드시 서버에서 돌려야 모두가 같은 움직임을 본다
+      if (this.bots) for (const b of this.bots){
+        if (b.slot >= this.n || this.s.p[b.slot].hp <= 0) continue;
+        const a = b.ai.think(this.s, b.slot, TICK_MS / 1000, this.s.tick * TICK_MS);
+        const q = { ...NOIN };
+        q.dx = Math.round((a.vx || 0) * TUNE.spd.v / 60 * FP);
+        q.dy = Math.round((a.vy || 0) * TUNE.spd.v / 60 * FP);
+        if (a.sh) q.sh = 1;
+        if (a.thr) q.thr = a.thr;
+        if (a.place) q.place = a.place;
+        q.ready = 1; q.go = 1;                 // 봇은 언제나 준비 완료
+        inp[b.slot] = q;
+      }
       this.inbox.delete(t);
       if (this.pendingCfg){ Object.assign(this.s, this.pendingCfg); this.pendingCfg = null; }
       // 지연 보상은 **끈다**. 클라가 상대도 '현재'로 예측해 그리므로 서버가 되감으면
@@ -281,7 +324,9 @@ export class Client {
     this.frames = new Map();           // tick -> {inp, ck}
     this.nextInputTick = -1;
     this.delay = MIN_DELAY;
-    this.rtt = -1; this.pings = new Map(); this.pingId = 1; this.lastPing = -1e9;
+    // **매칭 중에 재둔 값을 물려받는다.** 없으면 -1 (그때는 최대 지연으로 시작)
+    this.rtt = (net && net.rtt > 0) ? net.rtt : -1;
+    this.pings = new Map(); this.pingId = 1; this.lastPing = -1e9;
     this.svTick = 0; this.svAt = CLOCK.now();
     const blank = () => ({ dx:0, dy:0, fire:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0 });
     // 슬롯 수가 늘어도(3대3=6인) 자리가 있어야 한다. 4칸 고정이라
@@ -366,6 +411,12 @@ export class Client {
     this.stats.sendCalls++;
     if (this.nextInputTick < 0){ this.stats.blocked++; return; }
     const target = this.estServerTick(now) + this.delay;
+    // **너무 앞서 있으면 당겨온다.** 접속이 느리면 처음에 최대 지연(400ms)으로
+    // 잡히는데, nextInputTick 은 1틱씩만 나아가서 정상으로 돌아오는 데 3초 넘게 걸린다 —
+    // 그동안 조작이 늦게 먹어 "시작할 때 렉이 심하다"고 느껴진다.
+    // 뒤로 되돌리지는 않는다(이미 보낸 틱을 다시 보낼 수 없다)
+    const aheadNow = this.nextInputTick - 1 - target;
+    if (aheadNow > MIN_DELAY) this.nextInputTick -= Math.min(aheadNow - MIN_DELAY, 12);
     let guard = 0;
     while (this.nextInputTick <= target && guard++ < 8){
       const t = this.nextInputTick++;

@@ -82,7 +82,7 @@ export const BUFF_KINDS = BUFF_DEF.length;
 // [stated] 칼전 차원문. 하나로 들어가면 다른 하나로 나온다.
 // 쿨타임 없음 · 양방향 · 항상 열려 있고 **위치만** 주기마다 바뀐다
 export const PORTAL_N = 2;             // 한 쌍
-export const PORTAL_EVERY = 10 * 60;   // 10초마다 자리 옮김
+export const PORTAL_EVERY = 7 * 60;    // [stated] 7초마다 자리 옮김 (10초는 길었다)
 // [stated] 준비 단계 제한 시간. **상대가 준비완료를 안 누르면 영원히 시작이 안 됐다.**
 // 총격전은 설치할 게 있어 15초, 칼전은 놓을 게 없어 10초
 export const READY_TICKS = 15 * 60;

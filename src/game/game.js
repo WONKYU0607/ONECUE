@@ -253,8 +253,12 @@ export function createGame(canvas, opts = {}){
       const last = st.fx[st.fx.length - 1];
       // **버프(k=2)는 폭발이 아니다.** 예전엔 여기 걸려서 터지는 소리가 나고
       // 화면까지 흔들렸다 — 효과를 얻는 건데 무언가 터진 것처럼 들렸다
-      if ((last?.k || 0) === 2) sfx.buff();
-      else if ((last?.k || 0) === 1) sfx.flash();
+      // **버프(k=2)·차원문(k=3)은 폭발이 아니다.** 여기 걸리면 터지는 소리가 나고
+      // 화면까지 흔들린다 — 버프에서 한 번 겪은 문제라 종류를 반드시 갈라야 한다
+      const fk = last?.k || 0;
+      if (fk === 2) sfx.buff();
+      else if (fk === 3){ /* 차원문: 링 연출만. 소리·흔들림 없음 */ }
+      else if (fk === 1) sfx.flash();
       else { sfx.explode(); juice.shake(2.4); buzz(28); }
     }
     // 투척물이 새로 날아감

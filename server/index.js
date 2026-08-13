@@ -5,6 +5,7 @@ import { WebSocketServer } from 'ws';
 import { Server } from '../src/game/net.js';
 import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY } from '../src/game/config.js';
 import { scoreDelta } from '../src/game/score.js';
+import { createAI } from '../src/game/ai.js';
 import * as store from './store.js';
 import { forfeit, setOff } from '../src/game/sim.js';
 
@@ -18,6 +19,8 @@ const rooms = new Map();         // id -> Room
 const codes = new Map();         // 코드 -> Room (친구방)
 const waiting = new Map();       // '인원수:모드' -> 대기 소켓 목록. 섞이면 안 된다
 const qkey = (n, melee, ffa) => `${n}:${melee ? 'm' : 's'}${ffa ? ':f' : ''}`;
+// [stated] 사람이 모자랄 때 빈 자리를 AI 로 채우기까지 기다리는 시간
+const BOT_FILL_MS = 10000;
 const queueOf = k => { if (!waiting.has(k)) waiting.set(k, []); return waiting.get(k); };
 const waitingCount = () => [...waiting.values()].reduce((a, q) => a + q.length, 0);
 
@@ -89,6 +92,42 @@ class Room {
   // 판이 끝나면 **서버가** 점수를 계산해 Firestore에 쓴다.
   // 클라이언트가 쓰면 자기 점수를 자기가 올릴 수 있어 순위표가 무너진다.
   // 한 판에 한 번만 부르고, 실패해도 게임은 그대로 굴러간다
+  // 빈 자리를 봇으로 채운다. **봇인 걸 드러내지 않는다** —
+  // 이름을 사람과 같은 꼴(player##)로 지어 구분이 안 되게 한다
+  addBots(){
+    const st = this.server.s;
+    this.server.bots = this.server.bots || [];
+    for (let i = 0; i < this.n; i++){
+      const seat = this.seats[i];
+      if (seat && seat.sid) continue;                 // 사람이 앉은 자리
+      if (this.server.bots.some(b => b.slot === i)) continue;
+      seat.sid = 'bot:' + this.id + ':' + i;          // 자리를 잡아둔다 (다른 사람이 못 앉게)
+      seat.bot = true;
+      st.nick[i] = 'player' + (10 + Math.floor(Math.random() * 89));
+      if (st.color) st.color[i] = this.freeColor();
+      setOff(st, i, false);
+      // 단계는 전투가 시작될 때 사람 점수에 맞춰 정한다. 그전엔 중간값
+      this.server.bots.push({ slot: i, ai: createAI(5), stage: 5 });
+    }
+  }
+
+  // 사람 점수에 맞춰 봇 단계를 정한다. 점수를 모르면 중간값 그대로
+  tuneBots(){
+    if (!this.server.bots || !this.server.bots.length) return;
+    let sum = 0, cnt = 0;
+    for (let i = 0; i < this.n; i++){
+      const seat = this.seats[i];
+      if (!seat || seat.bot || !seat.uid) continue;
+      sum += this.preScore[i].score; cnt++;
+    }
+    if (!cnt) return;
+    const avg = sum / cnt;
+    // 1000점 = 5단계 기준, 400점마다 한 단계
+    const stage = Math.max(1, Math.min(10, Math.round(5 + (avg - 1000) / 400)));
+    for (const b of this.server.bots){ b.stage = stage; b.ai = createAI(stage); }
+    console.log(`봇 단계 ${stage} (사람 평균 ${Math.round(avg)}점)`);
+  }
+
   // 전투가 시작되는 순간 참가자 점수를 한 번 읽는다.
   // **매칭 때가 아니라 여기서** 읽어야 재접속·팀 변경까지 반영된다
   prime(){
@@ -103,6 +142,7 @@ class Room {
         const v = seat && seat.uid && m.get(seat.uid);
         if (v) this.preScore[i] = { score: v.score[kind], streak: v.streak[kind] };
       });
+      this.tuneBots();          // 사람 점수를 알았으니 봇 난이도를 맞춘다
     }).catch(() => {});
   }
 
@@ -246,6 +286,7 @@ class Room {
     }
     for (let i = 0; i < this.n; i++){          // 2명 고정이었음. 2대2에서 3·4번이 영영 안 정리됨
       const seat = this.seats[i];
+      if (seat.bot) continue;                  // **봇은 소켓이 없다.** 나간 것으로 보면 안 된다
       if (seat.sid && !seat.ws && now - seat.goneAt > GRACE_MS){
         seat.sid = null; seat.goneAt = 0;
         forfeit(this.server.s, i);             // 유예 시간이 지나면 완전히 나간 것으로
@@ -304,6 +345,32 @@ http.listen(PORT, () => console.log(`듀얼 서버 대기중 :${PORT}`));
 // 대기열: 새로 들어온 사람은 방에 바로 앉히지 않는다.
 // 방에 빈 자리가 있다고 바로 넣으면, 상대가 재접속 대기 중인(예약석) 방에 앉아
 // 오지 않을 사람을 기다리게 된다. 둘이 모였을 때만 방을 만든다.
+// 기다린 사람이 있으면 빈 자리를 봇으로 채워 판을 연다.
+// **봇인 걸 드러내지 않는다** — 이름도 사람과 같은 꼴로 짓는다
+function fillWithBots(key){
+  const q = queueOf(key);
+  if (!q.length) return;
+  const parts = key.split(':');
+  const n = +parts[0], melee = parts[1] === 'm', ffa = parts[2] === 'f';
+  const now = Date.now();
+  // 가장 오래 기다린 사람이 기준
+  if (!q.some(ws => ws.botAt && now >= ws.botAt)) return;
+  const picked = [];
+  while (picked.length < n && q.length){
+    const ws = q.shift();
+    if (ws.readyState === 1) picked.push(ws);
+  }
+  if (!picked.length) return;
+  const room = new Room(nextRoomId++, null, n, melee, ffa);
+  room.hasBots = true;
+  rooms.set(room.id, room);
+  for (const ws of picked){ ws.room = room; }
+  // 사람 먼저 앉히고 (팀전도 봇이 있으면 팀 고르기 없이 바로 시작한다)
+  for (const ws of picked) room.join(ws, ws.sid, undefined, ws.wantColor, ws.nick);
+  room.addBots();
+  console.log(`봇 채움: room ${room.id} ${key} (사람 ${picked.length}/${n})`);
+}
+
 function pairUp(key){
   const q = queueOf(key);
   const parts = key.split(':');
@@ -406,10 +473,18 @@ wss.on('connection', (ws, req) => {
     q.push(ws);
     ws.send(JSON.stringify({ t: 'queued', ahead: q.length - 1 }));
     pairUp(key);
+    // [stated] **10초 안에 상대가 잡히게 한다.** 사람이 모자라면 빈 자리를 AI 로 채운다
+    ws.botAt = Date.now() + BOT_FILL_MS;
   }
 
   ws.on('message', raw => {
     let m; try { m = JSON.parse(raw); } catch { return; }
+    // **매칭 중에 오는 왕복 측정용 ping.** 자리에 앉기 전에도 바로 답한다 —
+    // 그래야 클라가 시작 전에 지연을 알고, 시작하자마자 렉이 안 걸린다
+    if (m.t === 'p' && m.pre){
+      try { ws.send(JSON.stringify({ t: 'p', id: m.id })); } catch { /* 무시 */ }
+      return;
+    }
     if (m.t === 'team' && ws.room && ws.room.n > 2 && !ws.room.ffa){
       const room = ws.room, team = m.team === 1 ? 1 : 0;
       if (ws.slot === undefined || ws.slot < 0){
@@ -484,6 +559,11 @@ setInterval(() => {
 }, TICK_MS);
 
 // 끊긴 소켓 정리 (모바일은 연결이 조용히 죽는 경우가 많다)
+// [stated] 10초 안에 상대가 잡히게. 대기열을 훑어 오래 기다린 사람이 있으면 봇으로 채운다
+setInterval(() => {
+  for (const key of [...waiting.keys()]) fillWithBots(key);
+}, 500);
+
 setInterval(() => {
   for (const ws of wss.clients){
     if (!ws.isAlive){ ws.terminate(); continue; }
