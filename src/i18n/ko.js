@@ -190,4 +190,9 @@ export default {
   'quit.appTitle': '앱을 종료하시겠습니까?',
   'quit.appDesc': '홈 화면으로 돌아갑니다.',
   'ready.askTimeout': '{n}초 안에 답하지 않으면 그냥 진행됩니다.',
+  'ready.fastName': '2배속',
+  'ready.bareName': '노템전',
+  'ready.nobufName': '노버프전',
+  'ready.donePeer': '상대방이 {what} 신청을 수락하셨습니다',
+  'ready.doneMine': '{what} 신청을 수락했습니다',
 };

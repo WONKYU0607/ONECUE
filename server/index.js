@@ -19,8 +19,8 @@ const rooms = new Map();         // id -> Room
 const codes = new Map();         // 코드 -> Room (친구방)
 const waiting = new Map();       // '인원수:모드' -> 대기 소켓 목록. 섞이면 안 된다
 const qkey = (n, melee, ffa) => `${n}:${melee ? 'm' : 's'}${ffa ? ':f' : ''}`;
-// [stated] 사람이 모자랄 때 빈 자리를 AI 로 채우기까지 기다리는 시간
-const BOT_FILL_MS = 10000;
+// [stated] 사람이 모자랄 때 빈 자리를 AI 로 채우기까지 기다리는 시간 (7초)
+const BOT_FILL_MS = 6500;   // 접속·왕복 시간을 더해도 7초를 안 넘게
 const queueOf = k => { if (!waiting.has(k)) waiting.set(k, []); return waiting.get(k); };
 const waitingCount = () => [...waiting.values()].reduce((a, q) => a + q.length, 0);
 
@@ -602,7 +602,7 @@ setInterval(() => {
 // [stated] 10초 안에 상대가 잡히게. 대기열을 훑어 오래 기다린 사람이 있으면 봇으로 채운다
 setInterval(() => {
   for (const key of [...waiting.keys()]) fillWithBots(key);
-}, 500);
+}, 150);   // 0.5초마다 보면 그만큼 늦어져 7초를 넘긴다
 
 setInterval(() => {
   for (const ws of wss.clients){

@@ -60,14 +60,16 @@ export const NEG_LABEL = {
     desc: 'ready.fastNote',
     btn: 'ready.fastReq',
     on: 'ready.fastOn',
-    wait: 'ready.fastSent'
+    wait: 'ready.fastSent',
+    name: 'ready.fastName'
   },
   bare: {
     title: 'ready.bareAsk',
     desc: 'ready.bareNote',
     btn: 'ready.bareReq',
     on: 'ready.bareOn',
-    wait: 'ready.bareSent'
+    wait: 'ready.bareSent',
+    name: 'ready.bareName'
   }
 };
 
@@ -79,7 +81,7 @@ export const NEG_LABEL = {
 //   waiting 내가 신청하고 기다리는 것 {kind, sec}
 //   offer   지금 누를 수 있는 신청 버튼 ['fast','bare']
 export function uiPrompt(st, slot, online){
-  const none = { pre: false, banner: [], ask: null, waiting: null, offer: [] };
+  const none = { pre: false, banner: [], ask: null, waiting: null, offer: [], done: null };
   if (!st || !st.p) return none;
   const pre = st.phase === PH_READY || st.phase === PH_COUNT;
   if (!pre) return none;
@@ -114,7 +116,12 @@ export function uiPrompt(st, slot, online){
     // 시뮬은 열어놨는데 이 목록에 `!st.melee` 가 남아 버튼이 안 떴다
     if (!st.bare) offer.push('bare');
   }
-  return { pre: true, banner, ask, waiting, offer, melee: !!st.melee };
+  // [stated] 수락되면 화면 가운데에 알림을 띄운다.
+  // 내가 신청했으면 "상대가 수락했다", 상대가 신청했으면 "내가 수락했다"
+  const done = st.negDone
+    ? { kind: st.negDone.kind, mine: st.negDone.by === slot, melee: !!st.melee }
+    : null;
+  return { pre: true, banner, ask, waiting, offer, done, melee: !!st.melee };
 }
 
 // 신청 문구를 번역해서 돌려준다 (표는 열쇠만 담고 있다)
@@ -122,7 +129,7 @@ export function uiPrompt(st, slot, online){
 export const negText = (kind, part, melee = false) => {
   const key = (melee && kind === 'bare')
     ? { title: 'ready.nobufAsk', desc: 'ready.nobufNote', btn: 'ready.nobufReq',
-        on: 'ready.nobufOn', wait: 'ready.nobufSent' }[part]
+        on: 'ready.nobufOn', wait: 'ready.nobufSent', name: 'ready.nobufName' }[part]
     : (NEG_LABEL[kind] && NEG_LABEL[kind][part]);
   return t(key || part);
 };

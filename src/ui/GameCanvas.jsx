@@ -130,6 +130,13 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
       {(ready.prompt?.banner || []).map(k => (
         <div key={k} className="link-note ui-overlay fast">{negText(k, 'on', ready.prompt?.melee)}</div>
       ))}
+      {/* [stated] 수락되면 화면 가운데에 알림 문구를 잠깐 띄운다 */}
+      {ready.prompt?.done && (
+        <div className="negdone ui-overlay">
+          {t(ready.prompt.done.mine ? 'ready.doneMine' : 'ready.donePeer',
+             { what: negText(ready.prompt.done.kind, 'name', ready.prompt.done.melee) })}
+        </div>
+      )}
       {(ready.prompt?.offer || []).length > 0 && (
         <div className="fastwrap ui-overlay">
           {(ready.prompt?.offer || []).map((k, i) => (

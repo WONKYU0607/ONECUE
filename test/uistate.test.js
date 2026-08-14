@@ -207,3 +207,26 @@ console.log('결과 요약 — 결과 창이 쓸 값');
 }
 
 console.log('uistate.test.js 통과');
+
+console.log('수락되면 가운데 알림이 뜬다');
+{
+  // [stated] "상대방이 2배속 신청을 수락하셨습니다" 같은 문구를 화면 가운데에
+  for (const [melee, nm] of [[false, '총격'], [true, '칼전']]){
+    const s = newState(2, melee);
+    let q = IN(2); q[0].bareReq = 1; step(s, q);
+    q = IN(2); q[1].bareAns = 1; step(s, q);
+    const mine = P(s, 0).done, peer = P(s, 1).done;
+    assert(mine && peer, `  ${nm}: 양쪽 다 알림이 뜬다`);
+    assert(mine.mine === true, `  ${nm}: 신청한 쪽은 "내가 수락했다"가 아니다`);
+    assert(peer.mine === false, `  ${nm}: 받은 쪽은 "상대가 수락했다"`);
+    // 잠깐 뒤 사라진다
+    let t = 0;
+    while (s.negDone && t < 600){ step(s, IN(2)); t++; }
+    assert(t > 60 && t < 400, `  ${nm}: 몇 초 뒤 사라진다 (${(t / 60).toFixed(1)}초)`);
+  }
+  // 문구가 실제로 만들어지는가
+  for (const [kind, melee] of [['fast', false], ['bare', false], ['bare', true]])
+    assert(negText(kind, 'name', melee).length > 0, `  ${kind} 이름이 있다`);
+}
+
+console.log('uistate.test.js 통과');

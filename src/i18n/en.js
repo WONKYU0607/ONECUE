@@ -190,4 +190,9 @@ export default {
   'quit.appTitle': 'Exit the app?',
   'quit.appDesc': 'You will return to your home screen.',
   'ready.askTimeout': 'If you do not answer in {n}s, the match starts as normal.',
+  'ready.fastName': 'double speed',
+  'ready.bareName': 'the no-items match',
+  'ready.nobufName': 'the no-buffs match',
+  'ready.donePeer': 'Your opponent accepted {what}',
+  'ready.doneMine': 'You accepted {what}',
 };

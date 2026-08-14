@@ -192,6 +192,13 @@ font:900 19px/1 var(--gf);letter-spacing:3px;text-align:center;padding:0 4px}
 /* 신청 버튼. **폭·높이를 고정한다** — 문구 길이에 따라 늘어나면 두 줄로 접혀
    아래 버튼과 겹친다(영어는 한국어의 2.5배까지 길어진다).
    글자는 칸에 맞춰 자동으로 줄어든다 */
+/* [stated] 수락 알림. 화면 가운데에 잠깐 뜬다 */
+.negdone{position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);z-index:24;
+max-width:80vw;padding:10px 16px;box-sizing:border-box;text-align:center;
+background:rgba(18,18,28,.94);border:2px solid #6ee7a8;color:#bff3d6;
+font-family:var(--gf);font-weight:900;font-size:13px;letter-spacing:1px;
+pointer-events:none}
+
 /* 신청 버튼 묶음. **한 덩어리로 쌓는다** — 버튼마다 top 을 따로 주면
    화면 크기·문구 길이에 따라 간격이 어긋나 겹친다.
    [stated] 위쪽 구석 말고 **중앙선 바로 위**에 둔다 (거기가 잘 보인다) */

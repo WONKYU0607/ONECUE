@@ -20,12 +20,12 @@ console.log('서버가 AI 를 돌린다');
   assert(!/room\.addBots|server\.bots\s*=/.test(game), '클라는 봇을 만들지 않는다');
 }
 
-console.log('10초 안에 채운다');
+console.log('7초 안에 채운다');
 {
   const srv = fs.readFileSync('server/index.js', 'utf8');
   const m = srv.match(/const BOT_FILL_MS = (\d+);/);
   assert(m, '기다리는 시간이 있다');
-  assert(+m[1] <= 10000, `10초 이내 (${+m[1] / 1000}초)`);
+  assert(+m[1] <= 7000, `7초 이내 (${+m[1] / 1000}초)`);
   assert(/fillWithBots/.test(srv), '채우는 함수가 있다');
   assert(/setInterval\(\(\) => \{\s*for \(const key of \[\.\.\.waiting\.keys\(\)\]\) fillWithBots/.test(srv),
     '주기적으로 대기열을 훑는다');

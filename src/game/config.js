@@ -372,6 +372,8 @@ export const SELF = { melee: false, ffa: false, slot: 0, n: 2 };
 export const FAST_MUL = 2;            // 2배속 대결 배수
 // 신청은 10초 안에 답해야 한다. 안 그러면 저절로 사라지고 기본 모드로 진행.
 // (답을 기다리는 동안 카운트다운이 멈추므로 상한이 없으면 판이 영영 시작되지 않는다)
+// [stated] 수락 알림을 화면 가운데에 띄우는 시간
+export const NEG_SHOW = 150;   // 2.5초
 export const NEG_TICKS = 600;   // 10초
 // 클라 전용 입력 곡선에도 2배속을 반영하기 위한 표식 (게임 루프가 갱신)
 export const FAST = { on: false };

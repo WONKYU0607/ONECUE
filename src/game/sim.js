@@ -124,7 +124,8 @@ import {
   topSpan,
   botSpan,
   wallIdx
-} from './config.js';
+,
+  NEG_SHOW} from './config.js';
 
 // ================= SIM (pure, deterministic) =================
 export function newItems(){ return []; }
@@ -148,6 +149,7 @@ export function normalizeState(st){
   if (typeof st.bareBy !== 'number') st.bareBy = 0;
   for (const k of ['fastT', 'bareT']) if (typeof st[k] !== 'number') st[k] = 0;
   if (!Array.isArray(st.negOk)) st.negOk = [];
+  if (st.negDone === undefined) st.negDone = null;
   if (!Array.isArray(st.nick) || st.nick.length !== (st.n || 2))
     st.nick = Array.from({ length: st.n || 2 }, (_, i) => (st.nick && st.nick[i]) || '');
   if (!Array.isArray(st.dealt) || st.dealt.length !== (st.n || 2))
@@ -240,7 +242,8 @@ export function newState(n = 2, melee = false, ffa = false){
     bareBy: 0,                  // 신청한 사람 (슬롯+1, 0이면 없음)
     fastT: 0,                   // 신청 응답 제한 시간 (틱). 0이 되면 저절로 취소
     bareT: 0,
-    negOk: [],                  // 이번 신청에 수락한 슬롯들 (상대 팀 전원이 모여야 켜진다)
+    negOk: [],
+    negDone: null,              // 방금 수락된 신청 (가운데 알림용)
     lag: 0,                     // 지연 보상 틱 수. 서버가 매 프레임 넣어준다
     pastP: [],                  // 최근 위치 기록 [[x,y]x인원] x LAG_HIST. 명중을 되감아 판정한다
     // 슬롯별 이동 속도 배율. **AI 모드 전용**(단계가 오를수록 상대가 조금씩 빨라진다).
@@ -561,6 +564,10 @@ export function step(s, inp){
       // 끊긴 사람은 못 누르므로 답할 수 있는 사람만 센다
       const need = foesOf(by).filter(v => !s.off[v]);
       if (need.every(v => s.negOk.includes(v))){
+        // [stated] 수락되면 화면 가운데에 알림을 띄운다.
+        // **누가 신청했는지 남겨야** "상대가 수락했습니다"인지 가릴 수 있다
+        // (아래에서 fastBy·bareBy 를 지우므로 여기서 미리 담아둔다)
+        s.negDone = { kind: s.fastBy ? 'fast' : 'bare', by: (s.fastBy || s.bareBy) - 1, t: NEG_SHOW };
         if (s.fastBy) s.fast = true;
         // 칼전은 없앨 아이템이 없으므로 **버프를 끈다** (= 노버프전)
         else { s.bare = true; s.items = []; if (s.melee) s.noBuff = true; }
@@ -568,6 +575,8 @@ export function step(s, inp){
       }
     }
     // 제한 시간이 지나면 거절한 것으로 보고 창을 닫는다
+    // 수락 알림은 잠깐 떴다 사라진다
+    if (s.negDone && --s.negDone.t <= 0) s.negDone = null;
     if (s.fastBy && --s.fastT <= 0){ s.fastBy = 0; s.fastT = 0; s.negOk = []; }
     if (s.bareBy && --s.bareT <= 0){ s.bareBy = 0; s.bareT = 0; s.negOk = []; }
   }
@@ -1092,6 +1101,7 @@ export function checksum(s){
   for (const m of (s.spdMul || [])) h = (h*31 + Math.round(m*100)) | 0;
   for (const m of (s.coolMul || [])) h = (h*31 + Math.round(m*100)) | 0;
   for (const v of (s.dealt || [])) h = (h*31 + Math.round(v)) | 0;
+  h = (h*31 + (s.negDone ? s.negDone.t * 7 + s.negDone.by * 3 : 0)) | 0;
   h = (h*31 + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16 + (s.bare ? 32 : 0) + s.bareBy*64 + s.fastT*3 + s.bareT*5 + s.negOk.length*13) | 0;
   for (const c of (s.color || [])) h = (h*31 + c) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
