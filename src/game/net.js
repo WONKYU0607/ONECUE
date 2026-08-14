@@ -286,8 +286,37 @@ export class Server {
         if (a.sh) q.sh = 1;
         if (a.thr) q.thr = a.thr;
         if (a.place) q.place = a.place;
+        // ── 2배속·노템전 신청에 답한다 ──────────────────────
+        // **답을 안 하면 사람이 계속 기다린다.** 봇은 신청을 받고도 아무 반응이 없었다.
+        // 잠깐 생각하는 척 뜸을 들인 뒤 답한다 (즉답하면 사람이 아닌 티가 난다)
+        const by = this.s.fastBy || this.s.bareBy;
+        const left = this.s.fastBy ? this.s.fastT : this.s.bareT;
+        if (by && by !== b.slot + 1 && teamOf(b.slot, this.n) !== teamOf(by - 1, this.n)){
+          if (b.ansAt === undefined || b.ansFor !== by){
+            b.ansFor = by;
+            b.ansAt = left - 30 - Math.floor(Math.random() * 60);   // 0.5~1.5초 뒤
+            b.ansYes = Math.random() < 0.65;                        // 대체로 받아준다
+          }
+          if (left <= b.ansAt){
+            if (this.s.fastBy) q.fastAns = b.ansYes ? 1 : 2;
+            else q.bareAns = b.ansYes ? 1 : 2;
+          }
+        } else { b.ansFor = 0; b.ansAt = undefined; }
+
+        // ── 가끔 먼저 신청한다 ────────────────────────────────
+        if (!by && this.s.phase === PH_READY && b.reqAt === undefined)
+          b.reqAt = 120 + Math.floor(Math.random() * 240);          // 2~6초쯤
+        if (!by && this.s.phase === PH_READY && b.reqAt !== undefined && b.reqAt > 0){
+          b.reqAt--;
+          if (b.reqAt === 0 && Math.random() < 0.35){
+            if (!this.s.melee && Math.random() < 0.5) q.fastReq = 1;
+            else q.bareReq = 1;
+          }
+        }
+
         // **다 놓기 전에 준비를 누르면 빈손으로 시작한다.**
-        // 놓을 게 남아 있으면 기다렸다가, 없을 때만 준비 완료
+        // 놓을 게 남아 있으면 기다렸다가, 없을 때만 준비 완료.
+        // 신청에 답을 기다리는 동안에도 준비는 눌러둔다 (준비 시간은 멈춰 있다)
         if (!a.place){ q.ready = 1; q.go = 1; }
         inp[b.slot] = q;
       }
@@ -413,12 +442,9 @@ export class Client {
     this.stats.sendCalls++;
     if (this.nextInputTick < 0){ this.stats.blocked++; return; }
     const target = this.estServerTick(now) + this.delay;
-    // **너무 앞서 있으면 당겨온다.** 접속이 느리면 처음에 최대 지연(400ms)으로
-    // 잡히는데, nextInputTick 은 1틱씩만 나아가서 정상으로 돌아오는 데 3초 넘게 걸린다 —
-    // 그동안 조작이 늦게 먹어 "시작할 때 렉이 심하다"고 느껴진다.
-    // 뒤로 되돌리지는 않는다(이미 보낸 틱을 다시 보낼 수 없다)
-    const aheadNow = this.nextInputTick - 1 - target;
-    if (aheadNow > MIN_DELAY) this.nextInputTick -= Math.min(aheadNow - MIN_DELAY, 12);
+    // **여기서 nextInputTick 을 뒤로 당기면 안 된다.** 이미 보낸 틱 번호를
+    // 다시 보내게 되어 서버와 어긋난다 — 5초 전투에 데싱크가 29번 났다.
+    // 시작 렉은 매칭 중에 미리 RTT 를 재는 것으로 해결한다(startPing)
     let guard = 0;
     while (this.nextInputTick <= target && guard++ < 8){
       const t = this.nextInputTick++;

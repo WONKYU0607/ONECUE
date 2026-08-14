@@ -173,10 +173,11 @@ console.log('시작하자마자 렉이 걸리지 않는다');
   assert(/this\.rtt = \(net && net\.rtt > 0\)/.test(net), '게임이 시작될 때 그 값을 물려받는다');
   assert(/m\.t === 'p' && m\.pre/.test(srv), '서버가 자리에 앉기 전에도 답한다');
 
-  // ② 너무 앞서면 당겨온다
-  const send = net.slice(net.indexOf('sendInputs(now){'), net.indexOf('sendInputs(now){') + 900);
-  assert(/aheadNow/.test(send), '입력 틱이 너무 앞서면 당겨온다');
-  assert(/this\.nextInputTick -=/.test(send), '실제로 줄인다');
+  // ② **뒤로 당기면 안 된다.** 이미 보낸 틱 번호를 다시 보내게 되어 서버와 어긋난다
+  // (시작 렉을 줄이려다 넣었는데, 5초 전투에 데싱크가 29번 났다).
+  // 시작 렉은 ① 만으로 해결한다
+  const send = net.slice(net.indexOf('sendInputs(now){'), net.indexOf('sendInputs(now){') + 1200);
+  assert(!/this\.nextInputTick -=/.test(send), '입력 틱을 뒤로 당기지 않는다');
 }
 
 console.log('pace.test.js 통과');

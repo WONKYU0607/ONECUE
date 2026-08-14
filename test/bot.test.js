@@ -109,8 +109,9 @@ console.log('봇이 사람 색을 뺏지 않는다');
 {
   // 봇을 먼저 앉히므로, 사람이 고른 색을 미리 잡아두지 않으면 뺏긴다
   const srv = fs.readFileSync('server/index.js', 'utf8');
-  assert(/reserved/.test(srv), '사람이 고른 색을 잡아둔다');
   assert(/addBotsFirst\(picked\.length, picked\.map/.test(srv), '고른 색을 넘겨준다');
+  // 사람이 고를 색을 미리 자리에 적어둔다 (예약 목록만으로는 색이 모자랄 때 겹친다)
+  assert(/this\.seats\[i\]\.held = true/.test(srv), '사람 자리를 미리 잡아둔다');
 }
 
 console.log('실제 클라 흐름 — 모든 모드가 매칭을 끝낸다');
@@ -185,6 +186,70 @@ console.log('총격전 봇이 아이템을 놓는다');
   // 다 놓기 전에 준비하면 안 된다
   const net = fs.readFileSync('src/game/net.js', 'utf8');
   assert(/if \(!a\.place\)\{ q\.ready = 1/.test(net), '놓을 게 남았으면 준비하지 않는다');
+}
+
+console.log('봇이 신청에 답하고, 가끔 먼저 건다');
+{
+  // [stated] "AI 한테 노템전·노버프전·2배속 신청을 해도 회신을 못 받는다"
+  //          "AI 도 가끔은 나한테 신청을 해야 한다"
+  const { newState, step, NOIN } = await import('../src/game/sim.js');
+  const { SELF, teamOf, setArena } = await import('../src/game/config.js');
+  const IN = n => Array.from({ length: n }, () => ({ ...NOIN }));
+  SELF.slot = 0; SELF.n = 2; setArena(2, true);
+  let yes = 0, no = 0, none = 0;
+  for (let trial = 0; trial < 20; trial++){
+    const st = newState(2, true);
+    const b = { slot: 1 };
+    let q = IN(2); q[0].bareReq = 1; step(st, q);
+    let done = false;
+    for (let t = 0; t < 400 && !done; t++){
+      q = IN(2);
+      const by = st.fastBy || st.bareBy;
+      const left = st.fastBy ? st.fastT : st.bareT;
+      if (by && by !== b.slot + 1 && teamOf(b.slot, st.n) !== teamOf(by - 1, st.n)){
+        if (b.ansAt === undefined || b.ansFor !== by){
+          b.ansFor = by;
+          b.ansAt = left - 30 - Math.floor(Math.random() * 60);
+          b.ansYes = Math.random() < 0.65;
+        }
+        if (left <= b.ansAt) q[1].bareAns = b.ansYes ? 1 : 2;
+      } else { b.ansFor = 0; b.ansAt = undefined; }
+      q[0].ready = 1; q[0].go = 1;
+      step(st, q);
+      if (st.bare){ yes++; done = true; }
+      else if (!st.bareBy){ no++; done = true; }
+    }
+    if (!done) none++;
+  }
+  assert(none === 0, `20번 모두 답한다 (무응답 ${none})`);
+  assert(yes > 0 && no > 0, `수락도 거절도 나온다 (수락 ${yes} 거절 ${no})`);
+
+  // 서버 쪽에 실제로 그 코드가 있는가
+  const net = fs.readFileSync('src/game/net.js', 'utf8');
+  assert(/q\.fastAns = b\.ansYes/.test(net), '2배속 신청에 답한다');
+  assert(/q\.bareAns = b\.ansYes/.test(net), '노템전 신청에 답한다');
+  assert(/q\.fastReq = 1/.test(net) && /q\.bareReq = 1/.test(net), '봇도 먼저 신청한다');
+}
+
+console.log('색이 겹치지 않는다');
+{
+  // [stated] "2대2에서 색이 다 똑같이 나온다"
+  // 원인: 자리를 잡자마자 그 자리의 초기 색(=슬롯 번호)이 '이미 쓰는 색'으로 잡혀
+  // 엉뚱하게 밀렸다. 자기 자리는 빼고 봐야 한다
+  const srv = fs.readFileSync('server/index.js', 'utf8');
+  assert(/colorTaken\(c, except = -1\)/.test(srv), 'colorTaken 이 자기 자리를 뺄 수 있다');
+  assert(/freeColor\(except = -1\)/.test(srv), 'freeColor 도 마찬가지');
+  assert(/this\.freeColor\(i\)/.test(srv), '봇이 자기 자리를 빼고 고른다');
+  assert(/this\.colorTaken\(c, slot\)/.test(srv), '사람도 자기 자리를 빼고 본다');
+}
+
+console.log('입력 틱을 뒤로 당기지 않는다');
+{
+  // 시작 렉을 줄이려고 nextInputTick 을 당겼더니 **이미 보낸 틱을 다시 보내** 어긋났다.
+  // 5초 전투에 데싱크가 29번 났다
+  const net = fs.readFileSync('src/game/net.js', 'utf8');
+  const send = net.slice(net.indexOf('sendInputs(now){'), net.indexOf('sendInputs(now){') + 1200);
+  assert(!/this\.nextInputTick -=/.test(send), '뒤로 당기지 않는다');
 }
 
 console.log('bot.test.js 통과');

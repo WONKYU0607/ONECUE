@@ -96,11 +96,21 @@ class Room {
   // 이름을 사람과 같은 꼴(player##)로 지어 구분이 안 되게 한다
   // 사람이 앉을 자리(앞쪽 humans 개)만 비워두고 나머지를 봇으로 채운다
   addBotsFirst(humans, wants = []){
-    // **사람이 고른 색을 먼저 잡아둔다.** 봇이 먼저 앉으면 그 색을 가져가서
-    // 사람이 고른 색이 바뀐다
-    this.reserved = wants.filter(c => Number.isInteger(c) && c >= 0);
+    // **사람이 고를 색을 미리 그 자리에 적어둔다.** 예약 목록만 피하게 하면
+    // 색이 모자랄 때(6인전) 결국 겹친다 — 자리에 넣어두면 colorTaken 이 알아서 피한다
+    const st = this.server.s;
+    for (let i = 0; i < humans; i++){
+      const c = wants[i];
+      if (Number.isInteger(c) && c >= 0 && !this.colorTaken(c)){
+        this.seats[i].sid = this.seats[i].sid || 'hold:' + i;   // 자리를 잠깐 잡아둔다
+        st.color[i] = c;
+        this.seats[i].held = true;
+      }
+    }
     for (let i = humans; i < this.n; i++) this.seatBot(i);
-    this.reserved = [];
+    // 잡아둔 자리를 되돌린다 (사람이 곧 진짜로 앉는다)
+    for (let i = 0; i < humans; i++)
+      if (this.seats[i].held){ this.seats[i].sid = null; this.seats[i].held = false; }
   }
   addBots(){
     const st = this.server.s;
@@ -124,11 +134,9 @@ class Room {
     if (!Array.isArray(st.nick)) st.nick = new Array(this.n).fill('');
     st.nick[i] = 'player' + (10 + Math.floor(Math.random() * 89));
     if (st.color){
-      let c = this.freeColor();
-      // 사람이 찜한 색은 피한다
-      for (let k = 0; k < COLOR_COUNT && (this.reserved || []).includes(c); k++)
-        c = (c + 1) % COLOR_COUNT;
-      st.color[i] = c;
+      // **자기 자리는 빼고 본다.** 자리를 잡자마자 그 자리의 초기 색(=슬롯 번호)이
+      // '이미 쓰는 색'으로 잡혀 엉뚱하게 밀린다
+      st.color[i] = this.freeColor(i);
     }
     setOff(st, i, false);
     // 단계는 전투가 시작될 때 사람 점수에 맞춰 정한다. 그전엔 중간값
@@ -210,9 +218,12 @@ class Room {
     return false;
   }
 
-  colorTaken(c){ return this.seats.some((st, i) => st.sid && this.server.s.color[i] === c); }
-  freeColor(){
-    for (let c = 0; c < COLOR_COUNT; c++) if (!this.colorTaken(c)) return c;
+  // except: 그 자리는 빼고 본다. **자기 자리에 미리 적어둔 색은 '남이 쓰는 색'이 아니다**
+  colorTaken(c, except = -1){
+    return this.seats.some((st, i) => i !== except && st.sid && this.server.s.color[i] === c);
+  }
+  freeColor(except = -1){
+    for (let c = 0; c < COLOR_COUNT; c++) if (!this.colorTaken(c, except)) return c;
     return 0;
   }
   teamCounts(){
@@ -267,7 +278,7 @@ class Room {
       const c = Number.isInteger(wantColor) && wantColor >= 0 && wantColor < COLOR_COUNT ? wantColor : -1;
       const teamMode = this.n > 2 && !this.ffa;
       this.server.s.color[slot] = c < 0 ? this.freeColor()
-        : (teamMode && this.colorTaken(c)) ? this.freeColor() : c;
+        : (teamMode && this.colorTaken(c, slot)) ? this.freeColor() : c;
     }
     this.pending.delete(sid);                 // 자리를 받았으니 대기 기록은 필요 없다
     setOff(this.server.s, slot, false);       // 돌아왔으면 표시를 지운다
