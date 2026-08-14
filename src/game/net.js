@@ -286,7 +286,9 @@ export class Server {
         if (a.sh) q.sh = 1;
         if (a.thr) q.thr = a.thr;
         if (a.place) q.place = a.place;
-        q.ready = 1; q.go = 1;                 // 봇은 언제나 준비 완료
+        // **다 놓기 전에 준비를 누르면 빈손으로 시작한다.**
+        // 놓을 게 남아 있으면 기다렸다가, 없을 때만 준비 완료
+        if (!a.place){ q.ready = 1; q.go = 1; }
         inp[b.slot] = q;
       }
       this.inbox.delete(t);

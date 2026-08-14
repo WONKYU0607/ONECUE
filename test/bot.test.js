@@ -113,4 +113,78 @@ console.log('봇이 사람 색을 뺏지 않는다');
   assert(/addBotsFirst\(picked\.length, picked\.map/.test(srv), '고른 색을 넘겨준다');
 }
 
+console.log('실제 클라 흐름 — 모든 모드가 매칭을 끝낸다');
+{
+  // [stated] "상대를 전혀 못 찾는다"
+  // 원인: 서버가 `모든 자리에 소켓이 있을 때만` go 를 보냈다.
+  // **봇은 소켓이 없어서** 그 조건이 영원히 안 맞았다.
+  //
+  // **hello 만 보면 안 된다.** 클라는 go 를 받아야 매칭 화면을 벗어난다 —
+  // 생 소켓으로 hello 만 확인하다가 이 버그를 두 번 놓쳤다
+  const PORT = 8283;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const wsPkg = await import('../server/node_modules/ws/index.js');
+  const { WebSocket } = wsPkg.default || wsPkg;
+  const proc = spawn(process.execPath, ['server/index.js'],
+    { env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'ignore', 'inherit'] });
+  try {
+    await sleep(900);
+    for (const [n, melee, ffa, nm] of [[2, 0, 0, '1대1'], [4, 0, 0, '2대2'],
+                                       [6, 1, 0, '3대3 칼전'], [4, 1, 1, '개인전']]){
+      const url = `ws://127.0.0.1:${PORT}?sid=t${n}${melee}${ffa}&mode=queue&n=${n}` +
+                  (melee ? '&melee=1' : '') + (ffa ? '&ffa=1' : '') + '&color=2&nick=원구';
+      const ws = new WebSocket(url);
+      const seen = { hello: false, go: false, lobby: false };
+      ws.on('message', d => {
+        let m; try { m = JSON.parse(d); } catch { return; }
+        if (m.t === 'hello') seen.hello = true;
+        if (m.t === 'go') seen.go = true;
+        if (m.t === 'lobby') seen.lobby = true;
+      });
+      ws.on('error', () => { /* 무시 */ });
+      await new Promise(r => ws.on('open', r));
+      for (let i = 0; i < 30 && !seen.go; i++) await sleep(500);
+      assert(seen.hello, `  ${nm}: 방을 받는다`);
+      assert(seen.go, `  ${nm}: go 까지 와서 매칭이 끝난다`);
+      assert(!seen.lobby, `  ${nm}: 팀 고르기 화면이 안 뜬다`);
+      try { ws.close(); } catch { /* 무시 */ }
+      await sleep(500);
+    }
+  } finally { await new Promise(r => setTimeout(r, 150)); proc.kill(); }
+}
+
+console.log('총격전 봇이 아이템을 놓는다');
+{
+  // 봇이 벽·드럼통을 하나도 안 놓고 빈손으로 싸우고 있었다.
+  // ready 를 매 틱 보내서 **다 놓기 전에 준비가 끝나던** 것도 원인이었다
+  const { newState, step, NOIN } = await import('../src/game/sim.js');
+  const { createAI } = await import('../src/game/ai.js');
+  const { SELF, PH_READY, coverUsed, coverBudget, itemQuota, ITEM } =
+    await import('../src/game/config.js');
+  const IN = n => Array.from({ length: n }, () => ({ ...NOIN }));
+  for (const n of [2, 4, 6]){
+    SELF.slot = 0; SELF.n = n;
+    const st = newState(n, false);
+    const ais = Array.from({ length: n }, () => createAI(5));
+    for (let t = 0; t < 900; t++){
+      const q = IN(n);
+      for (let i = 1; i < n; i++){
+        const a = ais[i].think(st, i, 1 / 60, t * 1000 / 60);
+        if (a.place) q[i].place = a.place; else { q[i].ready = 1; q[i].go = 1; }
+      }
+      q[0].ready = 1; q[0].go = 1;
+      step(st, q);
+      if (st.phase !== PH_READY) break;
+    }
+    const cover = coverUsed(st.items, 1);
+    const drums = st.items.filter(it => it.by === 1 && it.k === ITEM.DRUM).length;
+    assert(cover === coverBudget(), `  ${n}인: 엄폐물을 다 쓴다 (${cover}/${coverBudget()})`);
+    assert(drums === itemQuota(ITEM.DRUM), `  ${n}인: 드럼통을 다 쓴다 (${drums}/${itemQuota(ITEM.DRUM)})`);
+    assert(st.phase !== PH_READY, `  ${n}인: 배치가 끝나 전투로 넘어간다`);
+  }
+  // 다 놓기 전에 준비하면 안 된다
+  const net = fs.readFileSync('src/game/net.js', 'utf8');
+  assert(/if \(!a\.place\)\{ q\.ready = 1/.test(net), '놓을 게 남았으면 준비하지 않는다');
+}
+
 console.log('bot.test.js 통과');

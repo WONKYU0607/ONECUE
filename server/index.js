@@ -278,7 +278,9 @@ class Room {
     // 방은 이미 돌고 있으므로 현재 상태를 먼저 보내 시작점을 맞춘다
     this.snapshotTo(slot);
     if (reconnected) this.send({ t: 'peer', slot, state: 'back' });
-    else if (this.seats.every(x => x.ws)) this.send({ t: 'go' });
+    // **봇 자리는 소켓이 없다.** `x.ws` 만 보면 봇이 낀 방은 영원히 안 차서
+    // 클라가 매칭 화면에서 멈춘다 ("상대를 전혀 못 찾는다")
+    else if (this.seats.every(x => x.ws || x.bot)) this.send({ t: 'go' });
     else this.sendLobby();
     return slot;
   }

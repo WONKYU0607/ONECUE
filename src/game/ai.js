@@ -1,7 +1,9 @@
 import {
   FP, WALL_L, WALL_R, wallIdx, PH_PLAY, THROW,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CW, GRID_CH, GRID_X0, GRID_Y0,
-  ATK_TICKS, ATK_HIT, FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX, PHf, PWf, MAXHP, BUFF, PORTAL_N} from './config.js';
+  ATK_TICKS, ATK_HIT, FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX, PHf, PWf, MAXHP, BUFF, PORTAL_N,
+  ITEM, ITEM_DEF, isCover, coverBudget, itemQuota, PH_READY, coverUsed} from './config.js';
+import { canPlace } from './sim.js';
 
 // 노릴 상대. 2대2에서는 살아 있는 적 중 가로로 가장 가까운 쪽을 본다.
 // (1대1이면 결과가 예전과 같은 그 한 명)
@@ -62,6 +64,54 @@ const HALF = 7 * FP;        // 캐릭터 가로 절반
 const MID  = 8 * FP;        // 세로 중앙 오프셋
 
 // 결정론이 필요 없는 로컬 전용이라 Math.random을 써도 된다 (서버는 관여하지 않음)
+// 봇이 놓을 자리를 하나 고른다. 한 틱에 하나씩 놓는다.
+// 엄폐물은 내 진영에, 드럼통은 상대 진영에 놓는다
+function planPlace(s, me, p){
+  const team = teamOf(me, s.n);
+  const used = k => (s.items || []).filter(it => it.by === team && it.k === k).length;
+  // **시뮬과 같은 방식으로 센다.** 시뮬은 칸 수가 아니라 **개수**로 센다 —
+  // 칸 수로 세면 남은 양을 잘못 계산해 예산을 못 쓰거나 넘긴다
+  const usedCover = coverUsed(s.items, team);
+  // 남은 게 있는 종류를 고른다.
+  // **예산에 딱 맞는 크기를 골라야** 남은 칸을 다 쓴다 (2칸 남았는데 1칸만 놓고 끝나면 손해)
+  // **놓을 자리가 있는 크기만 고른다.** 예산이 2칸이면 2·3칸짜리는 자리가 아예 없다
+  const left = coverBudget() - usedCover;
+  // 엄폐물이 남았으면 큰 것부터 시도한다 (개수 한도 안에서 넓게 막는 게 유리)
+  const cands = [];
+  if (left > 0)
+    for (const k of [ITEM.WALL3, ITEM.BARR3, ITEM.WALL2, ITEM.BARR2, ITEM.WALL, ITEM.BARR])
+      if (used(k) < itemQuota(k)) cands.push(k);
+  if (used(ITEM.DRUM) < itemQuota(ITEM.DRUM)) cands.push(ITEM.DRUM);
+  if (!cands.length) return null;
+  // **단계가 높을수록 잘 놓는다.** 모두가 똑같이 놓으면 배치가 실력 차이를 못 만든다.
+  //  - 엄폐물: 잘하면 중앙선 가까이(빨리 숨을 수 있다), 못하면 뒤쪽에 아무렇게나
+  //  - 드럼통: 잘하면 상대가 다니는 가운데 줄에, 못하면 구석에
+  const skill = p.aim || 0;
+  for (const want of cands){
+    const def = ITEM_DEF[want];
+    const mineSide = !!def.mine;
+    let best = null, bestW = -1e9;
+    for (let tryN = 0; tryN < 60; tryN++){
+      const c = Math.floor(Math.random() * GRID_COLS);
+      const depth = 1 + Math.floor(Math.random() * 5);
+      const r = mineSide
+        ? (team === 0 ? GRID_MIDROW + depth : GRID_MIDROW - depth)
+        : (team === 0 ? GRID_MIDROW - depth : GRID_MIDROW + depth);
+      if (!canPlace(s, me, want, c, r)) continue;
+      // 점수: 잘할수록 좋은 자리를 고른다. 못하면 아무 데나(먼저 찾은 것)
+      const mid = (GRID_COLS - 1) / 2;
+      const w = mineSide
+        ? -depth * 2 - Math.abs(c - mid) * 0.5        // 중앙선 가깝고 가운데
+        : -Math.abs(c - mid) * 2 - Math.abs(depth - 3);  // 상대가 다니는 가운데 줄
+      const score = w * skill + Math.random() * (1 - skill) * 10;
+      if (score > bestW){ bestW = score; best = { k: want, c, r }; }
+      if (skill < 0.2) break;                          // 낮은 단계는 첫 자리에 그냥 놓는다
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
 export function createAI(stage = 1){
   const p = AI_STAGES[Math.max(0, Math.min(AI_STAGES.length - 1, stage - 1))];
   let targetX = null, nextPlan = 0;
@@ -153,6 +203,13 @@ export function createAI(stage = 1){
     stage: p,
     // s: 현재 상태, me: AI 슬롯, dt: 초, now: ms
     think(s, me, dt, now){
+      // ── 배치 단계: 아이템을 놓는다 ──────────────────────────
+      // **없으면 빈손으로 싸운다.** 봇이 벽·드럼통을 하나도 안 놓고 있었다
+      if (s.phase === PH_READY && !s.melee && !s.bare){
+        targetX = null; aimKind = -1;
+        const pl = planPlace(s, me, p);
+        return pl ? { vx: 0, vy: 0, place: pl } : { vx: 0, vy: 0 };
+      }
       if (s.phase !== PH_PLAY){ targetX = null; aimKind = -1; return { vx: 0, vy: 0 }; }
       const my = s.p[me], foe = foeOf(s, me);
       if (!foe) return { vx: 0, vy: 0 };
