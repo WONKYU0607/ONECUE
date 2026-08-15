@@ -340,9 +340,24 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .pick-title{display:block;margin:6px 0 4px;font-family:var(--gf);font-weight:900;
   font-size:12px;letter-spacing:2px;color:#9fb0cc;text-align:center}
 .pick-row{display:flex;gap:6px;width:100%}
-.pick-row .menu-btn{flex:1 1 0;min-width:0}
-.pick-row .menu-btn .t{font-size:13px}
+/* [stated] PVP 진입 화면의 칸이 너무 크다 → 훨씬 작게.
+   **높이를 키운 건 글씨가 접힌 줄 수였다.** 칸 폭 108px 중 62px을
+   틀(17x2)과 여백(14x2)이 먹어 "1 vs 1"이 세 줄로, 4개짜리 칼전 줄에서는
+   "개인전"이 한 글자씩 세로로 쌓였다. 틀·여백을 줄여 한 줄에 들어가게 한다.
+   **아래 '방 만들기/코드 입력' 줄도 `.pick-row` 라서 같이 얇아진다** (58 → 44px) */
+.pick-row .menu-btn{flex:1 1 0;min-width:0;
+  min-height:34px;padding:2px 3px;border-width:9px 10px}
+.pick-row .menu-btn .t{font-size:12px;letter-spacing:.5px;white-space:nowrap}
+.pick-row .menu-btn .tkn{font-size:11px;margin-top:1px}
+.pick-row .menu-btn .tkn .tk-ico{flex:0 0 15px;height:10px}
 .sub-row{margin-top:10px}
+/* 방 만들기를 펼쳤을 때 아래로 자라는 칸들. 윗줄과 붙여 한 덩어리로 보이게 한다.
+   `.mk-half` 를 겹쳐 **방 만들기 칸과 정확히 같은 폭**(줄의 절반)을 만들고
+   그 안을 다시 반으로 갈라 총격전·칼전을 놓는다. 한 줄에 셋을 늘어놓으면
+   3등분이 되어 방 만들기 밑에 안 맞는다 */
+.mk-group{margin-top:6px}
+.mk-head .mk-half{flex:1 1 0;min-width:0;display:flex;gap:6px}
+.mk-row{margin-top:6px}
 .menu-btn.small{padding:6px 8px}
 .menu-btn.small .t{font-size:12px}
 

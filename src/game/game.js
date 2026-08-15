@@ -1,6 +1,7 @@
 import {
   FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH, setArena,
-  stepCap, bulletFP, coolTicks, clampi, BUFF, BUFF_DEF, FAST_MUL} from './config.js';
+  stepCap, bulletFP, coolTicks, clampi, BUFF, BUFF_DEF, FAST_MUL, assignColors,
+} from './config.js';
 import { Loopback, Server, Client } from './net.js';
 import { createRenderer } from './render.js';
 import { attachInput } from './input.js';
@@ -8,6 +9,7 @@ import { createAI, AI_STAGES } from './ai.js';
 import { createJuice } from './juice.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { canPlace, canThrow, allPlaced, myItemAt, newState } from './sim.js';
+import { getColor } from '../state/profile.js';
 import {
   FAST, BARE, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, teamOf, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
   ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed,
@@ -71,6 +73,17 @@ export function createGame(canvas, opts = {}){
     client.s = newState(n0, isMelee, isFfa); client.pred = newState(n0, isMelee, isFfa);
   }
   setArena(n0, isMelee, isFfa);
+  // [stated] 프로필에서 고른 색으로 앞으로 계속 플레이한다.
+  // 온라인은 접속 URL로 서버에 보내 서버가 정하지만, **AI·연습은 서버가 없어서**
+  // `color[i]=i` 기본값 그대로였다 — 무슨 색을 골라도 내 캐릭터는 늘 파랑이었다.
+  // 서버 상태와 클라 상태 둘 다에 넣는다 (색은 체크섬에 들어간다)
+  if (!online){
+    const cols = assignColors(nLocal, SELF.slot, getColor());
+    if (server) server.s.color = cols.slice();
+    client.s.color = cols.slice();
+    client.pred.color = cols.slice();
+  }
+
   const practice = !online && session.kind === 'practice';
   if (practice){
     // 상대도 총알도 승패도 없다. 이동·배치·투척만 자유롭게 해보는 모드

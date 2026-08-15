@@ -22,6 +22,7 @@ export default {
   'mode.2v2': '2대2',
   'mode.3v3': '3대3',
   'mode.ffa': '개인전',
+  'mode.team': '팀전',
   'mode.ai': 'AI 모드',
   'mode.practice': '연습 모드',
   'mode.pvp': 'PVP',

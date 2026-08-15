@@ -70,6 +70,24 @@ try {
     const tc = sn?.st?.color?.slice(0,4);
     assert(tc && new Set(tc).size === 4, `팀전은 전부 다른 색 (${tc})`);
   }
+  all.forEach(t=>t.ws.close()); all.length = 0;
+  await sleep(300);
+
+  // **팀전에서도 보라·검정을 고를 수 있어야 한다.**
+  // 서버 팀 선택 경로에 `color > 3` 이 남아 있어 4·5번이 통째로 버려졌다.
+  // 위 검사는 넷 다 같은 색을 골라서, 서버가 전부 갈아치워도 통과했다 —
+  // **겹치지 않는 색을 저마다 고르게 해야 갈아치운 게 드러난다**
+  {
+    const want = [5, 4, 0, 1];
+    const ts = [0,1,2,3].map(i => conn('v'+i, { n:4 }));
+    await sleep(1300);
+    ts.forEach((c, i) => c.ws.send(JSON.stringify({ t: 'team', team: i < 2 ? 0 : 1, color: want[i] })));
+    await sleep(1500);
+    const sn = [...ts[0].msgs].reverse().find(m => m.t === 's');
+    const tc = sn?.st?.color?.slice(0,4);
+    assert(tc && tc.join() === want.join(),
+      `팀전에서도 고른 색 그대로 — 보라·검정 포함 (원한 ${want} / 받은 ${tc})`);
+  }
 
 console.log('화면에 쓸 색 — 겹치면 각자 다르게 보인다');
 {
@@ -87,6 +105,25 @@ console.log('화면에 쓸 색 — 겹치면 각자 다르게 보인다');
     const v = viewColors(Array(6).fill(5), 6, self, false);
     assert(v[self] === 5, `  슬롯${self}: 자기는 고른 색`);
     assert(new Set(v).size === 6, `  슬롯${self}: 여섯이 전부 다른 색 (${v})`);
+  }
+
+  // [stated] 프로필에서 고른 색으로 **항상** 들어간다 — 서버가 없는 AI·연습 판에도.
+  // 예전엔 color[i]=i 기본값 그대로라 무슨 색을 골라도 내 캐릭터가 늘 파랑이었다
+  {
+    const { assignColors } = await import('../src/game/config.js');
+    for (const n of [2, 4, 6]){
+      for (const slot of [0, 1, n - 1]){
+        for (const c of [0, 3, 5]){
+          const v = assignColors(n, slot, c);
+          assert(v[slot] === c, `  ${n}인 슬롯${slot}: 고른 색 ${c} 그대로 (${v})`);
+          assert(new Set(v).size === n, `  ${n}인 슬롯${slot}: 아무도 안 겹친다 (${v})`);
+        }
+      }
+    }
+    // 색이 이상하면 기본 배치로 돌아간다 (죽지 않는다)
+    for (const bad of [undefined, -1, 99, 1.5, '2'])
+      assert(assignColors(4, 0, bad).join() === '0,1,2,3', `이상한 색은 무시 (${bad})`);
+    assert(assignColors(2, 5, 3).join() === '0,1', '슬롯이 인원 밖이면 그대로');
   }
 
   // 겹치지 않으면 손대지 않는다

@@ -532,7 +532,9 @@ wss.on('connection', (ws, req) => {
         if (seat < 0){ ws.send(JSON.stringify({ t: 'teamfull', team })); return; }
         // 색은 겹치면 안 된다. 원하는 색이 이미 쓰이면 남은 색을 준다
         let color = Number.isInteger(m.color) ? m.color : room.freeColor();
-        if (color < 0 || color > 3 || room.colorTaken(color)){
+        // **`> 3` 으로 박아두면 보라·검정이 통째로 무시된다.** 접속 경로는 고쳤는데
+        // 팀 선택 경로에 같은 코드가 하나 더 남아 있었다 (색은 6개다)
+        if (color < 0 || color >= COLOR_COUNT || room.colorTaken(color)){
           if (Number.isInteger(m.color)) ws.send(JSON.stringify({ t: 'colortaken', color: m.color }));
           color = room.freeColor();
         }

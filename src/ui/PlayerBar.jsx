@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import TierIcon from './TierIcon.jsx';
 import ProfileTab from './ProfileTab.jsx';
-import { getNick } from '../state/profile.js';
+import { getNick, avatarPos } from '../state/profile.js';
 import { scoreOf, ticketsLeft, ffaLeft, nextTicketIn, fmtLeft } from '../state/tickets.js';
 import { fitBar } from '../state/homeLayout.js';
 import { getSettings, setSetting } from '../state/settings.js';
@@ -31,7 +31,7 @@ export default function PlayerBar({ onHelp, onSettings }){
     <>
       <div className="pbar">
         <button className="pcell prof-btn" onClick={() => setProf(true)} aria-label={t('home.profile')}>
-          <span className="prof-av" />
+          <span className="prof-av" style={{ backgroundPositionX: avatarPos() }} />
           <span className="prof-name">{getNick()}</span>
         </button>
 

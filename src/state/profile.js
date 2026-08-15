@@ -47,7 +47,13 @@ export const getNick = () => cur.nick;
 
 // [stated] 색을 프로필에 저장해 **항상 그 색으로** 들어간다.
 // 판마다 고르지 않아도 되게 하려는 것
-export const getColor = () => cur.color;
+export const getColor = () => okColor(cur.color);
+
+// 프로필 사진의 시트 위치. **두 곳(상단바·프로필 탭)이 각자 계산하면 어긋난다.**
+// 시트는 24칸 = 6색 x (앞·뒤) + 피격 12칸이라 색 c 의 앞모습은 `c*2` 번 칸이다.
+// 예전엔 `c*4` 로 세어 3·4번 색이 **피격 칸(하얗게 번쩍이는 그림)** 을 가리켰다
+export const AV_FRAMES = 24;
+export const avatarPos = (c = cur.color) => `${okColor(c) * 2 * (100 / (AV_FRAMES - 1))}%`;
 export function setColor(c){
   cur = { ...cur, color: okColor(c) };
   try { localStorage.setItem(KEY, JSON.stringify(cur)); } catch { /* 무시 */ }
@@ -70,7 +76,9 @@ export function setNick(v){
 export const nickSnapshot = () => ({ nick: cur.nick, color: cur.color });
 export function hydrateNick(v){
   if (v && typeof v.nick === 'string' && v.nick.trim()){
-    cur = { nick: clampNick(v.nick) };
+    // **색을 같이 챙긴다.** 예전엔 nick 만 담아서, 구름에서 받아오는 순간
+    // 골라둔 색이 통째로 사라지고 getColor() 가 undefined 가 됐다
+    cur = { nick: clampNick(v.nick), color: okColor(v.color != null ? v.color : cur.color) };
     try { localStorage.setItem(KEY, JSON.stringify(cur)); } catch { /* 무시 */ }
     return true;
   }

@@ -22,6 +22,7 @@ export default {
   'mode.2v2': '2v2',
   'mode.3v3': '3v3',
   'mode.ffa': 'Free-for-all',
+  'mode.team': 'Team',
   'mode.ai': 'AI Mode',
   'mode.practice': 'Practice',
   'mode.pvp': 'PVP',

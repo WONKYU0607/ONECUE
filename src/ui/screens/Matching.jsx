@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { connectAndWait, disconnect, serverUrl, pickTeam } from '../../net/connection.js';
-import { TEAMS } from '../../game/config.js';
+import { getColor } from '../../state/profile.js';
 import { spendFor } from '../../state/tickets.js';
 import { t } from '../../i18n/index.js';
 
@@ -23,7 +23,6 @@ export default function Matching({ session, onCancel, onMatched }){
   const [code, setCode] = useState('');
   const [err, setErr] = useState('');
   const [lobby, setLobby] = useState(null);
-  const [color, setColor] = useState(0);
   const [sec, setSec] = useState(0);
   const alive = useRef(true);
 
@@ -80,21 +79,9 @@ export default function Matching({ session, onCancel, onMatched }){
 
       {lobby && stage === 'team' && (
         <>
-          <p className="hint">{t('pvp.color')}</p>
-          <div className="colorpick">
-            {[0, 1, 2, 3, 4, 5].map(c => {
-              const taken = (lobby.taken || []).includes(c) && lobby.myColor !== c;
-              const on = lobby.myColor != null ? lobby.myColor === c : color === c;
-              return (
-                <button key={c}
-                  className={'swatch' + (on ? ' on' : '') + (taken ? ' off' : '')}
-                  disabled={taken || lobby.myColor != null}
-                  style={{ background: TEAMS[c].m }}
-                  onClick={() => setColor(c)}
-                  aria-label={t('pvp.colorN', { n: c + 1 })} />
-              );
-            })}
-          </div>
+          {/* [stated] 색은 **프로필에서 한 번 고른 걸 계속 쓴다.**
+              여기서 또 고르게 하면 프로필 색이 무시된다(기본값이 0번 파랑이었다).
+              팀전은 팀원을 알아봐야 해서 겹치면 서버가 선착순으로 갈라 준다 */}
           <div className="teampick">
             {/* **변수 이름을 t 로 쓰면 안 된다.** 번역 함수 t 가 가려져
                 안에서 번역 함수를 부를 때 숫자를 함수로 호출하게 된다
@@ -108,7 +95,7 @@ export default function Matching({ session, onCancel, onMatched }){
                 <button key={tm}
                   className={'menu-btn teambtn' + (mine ? ' primary' : '') + (full && !mine ? ' off' : '')}
                   disabled={(full && !mine) || lobby.mine != null}
-                  onClick={() => pickTeam(tm, color)}>
+                  onClick={() => pickTeam(tm, getColor())}>
                   <span className="t">{tm === 0 ? t('match.teamA') : t('match.teamB')}</span>
                 </button>
               );

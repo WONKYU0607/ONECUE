@@ -227,6 +227,20 @@ export function viewColors(colors, n, self, teamMode){
   }
   return out;
 }
+// [stated] 프로필에서 고른 색으로 **항상** 들어간다 — 서버가 없는 판(AI·연습)에도.
+// 기본 배치는 `색 = 슬롯 번호`라서, 내 자리에 고른 색을 넣고 그 색을 쓰던 자리와
+// **맞바꾼다.** 맞바꾸면 겹칠 일이 없다(어느 색도 한 번씩만 쓰인다)
+export function assignColors(n, slot, c){
+  const out = Array.from({ length: n }, (_, i) => i);
+  if (!Number.isInteger(c) || c < 0 || c >= COLOR_COUNT) return out;
+  if (!(slot >= 0 && slot < n)) return out;
+  const prev = out[slot];
+  out[slot] = c;
+  const clash = out.findIndex((v, i) => i !== slot && v === c);
+  if (clash >= 0) out[clash] = prev;
+  return out;
+}
+
 export const TEAM_OF = [0, 1, 2, 3, 4, 5];     // 플레이어 슬롯 -> 컬러 (1대1 호환)
 // 2대2에서는 슬롯 0·1이 아래 팀, 2·3이 위 팀. 1대1은 0이 아래, 1이 위
 // **개인전(ffa)이면 각자가 자기 팀이다.** 팀 판정이 45곳에 흩어져 있어서
@@ -382,7 +396,7 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 61;
+export const PROTO_VER = 62;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

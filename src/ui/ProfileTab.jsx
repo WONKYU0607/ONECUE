@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getNick, setNick, clampNick, NICK_MAX, NICK_MAX_KO, getColor, setColor } from '../state/profile.js';
+import { getNick, setNick, clampNick, NICK_MAX, NICK_MAX_KO, getColor, setColor, avatarPos } from '../state/profile.js';
 import { scoreOf } from '../state/tickets.js';
 import { tierOf, tierName } from '../state/rank.js';
 import TierIcon from './TierIcon.jsx';
@@ -22,9 +22,8 @@ export default function ProfileTab({ onClose }){
 
         {/* 칸으로 묶어 가운데 정렬. 티켓은 상단바에 이미 있어 여기서는 뺐다 */}
         <div className="prof-head prof-card">
-          {/* [stated] 프로필 사진도 고른 색으로 바뀐다.
-              캐릭터 시트는 24칸(6색 x 앞뒤 + 피격) — 색마다 4칸씩 건너뛴다 */}
-          <span className="prof-av" style={{ backgroundPositionX: `${color * 4 * (100 / 23)}%` }} />
+          {/* [stated] 프로필 사진도 고른 색으로 바뀐다. 자리 계산은 profile.js 한 곳에 */}
+          <span className="prof-av" style={{ backgroundPositionX: avatarPos(color) }} />
           {edit ? (
             <div className="prof-edit-row">
               <input className="code-input nick-input" value={draft}
@@ -62,8 +61,10 @@ export default function ProfileTab({ onClose }){
           ))}
         </div>
 
+        {/* [stated] "색 고르고 **확인** 누르면" — 고르는 순간 이미 저장되고 사진도 바뀐다.
+            누르는 즉시 반영해야 고른 게 맞는지 눈으로 보고 닫을 수 있다 */}
         <div className="prof-foot">
-          <button className="menu-btn" onClick={onClose}><span className="t">{t('common.close')}</span></button>
+          <button className="menu-btn" onClick={onClose}><span className="t">{t('common.ok')}</span></button>
         </div>
       </div>
     </div>

@@ -140,7 +140,9 @@ export function normalizeState(st){
   if (!Array.isArray(st.covers)) st.covers = [];
   if (!Array.isArray(st.ready)) st.ready = Array(st.n || 2).fill(false);
   if (!Array.isArray(st.done)) st.done = Array(st.n || 2).fill(false);
-  if (!Array.isArray(st.color)) st.color = [0, 1, 2, 3].slice(0, st.p ? st.p.length : 2);
+  // **인원수를 박아 넣으면 안 된다.** [0,1,2,3] 고정이라 3대3·개인전 6인에서
+  // 슬롯 4·5 의 색이 undefined 로 남았다
+  if (!Array.isArray(st.color)) st.color = Array.from({ length: (st.p ? st.p.length : (st.n || 2)) }, (_, i) => i);
   if (typeof st.solo !== 'boolean') st.solo = false;
   if (typeof st.fast !== 'boolean') st.fast = false;
   if (typeof st.fastBy !== 'number') st.fastBy = 0;
@@ -234,7 +236,7 @@ export function newState(n = 2, melee = false, ffa = false){
     ammo: players.map(() => THROW_DEF.map(d => d.count)),
     done: Array(n).fill(false),      // 아이템 배치를 끝냈는가 (설치 완료)
     ready: Array(n).fill(false),     // 준비완료까지 눌렀는가 — 전원이 눌러야 시작
-    color: Array.from({ length: n }, (_, i) => i),   // 슬롯별 캐릭터 색 (0~3)
+    color: Array.from({ length: n }, (_, i) => i),   // 슬롯별 캐릭터 색 (0 ~ COLOR_COUNT-1)
     solo: false,
     fast: false,
     fastBy: 0,
