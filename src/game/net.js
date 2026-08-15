@@ -252,9 +252,15 @@ export class Server {
     if (m.tick <= this.s.tick){                               // 마감 지난 입력은 폐기
       this.lateDrops++;
       this.dropBy[m.pid] = (this.dropBy[m.pid] || 0) + 1;
-      this.lastDrop = this.s.tick;
-      this.extra = Math.min(this.extra + 1, 8);               // 즉시 지연을 늘려 재발 방지
-      this.recalcDelay();
+      // [stated] **전투가 시작되기 전의 지각은 여유분을 늘리지 않는다.**
+      // 갓 깬 서버는 접속·배치·카운트다운 동안 느려서 지각이 무더기로 나는데,
+      // 그때는 잃을 움직임이 없다. 그걸로 `extra` 를 채워두면 전투가
+      // 시작될 때 이미 최대 지연이라 **첫 판만 렉이 걸린다**
+      if (this.s.phase === PH_PLAY){
+        this.lastDrop = this.s.tick;
+        this.extra = Math.min(this.extra + 1, 8);             // 즉시 지연을 늘려 재발 방지
+        this.recalcDelay();
+      }
       return;
     }
     let f = this.inbox.get(m.tick);
@@ -266,8 +272,14 @@ export class Server {
     this.delay = clampi(Math.ceil((worst/2 + JITTER_MS) / TICK_MS) + this.extra, MIN_DELAY, MAX_DELAY);
   }
   update(now){
-    if (this.extra > 0 && this.s.tick - this.lastDrop > 120){ // 안정되면 빠르게 회복(2초)
-      this.extra--; this.lastDrop = this.s.tick; this.recalcDelay();
+    // [stated] 회선이 멀쩡해지면 **빨리** 떨군다. 예전엔 2초에 1씩이라
+    // 상한 8에서 0까지 16초가 걸렸고, 그 사이 내내 여분 지연을 지고 갔다.
+    // 이제 조용하면 1초마다 절반: 8 → 4 → 2 → 1 → 0 (4초).
+    // 새 지각이 나면 위에서 즉시 다시 올라가므로 널뛰지는 않는다
+    if (this.extra > 0 && this.s.tick - this.lastDrop > 60){
+      this.extra = this.extra >> 1;
+      this.lastDrop = this.s.tick;
+      this.recalcDelay();
     }
     const want = Math.floor((now - this.start) / TICK_MS);
     let guard = 0;

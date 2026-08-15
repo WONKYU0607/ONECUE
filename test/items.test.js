@@ -319,4 +319,34 @@ console.log('겹친 칸은 벽이 부서진 뒤에야 드럼통이 터진다');
   shoot();
   assert(drum.hp <= 0, '벽이 사라진 뒤에야 드럼통이 터짐');
 }
+
+// 시트 프레임 표가 **두 곳**에 있다: render.js 의 ITEM_FRAME 과 public/assets/items.json.
+// 3칸짜리를 빼며 시트를 다시 붙였을 때 x 가 전부 밀렸다 — 한쪽만 고치면 조용히 엉뚱한 그림이 나온다
+{
+  const fs = await import('fs');
+  const src = fs.readFileSync('src/game/render.js', 'utf8');
+  const body = src.slice(src.indexOf('const ITEM_FRAME'), src.indexOf('};', src.indexOf('const ITEM_FRAME')));
+  const inRender = {};
+  for (const m of body.matchAll(/(\w+):\s*\{\s*x:\s*(\d+),\s*y:\s*(\d+),\s*w:\s*(\d+),\s*h:\s*(\d+)/g))
+    inRender[m[1]] = { x: +m[2], y: +m[3], w: +m[4], h: +m[5] };
+  const inJson = JSON.parse(fs.readFileSync('public/assets/items.json', 'utf8'));
+
+  assert(Object.keys(inRender).length === ITEM_DEF.length,
+    `  render.js 프레임 수 = 아이템 수 (${Object.keys(inRender).length} / ${ITEM_DEF.length})`);
+  for (const def of ITEM_DEF){
+    const a = inRender[def.key], b = inJson[def.key];
+    assert(a && b, `  ${def.key}: 두 표에 다 있다`);
+    assert(a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h,
+      `  ${def.key}: render.js 와 items.json 의 자리가 같다 (${JSON.stringify(a)} / ${JSON.stringify(b)})`);
+    assert(a.w === def.cells * 65 || def.key === 'drum',
+      `  ${def.key}: 폭이 칸 수와 맞는다 (${a.w})`);
+  }
+  // 프레임이 겹치거나 시트 밖으로 나가지 않는가
+  const fr = ITEM_DEF.map(d => inJson[d.key]).sort((p, q) => p.x - q.x);
+  for (let i = 1; i < fr.length; i++)
+    assert(fr[i].x >= fr[i-1].x + fr[i-1].w, `  프레임이 겹치지 않는다 (${i})`);
+  assert(!Object.keys(inJson).some(k => !ITEM_DEF.find(d => d.key === k)),
+    '  items.json 에 안 쓰는 프레임이 남아 있지 않다');
+}
+
 console.log('items.test.js 통과');

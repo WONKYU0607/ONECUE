@@ -123,21 +123,21 @@ export const HP_MARKS = 5;            // HP 막대 눈금 (20%마다)
 export const DEBUG_INF_HP = false;  // 디버그: 체력 무한 (라운드가 안 끝남)
 // 아이템 종류. 벽·바리케이트는 1·2·3칸짜리가 따로 있고 자기 영역에,
 // 드럼통은 상대 영역에 심는다. 번호는 시뮬 상태에 그대로 실리므로 바꾸지 말 것
-export const ITEM = { WALL: 0, WALL2: 1, WALL3: 2, BARR: 3, BARR2: 4, BARR3: 5, DRUM: 6 };
+// [stated] 3칸짜리는 게임에서 완전히 뺐다 — 번호도 다시 매겼다(드럼통 6 → 4).
+// 번호가 시뮬 상태에 실리므로 **서버·클라가 같은 표를 써야 한다** (PROTO_VER 로 막는다)
+export const ITEM = { WALL: 0, WALL2: 1, BARR: 2, BARR2: 3, DRUM: 4 };
 // 폭은 달라도 내구는 같다. 넓게 막을수록 칸당 내구는 얇아지는 셈
 export const ITEM_DEF = [
-  { key: 'wall1', nameKey: 'item.wall',          hp: 5, cells: 1, mine: true  },
-  { key: 'wall2', nameKey: 'item.wall2',      hp: 5, cells: 2, mine: true  },
-  { key: 'wall3', nameKey: 'item.wall3',      hp: 5, cells: 3, mine: true  },
+  { key: 'wall1', nameKey: 'item.wall',   hp: 5, cells: 1, mine: true  },
+  { key: 'wall2', nameKey: 'item.wall2',  hp: 5, cells: 2, mine: true  },
   { key: 'barr1', nameKey: 'item.barr',   hp: 3, cells: 1, mine: true  },
-  { key: 'barr2', nameKey: 'item.barr2', hp: 3, cells: 2, mine: true },
-  { key: 'barr3', nameKey: 'item.barr3', hp: 3, cells: 3, mine: true },
-  { key: 'drum',  nameKey: 'item.drum',       hp: 1, cells: 1, mine: false }
+  { key: 'barr2', nameKey: 'item.barr2',  hp: 3, cells: 2, mine: true  },
+  { key: 'drum',  nameKey: 'item.drum',   hp: 1, cells: 1, mine: false }
 ];
 // 정원은 아레나마다 다르다. 0이면 그 모드엔 없는 아이템
 export const itemQuota = k => (ARENA.quota[k] || 0);
 // 엄폐물(벽·바리케이트)은 종류별 정원과 별개로 **합계**가 묶여 있다.
-// 2대2는 1·2·3칸을 마음대로 조합하되 총 3개까지. 1대1은 2개(벽1+바리1)로 예전과 동일
+// 총격전은 1대1·팀전 모두 **2개**. 팀전은 1칸·2칸을 마음대로 조합한다
 export const isCover = k => !!(ITEM_DEF[k] && ITEM_DEF[k].mine);
 export const coverBudget = () => ARENA.cover;
 export const coverUsed = (items, team) =>
@@ -270,7 +270,7 @@ export const WALL2_R = '148,148,148,148,148,148,148,148,148,148,148,148,148,148,
 const A1 = {
   cols: 6, rows: 14, x0: 24.9, cw: 21.638, y0: 0, ch: 22.214, mid: 7,
   pw: 14, ph: 16, bg: 'arena', neutral: false, hc: 3, tc: [1, 4],
-  flip: H, quota: [1, 0, 0, 1, 0, 0, 2], cover: 2,   // 1대1은 1칸 벽·바리 하나씩 (합계 2개)
+  flip: H, quota: [1, 0, 1, 0, 2], cover: 2,   // 1대1은 1칸 벽·바리 하나씩 (합계 2개)
   bands: [[0, 13, 0, 5]],
   wl: WALL1_L, wr: WALL1_R
 };
@@ -280,7 +280,8 @@ const A1 = {
 const A2 = {
   cols: 11, rows: 23, x0: 18.73, cw: 12.878, y0: 17.04, ch: 11.905, mid: 11,
   pw: 12, ph: 13, bg: 'arena2', neutral: true, hc: 5, tc: [3, 7], tc6: [3, 5, 7],   // 3·7열 = 팻말 사이 빈 칸
-  flip: 17.04 * 2 + 11.905 * 23, quota: [3, 3, 3, 3, 3, 3, 2], cover: 3,
+  // [stated] 엄폐물 합계 **2개**. 1칸·2칸을 마음대로 조합한다
+  flip: 17.04 * 2 + 11.905 * 23, quota: [2, 2, 2, 2, 2], cover: 2,
   bands: [[1, 1, 3, 7], [2, 20, 1, 9], [21, 21, 3, 7]],
   // 이동 가능한 세로 범위(월드 y) = **회색 벽 라인 안쪽**.
   // 바닥 타일은 302까지 이어지지만 그 아래는 난간·계단 그림이라 올라가면 안 된다.
@@ -298,7 +299,7 @@ export const BOT3 = '215,215,215,215,215,215,215,215,215,215,215,215,215,215,215
 const A3 = {
   cols: 10, rows: 22, x0: 26.76, cw: 12.580, y0: 22.54, ch: 12.236, mid: 11,
   pw: 12, ph: 12, bg: 'arena3', neutral: false, hc: 4, tc: [3, 6], tc6: [2, 4, 7],
-  flip: 22.54 * 2 + 12.236 * 22, quota: [0, 0, 0, 0, 0, 0, 0], cover: 0,
+  flip: 22.54 * 2 + 12.236 * 22, quota: [0, 0, 0, 0, 0], cover: 0,
   bands: [[0, 0, 1, 8], [1, 20, 0, 9], [21, 21, 1, 8]],
   wl: WALL3_L, wr: WALL3_R, wt: TOP3, wb: BOT3,
   melee: true
@@ -396,7 +397,7 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 62;
+export const PROTO_VER = 64;
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

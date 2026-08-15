@@ -351,13 +351,18 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .pick-row .menu-btn .tkn{font-size:11px;margin-top:1px}
 .pick-row .menu-btn .tkn .tk-ico{flex:0 0 15px;height:10px}
 .sub-row{margin-top:10px}
-/* 방 만들기를 펼쳤을 때 아래로 자라는 칸들. 윗줄과 붙여 한 덩어리로 보이게 한다.
-   `.mk-half` 를 겹쳐 **방 만들기 칸과 정확히 같은 폭**(줄의 절반)을 만들고
-   그 안을 다시 반으로 갈라 총격전·칼전을 놓는다. 한 줄에 셋을 늘어놓으면
-   3등분이 되어 방 만들기 밑에 안 맞는다 */
+/* [stated] 펼친 단계는 **부모 버튼 바로 아래**로 온다.
+   줄을 **네 칸 격자**로 보고 칸 번호로 자리를 잡는다 (총격전 0 / 칼전·팀전 1 /
+   개인전 2 / 코드 입력 2~3). 방 만들기 칸(줄의 절반)이 정확히 두 칸이라
+   왼쪽 끝이 딱 맞는다. 빈 칸은 `visibility:hidden` 이라 자리는 차지하되 안 보인다.
+   인원은 **옆으로 늘어놓지 않고 한 칸에 세로로 쌓는다** */
 .mk-group{margin-top:6px}
-.mk-head .mk-half{flex:1 1 0;min-width:0;display:flex;gap:6px}
-.mk-row{margin-top:6px}
+.mk-lvl{margin-top:6px}
+/* **`flex:1 1 0` 으로는 칸이 안 맞는다.** flex-basis:0 은 box-sizing 과 상관없이
+   내용 상자 기준이라, 금속 틀(좌우 10px)과 여백이 있는 버튼만 26px씩 더 넓어져
+   빈 칸과 폭이 어긋난다(실측 94 vs 68). 폭을 직접 못박아야 격자가 맞는다 */
+.pick-row.mk-lvl > *{flex:0 0 calc((100% - 18px) / 4);min-width:0}
+.mk-slot{visibility:hidden}
 .menu-btn.small{padding:6px 8px}
 .menu-btn.small .t{font-size:12px}
 

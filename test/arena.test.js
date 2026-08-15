@@ -85,17 +85,20 @@ assert(itemKinds().length === 3, '1대1은 1칸 벽·바리 + 드럼통 3종');
 assert(itemQuota(ITEM.WALL2) === 0 && itemQuota(ITEM.DRUM) === 2, '1대1엔 2·3칸이 없다');
 assert(coverBudget() === 2, '1대1 엄폐물 합계 2개');
 setArena(4);
-assert(itemKinds().length === 7, '2대2는 7종 (벽 1·2·3칸, 바리케이트 1·2·3칸, 드럼통)');
-assert(coverBudget() === 3, '엄폐물은 조합 자유, 합계 3개');
-assert(ITEM_DEF[ITEM.WALL3].cells === 3 && ITEM_DEF[ITEM.BARR2].cells === 2, '칸 수가 이름과 맞는다');
+// [stated] 총격전 팀전은 엄폐물 **2개**. 3칸짜리는 게임에서 완전히 뺐다
+assert(itemKinds().length === 5, '2대2는 5종 (벽 1·2칸, 바리케이트 1·2칸, 드럼통)');
+assert(ITEM_DEF.length === 5 && ITEM_DEF.every(d => d.cells <= 2), '3칸짜리 정의가 남아 있지 않다');
+assert(coverBudget() === 2, '엄폐물은 조합 자유, 합계 2개');
+assert(ITEM_DEF[ITEM.WALL2].cells === 2 && ITEM_DEF[ITEM.BARR2].cells === 2, '칸 수가 이름과 맞는다');
 
 console.log('여러 칸짜리 배치');
 const si = newState(4);
 const backRow = ROW_MAX[0] - 1;                 // 2~20행 = 1~9열 전부 사용 가능
-assert(canPlace(si, 0, ITEM.WALL3, 7, backRow), '3칸 벽은 7열까지 (9열이 끝)');
-assert(!canPlace(si, 0, ITEM.WALL3, 8, backRow), '8열부터는 벽 열을 침범한다');
-si.items.push({ k: ITEM.WALL3, c: 3, r: backRow, by: 0, hp: ITEM_DEF[ITEM.WALL3].hp });
-assert(!canPlace(si, 0, ITEM.BARR, 4, backRow), '3칸 벽 한가운데엔 못 겹친다');
+// 3칸짜리는 뺐으므로 2칸짜리로 확인한다
+assert(canPlace(si, 0, ITEM.WALL2, 8, backRow), '2칸 벽은 8열까지 (9열이 끝)');
+assert(!canPlace(si, 0, ITEM.WALL2, 9, backRow), '9열부터는 벽 열을 침범한다');
+si.items.push({ k: ITEM.WALL2, c: 3, r: backRow, by: 0, hp: ITEM_DEF[ITEM.WALL2].hp });
+assert(!canPlace(si, 0, ITEM.BARR, 4, backRow), '2칸 벽이 덮은 칸엔 못 겹친다');
 assert(!canPlace(si, 0, ITEM.BARR2, 2, backRow), '걸치기만 해도 막힌다');
 assert(canPlace(si, 0, ITEM.BARR, 1, backRow), '비어 있는 칸엔 놓인다');
 // 정원을 다 채워야 준비 완료가 된다

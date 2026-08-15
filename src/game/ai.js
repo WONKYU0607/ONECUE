@@ -79,7 +79,7 @@ function planPlace(s, me, p){
   // 엄폐물이 남았으면 큰 것부터 시도한다 (개수 한도 안에서 넓게 막는 게 유리)
   const cands = [];
   if (left > 0)
-    for (const k of [ITEM.WALL3, ITEM.BARR3, ITEM.WALL2, ITEM.BARR2, ITEM.WALL, ITEM.BARR])
+    for (const k of [ITEM.WALL2, ITEM.BARR2, ITEM.WALL, ITEM.BARR])
       if (used(k) < itemQuota(k)) cands.push(k);
   if (used(ITEM.DRUM) < itemQuota(ITEM.DRUM)) cands.push(ITEM.DRUM);
   if (!cands.length) return null;

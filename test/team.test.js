@@ -66,9 +66,8 @@ console.log('장애물은 팀 단위');
   const b = IN(4); b[1] = mk({ place: { k: ITEM.BARR, c: 4, r: mine } });
   step(s, b);
   assert(s.items.length === 2, '팀원이 놓은 것도 같은 팀 소유');
-  const c = IN(4); c[1] = mk({ place: { k: ITEM.BARR2, c: 6, r: mine } });
-  step(s, c);
-  assert(s.items.length === 3, '세 개까지');
+  // [stated] 엄폐물 합계는 **2개**. 벽 하나 + 바리케이트 하나로 이미 다 썼다
+  assert(s.items.length === 2, '두 개까지');
   assert(!canPlace(s, 0, ITEM.WALL, 0, mine) && !canPlace(s, 1, ITEM.WALL, 0, mine),
     '한도를 다 쓰면 팀 전체가 더 못 놓는다');
   assert(!allPlaced(s, 0) && !allPlaced(s, 1), '드럼통이 남아 완료 불가');

@@ -27,15 +27,14 @@ const MELEE_FW = 484, MELEE_FH = 198, MELEE_BODY_H = 190;
 const MELEE_COL = { 0: 2, 1: 0, 2: 4, 3: 6 };        // face -> 대기 열
 const MELEE_FLIP = { 0: 1, 1: 0, 2: 2, 3: 3 };       // 뒤집힌 화면에서의 face
 
-// items.webp 안의 프레임 위치 (824x66)
+// items.webp 안의 프레임 위치 (434x66). **public/assets/items.json 과 같은 값이어야 한다**
+// 3칸짜리를 빼면서 시트를 다시 붙였다 — 뒤 프레임의 x 가 전부 앞으로 당겨졌다
 const ITEM_FRAME = {
   wall1: { x: 0,   y: 3, w: 65,  h: 63 },
   wall2: { x: 65,  y: 3, w: 130, h: 63 },
-  wall3: { x: 195, y: 3, w: 195, h: 63 },
-  barr1: { x: 390, y: 0, w: 65,  h: 66 },
-  barr2: { x: 455, y: 0, w: 130, h: 66 },
-  barr3: { x: 585, y: 0, w: 195, h: 66 },
-  drum:  { x: 780, y: 3, w: 44,  h: 63 }
+  barr1: { x: 195, y: 0, w: 65,  h: 66 },
+  barr2: { x: 260, y: 0, w: 130, h: 66 },
+  drum:  { x: 390, y: 3, w: 44,  h: 63 }
 };
 // 시트는 1대1 칸 기준으로 만들었다. 칸 비율이 가로·세로가 달라서 배율도 따로 준다
 const itemScale = () => ({ x: GRID_CW / SHEET_CW, y: GRID_CH / SHEET_CH });
