@@ -172,6 +172,14 @@ console.log('시작하자마자 렉이 걸리지 않는다');
   assert(/startPing\(\)/.test(net), '접속되면 바로 왕복 시간을 재기 시작한다');
   assert(/this\.rtt = \(net && net\.rtt > 0\)/.test(net), '게임이 시작될 때 그 값을 물려받는다');
   assert(/m\.t === 'p' && m\.pre/.test(srv), '서버가 자리에 앉기 전에도 답한다');
+  // **resync 가 그 값을 지우면 안 된다.** 첫 접속에도 도는데, 여기서 -1 로 되돌리면
+  // 시작하는 순간 RTT 를 몰라 최대 지연(400ms)으로 출발한다
+  const rs = net.slice(net.indexOf('resync(){'), net.indexOf('resync(){') + 700);
+  assert(!/this\.rtt = -1;/.test(rs), 'resync 가 재둔 RTT 를 지우지 않는다');
+  assert(/this\.net\.rtt > 0/.test(rs), 'resync 도 재둔 값을 쓴다');
+  // **서버에도 곧바로 알려야** 서버가 최대 지연으로 시작하지 않는다
+  assert(/clientSend\(\{ t:'rtt'/.test(net.slice(0, net.indexOf('resync(){'))),
+    '클라가 만들어질 때 서버에 RTT 를 알린다');
 
   // ② **뒤로 당기면 안 된다.** 이미 보낸 틱 번호를 다시 보내게 되어 서버와 어긋난다
   // (시작 렉을 줄이려다 넣었는데, 5초 전투에 데싱크가 29번 났다).

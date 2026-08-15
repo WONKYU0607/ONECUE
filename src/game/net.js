@@ -357,6 +357,13 @@ export class Client {
     this.delay = MIN_DELAY;
     // **매칭 중에 재둔 값을 물려받는다.** 없으면 -1 (그때는 최대 지연으로 시작)
     this.rtt = (net && net.rtt > 0) ? net.rtt : -1;
+    // **서버에도 곧바로 알린다.** 안 알리면 서버가 최대 지연(400ms)으로 시작하고,
+    // 클라는 `Math.max(서버 값, 내 값)` 이라 그 값을 그대로 따라간다 —
+    // 매칭에서 미리 재둔 게 첫 ping 이 끝날 때까지 아무 소용이 없었다
+    if (this.rtt > 0){
+      try { this.net.clientSend({ t:'rtt', pid: this.controlled[0], rtt: this.rtt }); }
+      catch { /* 무시 */ }
+    }
     this.pings = new Map(); this.pingId = 1; this.lastPing = -1e9;
     this.svTick = 0; this.svAt = CLOCK.now();
     const blank = () => ({ dx:0, dy:0, fire:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0 });
@@ -424,8 +431,15 @@ export class Client {
     this.frames.clear();
     this.sent.length = 0;
     this.nextInputTick = -1;
-    this.rtt = -1; this.pings.clear(); this.lastPing = -1e9;
+    // **매칭 중에 재둔 값은 살린다.** 여기서 지우면 시작하는 순간 RTT 를 몰라
+    // 최대 지연(400ms)으로 출발한다 — 미리 잰 게 소용없어진다
+    this.rtt = (this.net && this.net.rtt > 0) ? this.net.rtt : -1;
+    this.pings.clear(); this.lastPing = -1e9;
     this.pendingSnap = null;
+    if (this.rtt > 0){
+      try { this.net.clientSend({ t:'rtt', pid: this.controlled[0], rtt: this.rtt }); }
+      catch { /* 무시 */ }
+    }
   }
   estServerTick(now){
     const ow = Math.ceil((this.rtt < 0 ? 0 : this.rtt / 2) / TICK_MS);

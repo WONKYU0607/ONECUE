@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getNick, setNick, clampNick, NICK_MAX, NICK_MAX_KO } from '../state/profile.js';
+import { getNick, setNick, clampNick, NICK_MAX, NICK_MAX_KO, getColor, setColor } from '../state/profile.js';
 import { scoreOf } from '../state/tickets.js';
 import { tierOf, tierName } from '../state/rank.js';
 import TierIcon from './TierIcon.jsx';
@@ -8,6 +8,7 @@ import { t } from '../i18n/index.js';
 // 프로필 탭. 캐릭터 옆에 닉네임, 오른쪽 위에 수정 버튼
 export default function ProfileTab({ onClose }){
   const [nick, setN] = useState(getNick());
+  const [color, setC] = useState(getColor());
   const [edit, setEdit] = useState(false);
   const [draft, setDraft] = useState(nick);
 
@@ -21,7 +22,9 @@ export default function ProfileTab({ onClose }){
 
         {/* 칸으로 묶어 가운데 정렬. 티켓은 상단바에 이미 있어 여기서는 뺐다 */}
         <div className="prof-head prof-card">
-          <span className="prof-av" />
+          {/* [stated] 프로필 사진도 고른 색으로 바뀐다.
+              캐릭터 시트는 24칸(6색 x 앞뒤 + 피격) — 색마다 4칸씩 건너뛴다 */}
+          <span className="prof-av" style={{ backgroundPositionX: `${color * 4 * (100 / 23)}%` }} />
           {edit ? (
             <div className="prof-edit-row">
               <input className="code-input nick-input" value={draft}
@@ -35,6 +38,18 @@ export default function ProfileTab({ onClose }){
         </div>
 
         {edit && <p className="hint nick-hint">영문 {NICK_MAX}자 · 한글 {NICK_MAX_KO}자까지</p>}
+
+        {/* [stated] 여기서 고른 색으로 **항상** 들어간다 (판마다 안 고른다) */}
+        <div className="prof-card prof-colors">
+          <span className="prof-clabel">{t('prof.color')}</span>
+          <div className="cgrid">
+            {[0, 1, 2, 3, 4, 5].map(c => (
+              <button key={c} className={'cdot c' + c + (c === color ? ' on' : '')}
+                      onClick={() => setC(setColor(c))}
+                      aria-label={t('prof.color') + ' ' + (c + 1)} />
+            ))}
+          </div>
+        </div>
 
         <div className="prof-rows">
           {[['gun', t('mode.gun')], ['melee', t('mode.melee')]].map(([k, nm]) => (

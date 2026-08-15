@@ -137,10 +137,19 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
              { what: negText(ready.prompt.done.kind, 'name', ready.prompt.done.melee) })}
         </div>
       )}
-      {(ready.prompt?.offer || []).length > 0 && (
-        <div className="fastwrap ui-overlay">
+      {/* [stated] 준비 상황과 신청 버튼을 **같은 크기로 최상단에 나란히** 놓는다 */}
+      {(placing || (ready.prompt?.offer || []).length > 0) && (
+        <div className="topbar ui-overlay">
+          {placing && (
+            <div className="topbox">
+              <FitText>
+                {ready.cnt ? t('ready.waitN', { a: ready.cnt.go, b: ready.cnt.n })
+                           : t('ready.waitMe')}
+              </FitText>
+            </div>
+          )}
           {(ready.prompt?.offer || []).map((k, i) => (
-            <button key={k} className={'fastbtn' + (i ? ' bare' : '')}
+            <button key={k} className={'topbox btn' + (i ? ' bare' : '')}
                     onClick={() => gameRef.current?.request(k)}>
               <FitText>{negText(k, 'btn', ready.prompt?.melee)}</FitText>
             </button>
@@ -168,7 +177,7 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
         </div>
       )}
 
-      {/* 1단계: 아이템을 다 놓아야 설치 완료 */}
+      {/* 1단계. **다 놓으면 저절로 넘어가므로** 이 버튼은 덜 놓고 건너뛸 때만 쓴다 */}
       {placing && !ready.cnt?.meDone && (
         <button className="panelbtn place ui-overlay" style={boxStyle}
                 onClick={() => gameRef.current?.ready()}>
@@ -182,33 +191,25 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
           {t('ready.goDone')}
         </button>
       )}
-      {placing && ready.me && !ready.peer && (
+      {placing && ready.me && !ready.peer && SHOW_NETINFO && ready.srv && (
         <div className="link-note ui-overlay">
-          {ready.cnt ? t('ready.waitN', { a: ready.cnt.go, b: ready.cnt.n }) : t('match.others')}
-          {SHOW_NETINFO && ready.srv && (
-            <span className="sub">
-              서버 확정 · 나 {ready.srv.me ? 'O' : 'X'} / 나머지 {ready.srv.peer ? 'O' : 'X'}
-              {ready.room != null && <><br />방 {ready.room} · 내 자리 {ready.slot}</>}
-              {ready.net && (
-                <><br />
-                소켓 {ready.net.sock} · 프레임 {ready.net.f} · 핑응답 {ready.net.q} · 스냅 {ready.net.snap}
-                <br />
-                RTT {ready.net.rtt} · 지연 {ready.net.delay} · 보냄 {ready.net.sent} · 막힘 {ready.net.blocked}
-                <br />
-                내틱 {ready.net.ctick} · 다음입력틱 {ready.net.nit}
-                </>
-              )}
-            </span>
-          )}
+          <span className="sub">
+            서버 확정 · 나 {ready.srv.me ? 'O' : 'X'} / 나머지 {ready.srv.peer ? 'O' : 'X'}
+            {ready.room != null && <><br />방 {ready.room} · 내 자리 {ready.slot}</>}
+            {ready.net && (
+              <><br />
+              소켓 {ready.net.sock} · 프레임 {ready.net.f} · 핑응답 {ready.net.q} · 스냅 {ready.net.snap}
+              <br />
+              RTT {ready.net.rtt} · 지연 {ready.net.delay} · 보냄 {ready.net.sent} · 막힘 {ready.net.blocked}
+              <br />
+              내틱 {ready.net.ctick} · 다음입력틱 {ready.net.nit}
+              </>
+            )}
+          </span>
         </div>
       )}
       {placing && ready.me && ready.peer && (
         <div className="link-note ui-overlay">{t('ready.soon')}</div>
-      )}
-      {placing && !ready.me && ready.peer && (
-        <div className="link-note ui-overlay">
-          {ready.cnt ? t('ready.meOnly', { a: ready.cnt.go, b: ready.cnt.n }) : t('ready.waitMe')}
-        </div>
       )}
       <TunePanel gameRef={gameRef} />
     </div>

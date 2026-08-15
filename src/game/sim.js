@@ -592,6 +592,10 @@ export function step(s, inp){
         }
         s.items.push({ k: pl.k, c: pl.c, r: pl.r, by: teamOf(i, s.n), hp: ITEM_DEF[pl.k].hp });
       }
+      // [stated] **다 놓으면 저절로 설치 완료가 된다.** 버튼을 하나 없애려는 것 —
+      // 한 판 하는 데 눌러야 할 게 너무 많았다.
+      // 다 안 놓고 넘어가고 싶으면 준비완료를 눌러 건너뛸 수 있다
+      if (!s.done[i] && allPlaced(s, i)) s.done[i] = true;
       // 1단계 설치 완료: 몇 개를 놓았든 누를 수 있다.
       // 엄폐물을 아예 안 깔고 싶은 사람도 있어서 정원을 채우도록 강제하지 않는다
       if (q.ready){

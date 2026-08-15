@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getColor } from '../../state/profile.js';
 import { TEAMS } from '../../game/config.js';
 import { leftFor, maxFor } from '../../state/tickets.js';
 import { t } from '../../i18n/index.js';
@@ -24,10 +25,8 @@ export default function PvpMenu({ onBack, onStart }){
   const guard = (ffa, fn) => () => { if (!out(ffa)) fn(); };
   const back = () => {
     if (step === 'mode') return onBack();
-    if (step === 'how') return setStep('mode');
-    if (step === 'ffa') return setStep('n');
-    if (step === 'color') return setStep(pending?.ffa ? 'ffa' : 'n');
-    setStep('how');
+    if (step === 'ffa' || step === 'n' || step === 'code') return setStep('mode');
+    return onBack();
   };
   // 하단 뒤로가기가 **단계 안에서** 먼저 돌아가게 한다.
   // effect 가 아니라 **렌더 중에** 덮어쓴다 — effect 순서에 기대면
@@ -50,56 +49,63 @@ export default function PvpMenu({ onBack, onStart }){
       </header>
 
       <div className="menu wide-menu">
+        {/* [stated] 총격전·칼전과 인원을 **한 화면에** 놓는다.
+            예전엔 모드 → 방식 → 인원 → 색으로 네 번을 눌러야 했다.
+            색은 프로필에서 한 번 고른 걸 계속 쓴다 */}
         {step === 'mode' && (
           <>
-            <button className="menu-btn primary" onClick={() => { setMelee(false); setStep('how'); }}>
-              <span className="t">{t('mode.gun')}</span>
-            </button>
-            <button className="menu-btn" onClick={() => { setMelee(true); setStep('how'); }}>
-              <span className="t">{t('mode.melee')}</span>
-            </button>
+            {[[false, 'mode.gun'], [true, 'mode.melee']].map(([m, key]) => (
+              <div key={key} className="pick-group">
+                <span className="pick-title">{t(key)}</span>
+                <div className="pick-row">
+                  {[2, 4, 6].map(k => (
+                    <button key={k} className={'menu-btn pick' + (out() ? ' off' : '')}
+                            onClick={guard(false, () => onStart({ mode: 'queue', n: k, melee: m,
+                                                                  color: getColor() }))}>
+                      <span className="t">{k / 2} vs {k / 2}</span>
+                      <span className="tkn"><span className="tk-ico" />{tk()}</span>
+                    </button>
+                  ))}
+                  {/* 개인전은 칼전에만. 총격전은 진영이 나뉘어 성립하지 않는다 */}
+                  {m && (
+                    <button className={'menu-btn pick' + (out(true) ? ' off' : '')}
+                            onClick={guard(true, () => { setMelee(true); setHow('queue'); setStep('ffa'); })}>
+                      <span className="t">{t('mode.ffa')}</span>
+                      <span className="tkn"><span className="tk-ico" />{tk(true)}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {/* 친구랑 하기는 아래에 작게 */}
+            <div className="pick-row sub-row">
+              <button className="menu-btn small" onClick={() => { setHow('create'); setStep('n'); }}>
+                <span className="t">{t('pvp.create')}</span>
+              </button>
+              <button className="menu-btn small" onClick={() => setStep('code')}>
+                <span className="t">{t('pvp.join')}</span>
+              </button>
+            </div>
           </>
         )}
 
-        {step === 'how' && (
-          <>
-            <button className="menu-btn primary" onClick={() => { setHow('queue'); setStep('n'); }}>
-              <span className="t">{t('pvp.random')}</span>
-            </button>
-            <button className="menu-btn" onClick={() => { setHow('create'); setStep('n'); }}>
-              <span className="t">{t('pvp.create')}</span>
-            </button>
-            <button className="menu-btn" onClick={() => setStep('code')}>
-              <span className="t">{t('pvp.join')}</span>
-            </button>
-          </>
-        )}
-
+        {/* 방 만들기로 왔을 때만 인원을 따로 고른다 */}
         {step === 'n' && (
           <>
-            <button className={'menu-btn primary' + (out() ? ' off' : '')}
-                    onClick={guard(false, () => { setPending({ mode: how, n: 2, melee }); setStep('color'); })}>
-              <span className="t">1 vs 1</span>
-              <span className="tkn"><span className="tk-ico" />{tk()}</span>
-            </button>
-            <button className={'menu-btn' + (out() ? ' off' : '')}
-                    onClick={guard(false, () => { setPending({ mode: how, n: 4, melee }); setStep('color'); })}>
-              <span className="t">2 vs 2</span>
-              <span className="tkn"><span className="tk-ico" />{tk()}</span>
-            </button>
-            <button className={'menu-btn' + (out() ? ' off' : '')}
-                    onClick={guard(false, () => { setPending({ mode: how, n: 6, melee }); setStep('color'); })}>
-              <span className="t">3 vs 3</span>
-              <span className="tkn"><span className="tk-ico" />{tk()}</span>
-            </button>
-            {/* 개인전은 칼전에만. 총격전은 진영이 나뉘어 있어 성립하지 않는다 */}
-            {melee && (
-              <button className={'menu-btn' + (out(true) ? ' off' : '')}
-                      onClick={guard(true, () => setStep('ffa'))}>
-                <span className="t">{t('mode.ffa')}</span>
-                <span className="tkn"><span className="tk-ico" />{tk(true)}</span>
-              </button>
-            )}
+            {[[false, 'mode.gun'], [true, 'mode.melee']].map(([m, key]) => (
+              <div key={key} className="pick-group">
+                <span className="pick-title">{t(key)}</span>
+                <div className="pick-row">
+                  {[2, 4, 6].map(k => (
+                    <button key={k} className={'menu-btn pick' + (out() ? ' off' : '')}
+                            onClick={guard(false, () => onStart({ mode: how, n: k, melee: m,
+                                                                  color: getColor() }))}>
+                      <span className="t">{k / 2} vs {k / 2}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </>
         )}
 
@@ -107,30 +113,11 @@ export default function PvpMenu({ onBack, onStart }){
           <>
             {[3, 4, 5, 6].map((k, i) => (
               <button key={k} className={'menu-btn' + (i === 0 ? ' primary' : '')}
-                onClick={guard(true, () => { setPending({ mode: how, n: k, melee, ffa: true }); setStep('color'); })}>
+                onClick={guard(true, () => { onStart({ mode: how, n: k, melee: true, ffa: true, color: getColor() }); })}>
                 <span className="t">{t('pvp.players', { n: k })}</span>
                 <span className="tkn"><span className="tk-ico" />{tk(true)}</span>
               </button>
             ))}
-          </>
-        )}
-
-        {step === 'color' && (
-          <>
-            <p className="hint">{t('pvp.pickColor')}</p>
-            <div className="colorpick">
-              {[0, 1, 2, 3, 4, 5].map(c => (
-                <button key={c}
-                  className={'swatch' + (color === c ? ' on' : '')}
-                  style={{ background: TEAMS[c].m }}
-                  onClick={() => setColor(c)}
-                  aria-label={t('pvp.colorN', { n: c + 1 })} />
-              ))}
-            </div>
-            <p className="hint">{t('pvp.colorNote')}</p>
-            <button className="menu-btn primary" onClick={() => onStart({ ...pending, color })}>
-              <span className="t">{t('common.start')}</span>
-            </button>
           </>
         )}
 

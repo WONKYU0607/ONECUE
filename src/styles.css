@@ -199,20 +199,21 @@ background:rgba(18,18,28,.94);border:2px solid #6ee7a8;color:#bff3d6;
 font-family:var(--gf);font-weight:900;font-size:13px;letter-spacing:1px;
 pointer-events:none}
 
-/* 신청 버튼 묶음. **한 덩어리로 쌓는다** — 버튼마다 top 을 따로 주면
-   화면 크기·문구 길이에 따라 간격이 어긋나 겹친다.
-   [stated] 위쪽 구석 말고 **중앙선 바로 위**에 둔다 (거기가 잘 보인다) */
-.fastwrap{position:fixed;left:50%;top:34%;transform:translate(-50%,-100%);
-z-index:22;display:flex;flex-direction:column;gap:8px;align-items:center}
-.fastbtn{width:min(260px,76vw);height:38px;padding:0 10px;box-sizing:border-box;
+/* [stated] 준비 상황·2배속·노템전을 **같은 크기로 최상단에 나란히** 놓는다.
+   칸을 똑같이 나눠(1fr) 문구 길이와 상관없이 크기가 같다 */
+.topbar{position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:22;
+width:min(96vw,var(--gw,420px));display:grid;grid-auto-flow:column;
+grid-auto-columns:1fr;gap:6px;box-sizing:border-box;padding:0 6px}
+.topbox{height:34px;padding:0 6px;box-sizing:border-box;
 display:flex;align-items:center;justify-content:center;
-background:rgba(18,18,28,.92);border:2px solid #8f6ef0;color:#c3adff;
-font-family:var(--gf);font-weight:900;font-size:14px;letter-spacing:2px;cursor:pointer;
+background:rgba(18,18,28,.92);border:2px solid #4a5570;color:#cfd8ee;
+font-family:var(--gf);font-weight:900;font-size:12px;letter-spacing:1px;
 white-space:nowrap;overflow:hidden}
-/* 긴 문구는 글씨를 줄여 한 줄에 담는다 */
-.fastbtn > span{display:block;width:100%;text-align:center;
+.topbox.btn{border-color:#8f6ef0;color:#c3adff;cursor:pointer}
+.topbox.btn.bare{border-color:#f0a81e;color:#f0c86e}
+.topbox.btn:active{background:#8f6ef0;color:#12121c}
+.topbox > span{display:block;width:100%;text-align:center;
 transform-origin:center;white-space:nowrap}
-.fastbtn:active{background:#8f6ef0;color:#12121c}
 .link-note.fast{border-color:#8f6ef0;color:#c3adff}
 /* 노템전은 2배속과 색을 갈라서 뭘 신청받았는지 바로 알게 한다 */
 .fastbtn.bare{border-color:#f0a81e;color:#f0c86e}
@@ -334,6 +335,29 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   width:calc((var(--h-rowH,20) - 4) * var(--u));height:calc((var(--h-rowH,20) - 4) * var(--u));
   /* 캐릭터 시트는 24칸(6색 x 앞뒤 + 피격). 0번 = 파랑 앞모습 */
   background:var(--chars) 0 0/2400% 100% no-repeat;image-rendering:pixelated}
+/* [stated] 총격전·칼전과 인원을 한 화면에. 모드마다 한 줄씩 */
+.pick-group{width:100%}
+.pick-title{display:block;margin:6px 0 4px;font-family:var(--gf);font-weight:900;
+  font-size:12px;letter-spacing:2px;color:#9fb0cc;text-align:center}
+.pick-row{display:flex;gap:6px;width:100%}
+.pick-row .menu-btn{flex:1 1 0;min-width:0}
+.pick-row .menu-btn .t{font-size:13px}
+.sub-row{margin-top:10px}
+.menu-btn.small{padding:6px 8px}
+.menu-btn.small .t{font-size:12px}
+
+.prof-colors{display:flex;align-items:center;gap:10px;justify-content:center}
+.prof-clabel{font-family:var(--gf);font-weight:900;font-size:12px;color:#9fb0cc;letter-spacing:1px}
+.cgrid{display:flex;gap:6px}
+.cdot{width:26px;height:26px;border:2px solid #3a4560;cursor:pointer;padding:0}
+.cdot.on{border-color:#eaf2ff;box-shadow:0 0 0 2px rgba(234,242,255,.35)}
+/* 진영 색과 같아야 한다 (config.js TEAMS) */
+.cdot.c0{background:#3aa6f0}
+.cdot.c1{background:#f04a3a}
+.cdot.c2{background:#4ad14a}
+.cdot.c3{background:#f0a81e}
+.cdot.c4{background:#9a5cf0}
+.cdot.c5{background:#16161c}
 .prof-name{font-family:var(--gf);font-weight:900;font-size:calc(var(--h-nickSz,10) * var(--u));
   color:#d6eeff;white-space:nowrap}
 .pscore{flex:0 1 auto}

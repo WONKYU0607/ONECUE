@@ -98,11 +98,12 @@ console.log('모든 모드가 팀 화면 없이 바로 시작한다');
   assert(/this\.n <= 2/.test(lob), '1대1은 팀 화면을 안 보낸다');
   assert(/this\.hasBots/.test(lob), '봇으로 채운 방도 안 보낸다');
 
-  // 팀전도 메뉴에서 색을 고른다 (팀 화면이 없어졌으므로)
+  // [stated] 색은 프로필에서 한 번 고른 걸 계속 쓴다. 판마다 고르지 않는다
   const menu = fs.readFileSync('src/ui/screens/PvpMenu.jsx', 'utf8');
-  for (const n of [2, 4, 6])
-    assert(new RegExp(`n: ${n}, melee \\}\\); setStep\\('color'\\)`).test(menu),
-      `  ${n}인전도 색을 고른다`);
+  assert(!/setStep\('color'\)/.test(menu), '메뉴에 색 고르기 단계가 없다');
+  assert(/getColor\(\)/.test(menu), '프로필에 저장된 색을 쓴다');
+  // 총격전·칼전과 인원이 한 화면에 있다
+  assert(/pick-group/.test(menu), '모드와 인원이 한 화면에 있다');
 }
 
 console.log('봇이 사람 색을 뺏지 않는다');
