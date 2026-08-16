@@ -195,4 +195,8 @@ export default {
   'ready.donePeer': 'Your opponent accepted {what}',
   'ready.doneMine': 'You accepted {what}',
   'prof.color': 'Color',
+  'rank.title': 'Ranking',
+  'rank.mine': '#{r} of {n}',
+  'rank.none': 'No record',
+  'rank.loading': 'Loading',
 };

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import TierIcon from './TierIcon.jsx';
 import ProfileTab from './ProfileTab.jsx';
 import { getNick, avatarPos } from '../state/profile.js';
-import { scoreOf, ticketsLeft, ffaLeft, nextTicketIn, fmtLeft } from '../state/tickets.js';
+import { scoreOf, ticketsLeft, nextTicketIn, fmtLeft } from '../state/tickets.js';
 import { fitBar } from '../state/homeLayout.js';
 import { getSettings, setSetting } from '../state/settings.js';
 import { t } from '../i18n/index.js';
@@ -24,7 +24,10 @@ export default function PlayerBar({ onHelp, onSettings }){
     return () => window.removeEventListener('resize', fitBar);
   });
   const wait = nextTicketIn();
-  const total = ticketsLeft() + ffaLeft();
+  // [stated] 상단바에 뜨는 **기본 티켓은 5개.** 예전엔 일반 5 + 개인전 3 을 더해
+  // 8 로 떠서, 성격이 다른 두 주머니가 한 숫자로 섞여 보였다.
+  // 개인전 남은 판은 PVP 메뉴의 개인전 칸에 이미 따로 뜬다
+  const total = ticketsLeft();
   const sound = getSettings().sound;
 
   return (

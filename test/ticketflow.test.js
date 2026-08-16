@@ -19,10 +19,22 @@ console.log('처음 상태');
 console.log('티켓은 모드별로 따로 준다');
 {
   assert(T.spendFor(false) === true, '팀전 티켓을 쓴다');
-  assert(T.ticketsLeft() === T.TICKET_MAX - 1, '일반만 줄었다');
-  assert(T.ffaLeft() === T.FFA_MAX, '개인전은 그대로');
+  assert(T.ticketsLeft() === T.TICKET_MAX - 1, '티켓이 줄었다');
+  assert(T.ffaLeft() === T.FFA_MAX, '일반 판은 개인전 횟수를 안 깎는다');
   assert(T.spendFor(true) === true, '개인전 판을 쓴다');
-  assert(T.ffaLeft() === T.FFA_MAX - 1, '개인전만 줄었다');
+  // [stated] **티켓은 하나로 통합.** 개인전은 티켓도 깎고 하루 횟수도 깎는다
+  assert(T.ticketsLeft() === T.TICKET_MAX - 2, '개인전도 같은 티켓에서 깎인다');
+  assert(T.ffaLeft() === T.FFA_MAX - 1, '개인전 하루 횟수도 같이 깎인다');
+}
+
+// 개인전은 **티켓과 하루 횟수 둘 다** 걸린다 — 더 빡빡한 쪽이 실제 남은 판수
+console.log('개인전은 둘 중 빡빡한 쪽');
+{
+  T.__reset && T.__reset();
+  while (T.ffaLeft() > 0) T.spendFor(true);
+  assert(T.leftFor(true) === 0, '  하루 3판을 다 쓰면 티켓이 남아도 못 한다');
+  assert(T.ticketsLeft() > 0, '  그래도 티켓은 남아 있다');
+  assert(T.spendFor(false) === true, '  남은 티켓으로 일반 판은 된다');
 }
 
 console.log('다 쓰면 더 못 쓴다');

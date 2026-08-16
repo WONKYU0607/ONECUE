@@ -195,4 +195,8 @@ export default {
   'ready.donePeer': '상대방이 {what} 신청을 수락하셨습니다',
   'ready.doneMine': '{what} 신청을 수락했습니다',
   'prof.color': '색',
+  'rank.title': '순위표',
+  'rank.mine': '{r}등 / {n}명',
+  'rank.none': '기록 없음',
+  'rank.loading': '불러오는 중',
 };

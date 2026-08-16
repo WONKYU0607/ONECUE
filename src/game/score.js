@@ -29,12 +29,17 @@ export const LOSE_BASE = 20, LOSE_MARGIN = 0.3;
 // **상·하한을 둔다** — 점수 차가 벌어지면 배율이 0 이나 2 로 붙어 한쪽이 무의미해진다
 export const RATING_SPREAD = 400;
 export const MUL_MIN = 0.5, MUL_MAX = 1.8;
-export function skillMul(myScore, foeScore, win){
+const clampMul = m => Math.min(MUL_MAX, Math.max(MUL_MIN, m));
+// 상·하한을 씌우기 전 값. 개인전은 이걸로 먼저 섞은 뒤에 한 번만 씌운다 —
+// **먼저 씌우고 섞으면** 상·하한이 위아래로 다른 폭이라 한가운데가 1.0 에서 어긋난다
+function rawMul(myScore, foeScore, win){
   const me = Number.isFinite(myScore) ? myScore : 1000;
   const foe = Number.isFinite(foeScore) ? foeScore : me;
   const expWin = 1 / (1 + Math.pow(10, (foe - me) / RATING_SPREAD));
-  const m = win ? 2 * (1 - expWin) : 2 * expWin;
-  return Math.min(MUL_MAX, Math.max(MUL_MIN, m));
+  return win ? 2 * (1 - expWin) : 2 * expWin;
+}
+export function skillMul(myScore, foeScore, win){
+  return clampMul(rawMul(myScore, foeScore, win));
 }
 
 // 연승 배율 (이긴 쪽만). 1연승은 보너스 없음.
@@ -44,6 +49,14 @@ export function streakMul(streak){
   return 1 + s * STREAK_STEP;
 }
 
+// 개인전용 배율. 강한 사람들 사이에서 잘하면 더, 약한 사람들 사이에서 잘하면 덜.
+// 반대로 강한 사람들 사이에서 꼴찌면 덜 깎이는 대신 **덜 받는다** (개인전은 전부 양수)
+export function ffaSkillMul(myScore, foeScore, n, rank){
+  const perf = n > 1 ? (n - rank) / (n - 1) : 1;      // 1등 1.0 ~ 꼴찌 0
+  const hi = rawMul(myScore, foeScore, true);
+  const lo = rawMul(myScore, foeScore, false);
+  return clampMul(lo + (hi - lo) * perf);             // 두 값의 합이 2라 한가운데는 정확히 1.0
+}
 // 개인전 등수: 살아남은 순서. 체력이 남은 사람이 위, 같으면 피해가 많은 쪽이 위
 function ffaRanks(st){
   const idx = st.p.map((_, i) => i);
@@ -85,7 +98,11 @@ export function scoreDelta(st, slot, opt = {}){
     out.base = byRank + byDmg;
     out.result = rank === 1 ? 'win' : 'lose';
     out.streakMul = rank === 1 ? streakMul(opt.streak) : 1;
-    out.delta = Math.round(out.base * out.streakMul);
+    // [stated] 개인전도 강약 차등을 맞춘다. 승패가 갈리는 판이 아니라 **등수가 연속적**이므로
+    // 성적 비율(1등 1.0 ~ 꼴찌 0)로 이길 때 배율과 질 때 배율 사이를 잇는다.
+    // 두 배율의 합이 2 라서 **한가운데 등수는 정확히 1.0** 으로 떨어진다
+    out.skillMul = ffaSkillMul(opt.myScore, opt.foeScore, n, rank);
+    out.delta = Math.round(out.base * out.streakMul * out.skillMul);
     return out;
   }
 

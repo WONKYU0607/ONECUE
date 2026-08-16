@@ -102,10 +102,14 @@ export function createGame(canvas, opts = {}){
   const aiNextAt = new Map();     // 슬롯 -> 다음 배치를 보낼 시각
   // 이 종류를 정원만큼 놓았는가
   // 아이템은 팀 소유라 팀 번호로 센다
-  const allPlacedKind = (st, team, k) =>
-    isCover(k)
-      ? coverUsed(st.items, team, coverCells(k)) >= coverBudget(coverCells(k))
-      : (st.items || []).filter(it => it.by === team && it.k === k).length >= itemQuota(k);
+  // 그 종류를 더 놓을 수 있는가. **칸 수 몫과 종류별 정원 둘 다** 봐야 한다
+  const allPlacedKind = (st, team, k) => {
+    const used = (st.items || []).filter(it => it.by === team && it.k === k).length;
+    if (used >= itemQuota(k)) return true;
+    if (!isCover(k)) return false;
+    const c = coverCells(k);
+    return coverUsed(st.items, team, c) >= coverBudget(c);
+  };
   // 재접속하면 옛 프레임을 버리고 서버 스냅샷으로 다시 맞춘다
   if (online){
     let first = true;
@@ -147,14 +151,17 @@ export function createGame(canvas, opts = {}){
   const leftCount = k => {
     const st = client.pred;
     const myTeam = teamOf(SELF.slot, st.n || 2);
-    // 엄폐물은 종류별이 아니라 **칸 수별**로 센다 (1칸 2개 · 2칸 1개).
-    // 팔레트의 남은 수는 같은 칸 수끼리 같은 값이 뜬다
+    const used = (st.items || []).filter(it => it.by === myTeam && it.k === k).length;
+    const byKind = Math.max(0, itemQuota(k) - used);
+    // 엄폐물은 **칸 수별 몫**과 **종류별 정원** 둘 다에 걸린다.
+    // 칸 수 몫만 보면 1대1에서 `x2` 로 떠 있었는데 정원이 벽·바리 각 1개라
+    // 실제로는 하나씩밖에 못 놓았다 — **둘 중 작은 쪽**이 진짜 남은 수다
     if (isCover(k)){
       const c = coverCells(k);
-      return Math.max(0, coverBudget(c) - coverUsed(st.items, myTeam, c));
+      const bySize = Math.max(0, coverBudget(c) - coverUsed(st.items, myTeam, c));
+      return Math.min(byKind, bySize);
     }
-    const used = (st.items || []).filter(it => it.by === myTeam && it.k === k).length;
-    return Math.max(0, itemQuota(k) - used);
+    return byKind;
   };
   // 화면 좌표 -> 놓을 수 있는 칸 (슬롯1이면 세로가 뒤집혀 있으므로 되돌린다)
   const okCell = (k, c, r, from) => canPlace(client.pred, SELF.slot, k, c, r, from);

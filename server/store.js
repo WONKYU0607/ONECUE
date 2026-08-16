@@ -86,10 +86,35 @@ export async function writeResults(rows){
   }
 }
 
-/** 순위표를 한 덩어리로 저장한다.
- *  **문서 하나에 모아둔다** — 볼 때마다 50명을 읽으면 읽기 할당량이 금방 닳는다
- *  (50 → 1로 줄어 무료 한도로 버틸 수 있는 인원이 400명에서 2,000명이 된다) */
-export async function buildRanks(kind = 'gun', top = 50){
+/** [stated] **정확한 등수.** 나보다 점수가 높은 사람 수를 세어 +1 한다.
+ *  집계 쿼리는 훑은 색인 1,000건마다 읽기 1회로 계산돼서, 만 명 중 5,000등이어도
+ *  조회 한 번에 읽기 5회쯤이다 — 근사표를 따로 관리할 이유가 없다.
+ *  **클라가 직접 셀 수는 없다** — 규칙이 players 를 자기 문서만 읽게 막아둬서,
+ *  규칙을 건너뛰는 서버(Admin SDK)가 대신 세어 준다 */
+export async function myRank(uid, kind = 'gun'){
+  if (!db) return null;
+  const field = 'score.' + (kind === 'melee' ? 'melee' : 'gun');
+  try {
+    const me = await db.doc('players/' + uid).get();
+    if (!me.exists) return null;
+    const v = me.data();
+    const score = (v.score && v.score[kind === 'melee' ? 'melee' : 'gun']) | 0;
+    // 나보다 **높은** 사람만 센다. 동점자끼리는 같은 등수가 된다
+    const [above, total] = await Promise.all([
+      db.collection('players').where(field, '>', score).count().get(),
+      db.collection('players').count().get()
+    ]);
+    return { rank: above.data().count + 1, total: total.data().count, score, nick: v.nick || '' };
+  } catch (e){
+    console.log('[store] 등수 계산 실패', e && e.code);
+    return null;
+  }
+}
+
+/** 순위표를 한 덩어리로 저장한다. [stated] 상위 **30명**.
+ *  **문서 하나에 모아둔다** — 볼 때마다 30명을 각각 읽으면 읽기 할당량이 금방 닳는다.
+ *  한 덩어리면 몇 명을 담든 조회 1회라, 인원을 늘려도 비용은 그대로다 */
+export async function buildRanks(kind = 'gun', top = 30){
   if (!db) return false;
   try {
     const q = await db.collection('players')

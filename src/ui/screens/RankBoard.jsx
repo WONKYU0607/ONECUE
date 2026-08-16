@@ -1,0 +1,89 @@
+// 순위표 화면. [stated] 상위 **30명** 목록 + 내 등수(총 몇 명 중 몇 등).
+//
+// 목록은 Firestore 의 `ranks/{kind}` **문서 하나**를 읽는다 — 판이 끝날 때마다
+// 서버가 말아 저장해두므로 몇 명을 담든 조회 1회다.
+// 내 등수는 게임 서버가 세어 준다(규칙이 `players` 를 자기 문서만 읽게 막아둬서
+// 클라가 직접 못 센다).
+//
+// **못 받아도 화면은 떠야 한다** — 서버가 자고 있거나 아직 기록이 없을 수 있다.
+import { useState, useEffect } from 'react';
+import { loadRank, cachedRank, fmtRank } from '../../state/ranks.js';
+import { getNick } from '../../state/profile.js';
+import { scoreOf } from '../../state/tickets.js';
+import { tierOf, tierName } from '../../state/rank.js';
+import TierIcon from '../TierIcon.jsx';
+import { setInnerBack } from '../../state/back.js';
+import { t } from '../../i18n/index.js';
+
+export default function RankBoard({ kind: kind0 = 'gun', onBack }){
+  const [kind, setKind] = useState(kind0 === 'melee' ? 'melee' : 'gun');
+  const [data, setData] = useState(() => cachedRank(kind));
+  const [busy, setBusy] = useState(!cachedRank(kind));
+
+  // 뒤로가기는 화면을 그냥 나간다 (안에 펼쳐지는 단계가 없다)
+  setInnerBack(() => false);
+  useEffect(() => () => setInnerBack(null), []);
+
+  useEffect(() => {
+    let live = true;
+    const hit = cachedRank(kind);
+    setData(hit); setBusy(!hit);
+    loadRank(kind)
+      .then(v => { if (live){ setData(v); setBusy(false); } })
+      .catch(() => { if (live) setBusy(false); });
+    return () => { live = false; };
+  }, [kind]);
+
+  const me = fmtRank(data && data.my);
+  const list = (data && data.list) || [];
+  const myNick = getNick();
+
+  return (
+    <div className="screen list">
+      <header className="bar-top">
+        <button className="icon-btn" onClick={onBack} aria-label={t('common.back')}>‹</button>
+        <span className="title">{t('rank.title')}</span>
+        <span className="spacer" />
+      </header>
+
+      <div className="menu wide-menu">
+        {/* 종목 전환 */}
+        <div className="pick-row rb-tabs">
+          {[['gun', t('mode.gun')], ['melee', t('mode.melee')]].map(([k, nm]) => (
+            <button key={k} className={'menu-btn pick' + (kind === k ? ' primary' : '')}
+                    onClick={() => setKind(k)}>
+              <span className="t">{nm}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* 내 자리. **목록보다 위에 둔다** — 30위 밖이면 목록에 없어서
+            아래에 두면 스크롤을 끝까지 내려야 자기 등수를 본다 */}
+        <div className="rb-me">
+          <TierIcon score={scoreOf(kind)} />
+          <span className="rb-nick">{myNick}</span>
+          <span className="rb-tier">{tierName(tierOf(scoreOf(kind)))}</span>
+          <span className="rb-rank">
+            {busy ? t('rank.loading') : (me ? t('rank.mine', { r: me.rank, n: me.total }) : t('rank.none'))}
+          </span>
+          <span className="rb-score">{scoreOf(kind).toLocaleString()}</span>
+        </div>
+
+        <div className="rb-list">
+          {list.length === 0 && (
+            <p className="hint">{busy ? t('rank.loading') : t('rank.none')}</p>
+          )}
+          {list.map(row => (
+            <div key={row.rank}
+                 className={'rb-row' + (row.nick && row.nick === myNick ? ' me' : '')}>
+              <span className="rb-no">{row.rank}</span>
+              <TierIcon score={row.score | 0} />
+              <span className="rb-nick">{row.nick || '-'}</span>
+              <span className="rb-score">{(row.score | 0).toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

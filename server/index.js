@@ -358,6 +358,21 @@ class Room {
 // Render 무료 플랜은 HTTP 요청으로도 깨어나므로 상태 확인용 엔드포인트를 둔다.
 const http = createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');   // 브라우저 fetch로 깨울 수 있어야 함
+  // [stated] **정확한 등수.** 클라는 규칙에 막혀 못 세므로 서버가 대신 세어 준다.
+  // 순위표 목록(상위 30명)은 `ranks/{kind}` 문서를 클라가 직접 읽으면 되고,
+  // 여기서 주는 건 **내 등수 하나뿐**이다
+  if (req.url && req.url.startsWith('/rank')){
+    const q = new URL(req.url, 'http://x').searchParams;
+    const uid = q.get('uid') || '';
+    const kind = q.get('kind') === 'melee' ? 'melee' : 'gun';
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    if (!uid){ res.end(JSON.stringify({ ok: false, why: 'uid 없음' })); return; }
+    store.myRank(uid, kind)
+      .then(r => res.end(JSON.stringify(r ? { ok: true, kind, ...r } : { ok: false, why: '기록 없음' })))
+      .catch(() => res.end(JSON.stringify({ ok: false, why: '실패' })));
+    return;
+  }
+
   if (req.url === '/' || req.url === '/health'){
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     // 서버가 실제로 무엇을 갖고 있는지 그대로 내보낸다.

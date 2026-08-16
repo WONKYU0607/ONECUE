@@ -5,10 +5,11 @@ export const SERVER_BACKED = false;   // ← 점수를 서버가 쓰게 되면 t
 
 const KEY = 'duel.play.v2';
 
-// [stated] 일반 티켓은 **5개까지, 10분에 1개씩** 찬다 (총격전·칼전 팀전에 쓴다)
+// [stated] 티켓은 **하나로 통합.** 5장까지, 10분에 1장씩 차고 **무엇을 하든 여기서 깎인다**
 export const TICKET_MAX = 5;
 export const REGEN_MS = 10 * 60 * 1000;
-// [stated] **개인전은 따로 하루 3판.** 시간이 지나도 안 차고 자정에 초기화된다
+// [stated] **개인전은 대신 하루 3판 제한.** 티켓과 별개로 세는 **횟수 상한**이지
+// 따로 쓰는 주머니가 아니다 — 개인전을 하면 티켓도 같이 깎인다
 export const FFA_MAX = 3;
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -67,16 +68,19 @@ function rollDay(){
   if (cur.day !== today()){ cur.day = today(); cur.ffa = FFA_MAX; save(); }
 }
 export function ffaLeft(){ rollDay(); return cur.ffa; }
+// 개인전 한 판: **티켓과 하루 횟수를 같이** 깎는다. 둘 중 하나라도 없으면 못 한다
 export function useFfa(){
-  rollDay();
-  if (cur.ffa <= 0) return false;
-  cur.ffa -= 1; save();
+  rollDay(); regen();
+  if (cur.ffa <= 0 || cur.tk <= 0) return false;
+  if (cur.tk >= TICKET_MAX) cur.at = Date.now();
+  cur.ffa -= 1; cur.tk -= 1;
+  save();
   return true;
 }
 export function addFfa(n = 1){ rollDay(); cur.ffa = Math.min(FFA_MAX, cur.ffa + n); save(); return cur.ffa; }
-// 개인전인지에 따라 알맞은 쪽을 본다
-export const leftFor = ffa => (ffa ? ffaLeft() : ticketsLeft());
-export const maxFor = ffa => (ffa ? FFA_MAX : TICKET_MAX);
+// 개인전은 **티켓과 하루 횟수 둘 다** 걸리므로 더 빡빡한 쪽이 실제로 할 수 있는 판수다
+export const leftFor = ffa => (ffa ? Math.min(ticketsLeft(), ffaLeft()) : ticketsLeft());
+export const maxFor = ffa => (ffa ? Math.min(TICKET_MAX, FFA_MAX) : TICKET_MAX);
 export const spendFor = ffa => (ffa ? useFfa() : useTicket());
 // 다음 한 장까지 남은 밀리초 (꽉 찼으면 0)
 export function nextTicketIn(now = Date.now()){

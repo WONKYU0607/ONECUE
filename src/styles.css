@@ -331,9 +331,13 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .pcell.ptk b{color:#8fd8ff}
 /* 프로필은 두 줄 높이. 캐릭터 시트 0번(파랑 앞모습) */
 .prof-btn{flex:0 0 auto;cursor:pointer;gap:calc(var(--h-padX,5) * var(--u));background:rgba(16,24,40,.9)}
+/* [stated] 프로필 사진이 가로로 늘어나 보이던 것을 고쳤다.
+   원본 한 칸이 42x48 인데 정사각형 칸에 넣어 **가로가 14% 늘어나 있었다**.
+   폭을 높이의 42/48 = 0.875 로 잡아 원본 비율을 지킨다 */
 .prof-av{display:block;flex:0 0 auto;
-  width:calc((var(--h-rowH,20) - 4) * var(--u));height:calc((var(--h-rowH,20) - 4) * var(--u));
-  /* 캐릭터 시트는 24칸(6색 x 앞뒤 + 피격). 0번 = 파랑 앞모습 */
+  height:calc((var(--h-rowH,20) - 4) * var(--u));
+  width:calc((var(--h-rowH,20) - 4) * var(--u) * 0.875);
+  /* 캐릭터 시트는 24칸(6색 x 앞뒤 + 피격). 자리 계산은 profile.js 의 avatarPos() */
   background:var(--chars) 0 0/2400% 100% no-repeat;image-rendering:pixelated}
 /* [stated] 총격전·칼전과 인원을 한 화면에. 모드마다 한 줄씩 */
 .pick-group{width:100%}
@@ -418,10 +422,54 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* 칸으로 묶는다. 상단바와 같은 테두리색으로 맞춘다 */
 .prof-card{background:rgba(8,14,26,.6);border:1px solid #5a96c8;padding:8px 12px}
 .prof-head{display:flex;align-items:center;justify-content:center;gap:12px;margin:2px 0 8px}
-.prof-head .prof-av{width:48px;height:48px;flex:0 0 auto}
+.prof-head .prof-av{width:42px;height:48px;flex:0 0 auto}   /* 42x48 = 원본 비율 */
 .prof-nick{font:900 20px var(--gf);color:#ffe9a8}
 .prof-edit-row{flex:1 1 0;min-width:0;display:flex;gap:6px}
 .nick-input{flex:1 1 0;min-width:0;letter-spacing:1px;font-size:16px}
+/* [stated] 점수 줄 밑에 순위 한 줄. 같은 상자 안에 위아래로 붙여 한 덩어리로 보이게 */
+.prof-stack{display:flex;flex-direction:column}
+.prof-rank{display:flex;align-items:center;gap:6px;padding:3px 8px 5px;
+  border-top:1px solid rgba(90,140,190,.22)}
+.prof-rank .nm{font-size:11px;color:var(--dim)}
+.prof-rank .val{margin-left:auto;font-size:12px;color:var(--txt)}
+/* 순위표의 종목 전환은 **탭**이라 고른 쪽이 확실히 달라 보여야 한다.
+   `.primary` 는 글자 밝기만 바꿔서(원래 강조 버튼용) 탭으로는 구분이 안 됐다 */
+.rb-tabs .menu-btn{opacity:.55}
+.rb-tabs .menu-btn.primary{opacity:1;background:rgba(28,64,104,.5)}
+.rb-tabs .menu-btn.primary .t{color:#eaf7ff}
+
+/* 순위표 화면. 내 자리는 **목록보다 위**에 둔다 — 30위 밖이면 목록에 없어서
+   아래에 두면 자기 등수를 보려고 끝까지 내려야 한다 */
+.rb-me{display:flex;align-items:center;gap:6px;padding:7px 9px;margin-bottom:8px;
+  background:rgba(16,32,54,.85);border:1px solid #5a96c8;border-radius:3px}
+.rb-me .rb-nick{font-size:13px;font-weight:900}
+.rb-me .rb-tier{font-size:10px;color:var(--dim)}
+.rb-me .rb-rank{margin-left:auto;font-size:12px;color:#6cf}
+.rb-me .rb-score{font-size:13px;font-weight:900;min-width:44px;text-align:right}
+.rb-list{display:flex;flex-direction:column;gap:3px;
+  max-height:calc(100vh - 260px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.rb-row{display:flex;align-items:center;gap:6px;padding:5px 8px;
+  background:rgba(10,18,30,.7);border:1px solid rgba(90,140,190,.28);border-radius:3px}
+.rb-row.me{border-color:#5a96c8;background:rgba(16,32,54,.85)}
+.rb-no{min-width:22px;font-size:12px;color:var(--dim);text-align:right}
+.rb-row .rb-nick{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb-row .rb-score{margin-left:auto;font-size:12px;font-weight:900}
+/* [stated] 홈 상단바 **바로 밑**, 같은 크기 두 칸.
+   `.screen` 이 세로 가운데 정렬이라 그냥 두면 화면 한가운데로 밀린다 —
+   상단바가 그렇듯 **띄워서(absolute)** 바 바로 아래에 붙인다.
+   좌우도 상단바와 같은 변수를 써서 끝이 맞는다 */
+.rank-cards{position:absolute;z-index:24;
+  left:calc(var(--h-barX,0) * var(--u));right:calc(var(--h-barX,0) * var(--u));
+  top:calc((var(--h-barY,2) + var(--h-rowH,20) + 3) * var(--u));
+  display:flex;gap:calc(var(--h-boxGap,3) * var(--u))}
+.rank-card{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:2px;
+  padding:6px 8px;text-align:left;
+  background:rgba(12,22,36,.72);border:1px solid rgba(90,140,190,.35);border-radius:3px;
+  color:var(--txt);font:inherit;cursor:pointer}
+.rank-card .rc-top{display:flex;align-items:center;gap:5px;min-width:0}
+.rank-card .rc-nm{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-card .rc-tier{font-size:10px;color:var(--dim)}
+.rank-card .rc-rank{font-size:12px;color:var(--acc, #6cf)}
 .prof-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
 .prof-row{display:flex;align-items:center;gap:10px;font:900 14px var(--gf);color:#c8d8e6}
 .prof-row .nm{flex:0 0 auto}

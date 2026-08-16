@@ -96,6 +96,23 @@ console.log('개인전 — 전부 양수, 등수 40 + 피해 60');
   const t = mk(4, true, [80, 0, 0, 0], [60, 20, 15, 5], 1);
   const tr = [0,1,2,3].map(i => scoreDelta(t, i).delta);
   assert(Math.max(...tr) === tr[0], `잘한 1등이 최고점 (${tr})`);
+
+  // [stated] 개인전도 강약 차등을 맞춘다.
+  // 승패가 아니라 등수가 연속적이므로 성적 비율로 두 배율 사이를 잇는다 —
+  // **한가운데 등수는 배율이 정확히 1.0** (두 배율의 합이 2라서)
+  const top = f => scoreDelta(t, 0, { myScore: 1000, foeScore: f }).delta;
+  const bot = f => scoreDelta(t, 3, { myScore: 1000, foeScore: f }).delta;
+  assert(top(1200) > top(1000) && top(1000) > top(800),
+    `  강자들 사이 1등이 더 받는다 (${top(1200)} / ${top(1000)} / ${top(800)})`);
+  assert(bot(1200) < bot(1000) && bot(1000) < bot(800),
+    `  강자들 사이 꼴찌는 덜 받는다 (${bot(1200)} / ${bot(1000)} / ${bot(800)})`);
+  // 5인전 한가운데(3등)는 상대가 세든 약하든 같다
+  const mid = f => {
+    const m = mk(5, true, [90, 70, 50, 30, 0], [30, 25, 20, 15, 10], 1);
+    return scoreDelta(m, 2, { myScore: 1000, foeScore: f }).delta;
+  };
+  assert(mid(1400) === mid(1000) && mid(1000) === mid(600),
+    `  한가운데 등수는 배율 1.0 (${mid(1400)} / ${mid(1000)} / ${mid(600)})`);
 }
 
 console.log('인원 열세 보정 — 1대2로 이기면 두 배');

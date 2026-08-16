@@ -1,14 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getNick, setNick, clampNick, NICK_MAX, NICK_MAX_KO, getColor, setColor, avatarPos } from '../state/profile.js';
 import { scoreOf } from '../state/tickets.js';
 import { tierOf, tierName } from '../state/rank.js';
 import TierIcon from './TierIcon.jsx';
+import { loadAllRanks, cachedRank, fmtRank } from '../state/ranks.js';
 import { t } from '../i18n/index.js';
 
 // 프로필 탭. 캐릭터 옆에 닉네임, 오른쪽 위에 수정 버튼
 export default function ProfileTab({ onClose }){
   const [nick, setN] = useState(getNick());
   const [color, setC] = useState(getColor());
+  // 순위는 서버·구름에서 받아오므로 **화면이 먼저 뜨고 값은 나중에 채워진다**.
+  // 못 받아도 화면은 그대로 떠야 한다 (서버가 자고 있을 수 있다)
+  const [ranks, setRanks] = useState(() => ({ gun: cachedRank('gun'), melee: cachedRank('melee') }));
+  useEffect(() => {
+    let live = true;
+    loadAllRanks().then(r => { if (live) setRanks(r); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  const rankText = v => {
+    if (!v) return t('rank.loading');
+    const f = fmtRank(v.my);
+    return f ? t('rank.mine', { r: f.rank, n: f.total }) : t('rank.none');
+  };
   const [edit, setEdit] = useState(false);
   const [draft, setDraft] = useState(nick);
 
@@ -50,13 +64,20 @@ export default function ProfileTab({ onClose }){
           </div>
         </div>
 
+        {/* [stated] 총격전·칼전 점수 줄 **밑에 각각 한 줄씩** 순위를 붙인다 */}
         <div className="prof-rows">
           {[['gun', t('mode.gun')], ['melee', t('mode.melee')]].map(([k, nm]) => (
-            <div key={k} className="prof-row prof-card">
-              <TierIcon score={scoreOf(k)} />
-              <span className="nm">{nm}</span>
-              <span className="tier">{tierName(tierOf(scoreOf(k)))}</span>
-              <span className="val">{scoreOf(k).toLocaleString()}</span>
+            <div key={k} className="prof-card prof-stack">
+              <div className="prof-row">
+                <TierIcon score={scoreOf(k)} />
+                <span className="nm">{nm}</span>
+                <span className="tier">{tierName(tierOf(scoreOf(k)))}</span>
+                <span className="val">{scoreOf(k).toLocaleString()}</span>
+              </div>
+              <div className="prof-rank">
+                <span className="nm">{t('rank.title')}</span>
+                <span className="val">{rankText(ranks[k])}</span>
+              </div>
             </div>
           ))}
         </div>

@@ -1,0 +1,84 @@
+// 순위표. 두 갈래로 나뉜다.
+//
+//  1) **내 등수** — 서버(`GET /rank`)가 세어 준다.
+//     클라가 직접 못 세는 이유: 규칙이 `players` 를 자기 문서만 읽게 막아뒀다.
+//     Admin SDK 인 게임 서버는 규칙을 건너뛰므로 거기서 센다.
+//  2) **상위 30명 목록** — Firestore 의 `ranks/{kind}` **문서 하나**를 그냥 읽는다.
+//     판이 끝날 때마다 서버가 말아서 저장해두므로, 몇 명을 담든 조회 1회다.
+//
+// [stated] 총 몇 명 중 몇 등인지 같이 보여준다.
+// **없으면 없는 대로 넘어간다** — 서버가 자거나 Firestore 가 꺼져 있어도 화면은 떠야 한다.
+import { serverUrl } from '../net/connection.js';
+import { getUid } from '../cloud/firebase.js';
+
+const HTTP = serverUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
+const KINDS = ['gun', 'melee'];
+const norm = k => (k === 'melee' ? 'melee' : 'gun');
+
+// 같은 값을 화면 여러 곳(홈·프로필)에서 쓰므로 한 번만 받아 나눠 쓴다.
+// 판이 끝나면 바뀌므로 오래 붙들지는 않는다
+const CACHE_MS = 60 * 1000;
+const cache = { gun: null, melee: null };      // { at, my, list }
+const inflight = { gun: null, melee: null };
+
+const empty = () => ({ my: null, list: [] });
+
+async function fetchMy(kind){
+  const uid = getUid();
+  if (!uid) return null;
+  try {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 6000);
+    const res = await fetch(`${HTTP}/rank?uid=${encodeURIComponent(uid)}&kind=${kind}`,
+      { cache: 'no-store', signal: ac.signal });
+    clearTimeout(timer);
+    const j = await res.json();
+    return j && j.ok ? { rank: j.rank | 0, total: j.total | 0, score: j.score | 0 } : null;
+  } catch { return null; }
+}
+
+async function fetchList(kind){
+  try {
+    // 무겁게 시작하지 않도록 필요할 때 불러온다 (첫 화면 로딩에 firestore 가 안 끼게)
+    const [{ db }, fs] = await Promise.all([
+      import('../cloud/firebase.js'),
+      import('firebase/firestore')
+    ]);
+    const snap = await fs.getDoc(fs.doc(db, 'ranks', kind));
+    const v = snap.exists() ? snap.data() : null;
+    return Array.isArray(v && v.list) ? v.list : [];
+  } catch { return []; }
+}
+
+/** 한 종목의 순위 정보. 실패해도 던지지 않고 빈 값을 준다 */
+export function loadRank(kindRaw, force = false){
+  const kind = norm(kindRaw);
+  const hit = cache[kind];
+  if (!force && hit && Date.now() - hit.at < CACHE_MS) return Promise.resolve(hit);
+  if (inflight[kind]) return inflight[kind];
+  inflight[kind] = Promise.all([fetchMy(kind), fetchList(kind)])
+    .then(([my, list]) => {
+      const v = { at: Date.now(), my, list };
+      cache[kind] = v;
+      return v;
+    })
+    .catch(() => ({ at: Date.now(), ...empty() }))
+    .finally(() => { inflight[kind] = null; });
+  return inflight[kind];
+}
+
+/** 두 종목을 한 번에 */
+export const loadAllRanks = (force = false) =>
+  Promise.all(KINDS.map(k => loadRank(k, force))).then(([gun, melee]) => ({ gun, melee }));
+
+/** 이미 받아둔 값 (없으면 null) — 화면이 먼저 뜨고 값은 나중에 채워지게 */
+export const cachedRank = kindRaw => cache[norm(kindRaw)] || null;
+
+/** 판이 끝나면 다음에 볼 때 새로 받는다 */
+export function invalidateRanks(){ cache.gun = null; cache.melee = null; }
+
+/** `3,847등 / 10,231명` — 아직 못 받았으면 null */
+export function fmtRank(my){
+  if (!my || !my.rank) return null;
+  return { rank: my.rank.toLocaleString(), total: (my.total || 0).toLocaleString() };
+}

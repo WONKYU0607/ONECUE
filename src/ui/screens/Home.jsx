@@ -1,12 +1,16 @@
 // 첫 화면: 모드 선택 + 설정
 import PlayerBar from '../PlayerBar.jsx';
+import RankCards from '../RankCards.jsx';
 import { t } from '../../i18n/index.js';
 
-export default function Home({ onPvp, onAi, onPractice, onSettings, onHelp }){
+export default function Home({ onPvp, onAi, onPractice, onSettings, onHelp, onRanks }){
   return (
     <div className="screen home">
 
       <PlayerBar onHelp={onHelp} onSettings={onSettings} />
+
+      {/* [stated] 상단바 **바로 밑에** 순위표 두 칸 */}
+      <RankCards onOpen={onRanks} />
 
       <div className="menu">
         <button className="menu-btn primary" onClick={onPvp}>
