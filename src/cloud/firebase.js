@@ -3,7 +3,11 @@
 // 설정값은 공개돼도 괜찮다. 웹 앱에 어차피 박혀 나가는 값이고,
 // 보안은 Firestore 규칙으로 막는다(자기 문서만 읽기·쓰기, 점수는 서버만).
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import {
+  getAuth, signInAnonymously, onAuthStateChanged,
+  GoogleAuthProvider, signInWithCredential, linkWithCredential,
+  signInWithPopup, linkWithPopup
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const config = {
@@ -48,3 +52,84 @@ export function signIn(){
 
 // 로그인될 때까지 기다렸다가 uid를 준다 (없으면 null)
 export const whenSignedIn = () => (uid ? Promise.resolve(uid) : signIn());
+
+// ── 구글 로그인 ───────────────────────────────────────────────────
+// [stated] 익명 계정을 **구글 계정으로 승격(link)** 한다 — 지금 점수·닉네임이 그대로 따라간다.
+// 앱을 지우거나 기기를 바꿔도 같은 구글 계정으로 들어오면 기록이 살아난다.
+//
+// **앱(Capacitor)과 웹이 가는 길이 다르다.**
+//  - 앱: WebView 라 팝업이 안 뜬다 → 네이티브 플러그인이 구글 인증만 받아오고,
+//        실제 로그인은 우리가 JS SDK 로 한다 (`skipNativeAuth: true` 로 둔 이유).
+//        **여기서 JS SDK 로 해야** Firestore·서버 증표가 같은 계정을 본다
+//  - 웹: 그냥 팝업
+
+const isNative = async () => {
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    return Capacitor.isNativePlatform();
+  } catch { return false; }
+};
+
+// 앱에서 구글 인증만 받아 Firebase 자격증명으로 바꾼다
+async function nativeGoogleCredential(){
+  const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+  const r = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+  const idToken = r && r.credential && r.credential.idToken;
+  if (!idToken) throw new Error('구글 인증을 받지 못했다');
+  return GoogleAuthProvider.credential(idToken, r.credential.accessToken);
+}
+
+/** 구글 계정 연결.
+ *  돌려주는 값:
+ *   - `{ ok:true, mode:'link' }`     익명 계정이 그대로 승격됐다 (기록 유지)
+ *   - `{ ok:true, mode:'switch' }`   그 구글 계정에 **이미 기록이 있어** 그쪽으로 갈아탔다
+ *   - `{ ok:false, reason }`         취소·실패
+ *
+ *  [stated] **A안**: 이미 쓰던 구글 계정이면 **그쪽 기록을 살리고 지금 익명 것은 버린다.**
+ *  기기를 바꿔 새로 깔면 익명 계정이 새로 생기는데, 그 빈 기록으로 옛 기록을 덮으면 안 된다 */
+export async function linkGoogle(){
+  await signIn();                                  // 익명이라도 먼저 붙어 있어야 한다
+  const native = await isNative();
+  const user = auth.currentUser;
+  try {
+    if (native){
+      const cred = await nativeGoogleCredential();
+      if (user && user.isAnonymous) await linkWithCredential(user, cred);
+      else await signInWithCredential(auth, cred);
+    } else {
+      const provider = new GoogleAuthProvider();
+      if (user && user.isAnonymous) await linkWithPopup(user, provider);
+      else await signInWithPopup(auth, provider);
+    }
+    uid = auth.currentUser ? auth.currentUser.uid : uid;
+    return { ok: true, mode: 'link' };
+  } catch (e){
+    const code = (e && e.code) || '';
+    // **이미 그 구글 계정으로 쓰던 기록이 있다.** 승격이 안 되므로 그 계정으로 갈아탄다
+    if (code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use'){
+      try {
+        const cred = GoogleAuthProvider.credentialFromError(e);
+        if (!cred) return { ok: false, reason: 'inuse' };
+        await signInWithCredential(auth, cred);
+        uid = auth.currentUser ? auth.currentUser.uid : uid;
+        return { ok: true, mode: 'switch' };
+      } catch { return { ok: false, reason: 'inuse' }; }
+    }
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request')
+      return { ok: false, reason: 'cancel' };
+    console.warn('[firebase] 구글 연결 실패', code || e);
+    return { ok: false, reason: 'fail' };
+  }
+}
+
+/** 지금 계정이 구글에 연결돼 있는가 */
+export function googleLinked(){
+  const u = auth.currentUser;
+  return !!(u && !u.isAnonymous && (u.providerData || []).some(p => p.providerId === 'google.com'));
+}
+
+/** 화면에 보여줄 계정 이름 (없으면 null) */
+export function accountName(){
+  const u = auth.currentUser;
+  return u && !u.isAnonymous ? (u.displayName || u.email || null) : null;
+}

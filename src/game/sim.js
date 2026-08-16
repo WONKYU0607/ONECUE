@@ -539,10 +539,15 @@ export function canThrow(s, slot, k){
 // (막으면 안 보이는 상태에서 길이 막혀 위치가 드러난다)
 export function blocked(s, x, y, self = -1){
   setArena(s.n, s.melee, s.ffa);
+  // **이미 그 안에 서 있으면 막지 않는다.** 안 그러면 아이템 안에 갇혀 영영 못 나온다
+  // (드럼통은 상대가 서 있는 자리에도 놓일 수 있다)
+  const me = self >= 0 && s.p ? s.p[self] : null;
   for (const it of (s.items || [])){
-    if (it.hp <= 0 || it.k === ITEM.DRUM) continue;
+    if (it.hp <= 0) continue;                      // [stated] 드럼통도 캐릭터를 막는다
     const r = itemRect(it);
-    if (overlap(x, y, PWf, PHf, r.x, r.y, r.w, r.h)) return true;
+    if (!overlap(x, y, PWf, PHf, r.x, r.y, r.w, r.h)) continue;
+    if (me && overlap(me.x, me.y, PWf, PHf, r.x, r.y, r.w, r.h)) continue;
+    return true;
   }
   // 캐릭터끼리도 서로 막는다 (2대2에서 팀원과 겹쳐 서지 못하게)
   for (let i = 0; i < s.n; i++){

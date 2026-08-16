@@ -358,6 +358,30 @@ class Room {
 // Render 무료 플랜은 HTTP 요청으로도 깨어나므로 상태 확인용 엔드포인트를 둔다.
 const http = createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');   // 브라우저 fetch로 깨울 수 있어야 함
+  // [stated] 닉네임은 **유일**해야 한다 (친구를 이름으로 찾는다).
+  // **쓰기라서 증표(token)로 본인 확인을 한다** — uid 만 받으면 남의 이름을 바꿀 수 있다
+  if (req.url && req.url.startsWith('/nick')){
+    const q = new URL(req.url, 'http://x').searchParams;
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    const nick = q.get('nick') || '';
+    store.uidFromToken(q.get('token'))
+      .then(uid => uid ? store.claimNick(uid, nick) : { ok: false, auth: true })
+      .then(r => res.end(JSON.stringify(r)))
+      .catch(() => res.end(JSON.stringify({ ok: false, err: true })));
+    return;
+  }
+
+  // 이름으로 친구 찾기. 유일하므로 한 명 아니면 없음.
+  // 읽기만이라 증표는 안 받는다 — 대신 **공개해도 되는 것만** 돌려준다
+  if (req.url && req.url.startsWith('/find')){
+    const q = new URL(req.url, 'http://x').searchParams;
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    store.findByNick(q.get('nick') || '')
+      .then(v => res.end(JSON.stringify(v ? { ok: true, ...v } : { ok: false, why: '없음' })))
+      .catch(() => res.end(JSON.stringify({ ok: false, why: '실패' })));
+    return;
+  }
+
   // [stated] **정확한 등수.** 클라는 규칙에 막혀 못 세므로 서버가 대신 세어 준다.
   // 순위표 목록(상위 30명)은 `ranks/{kind}` 문서를 클라가 직접 읽으면 되고,
   // 여기서 주는 건 **내 등수 하나뿐**이다

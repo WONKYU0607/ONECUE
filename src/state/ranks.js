@@ -9,7 +9,9 @@
 // [stated] 총 몇 명 중 몇 등인지 같이 보여준다.
 // **없으면 없는 대로 넘어간다** — 서버가 자거나 Firestore 가 꺼져 있어도 화면은 떠야 한다.
 import { serverUrl } from '../net/connection.js';
-import { getUid } from '../cloud/firebase.js';
+// **firebase 를 정적으로 들여오지 않는다.** 한 파일에서 정적·동적 들여오기를 섞으면
+// 묶음이 안 쪼개져서 첫 화면이 통째로 무거워진다 —
+// 실측: 섞었을 때 진입 묶음 1,120kB(gzip 306), 동적만 쓰면 292kB(gzip 100)
 
 const HTTP = serverUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
 const KINDS = ['gun', 'melee'];
@@ -24,7 +26,8 @@ const inflight = { gun: null, melee: null };
 const empty = () => ({ my: null, list: [] });
 
 async function fetchMy(kind){
-  const uid = getUid();
+  let uid = null;
+  try { uid = (await import('../cloud/firebase.js')).getUid(); } catch { return null; }
   if (!uid) return null;
   try {
     const ac = new AbortController();

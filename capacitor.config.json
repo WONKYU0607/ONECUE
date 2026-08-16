@@ -1,0 +1,11 @@
+{
+  "appId": "com.wonkyu.gunsword",
+  "appName": "총칼대전",
+  "webDir": "dist",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
+  }
+}

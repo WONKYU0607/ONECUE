@@ -37,3 +37,18 @@ export async function startSync(){
 
 /** 바뀐 걸 올린다. 몰아서 보내므로 자주 불러도 된다 */
 export function save(){ if (mod) mod.push(gather()); }
+
+/** 계정이 바뀐 뒤 다시 맞춘다 (구글 로그인으로 갈아탄 경우).
+ *
+ *  **이걸 안 하면 새 기기의 빈 기록이 옛 기록을 덮어쓴다.**
+ *  기기를 바꿔 새로 깔면 익명 계정이 새로 생기고 점수 1000·티켓 5로 시작하는데,
+ *  그 상태로 구글 계정에 붙으면 `save()` 가 그 값을 그대로 올려 버린다.
+ *  그래서 **먼저 구름에서 읽어 기기에 덮고**, 그다음부터 올린다 */
+export async function resyncAccount(){
+  const m = await load();
+  setUid(await m.uid());
+  const v = await m.pull();
+  if (!v){ save(); return false; }      // 그 계정에 기록이 없으면 지금 값을 올려둔다
+  const a = hydrate(v), b = hydrateNick(v);
+  return a || b;
+}

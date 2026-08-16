@@ -426,6 +426,12 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .prof-nick{font:900 20px var(--gf);color:#ffe9a8}
 .prof-edit-row{flex:1 1 0;min-width:0;display:flex;gap:6px}
 .nick-input{flex:1 1 0;min-width:0;letter-spacing:1px;font-size:16px}
+/* 계정 칸. 연결 전에는 버튼 + 설명, 연결 뒤에는 계정 이름만 */
+.prof-acc{display:flex;align-items:center;gap:8px;padding:6px 8px;flex-wrap:wrap}
+.prof-acc .nm{font-size:12px;font-weight:700}
+.prof-acc .val{margin-left:auto;font-size:11px;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
+.prof-acc .acc-why{flex:1 1 120px;min-width:0;font-size:10px;color:var(--dim);line-height:1.3}
 /* [stated] 점수 줄 밑에 순위 한 줄. 같은 상자 안에 위아래로 붙여 한 덩어리로 보이게 */
 .prof-stack{display:flex;flex-direction:column}
 .prof-rank{display:flex;align-items:center;gap:6px;padding:3px 8px 5px;
@@ -462,14 +468,15 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   left:calc(var(--h-barX,0) * var(--u));right:calc(var(--h-barX,0) * var(--u));
   top:calc((var(--h-barY,2) + var(--h-rowH,20) + 3) * var(--u));
   display:flex;gap:calc(var(--h-boxGap,3) * var(--u))}
-.rank-card{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:2px;
-  padding:6px 8px;text-align:left;
+/* [stated] 크기 반으로 — 세 줄을 한 줄로 접는다 (66 → 33px).
+   티어는 프로필 창과 순위표 화면에 이미 있어서 여기선 뺐다 */
+.rank-card{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:5px;
+  height:calc(var(--h-rowH,20) * var(--u));padding:0 7px;
   background:rgba(12,22,36,.72);border:1px solid rgba(90,140,190,.35);border-radius:3px;
   color:var(--txt);font:inherit;cursor:pointer}
-.rank-card .rc-top{display:flex;align-items:center;gap:5px;min-width:0}
-.rank-card .rc-nm{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rank-card .rc-tier{font-size:10px;color:var(--dim)}
-.rank-card .rc-rank{font-size:12px;color:var(--acc, #6cf)}
+.rank-card .rc-nm{font-size:11px;font-weight:700;white-space:nowrap}
+.rank-card .rc-rank{margin-left:auto;font-size:11px;color:#6cf;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prof-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
 .prof-row{display:flex;align-items:center;gap:10px;font:900 14px var(--gf);color:#c8d8e6}
 .prof-row .nm{flex:0 0 auto}

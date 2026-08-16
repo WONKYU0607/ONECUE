@@ -5,6 +5,7 @@
 // **키가 없으면 조용히 꺼진다** — 개발 중이나 키를 안 넣었을 때 서버가 죽으면 안 된다.
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
 let db = null;
 let why = '';
@@ -26,6 +27,67 @@ try {
 if (!db) console.log('[store] 꺼짐 —', why, '· 점수는 저장되지 않는다');
 
 export const isOn = () => !!db;
+
+/** 로그인 증표 확인. **uid 를 그냥 믿으면 남의 이름을 바꿔버릴 수 있다** —
+ *  이름 바꾸기처럼 쓰기가 일어나는 곳은 반드시 이걸로 본인인지 확인한다 */
+export async function uidFromToken(idToken){
+  if (!db || !idToken) return null;
+  try { return (await getAuth().verifyIdToken(String(idToken))).uid || null; }
+  catch { return null; }
+}
+
+// [stated] 닉네임은 **유일**해야 한다 (친구를 이름으로 찾는다).
+// 화면에 보이는 이름과 **겹침 판정용 열쇠**를 따로 둔다 — 대소문자·공백만 다른
+// 이름을 다른 사람으로 보면 사칭이 쉬워진다. `src/state/profile.js` 의 `nickKey`
+// 와 **같은 방식이어야 한다** (한쪽만 바꾸면 판정이 어긋난다)
+export const nickKey = v =>
+  String(v || '').trim().toLowerCase().replace(/\s+/g, ' ').normalize('NFC');
+
+/** 이름 선점. 이미 남이 쓰고 있으면 `{ok:false, taken:true}`.
+ *  **트랜잭션이어야 한다** — 두 사람이 같은 이름을 동시에 넣으면 둘 다 통과해버린다 */
+export async function claimNick(uid, nick){
+  if (!db) return { ok: false, off: true };
+  const key = nickKey(nick);
+  if (!key) return { ok: false, bad: true };
+  try {
+    return await db.runTransaction(async tx => {
+      const ref = db.doc('nicks/' + key);
+      const cur = await tx.get(ref);
+      if (cur.exists && cur.data().uid !== uid) return { ok: false, taken: true };
+      const meRef = db.doc('players/' + uid);
+      const me = await tx.get(meRef);
+      const oldKey = me.exists ? nickKey(me.data().nick) : '';
+      tx.set(ref, { uid, at: FieldValue.serverTimestamp() });
+      // 옛 이름 자리는 비워 준다. 안 그러면 쓰지도 않는 이름을 계속 붙들고 있다
+      if (oldKey && oldKey !== key) tx.delete(db.doc('nicks/' + oldKey));
+      tx.set(meRef, { nick: String(nick) }, { merge: true });
+      return { ok: true, nick: String(nick) };
+    });
+  } catch (e){
+    console.log('[store] 이름 선점 실패', e && e.code);
+    return { ok: false, err: true };
+  }
+}
+
+/** 이름으로 찾기. 유일하므로 **한 명 아니면 없음** */
+export async function findByNick(nick){
+  if (!db) return null;
+  const key = nickKey(nick);
+  if (!key) return null;
+  try {
+    const hit = await db.doc('nicks/' + key).get();
+    if (!hit.exists) return null;
+    const uid = hit.data().uid;
+    const p = await db.doc('players/' + uid).get();
+    if (!p.exists) return null;
+    const v = p.data();
+    // **공개해도 되는 것만** 준다 (전적·저장값을 통째로 내보내면 안 된다)
+    return { uid, nick: v.nick || '', score: v.score || { gun: 1000, melee: 1000 } };
+  } catch (e){
+    console.log('[store] 이름 찾기 실패', e && e.code);
+    return null;
+  }
+}
 
 /** **부팅 때 연결을 미리 열어둔다.**
  *  첫 Firestore 호출은 인증 토큰 발급 + gRPC/TLS 수립까지 하느라 무겁다.

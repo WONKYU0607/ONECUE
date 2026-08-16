@@ -11,6 +11,10 @@
     "lint": "eslint src server test --ext .js,.jsx --max-warnings 200"
   },
   "dependencies": {
+    "@capacitor-firebase/authentication": "^8.4.0",
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
     "firebase": "^12.17.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

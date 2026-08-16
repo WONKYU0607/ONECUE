@@ -1,8 +1,7 @@
-import { newState, step, canPlace, canThrow, itemRect, allPlaced, myItemAt } from '../src/game/sim.js';
+import { newState, step, canPlace, canThrow, itemRect, allPlaced, myItemAt, blocked, NOIN } from '../src/game/sim.js';
 import {
   FP, ITEM, ITEM_DEF, PH_READY, PH_PLAY, PH_OVER, CD_TICKS, GRID_ROWS, GRID_COLS,
-  cellOwner, MAXHP, DRUM_DAMAGE, DRUM_RADIUS, GRID_MIDROW, EXPLO_TICKS, THROW
-} from '../src/game/config.js';
+  cellOwner, MAXHP, DRUM_DAMAGE, DRUM_RADIUS, GRID_MIDROW, EXPLO_TICKS, THROW, PWf, PHf } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 const mk = (o = {}) => ({ dx:0, dy:0, fire:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0, ...o });
@@ -347,6 +346,43 @@ console.log('겹친 칸은 벽이 부서진 뒤에야 드럼통이 터진다');
     assert(fr[i].x >= fr[i-1].x + fr[i-1].w, `  프레임이 겹치지 않는다 (${i})`);
   assert(!Object.keys(inJson).some(k => !ITEM_DEF.find(d => d.key === k)),
     '  items.json 에 안 쓰는 프레임이 남아 있지 않다');
+}
+
+
+// [stated] "캐릭터가 드럼통을 지나간다고. 캐릭터도 통과는 못해야지"
+// 벽·바리케이트는 원래 이동을 막고 있었는데 **드럼통만 예외로 빠져 있었다**
+console.log('드럼통도 캐릭터를 막는다');
+{
+  const s = newState(2);
+  s.phase = PH_PLAY;
+  const me = 1;                       // 위쪽 팀 — 드럼통은 위쪽(상대 영역)에 심긴다
+  const p = s.p[me];
+  const col = 3, row = 3;
+  s.items.push({ k: ITEM.DRUM, c: col, r: row, by: 0, hp: 1 });
+  const R = itemRect(s.items[0]);
+
+  // 드럼통 한가운데는 못 선다
+  assert(blocked(s, R.x + (R.w >> 1) - (PWf >> 1), R.y + 4, me),
+    '  드럼통 안은 막힌다');
+  // 같은 줄 옆 칸은 그대로 지나간다
+  assert(!blocked(s, R.x - PWf * 3, R.y + 4, me), '  옆 칸은 안 막힌다');
+
+  // 실제로 걸어 들어가려 해도 못 들어간다
+  p.x = R.x + (R.w >> 1) - (PWf >> 1);
+  p.y = R.y + R.h + 400;              // 드럼통 바로 아래
+  const startY = p.y;
+  for (let i = 0; i < 30; i++) step(s, [NOIN, { dx: 0, dy: -1, fire: 0 }]);
+  assert(p.y + PHf > R.y + R.h - 300,
+    `  드럼통에 막혀 못 올라간다 (${((startY - p.y) / FP).toFixed(1)}px 이동)`);
+
+  // **이미 안에 서 있으면 막지 않는다** — 안 그러면 드럼통이 깔린 자리에 갇힌다
+  p.x = R.x + (R.w >> 1) - (PWf >> 1);
+  p.y = R.y + 4;
+  assert(!blocked(s, p.x, p.y - 200, me), '  안에 갇히면 빠져나갈 수 있다');
+
+  // 부서진 드럼통(터진 뒤)은 안 막는다
+  s.items[0].hp = 0;
+  assert(!blocked(s, R.x + (R.w >> 1) - (PWf >> 1), R.y + 4, me), '  터진 뒤엔 안 막는다');
 }
 
 console.log('items.test.js 통과');

@@ -4,6 +4,7 @@ import { scoreOf } from '../state/tickets.js';
 import { tierOf, tierName } from '../state/rank.js';
 import TierIcon from './TierIcon.jsx';
 import { loadAllRanks, cachedRank, fmtRank } from '../state/ranks.js';
+import { resyncAccount } from '../cloud/sync.js';
 import { t } from '../i18n/index.js';
 
 // 프로필 탭. 캐릭터 옆에 닉네임, 오른쪽 위에 수정 버튼
@@ -18,6 +19,40 @@ export default function ProfileTab({ onClose }){
     loadAllRanks().then(r => { if (live) setRanks(r); }).catch(() => {});
     return () => { live = false; };
   }, []);
+  // 구글 연결. **firebase 를 정적으로 들여오지 않는다** — 그러면 첫 화면 묶음에
+  // firebase 가 통째로 딸려 들어가 292kB 가 1,170kB 가 된다(실측). 필요할 때만 받는다
+  const [linked, setLinked] = useState(false);
+  const [accName, setAccName] = useState(null);
+  const [accMsg, setAccMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    import('../cloud/firebase.js').then(m => {
+      if (!live) return;
+      setLinked(m.googleLinked());
+      setAccName(m.accountName());
+    }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  const doLink = async () => {
+    if (busy) return;
+    setBusy(true); setAccMsg('');
+    try {
+      const m = await import('../cloud/firebase.js');
+      const r = await m.linkGoogle();
+      if (r.ok){
+        // 계정이 바뀌었으면 **구름 값으로 기기를 덮는다** (순서가 반대면 옛 기록이 날아간다)
+        if (r.mode === 'switch'){ await resyncAccount(); setAccMsg(t('acc.switched')); }
+        setLinked(m.googleLinked());
+        setAccName(m.accountName());
+        setN(getNick());          // 계정이 바뀌면 이름도 그 계정 것으로
+      } else if (r.reason !== 'cancel'){
+        setAccMsg(t('acc.fail'));
+      }
+    } catch { setAccMsg(t('acc.fail')); }
+    setBusy(false);
+  };
+
   const rankText = v => {
     if (!v) return t('rank.loading');
     const f = fmtRank(v.my);
@@ -80,6 +115,25 @@ export default function ProfileTab({ onClose }){
               </div>
             </div>
           ))}
+        </div>
+
+        {/* [stated] 익명 계정은 앱을 지우면 사라진다 → **구글 계정으로 승격**.
+            이미 그 구글 계정에 기록이 있으면 그쪽으로 갈아탄다(A안) — 그때는
+            **구름에서 다시 읽어 기기에 덮어야** 새 기기의 빈 기록이 옛 기록을 안 지운다 */}
+        <div className="prof-card prof-acc">
+          {linked ? (
+            <>
+              <span className="nm">{t('acc.linked')}</span>
+              <span className="val">{accName || ''}</span>
+            </>
+          ) : (
+            <>
+              <button className="menu-btn small" disabled={busy} onClick={doLink}>
+                <span className="t">{busy ? t('acc.busy') : t('acc.google')}</span>
+              </button>
+              <span className="acc-why">{accMsg || t('acc.why')}</span>
+            </>
+          )}
         </div>
 
         {/* [stated] "색 고르고 **확인** 누르면" — 고르는 순간 이미 저장되고 사진도 바뀐다.
