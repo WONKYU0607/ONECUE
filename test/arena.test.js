@@ -83,12 +83,13 @@ console.log('아이템 종류');
 setArena(2);
 assert(itemKinds().length === 3, '1대1은 1칸 벽·바리 + 드럼통 3종');
 assert(itemQuota(ITEM.WALL2) === 0 && itemQuota(ITEM.DRUM) === 2, '1대1엔 2·3칸이 없다');
-assert(coverBudget() === 2, '1대1 엄폐물 합계 2개');
+assert(coverBudget(1) === 2 && coverBudget(2) === 0, '1대1 엄폐물은 1칸짜리 2개');
 setArena(4);
 // [stated] 총격전 팀전은 엄폐물 **2개**. 3칸짜리는 게임에서 완전히 뺐다
 assert(itemKinds().length === 5, '2대2는 5종 (벽 1·2칸, 바리케이트 1·2칸, 드럼통)');
 assert(ITEM_DEF.length === 5 && ITEM_DEF.every(d => d.cells <= 2), '3칸짜리 정의가 남아 있지 않다');
-assert(coverBudget() === 2, '엄폐물은 조합 자유, 합계 2개');
+// [stated] 팀전은 총 2개 — 1칸 하나 + 2칸 하나
+assert(coverBudget(1) === 1 && coverBudget(2) === 1, '팀전 엄폐물은 1칸 1개 + 2칸 1개');
 assert(ITEM_DEF[ITEM.WALL2].cells === 2 && ITEM_DEF[ITEM.BARR2].cells === 2, '칸 수가 이름과 맞는다');
 
 console.log('여러 칸짜리 배치');

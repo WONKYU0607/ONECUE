@@ -2,7 +2,7 @@ import {
   FP, WALL_L, WALL_R, wallIdx, PH_PLAY, THROW,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CW, GRID_CH, GRID_X0, GRID_Y0,
   ATK_TICKS, ATK_HIT, FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX, PHf, PWf, MAXHP, BUFF, PORTAL_N,
-  ITEM, ITEM_DEF, isCover, coverBudget, itemQuota, PH_READY, coverUsed} from './config.js';
+  ITEM, ITEM_DEF, isCover, coverBudget, itemQuota, PH_READY, coverUsed, coverCells} from './config.js';
 import { canPlace } from './sim.js';
 
 // 노릴 상대. 2대2에서는 살아 있는 적 중 가로로 가장 가까운 쪽을 본다.
@@ -69,18 +69,13 @@ const MID  = 8 * FP;        // 세로 중앙 오프셋
 function planPlace(s, me, p){
   const team = teamOf(me, s.n);
   const used = k => (s.items || []).filter(it => it.by === team && it.k === k).length;
-  // **시뮬과 같은 방식으로 센다.** 시뮬은 칸 수가 아니라 **개수**로 센다 —
-  // 칸 수로 세면 남은 양을 잘못 계산해 예산을 못 쓰거나 넘긴다
-  const usedCover = coverUsed(s.items, team);
-  // 남은 게 있는 종류를 고른다.
-  // **예산에 딱 맞는 크기를 골라야** 남은 칸을 다 쓴다 (2칸 남았는데 1칸만 놓고 끝나면 손해)
-  // **놓을 자리가 있는 크기만 고른다.** 예산이 2칸이면 2·3칸짜리는 자리가 아예 없다
-  const left = coverBudget() - usedCover;
-  // 엄폐물이 남았으면 큰 것부터 시도한다 (개수 한도 안에서 넓게 막는 게 유리)
+  // **시뮬과 같은 방식으로 센다.** 한도는 **칸 수마다 따로**다 (1칸 2개 · 2칸 1개) —
+  // 합계로 세면 남은 양을 잘못 계산해 예산을 못 쓰거나 넘긴다
+  const leftOf = c => coverBudget(c) - coverUsed(s.items, team, c);
+  // 큰 것부터 시도한다. 그 칸 수의 몫이 남아 있고 종류별 정원도 남아야 후보가 된다
   const cands = [];
-  if (left > 0)
-    for (const k of [ITEM.WALL2, ITEM.BARR2, ITEM.WALL, ITEM.BARR])
-      if (used(k) < itemQuota(k)) cands.push(k);
+  for (const k of [ITEM.WALL2, ITEM.BARR2, ITEM.WALL, ITEM.BARR])
+    if (leftOf(coverCells(k)) > 0 && used(k) < itemQuota(k)) cands.push(k);
   if (used(ITEM.DRUM) < itemQuota(ITEM.DRUM)) cands.push(ITEM.DRUM);
   if (!cands.length) return null;
   // **단계가 높을수록 잘 놓는다.** 모두가 똑같이 놓으면 배치가 실력 차이를 못 만든다.

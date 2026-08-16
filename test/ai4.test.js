@@ -3,7 +3,7 @@
 import { newState, step, canPlace, allPlaced, NOIN } from '../src/game/sim.js';
 import {
   FP, PH_PLAY, PH_READY, PH_COUNT, stepCap, teamOf, cellOwner,
-  GRID_COLS, GRID_ROWS, ITEM_DEF, itemKinds, itemQuota, isCover, coverBudget
+  GRID_COLS, GRID_ROWS, ITEM_DEF, itemKinds, itemQuota, isCover, coverBudget, coverCells
 } from '../src/game/config.js';
 import { createAI } from '../src/game/ai.js';
 import { assert } from './harness.js';
@@ -24,7 +24,7 @@ console.log('네 명 다 AI로 한 판이 굴러간다');
   for (const team of [0, 1]){
     const slot = team === 0 ? 0 : 2;
     for (const k of itemKinds()){
-      const want = isCover(k) ? coverBudget() : itemQuota(k);
+      const want = isCover(k) ? coverBudget(coverCells(k)) : itemQuota(k);
       for (let n = 0; n < want; n++){
         let put = null;
         for (let r = 0; r < GRID_ROWS && !put; r++){

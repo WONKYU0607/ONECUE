@@ -1,9 +1,15 @@
 // 점수 계산. **시뮬 상태만 보고 계산한다** — 화면 코드가 규칙을 다시 쓰면 어긋난다.
 //
 // 확정된 규칙:
-//   차이 D = (이긴 편 남은 체력 합) − (진 편 남은 체력 합)   ※ KO는 진 편이 0인 경우일 뿐
+//   [stated] **이긴 건 최소한을 보장한다.** 예전엔 점수 = 체력차 D 그대로라
+//     신승(5:0)이 5점, 완승(100:0)이 100점으로 20배 차이가 났다 —
+//     "체력이 조금 남고 이기면 그만큼 치열했다는 증거인데 점수가 너무 조금 오른다"
+//   승리   기본 70 + 체력차(1인 환산) x 0.4     → 신승 72 / 완승 110
+//   패배   기본 20 + 체력차(1인 환산) x 0.3     → 접전 -22 / 완패 -50
+//     예전엔 접전 패배가 -2~-3 이라 판만 많이 하면 무조건 올라갔다(실력이 아니라 판수)
+//   [stated] **강약 차등**: 센 상대를 이기면 더 주고 약한 상대를 이기면 덜 준다.
+//     지는 쪽도 뒤집어 — 센 상대에게 지면 조금, 약한 상대에게 지면 많이 깎인다
 //   배분   절반은 균등, 절반은 피해 기여도. 진 쪽은 비중을 뒤집어 많이 싸운 사람이 덜 깎인다
-//   지면   계산값의 절반만 깎는다
 //   개인전 전부 양수. 등수 40점 + 피해 60점
 //   열세   이겼을 때 (상대 인원 ÷ 우리 인원) 배. 1대2로 이기면 x2
 //   연승   한 단계마다 +10%, **상한 없음** (이긴 쪽만). 10연승이면 x1.90
@@ -13,6 +19,23 @@ import { teamOf, MAXHP } from './config.js';
 
 export const LEAVE_PENALTY = -100;
 export const STREAK_STEP = 0.10;    // 한 단계마다
+
+// [stated] 이기면 70 + D x 0.4 / 지면 20 + D x 0.3 (D 는 1인 환산 체력차 0~100)
+export const WIN_BASE = 70, WIN_MARGIN = 0.4;
+export const LOSE_BASE = 20, LOSE_MARGIN = 0.3;
+
+// [stated] 강약 차등. 점수 차 400 이면 기대 승률이 약 24% — 체스식 기대값을 그대로 쓴다.
+// 이기면 `2 x (1 - 기대승률)`, 지면 `2 x 기대승률` → 동급은 둘 다 1.0 으로 맞아떨어진다.
+// **상·하한을 둔다** — 점수 차가 벌어지면 배율이 0 이나 2 로 붙어 한쪽이 무의미해진다
+export const RATING_SPREAD = 400;
+export const MUL_MIN = 0.5, MUL_MAX = 1.8;
+export function skillMul(myScore, foeScore, win){
+  const me = Number.isFinite(myScore) ? myScore : 1000;
+  const foe = Number.isFinite(foeScore) ? foeScore : me;
+  const expWin = 1 / (1 + Math.pow(10, (foe - me) / RATING_SPREAD));
+  const m = win ? 2 * (1 - expWin) : 2 * expWin;
+  return Math.min(MUL_MAX, Math.max(MUL_MIN, m));
+}
 
 // 연승 배율 (이긴 쪽만). 1연승은 보너스 없음.
 // [stated] **상한을 두지 않는다** — 몇 연승이든 10%씩 계속 얹는다
@@ -47,7 +70,7 @@ export function scoreDelta(st, slot, opt = {}){
   const dealt = st.dealt || [];
   const hp = i => Math.max(0, st.p[i].hp | 0);
   const out = { delta: 0, base: 0, mine: dealt[slot] || 0, total: 0,
-                rank: 0, streakMul: 1, odds: 1, result: 'draw', reason: '' };
+                rank: 0, streakMul: 1, odds: 1, skillMul: 1, result: 'draw', reason: '' };
   for (let i = 0; i < n; i++) out.total += dealt[i] || 0;
 
   // [stated] 중도 이탈은 −100 고정
@@ -88,19 +111,25 @@ export function scoreDelta(st, slot, opt = {}){
   const teamDmg = sumDmg(me);
   const share = teamDmg > 0 ? out.mine / teamDmg : 1 / nMine;
 
+  // **1인 환산 체력차.** 인원이 늘면 D 도 같이 커지므로(3대3은 최대 300)
+  // 나눠서 0~100 으로 맞춘다 — 모드가 달라도 판당 점수가 비슷해진다
+  const Dn = D / Math.max(nMine, nFoe);
+  // 기여도 가중치: 균등하면 1.0, 혼자 다 하면 2대2에서 1.5배, 아무것도 안 하면 0.5배
+  const wWin = 0.5 + 0.5 * share * nMine;
+  // 지는 쪽은 뒤집는다 — 많이 싸운 사람이 덜 깎인다
+  const wLose = Math.min(1.5, Math.max(0.5, 1.5 - 0.5 * share * nMine));
+  out.skillMul = skillMul(opt.myScore, opt.foeScore, win);
+
   if (win){
-    // 절반 균등 + 절반 기여도. 인원 열세면 (상대 ÷ 우리) 배
-    out.base = D * (0.5 / nMine + 0.5 * share);
-    out.odds = nFoe / nMine;
+    out.base = (WIN_BASE + WIN_MARGIN * Dn) * wWin;
+    out.odds = nFoe / nMine;                        // 인원 열세면 (상대 ÷ 우리) 배
     out.streakMul = streakMul(opt.streak);
-    out.delta = Math.round(out.base * out.odds * out.streakMul);
+    out.delta = Math.round(out.base * out.odds * out.streakMul * out.skillMul);
   } else {
     // [stated] 우리 편에 이탈자가 있으면 져도 안 깎인다
     if (opt.teamLeft){ out.reason = 'teamLeft'; return out; }
-    const rest = Math.max(1, nMine - 1);
-    const inv = nMine > 1 ? (1 - share) / rest : 1;
-    out.base = -0.5 * D * (0.5 / nMine + 0.5 * inv);
-    out.delta = Math.round(out.base);
+    out.base = -(LOSE_BASE + LOSE_MARGIN * Dn) * wLose;
+    out.delta = Math.round(out.base * out.skillMul);
   }
   return out;
 }

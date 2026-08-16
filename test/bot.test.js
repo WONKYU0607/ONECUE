@@ -27,8 +27,10 @@ console.log('7초 안에 채운다');
   assert(m, '기다리는 시간이 있다');
   assert(+m[1] <= 7000, `7초 이내 (${+m[1] / 1000}초)`);
   assert(/fillWithBots/.test(srv), '채우는 함수가 있다');
-  assert(/setInterval\(\(\) => \{\s*for \(const key of \[\.\.\.waiting\.keys\(\)\]\) fillWithBots/.test(srv),
-    '주기적으로 대기열을 훑는다');
+  // **`pairUp` 도 같은 타이머에서 돌아야 한다.** 서버가 아직 안 데워져 한 번 걸러지면
+  // 다시 부르는 곳이 없어 둘이 기다리고 있어도 봇 채우기 시각까지 안 붙는다
+  assert(/for \(const key of \[\.\.\.waiting\.keys\(\)\]\)\s*\{\s*pairUp\(key\);\s*fillWithBots\(key\);/.test(srv),
+    '주기적으로 대기열을 훑는다 (pairUp + fillWithBots)');
 }
 
 console.log('봇인 걸 드러내지 않는다');
@@ -161,7 +163,7 @@ console.log('총격전 봇이 아이템을 놓는다');
   // ready 를 매 틱 보내서 **다 놓기 전에 준비가 끝나던** 것도 원인이었다
   const { newState, step, NOIN } = await import('../src/game/sim.js');
   const { createAI } = await import('../src/game/ai.js');
-  const { SELF, PH_READY, coverUsed, coverBudget, itemQuota, ITEM } =
+  const { SELF, PH_READY, coverUsed, coverBudget, coverSizes, itemQuota, ITEM } =
     await import('../src/game/config.js');
   const IN = n => Array.from({ length: n }, () => ({ ...NOIN }));
   for (const n of [2, 4, 6]){
@@ -178,15 +180,20 @@ console.log('총격전 봇이 아이템을 놓는다');
       step(st, q);
       if (st.phase !== PH_READY) break;
     }
+    // 엄폐물 한도는 **칸 수마다** 따로다 (1칸 하나 + 2칸 하나)
+    const want = coverSizes().reduce((a, c) => a + coverBudget(c), 0);
     const cover = coverUsed(st.items, 1);
     const drums = st.items.filter(it => it.by === 1 && it.k === ITEM.DRUM).length;
-    assert(cover === coverBudget(), `  ${n}인: 엄폐물을 다 쓴다 (${cover}/${coverBudget()})`);
+    assert(cover === want, `  ${n}인: 엄폐물을 다 쓴다 (${cover}/${want})`);
     assert(drums === itemQuota(ITEM.DRUM), `  ${n}인: 드럼통을 다 쓴다 (${drums}/${itemQuota(ITEM.DRUM)})`);
     assert(st.phase !== PH_READY, `  ${n}인: 배치가 끝나 전투로 넘어간다`);
   }
-  // 다 놓기 전에 준비하면 안 된다
+  // 다 놓기 전에도, 사람을 기다리는 중에도 준비하면 안 된다.
+  // [stated] 봇이 먼저 다 깔아버려 사람이 놓을 기회가 없었다 → 사람이 준비완료를
+  // 누른 뒤에야 봇이 채운다. 그동안 봇이 준비를 눌러두면 사람이 누르는 순간 시작돼 버린다
   const net = fs.readFileSync('src/game/net.js', 'utf8');
-  assert(/if \(!a\.place\)\{ q\.ready = 1/.test(net), '놓을 게 남았으면 준비하지 않는다');
+  assert(/if \(!a\.place && this\.botMayPlace\(b\.slot\)\)\{ q\.ready = 1/.test(net),
+    '놓을 게 남았거나 사람을 기다리는 중이면 준비하지 않는다');
 }
 
 console.log('봇이 신청에 답하고, 가끔 먼저 건다');

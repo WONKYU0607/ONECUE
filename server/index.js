@@ -192,7 +192,10 @@ class Room {
       const d = scoreDelta(st, i, {
         streak: before.streak + 1,
         left: !!st.off[i],
-        teamLeft: this.teamHasLeaver(i)
+        teamLeft: this.teamHasLeaver(i),
+        // [stated] 강약 차등 — 상대가 얼마나 센지를 넣는다
+        myScore: before.score,
+        foeScore: this.foeScoreOf(i)
       });
       const res = d.result;
       rows.push({
@@ -205,6 +208,22 @@ class Room {
     store.writeResults(rows)
       .then(ok => { if (ok) store.buildRanks(kind).catch(() => {}); })
       .catch(() => {});
+  }
+
+  // 상대 팀 평균 점수. **봇은 내 점수와 같다고 본다** —
+  // 봇 난이도가 이미 사람 점수에 맞춰지므로 동급(배율 1.0)이 맞고,
+  // [stated] 봇인 걸 몰라야 하니 사람과 붙은 것과 같은 점수가 나와야 한다
+  foeScoreOf(slot){
+    const st = this.server.s;
+    const bots = this.server.bots || [];
+    const mine = (this.preScore[slot] || {}).score || 1000;
+    let sum = 0, cnt = 0;
+    for (let i = 0; i < this.n; i++){
+      if (teamOf(i, this.n) === teamOf(slot, this.n)) continue;
+      sum += bots.some(b => b.slot === i) ? mine : ((this.preScore[i] || {}).score || 1000);
+      cnt++;
+    }
+    return cnt ? sum / cnt : mine;
   }
 
   // 우리 편에 중도 이탈자가 있었는가 (있으면 져도 점수가 안 깎인다)
@@ -370,6 +389,9 @@ const http = createServer((req, res) => {
       pid: process.pid,            // 서버가 두 벌 돌고 있는지 확인용
       uptime: Math.round(process.uptime()),
       waiting: waitingCount(),
+      // 틱 루프 지각(ms). 갓 깬 인스턴스는 여기가 크고, 그동안은 판을 안 연다
+      tickLate: +tickLate.toFixed(1),
+      warm: serverWarm(),
       players: wss ? wss.clients.size : 0,
       rooms: detail
     }));
@@ -380,6 +402,7 @@ const http = createServer((req, res) => {
 
 const wss = new WebSocketServer({ server: http });
 http.listen(PORT, () => console.log(`듀얼 서버 대기중 :${PORT}`));
+store.warmup();   // **첫 판이 아니라 부팅 때** Firestore 연결을 연다
 
 // 대기열: 새로 들어온 사람은 방에 바로 앉히지 않는다.
 // 방에 빈 자리가 있다고 바로 넣으면, 상대가 재접속 대기 중인(예약석) 방에 앉아
@@ -387,6 +410,7 @@ http.listen(PORT, () => console.log(`듀얼 서버 대기중 :${PORT}`));
 // 기다린 사람이 있으면 빈 자리를 봇으로 채워 판을 연다.
 // **봇인 걸 드러내지 않는다** — 이름도 사람과 같은 꼴로 짓는다
 function fillWithBots(key){
+  if (!serverWarm()) return;
   const q = queueOf(key);
   if (!q.length) return;
   const parts = key.split(':');
@@ -411,7 +435,32 @@ function fillWithBots(key){
   console.log(`봇 채움: room ${room.id} ${key} (사람 ${picked.length}/${n})`);
 }
 
+// **틱 루프가 제때 도는지 잰다.** 갓 깬 인스턴스는 CPU를 못 받아 타이머가 늦고,
+// 그러면 프레임이 뭉쳐서 나가 화면이 끊긴다 — 실측: 갓 깬 동안 프레임 간격 p95 68ms,
+// 데워진 뒤 17ms. **이건 넷코드로는 못 고친다.** 판을 그 위에서 열지 않는 수밖에 없다
+// **평균이 아니라 '최근 최악'을 본다.** 평균은 버벅임이 드문드문이면 묻힌다 —
+// 60ms 씩 막히는 상황에서도 EMA 는 10ms 언저리라 문턱을 아슬아슬하게 넘나들었다.
+// 서서히 잦아드는 최댓값이라 한 번 튀면 남고, 조용하면 0.7초쯤에 걸쳐 내려온다
+let tickLate = 0;          // 최근 최악의 지각 (ms)
+let lastTickAt = 0;
+let tickSeen = 0;
+const WARM_LATE_MS = 25;   // 정상일 때 실측 최대 16ms — 여유를 두고 25
+// **켜지자마자는 '데워졌다'고 할 수 없다** — 표본이 없어 지각이 0 으로 보인다.
+// 시계로 재면(예: 1.5초) 멀쩡한 서버도 무조건 그만큼 기다리게 되므로 **틱 표본 수**로 센다.
+// 굶는 프로세스는 이 표본을 채우는 데도 오래 걸려서 그 사이 지각이 드러난다
+const WARM_MIN_TICKS = 20;
+const WARM_WAIT_MAX = 12000;
+const bootAt = Date.now();
+// 서버가 아직 버벅이면 판을 열지 않는다. **첫 판이 렉 걸리는 진짜 이유**가 이거였다 —
+// 갓 깬 인스턴스 위에서 방이 열려 전투가 그대로 돌았다. 매칭 화면에서 조금 더
+// 기다리게 하되, 영영 안 열리면 안 되므로 상한을 둔다
+function serverWarm(){
+  if (Date.now() - bootAt > WARM_WAIT_MAX) return true;   // 상한을 넘기면 그냥 연다
+  return tickSeen >= WARM_MIN_TICKS && tickLate < WARM_LATE_MS;
+}
+
 function pairUp(key){
+  if (!serverWarm()) return;                              // 데워질 때까지 대기열에 둔다
   const q = queueOf(key);
   const parts = key.split(':');
   const n = +parts[0], melee = parts[1] === 'm', ffa = parts[2] === 'f';
@@ -586,6 +635,12 @@ wss.on('connection', (ws, req) => {
 // 모든 방을 한 타이머로 굴린다. 방마다 setInterval을 두면 방이 늘수록 흔들린다
 setInterval(() => {
   const now = performance.now(), wall = Date.now();
+  if (lastTickAt){
+    const late = Math.max(0, (now - lastTickAt) - TICK_MS);
+    tickLate = Math.max(late, tickLate * 0.98);           // 서서히 잦아드는 최댓값
+    tickSeen++;
+  }
+  lastTickAt = now;
   for (const [id, room] of rooms){
     room.sweep(wall);
     if (room.emptyAt && wall - room.emptyAt > EMPTY_ROOM_TTL){
@@ -603,7 +658,10 @@ setInterval(() => {
 // 끊긴 소켓 정리 (모바일은 연결이 조용히 죽는 경우가 많다)
 // [stated] 10초 안에 상대가 잡히게. 대기열을 훑어 오래 기다린 사람이 있으면 봇으로 채운다
 setInterval(() => {
-  for (const key of [...waiting.keys()]) fillWithBots(key);
+  // **`pairUp` 도 여기서 다시 시도해야 한다.** 예전엔 사람이 대기열에 들어올 때만
+  // 불렀는데, 서버가 아직 안 데워져 그때 걸러지면 **다시 부르는 곳이 없어서**
+  // 둘이 이미 기다리고 있어도 봇 채우기 시각(6.5초)까지 안 붙었다
+  for (const key of [...waiting.keys()]){ pairUp(key); fillWithBots(key); }
 }, 150);   // 0.5초마다 보면 그만큼 늦어져 7초를 넘긴다
 
 setInterval(() => {

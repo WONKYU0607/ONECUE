@@ -267,6 +267,19 @@ export class Server {
     if (!f){ f = Array(this.n).fill(null); this.inbox.set(m.tick, f); }
     f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, sh: m.sh ? 1 : 0, ready: m.ready ? 1 : 0, go: m.go ? 1 : 0, place: m.place || null, thr: m.thr || null, fastReq: m.fastReq|0, fastAns: m.fastAns|0, bareReq: m.bareReq|0, bareAns: m.bareAns|0 };
   }
+  // 이 봇이 지금 아이템을 놓아도 되는가.
+  // 같은 팀에 **아직 준비완료를 안 누른 사람**이 있으면 안 된다 (끊긴 사람은 기다리지 않는다)
+  botMayPlace(slot){
+    if (!this.bots) return true;
+    const team = teamOf(slot, this.n);
+    for (let i = 0; i < this.n; i++){
+      if (i === slot || teamOf(i, this.n) !== team) continue;
+      if (this.bots.some(b => b.slot === i)) continue;          // 팀원 봇은 기다릴 대상이 아니다
+      if (this.s.off && this.s.off[i]) continue;                // 끊긴 사람
+      if (!(this.s.ready && this.s.ready[i])) return false;     // 사람이 아직 준비 전
+    }
+    return true;
+  }
   recalcDelay(){
     const worst = Math.max(...this.rtt.map(v => v || 0));     // 가장 느린 사람 기준 = 전원 동일 지연
     this.delay = clampi(Math.ceil((worst/2 + JITTER_MS) / TICK_MS) + this.extra, MIN_DELAY, MAX_DELAY);
@@ -297,7 +310,10 @@ export class Server {
         q.dy = Math.round((a.vy || 0) * TUNE.spd.v / 60 * FP);
         if (a.sh) q.sh = 1;
         if (a.thr) q.thr = a.thr;
-        if (a.place) q.place = a.place;
+        // [stated] **봇이 사람보다 먼저 다 깔아버리면 사람은 놓을 기회가 없다.**
+        // 아이템은 팀 것이라 봇 하나가 팀 몫을 통째로 채워버렸다.
+        // 팀에 사람이 있으면 **그 사람이 준비완료를 누른 뒤에야** 봇이 남은 걸 채운다
+        if (a.place && this.botMayPlace(b.slot)) q.place = a.place;
         // ── 2배속·노템전 신청에 답한다 ──────────────────────
         // **답을 안 하면 사람이 계속 기다린다.** 봇은 신청을 받고도 아무 반응이 없었다.
         // 잠깐 생각하는 척 뜸을 들인 뒤 답한다 (즉답하면 사람이 아닌 티가 난다)
@@ -329,7 +345,10 @@ export class Server {
         // **다 놓기 전에 준비를 누르면 빈손으로 시작한다.**
         // 놓을 게 남아 있으면 기다렸다가, 없을 때만 준비 완료.
         // 신청에 답을 기다리는 동안에도 준비는 눌러둔다 (준비 시간은 멈춰 있다)
-        if (!a.place){ q.ready = 1; q.go = 1; }
+        // 아직 놓을 게 남았거나(=a.place) 사람을 기다리는 중이면 준비를 누르지 않는다.
+        // **기다리는 동안 준비를 눌러두면**, 사람이 준비를 누르는 순간 전원이 준비가 되어
+        // 봇이 아무것도 못 깐 채로 판이 시작된다 (조건을 반대로 썼다가 잡혔다)
+        if (!a.place && this.botMayPlace(b.slot)){ q.ready = 1; q.go = 1; }
         inp[b.slot] = q;
       }
       this.inbox.delete(t);

@@ -105,6 +105,8 @@ import {
   isCover,
   coverBudget,
   coverUsed,
+  coverCells,
+  coverSizes,
   TEAM_COLS,
   cellX,
   cellY,
@@ -125,7 +127,8 @@ import {
   botSpan,
   wallIdx
 ,
-  NEG_SHOW} from './config.js';
+  NEG_SHOW, BARR_BLAST_DMG, BARR_FIRE_DMG,
+} from './config.js';
 
 // ================= SIM (pure, deterministic) =================
 export function newItems(){ return []; }
@@ -303,9 +306,11 @@ export function itemRect(it){
 export function allPlaced(s, slot){
   setArena(s.n, s.melee, s.ffa);
   const team = teamOf(slot, s.n);
-  if (coverUsed(s.items, team) < coverBudget()) return false;      // 엄폐물 합계
+  // 엄폐물은 **칸 수마다** 따로 센다 (1칸 2개 · 2칸 1개)
+  for (const c of coverSizes())
+    if (coverUsed(s.items, team, c) < coverBudget(c)) return false;
   for (const k of itemKinds()){
-    if (isCover(k)) continue;                                       // 위에서 합계로 셌다
+    if (isCover(k)) continue;                                       // 위에서 칸 수별로 셌다
     const used = (s.items || []).filter(it => it.by === team && it.k === k).length;
     if (used < itemQuota(k)) return false;
   }
@@ -355,8 +360,11 @@ export function canPlace(s, slot, k, c, r, from){
     const prev = from
       ? (s.items || []).find(it => it.by === team && it.c === from.c && it.r === from.r)
       : null;
-    const held = coverUsed(s.items, team) - (prev && isCover(prev.k) ? 1 : 0);
-    if (held >= coverBudget()) return false;
+    // 옮기는 중이면 **같은 칸 수일 때만** 그 몫을 빼준다
+    const cells = coverCells(k);
+    const held = coverUsed(s.items, team, cells)
+      - (prev && isCover(prev.k) && coverCells(prev.k) === cells ? 1 : 0);
+    if (held >= coverBudget(cells)) return false;
   }
   // 겹침. 단, 내 엄폐물과 상대 드럼통은 같은 칸에 놓을 수 있다.
   // (안 그러면 배치 단계에 빈 칸이 생겨 상대가 드럼통 위치를 눈치챈다)
@@ -444,7 +452,25 @@ export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
       if (p.hp <= 0 && s.solo) p.hp = MAXHP;
     }
   }
+  // [stated] 바리케이트는 **상대** 폭발에 체력이 닳는다 (벽은 안 닳는다)
+  hurtBarricades(s, x0, y0, x1, y1, byTeam, BARR_BLAST_DMG);
   s.fx.push({ c, r, t: EXPLO_TICKS, k: 0 });   // k=0: 폭발
+}
+
+// 지정한 사각형에 걸친 **상대 팀 바리케이트**의 체력을 깎는다.
+// 벽(WALL 계열)은 건드리지 않는다 — `key` 로 구분하면 새 아이템이 늘 때 어긋나므로
+// `ITEM_DEF` 의 `barr` 표시를 본다
+export function hurtBarricades(s, x0, y0, x1, y1, byTeam, dmg){
+  if (byTeam < 0 || !s.items) return;
+  for (const it of s.items){
+    if (it.hp <= 0) continue;
+    if (!ITEM_DEF[it.k] || !ITEM_DEF[it.k].barr) continue;
+    if (it.by === byTeam) continue;                       // 내 팀 것은 안 닳는다
+    const R = itemRect(it);
+    if (!overlap(R.x, R.y, R.w, R.h, x0, y0, x1 - x0, y1 - y0)) continue;
+    it.hp -= dmg;
+    if (it.hp <= 0) it.hp = 0;
+  }
 }
 
 function explode(s, it, by = -1){
@@ -869,6 +895,8 @@ export function step(s, inp){
         t.hp -= FIRE_DAMAGE; t.flash = FLASH_T; t.hitBy = -1;
         if (was > 0 && t.hp <= 0) killFx(s, t);
       }
+      // [stated] 불길도 상대 바리케이트를 태운다
+      hurtBarricades(s, x0, y0, x1, y1, fireTeam, BARR_FIRE_DMG);
     }
     if (--fr.t <= 0) s.fire.splice(i, 1);
   }

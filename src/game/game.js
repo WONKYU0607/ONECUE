@@ -12,7 +12,7 @@ import { canPlace, canThrow, allPlaced, myItemAt, newState } from './sim.js';
 import { getColor } from '../state/profile.js';
 import {
   FAST, BARE, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, teamOf, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
-  ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed,
+  ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed, coverCells, coverSizes,
   GRID_X0, GRID_Y0, H, cellOwner, cellX, cellY
 } from './config.js';
 import { padRect, paletteSlots, uiBoxRect } from './layout.js';
@@ -104,7 +104,7 @@ export function createGame(canvas, opts = {}){
   // 아이템은 팀 소유라 팀 번호로 센다
   const allPlacedKind = (st, team, k) =>
     isCover(k)
-      ? coverUsed(st.items, team) >= coverBudget()
+      ? coverUsed(st.items, team, coverCells(k)) >= coverBudget(coverCells(k))
       : (st.items || []).filter(it => it.by === team && it.k === k).length >= itemQuota(k);
   // 재접속하면 옛 프레임을 버리고 서버 스냅샷으로 다시 맞춘다
   if (online){
@@ -147,8 +147,12 @@ export function createGame(canvas, opts = {}){
   const leftCount = k => {
     const st = client.pred;
     const myTeam = teamOf(SELF.slot, st.n || 2);
-    // 엄폐물은 종류별이 아니라 합계로 센다 (1·2·3칸 조합 자유, 총 N개)
-    if (isCover(k)) return Math.max(0, coverBudget() - coverUsed(st.items, myTeam));
+    // 엄폐물은 종류별이 아니라 **칸 수별**로 센다 (1칸 2개 · 2칸 1개).
+    // 팔레트의 남은 수는 같은 칸 수끼리 같은 값이 뜬다
+    if (isCover(k)){
+      const c = coverCells(k);
+      return Math.max(0, coverBudget(c) - coverUsed(st.items, myTeam, c));
+    }
     const used = (st.items || []).filter(it => it.by === myTeam && it.k === k).length;
     return Math.max(0, itemQuota(k) - used);
   };
@@ -355,12 +359,15 @@ export function createGame(canvas, opts = {}){
         const isPlacer = placerOf.get(team) === slot;
         if (isPlacer && !aiPlans.has(slot)){
           const plan = [];
-          // 넓은 것부터 놓는다. 좁은 걸 먼저 흩뿌리면 3칸짜리가 들어갈 자리가 없어진다
+          // 넓은 것부터 놓는다. 좁은 걸 먼저 흩뿌리면 넓은 게 들어갈 자리가 없어진다.
+          // 한도가 **칸 수별**이라 칸 수마다 따로 센다
           const wide = itemKinds().slice().sort((a, b) => ITEM_DEF[b].cells - ITEM_DEF[a].cells);
-          let budget = coverBudget();
+          const left = new Map(coverSizes().map(c => [c, coverBudget(c)]));
           for (const k of wide){
             if (isCover(k)){
-              for (let n = 0; n < Math.min(itemQuota(k), budget); n++){ plan.push(k); budget--; }
+              const c = coverCells(k);
+              const n0 = Math.min(itemQuota(k), left.get(c) || 0);
+              for (let n = 0; n < n0; n++){ plan.push(k); left.set(c, (left.get(c) || 0) - 1); }
             } else {
               for (let n = 0; n < itemQuota(k); n++) plan.push(k);
             }

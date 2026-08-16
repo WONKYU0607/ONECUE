@@ -27,6 +27,17 @@ if (!db) console.log('[store] 꺼짐 —', why, '· 점수는 저장되지 않�
 
 export const isOn = () => !!db;
 
+/** **부팅 때 연결을 미리 열어둔다.**
+ *  첫 Firestore 호출은 인증 토큰 발급 + gRPC/TLS 수립까지 하느라 무겁다.
+ *  그게 첫 판이 전투로 들어가는 순간(`prime()`)에 일어나면 하필 그때 CPU를 먹는다.
+ *  없는 문서를 한 번 읽어 그 비용을 부팅 쪽으로 옮긴다 (실패해도 무시) */
+export function warmup(){
+  if (!db) return;
+  db.doc('players/__warmup__').get()
+    .then(() => console.log('[store] 연결 미리 열어둠'))
+    .catch(e => console.log('[store] 미리 열기 실패(무시) —', String(e && e.message || e)));
+}
+
 /** 여러 사람의 기록을 한 번에 읽는다. 없으면 기본값.
  *  **매칭 때 한 번만** 부른다 — 판마다 읽으면 할당량이 금방 닳는다 */
 export async function readPlayers(uids){
