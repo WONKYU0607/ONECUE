@@ -10,6 +10,7 @@ import { createJuice } from './juice.js';
 import { sfx, buzz, unlockAudio } from './audio.js';
 import { canPlace, canThrow, allPlaced, myItemAt, newState } from './sim.js';
 import { getColor } from '../state/profile.js';
+import { usableW, usableH } from '../state/safearea.js';
 import {
   FAST, BARE, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, teamOf, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
   ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed, coverCells, coverSizes,
@@ -206,7 +207,9 @@ export function createGame(canvas, opts = {}){
     onShield: () => { sfx.ready?.(); client.raiseShield(SELF.slot); }
   });
 
-  const doResize = () => view.resize(innerWidth, innerHeight);
+  // **상태바·내비게이션바를 뺀 크기로 맞춘다.** 그냥 innerWidth/innerHeight 를 쓰면
+  // 캔버스가 그만큼 커져서 아래쪽 조작 패드가 내비게이션바에 가린다
+  const doResize = () => view.resize(usableW(), usableH());
   addEventListener('resize', doResize);
   doResize();
 

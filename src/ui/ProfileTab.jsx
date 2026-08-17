@@ -61,7 +61,31 @@ export default function ProfileTab({ onClose }){
   const [edit, setEdit] = useState(false);
   const [draft, setDraft] = useState(nick);
 
-  const save = () => { setN(setNick(draft)); setEdit(false); };
+  // [stated] 이름은 **유일**해야 한다(친구를 이름으로 찾는다) → 서버가 선점한 뒤에만 바꾼다.
+  // 규칙이 클라의 직접 수정을 막아놔서, 여기서 서버를 안 거치면 **구름에 이름이 안 들어가고
+  // 순위표 목록에 빈칸으로 뜬다**
+  const [nickMsg, setNickMsg] = useState('');
+  const [nickBusy, setNickBusy] = useState(false);
+  const save = async () => {
+    if (nickBusy) return;
+    const want = clampNick(draft);
+    if (!want.trim()) return;
+    if (want === nick){ setEdit(false); setNickMsg(''); return; }
+    setNickBusy(true); setNickMsg(t('nick.saving'));
+    const { claimNick } = await import('../state/nickname.js');
+    const r = await claimNick(want);
+    setNickBusy(false);
+    if (r && r.ok){
+      setN(setNick(want));                 // 서버가 받아준 뒤에 기기에도 쓴다
+      setEdit(false); setNickMsg('');
+    } else if (r && r.taken){
+      setNickMsg(t('nick.taken'));
+    } else {
+      // 로그인 전·서버 잠듦·저장소 꺼짐 — 기기에는 쓰되 겹침 확인은 못 했다고 알린다
+      setN(setNick(want));
+      setEdit(false); setNickMsg(t('nick.netfail'));
+    }
+  };
 
   return (
     <div className="modal-back" onClick={e => e.target === e.currentTarget && onClose?.()}>
@@ -78,7 +102,9 @@ export default function ProfileTab({ onClose }){
               <input className="code-input nick-input" value={draft}
                      autoFocus onChange={e => setDraft(clampNick(e.target.value))}
                      onKeyDown={e => e.key === 'Enter' && save()} />
-              <button className="menu-btn primary" onClick={save}><span className="t">{t('common.ok')}</span></button>
+              <button className="menu-btn primary" disabled={nickBusy} onClick={save}>
+                <span className="t">{t('common.ok')}</span>
+              </button>
             </div>
           ) : (
             <span className="prof-nick">{nick}</span>
@@ -86,6 +112,7 @@ export default function ProfileTab({ onClose }){
         </div>
 
         {edit && <p className="hint nick-hint">영문 {NICK_MAX}자 · 한글 {NICK_MAX_KO}자까지</p>}
+        {nickMsg && <p className="hint nick-hint">{nickMsg}</p>}
 
         {/* [stated] 여기서 고른 색으로 **항상** 들어간다 (판마다 안 고른다) */}
         <div className="prof-card prof-colors">

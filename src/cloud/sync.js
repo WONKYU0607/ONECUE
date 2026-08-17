@@ -32,7 +32,23 @@ export async function startSync(){
   const v = await m.pull();
   if (!v) { save(); return false; }        // 처음이면 지금 기기 값을 올려둔다
   const a = hydrate(v), b = hydrateNick(v);
+  // **구름 문서에 이름이 비어 있으면 채워 넣는다.**
+  // 규칙이 클라의 이름 쓰기를 막은 뒤로, 서버가 점수를 먼저 써서 만들어진 문서는
+  // 이름이 영영 안 들어간다 → 순위표 목록에 빈칸으로 뜬다. 서버를 거쳐 한 번 채운다
+  if (!v.nick) fillNick();
   return a || b;
+}
+
+// 이름이 비어 있을 때만 한 번. 실패해도 조용히 넘어간다(다음에 켤 때 다시 시도)
+let filling = false;
+async function fillNick(){
+  if (filling) return;
+  filling = true;
+  try {
+    const { claimNick } = await import('../state/nickname.js');
+    const me = nickSnapshot();
+    if (me && me.nick) await claimNick(me.nick);
+  } catch { /* 무시 */ }
 }
 
 /** 바뀐 걸 올린다. 몰아서 보내므로 자주 불러도 된다 */
@@ -50,5 +66,6 @@ export async function resyncAccount(){
   const v = await m.pull();
   if (!v){ save(); return false; }      // 그 계정에 기록이 없으면 지금 값을 올려둔다
   const a = hydrate(v), b = hydrateNick(v);
+  if (!v.nick) fillNick();
   return a || b;
 }

@@ -75,4 +75,22 @@ console.log('찾기는 공개해도 되는 것만 준다');
   assert(!/return \{ uid, \.\.\.v/.test(body), '  문서를 통째로 안 준다');
 }
 
+// **이름 저장이 실제로 서버를 거치는가.** 여기가 빠져 있어서 구름 문서에 이름이
+// 안 들어갔고, 순위표 목록에 내 줄이 `-` 로 떴다 (실기에서 발견)
+console.log('프로필 이름 저장이 서버를 거친다');
+{
+  const prof = fs.readFileSync('src/ui/ProfileTab.jsx', 'utf8');
+  const sync = fs.readFileSync('src/cloud/sync.js', 'utf8');
+  assert(/claimNick/.test(prof), '  이름을 바꿀 때 claimNick 을 부른다');
+  assert(/r && r\.taken/.test(prof), '  이미 쓰는 이름이면 알려준다');
+  const i = prof.indexOf('const save = async');
+  const body = prof.slice(i, prof.indexOf('\n  };', i));
+  assert(body.indexOf('claimNick(want)') < body.indexOf('setNick(want)'),
+    '  **서버가 받아준 뒤에** 기기에 쓴다 (순서가 반대면 겹친 이름이 남는다)');
+
+  // 규칙 때문에 서버가 문서를 먼저 만든 계정은 이름이 영영 안 들어간다 → 한 번 채워 준다
+  assert(/if \(!v\.nick\) fillNick\(\)/.test(sync), '  구름에 이름이 없으면 채워 넣는다');
+  assert(/let filling = false/.test(sync), '  여러 번 겹쳐 부르지 않는다');
+}
+
 console.log('nickname.test.js 통과');

@@ -8,14 +8,23 @@
   /* **한 칸 단위.** 화면(세로 띠) 폭이 창 크기에 따라 달라지므로
      UI 수치를 절대 px로 두면 PC에서 작아 보인다. 폰 360px을 1로 잡고 비례시킨다.
      [stated] PC도 폰과 완전히 같은 화면으로 간다 */
-  --u:calc(min(100vw, 45.5vh) / 360);
+  /* **안전 영역.** 안드로이드 15 부터 앱이 화면 끝까지 그려져서(edge-to-edge)
+     상태바·내비게이션바 자리에 UI 가 겹친다. `safearea.js` 가 실제 값을 넣어 준다.
+     여기 기본값 0 은 브라우저·PC 용 */
+  --sat:0px; --sab:0px; --sal:0px; --sar:0px;
+  /* 실제로 쓸 수 있는 세로 크기. 100vh 는 상태바·내비게이션바까지 포함한 값이라
+     그대로 쓰면 화면이 그만큼 커져 아래가 잘린다 */
+  --vh:calc(100vh - var(--sat) - var(--sab));
+  --u:calc(min(100vw, var(--vh) * 0.455) / 360);
   --fx:36px;   /* 틀 좌우 두께 */
   --fy:38px;   /* 틀 위아래 두께 */
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:#07070d;overflow:hidden;touch-action:none;
 -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
-.wrap{height:100%;display:flex;align-items:center;justify-content:center}
+/* 게임 캔버스도 안전 영역 안에 둔다 (상단바 밑으로 밀려 들어가지 않게) */
+.wrap{height:100%;display:flex;align-items:center;justify-content:center;
+  padding:var(--sat) var(--sar) var(--sab) var(--sal)}
 canvas{display:block;background:#12121c}
 .tune{position:fixed;right:6px;top:6px;display:flex;flex-direction:column;gap:5px;
 z-index:10;font:11px/1 monospace;color:#7a7a95}
@@ -38,7 +47,9 @@ font:900 21px/1 var(--gf);letter-spacing:2px;cursor:pointer}
 /* 폰에서는 화면을 꽉 채우고, PC처럼 가로가 넓으면 **게임 캔버스와 같은 폭**으로 묶는다.
    게임은 늘 폰 비율로 그려지는데 메뉴만 풀스크린이면 들어갈 때마다 크기가 널뛴다.
    캔버스 실측: 1917x950에서 466px, 1280x800에서 392px → 대략 높이의 0.455배 */
-.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+/* **`inset:0` 이면 상태바·내비게이션바 밑까지 깔린다.** 안전 영역만큼 띄운다 */
+.screen{position:fixed;top:var(--sat);right:var(--sar);bottom:var(--sab);left:var(--sal);
+display:flex;flex-direction:column;align-items:center;
 justify-content:center;gap:18px;color:#e8e8f0;font-family:var(--gf);font-weight:700;padding:8px}
 /* 금속 틀. CSS border-image 가 9분할을 대신 해준다 —
    네 모서리는 그대로, 변만 늘어나고, fill 로 가운데(바닥 타일)까지 채운다.

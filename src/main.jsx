@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import { startSync } from './cloud/sync.js';
 import { apply as applyHomeUI } from './state/homeLayout.js';
+import { measureSafeArea, watchSafeArea } from './state/safearea.js';
 import './styles.css';
 
 // 금속 틀 이미지. 상대 경로는 어디를 기준으로 풀릴지 애매해서 **절대 URL로 못 박는다**
@@ -21,6 +22,10 @@ for (const [name, file] of [['--tiers', 'tiers.webp'], ['--ticket', 'ticket.webp
   document.documentElement.style.setProperty(name, `url("${u}")`);
 }
 
+// **화면을 그리기 전에 잰다.** 안드로이드 15부터 앱이 화면 끝까지 그려져서
+// 상태바·내비게이션바 자리에 UI 가 겹친다. 회전하면 값이 바뀌므로 계속 지켜본다
+measureSafeArea();
+watchSafeArea(() => {});
 applyHomeUI();   // 홈 배치 수치를 CSS 변수로 내보낸다
 // 익명 로그인 + 구름 기록 내려받기. **첫 화면을 막지 않는다** —
 // Firebase는 따로 받아오고, 실패해도 기기 저장으로 게임이 돌아간다
