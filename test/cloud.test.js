@@ -85,11 +85,13 @@ console.log('보안 규칙');
   // 정의만 있고 안 쓰면 소용없다. **update 규칙이 실제로 부르는지** 본다
   const upd = r.slice(r.indexOf('allow update'), r.indexOf('allow delete'));
   assert(/keepsScore\(\)/.test(upd), '고칠 때 점수 보호를 실제로 검사한다');
-  // [stated] 이름이 유일해야 해서(친구를 이름으로 찾는다) **닉네임도 여기 들어간다** —
-  // 클라가 직접 고치면 서버의 선점을 건너뛰고 남과 같은 이름을 쓸 수 있다
-  assert(/hasAny\(\['score','streak','record','nick'\]\)/.test(r), '막는 항목이 명시돼 있다');
+  // [stated] 이름이 유일해야 해서(친구를 이름으로 찾는다) **닉네임도 여기 들어간다**.
+  // [stated] **티켓도 서버가 쥔다** — 기기에 두면 저장소를 고쳐 무한히 놀 수 있다
+  assert(/hasAny\(\['score','streak','record','nick','tk','at','ffa','day'\]\)/.test(r),
+    '막는 항목이 명시돼 있다');
   const mineFn = r.slice(r.indexOf('function mine'), r.indexOf('function keepsScore'));
-  assert(!/score|streak|record/.test(mineFn), '클라가 쓸 수 있는 목록에 점수가 없다');
+  assert(!/'score'|'streak'|'record'|'tk'|'ffa'/.test(mineFn),
+    '클라가 만들 때도 점수·티켓을 못 담는다');
   assert(/allow delete: if false/.test(r), '지우기 금지');
   assert(/match \/ranks\/\{doc\}/.test(r), '순위표 자리가 있다');
   const ranks = r.slice(r.indexOf('match /ranks'));

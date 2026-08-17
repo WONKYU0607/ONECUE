@@ -23,6 +23,16 @@ export default function PlayerBar({ onHelp, onSettings, onFriends }){
     window.addEventListener('resize', fitBar);
     return () => window.removeEventListener('resize', fitBar);
   });
+  // [stated] 티켓은 서버가 쥔다 → **화면을 켤 때 서버 값으로 맞춘다.**
+  // 판이 끝나고 돌아올 때도 다시 받아야 방금 깎인 게 반영된다
+  useEffect(() => {
+    let live = true;
+    import('../state/friends.js')
+      .then(m => m.pullTickets())
+      .then(ok => { if (ok && live) tick(v => v + 1); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
   const wait = nextTicketIn();
   // [stated] 상단바에 뜨는 **기본 티켓은 5개.** 예전엔 일반 5 + 개인전 3 을 더해
   // 8 로 떠서, 성격이 다른 두 주머니가 한 숫자로 섞여 보였다.

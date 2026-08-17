@@ -148,7 +148,7 @@ export default function ProfileTab({ onClose, onFriends }){
         {/* [stated] 친구는 홈이 아니라 **프로필 안, 칼전 줄 밑에** 작게 둔다 */}
         {onFriends && (
           <button className="prof-card prof-link" onClick={() => { onClose(); onFriends(); }}>
-            <span className="nm">{t('fr.title')}</span>
+            <span className="nm">{t('fr.menu')}</span>
             <span className="val">›</span>
           </button>
         )}

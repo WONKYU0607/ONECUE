@@ -197,6 +197,7 @@ export default {
   'prof.color': '색',
   'rank.title': '순위표',
   'fr.title': '친구',
+  'fr.menu': '친구 신청',
   'fr.search': '이름으로 찾기',
   'fr.add': '신청',
   'fr.none': '그런 이름이 없습니다',

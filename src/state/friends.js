@@ -58,3 +58,26 @@ export const myInvites = () => ask({ act: 'invites' });
 
 /** 입장했거나 무시했을 때 지운다 */
 export const clearInvite = uid => ask({ act: 'inviteClear', uid });
+
+// ── 티켓 ────────────────────────────────────────────────────────────
+// [stated] 티켓은 **서버가 쥔다.** 기기 값은 화면용 사본이라, 서버가 알려준 값으로 맞춘다.
+// 못 받으면 사본을 그대로 쓴다 — 서버가 자고 있어도 화면은 떠야 한다
+export async function pullTickets(){
+  let token = null;
+  try {
+    const { auth } = await import('../cloud/firebase.js');
+    if (!auth.currentUser) return false;
+    token = await auth.currentUser.getIdToken();
+  } catch { return false; }
+  try {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 8000);
+    const res = await fetch(`${HTTP}/ticket?token=${encodeURIComponent(token)}`,
+      { cache: 'no-store', signal: ac.signal });
+    clearTimeout(timer);
+    const v = await res.json();
+    if (!v || !v.ok) return false;
+    const { syncTickets } = await import('./tickets.js');
+    return syncTickets(v);
+  } catch { return false; }
+}

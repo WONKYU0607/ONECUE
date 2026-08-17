@@ -197,6 +197,7 @@ export default {
   'prof.color': 'Color',
   'rank.title': 'Ranking',
   'fr.title': 'Friends',
+  'fr.menu': 'Friend requests',
   'fr.search': 'Find by name',
   'fr.add': 'Request',
   'fr.none': 'No such name',

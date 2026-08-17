@@ -284,6 +284,75 @@ export async function friendList(me){
   }
 }
 
+// ── 티켓 ────────────────────────────────────────────────────────────
+// **기기에 두면 저장소를 고쳐 무한히 놀 수 있다.** 광고로 티켓을 파는 이상
+// 이 값은 반드시 서버가 쥐고 있어야 한다.
+//
+// `src/state/tickets.js` 와 **같은 규칙**이어야 한다 (한쪽만 고치면 화면과 실제가 어긋난다):
+//   5장까지 · 10분에 1장 · 꽉 차 있으면 시계를 지금으로 당긴다 · 개인전은 하루 3판
+export const TICKET_MAX = 5;
+export const REGEN_MS = 10 * 60 * 1000;
+export const FFA_MAX = 3;
+const dayKey = () => new Date().toISOString().slice(0, 10);
+
+/** 지난 시간만큼 채운 값을 돌려준다 (문서를 고치지는 않는다) */
+function grown(v, now){
+  let tk = Math.max(0, Math.min(TICKET_MAX, (v && v.tk) | 0));
+  let at = (v && typeof v.at === 'number' && isFinite(v.at)) ? v.at : now;
+  let ffa = Math.max(0, Math.min(FFA_MAX, (v && v.ffa) | 0));
+  const day = (v && v.day) || '';
+  // **꽉 차 있으면 시계를 지금으로 당긴다** — 안 그러면 오래 쉬었다 한 장 쓰는 순간
+  // 여러 장이 한꺼번에 들어온다
+  if (tk >= TICKET_MAX) at = now;
+  else {
+    const gained = Math.floor((now - at) / REGEN_MS);
+    if (gained > 0){ tk = Math.min(TICKET_MAX, tk + gained); at += gained * REGEN_MS; }
+  }
+  const today = dayKey();
+  if (day !== today) ffa = FFA_MAX;          // 자정에 개인전만 초기화
+  return { tk, at, ffa, day: today };
+}
+
+/** 지금 상태 (충전 반영). 문서가 없으면 가득 찬 것으로 본다 */
+export async function readTickets(uid){
+  if (!db || !uid) return null;
+  try {
+    const d = await db.doc('players/' + uid).get();
+    const now = Date.now();
+    const v = d.exists ? d.data() : null;
+    const g = grown(v || { tk: TICKET_MAX, at: now, ffa: FFA_MAX, day: dayKey() }, now);
+    return { ...g, max: TICKET_MAX, ffaMax: FFA_MAX };
+  } catch (e){
+    console.log('[store] 티켓 읽기 실패', e && e.code);
+    return null;
+  }
+}
+
+/** 한 판 값을 깎는다. **트랜잭션이어야 한다** — 탭 두 개로 동시에 들어가면
+ *  둘 다 "남아 있다"를 보고 한 장으로 두 판을 한다.
+ *  개인전은 티켓과 하루 횟수를 **둘 다** 깎는다 */
+export async function spendTicket(uid, ffa){
+  if (!db || !uid) return { ok: false, off: true };
+  try {
+    return await db.runTransaction(async tx => {
+      const ref = db.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const now = Date.now();
+      const g = grown(d.exists ? d.data() : { tk: TICKET_MAX, at: now, ffa: FFA_MAX, day: dayKey() }, now);
+      if (g.tk <= 0) return { ok: false, why: 'noTicket', ...g };
+      if (ffa && g.ffa <= 0) return { ok: false, why: 'noFfa', ...g };
+      const next = { tk: g.tk - 1, at: g.at, ffa: ffa ? g.ffa - 1 : g.ffa, day: g.day };
+      // 꽉 찬 상태에서 한 장 쓰면 그때부터 시계가 간다
+      if (g.tk >= TICKET_MAX) next.at = now;
+      tx.set(ref, next, { merge: true });
+      return { ok: true, ...next };
+    });
+  } catch (e){
+    console.log('[store] 티켓 차감 실패', e && e.code);
+    return { ok: false, why: 'err' };
+  }
+}
+
 // ── 방 초대 ──────────────────────────────────────────────────────────
 // [stated] 친구 목록에서 방으로 초대한다.
 //

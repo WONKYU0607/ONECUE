@@ -1,7 +1,11 @@
-// 티켓·점수. **아직 서버가 없어서 기기에 저장한다 — 출시 전 반드시 서버로 옮길 것.**
-// 지금 상태로 내면 저장소를 고쳐 무한히 플레이하고 점수도 바꿀 수 있다.
-// 서버가 생기면 이 파일의 read/write만 갈아끼우면 되도록 한 곳에 모아뒀다.
-export const SERVER_BACKED = false;   // ← 점수를 서버가 쓰게 되면 true
+// 티켓·점수.
+//
+// **점수도 티켓도 이제 서버가 쥔다.** 기기 값은 화면에 바로 보여주기 위한 사본일 뿐이라,
+// 여기서 고쳐도 실제 판수는 안 늘어난다 — 자리에 앉을 때 서버가 자기 값에서 깎는다.
+// (규칙에서도 `tk·at·ffa·day` 쓰기를 막아뒀다)
+//
+// 서버가 진짜 값을 알려주면 `syncTickets()` 로 기기 값을 맞춘다.
+export const SERVER_BACKED = true;
 
 const KEY = 'duel.play.v2';
 
@@ -80,6 +84,17 @@ export function useFfa(){
 export function addFfa(n = 1){ rollDay(); cur.ffa = Math.min(FFA_MAX, cur.ffa + n); save(); return cur.ffa; }
 // 개인전은 **티켓과 하루 횟수 둘 다** 걸리므로 더 빡빡한 쪽이 실제로 할 수 있는 판수다
 export const leftFor = ffa => (ffa ? Math.min(ticketsLeft(), ffaLeft()) : ticketsLeft());
+
+/** 서버가 알려준 값으로 기기 사본을 맞춘다. **서버 값이 진짜다** */
+export function syncTickets(v){
+  if (!v || typeof v.tk !== 'number') return false;
+  cur.tk = Math.max(0, Math.min(TICKET_MAX, v.tk | 0));
+  cur.ffa = Math.max(0, Math.min(FFA_MAX, v.ffa | 0));
+  if (typeof v.at === 'number' && isFinite(v.at)) cur.at = v.at;
+  if (v.day) cur.day = v.day;
+  saveLocalOnly();
+  return true;
+}
 export const maxFor = ffa => (ffa ? Math.min(TICKET_MAX, FFA_MAX) : TICKET_MAX);
 export const spendFor = ffa => (ffa ? useFfa() : useTicket());
 // 다음 한 장까지 남은 밀리초 (꽉 찼으면 0)

@@ -36,7 +36,17 @@ function makeTransport(sid, resume = false){
 const sidA = 'sid-A', sidB = 'sid-B';
 const A = makeTransport(sidA), B = makeTransport(sidB);
 await Promise.all([A.ready, B.ready]);
-await sleep(300);
+
+// **고정 시간으로 기다리면 안 된다.** 서버는 갓 켜져 버벅이는 동안 방을 안 연다
+// (첫 판 렉 때문에 넣은 규칙). 모듈 하나만 더 붙어도 그 시각이 밀려
+// 300ms 짜리 대기가 아슬아슬하게 실패한다 → **올 때까지 기다린다**
+const waitHello = async () => {
+  for (let i = 0; i < 60; i++){
+    if (A.msgs.some(m => m.t === 'hello') && B.msgs.some(m => m.t === 'hello')) return;
+    await sleep(100);
+  }
+};
+await waitHello();
 
 const helloA = A.msgs.find(m => m.t === 'hello');
 const helloB = B.msgs.find(m => m.t === 'hello');

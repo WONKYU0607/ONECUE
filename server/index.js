@@ -45,6 +45,8 @@ class Room {
     this.ffa = ffa;              // 개인전인가 (각자 한 팀, 칼전 3~4인)
     // 자리마다 세션 id를 기억한다. 소켓이 끊겨도 sid가 남아 있으면 그 자리는 예약 상태
     this.seats = Array.from({ length: n }, () => ({ sid: null, ws: null, goneAt: 0, uid: '' }));
+    // 이 방에서 이미 티켓을 깎은 사람 — 재접속으로 또 깎지 않게
+    this.charged = new Set();
     // 판 시작 전 점수·연승. **매칭 때 한 번만 읽는다** — 판마다 읽으면 할당량이 닳는다
     this.preScore = Array.from({ length: n }, () => ({ score: 1000, streak: 0 }));
     this.settled = false;        // 점수를 이미 썼는가 (한 판에 한 번만)
@@ -289,6 +291,16 @@ class Room {
 
     seat.sid = sid; seat.ws = ws; seat.goneAt = 0;
     seat.uid = ws.uid || seat.uid || '';
+    // [stated] 티켓을 서버가 쥔다. **자리에 앉을 때 한 번만** 깎는다 —
+    // 끊겼다 돌아오는 것(`reconnected`)이나 같은 방에 다시 앉는 것으로 또 깎으면 안 된다.
+    // 실패해도 판은 그대로 진행한다(서버가 자거나 저장소가 꺼져 있을 수 있다) —
+    // 여기서 막으면 **첫 사람이 아무것도 못 한다**
+    if (!reconnected && seat.uid && !this.charged.has(seat.uid)){
+      this.charged.add(seat.uid);
+      store.spendTicket(seat.uid, !!this.server.s.ffa)
+        .then(r => { if (r && !r.ok && r.why) console.log('[티켓]', seat.uid.slice(0, 6), r.why); })
+        .catch(() => {});
+    }
     // 슬롯별 닉네임을 상태에 실어 모두에게 전달한다
     if (!Array.isArray(this.server.s.nick)) this.server.s.nick = new Array(this.n).fill('');
     if (nick) this.server.s.nick[slot] = nick;
@@ -377,6 +389,18 @@ const http = createServer((req, res) => {
   // [stated] 친구 기능. **전부 쓰기라 증표(token)로 본인 확인**을 한다 —
   // uid 만 받으면 남의 이름으로 신청을 보내거나 남의 친구를 끊을 수 있다.
   // 목록에는 **접속 중인지**를 얹어 준다 (소켓을 들고 있는 이 서버만 안다)
+  // [stated] 티켓을 서버가 쥔다. 화면에 보여줄 값은 여기서 받아 간다.
+  // **증표로 본인 확인** — uid 만 받으면 남의 티켓을 들여다볼 수 있다
+  if (req.url && req.url.startsWith('/ticket')){
+    const q = new URL(req.url, 'http://x').searchParams;
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    store.uidFromToken(q.get('token'))
+      .then(me => (me ? store.readTickets(me) : null))
+      .then(v => res.end(JSON.stringify(v ? { ok: true, ...v } : { ok: false })))
+      .catch(() => res.end(JSON.stringify({ ok: false })));
+    return;
+  }
+
   if (req.url && req.url.startsWith('/friend')){
     const q = new URL(req.url, 'http://x').searchParams;
     const act = q.get('act') || 'list';
