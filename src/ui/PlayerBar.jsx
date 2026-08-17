@@ -11,7 +11,7 @@ import { t } from '../i18n/index.js';
 //   [캐릭터 이름] [총격전 트로피 점수] [칼전 트로피 점수] [티켓 | 타이머]
 // **틀 안쪽 폭을 그대로 쓴다.** 예전엔 기둥 사이를 21%~78%로 박아 절반만 써서
 // 두 줄로 나눠야 했는데, 실측하니 기둥 사이는 화면의 8%~92%였다
-export default function PlayerBar({ onHelp, onSettings }){
+export default function PlayerBar({ onHelp, onSettings, onFriends }){
   const [, tick] = useState(0);
   const [prof, setProf] = useState(false);
   useEffect(() => {
@@ -85,7 +85,7 @@ export default function PlayerBar({ onHelp, onSettings }){
           </svg>
         </button>
       </div>
-      {prof && <ProfileTab onClose={() => setProf(false)} />}
+      {prof && <ProfileTab onClose={() => setProf(false)} onFriends={onFriends} />}
     </>
   );
 }

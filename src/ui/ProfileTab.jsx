@@ -8,7 +8,7 @@ import { resyncAccount } from '../cloud/sync.js';
 import { t } from '../i18n/index.js';
 
 // 프로필 탭. 캐릭터 옆에 닉네임, 오른쪽 위에 수정 버튼
-export default function ProfileTab({ onClose }){
+export default function ProfileTab({ onClose, onFriends }){
   const [nick, setN] = useState(getNick());
   const [color, setC] = useState(getColor());
   // 순위는 서버·구름에서 받아오므로 **화면이 먼저 뜨고 값은 나중에 채워진다**.
@@ -144,6 +144,14 @@ export default function ProfileTab({ onClose }){
             </div>
           ))}
         </div>
+
+        {/* [stated] 친구는 홈이 아니라 **프로필 안, 칼전 줄 밑에** 작게 둔다 */}
+        {onFriends && (
+          <button className="prof-card prof-link" onClick={() => { onClose(); onFriends(); }}>
+            <span className="nm">{t('fr.title')}</span>
+            <span className="val">›</span>
+          </button>
+        )}
 
         {/* [stated] 익명 계정은 앱을 지우면 사라진다 → **구글 계정으로 승격**.
             이미 그 구글 계정에 기록이 있으면 그쪽으로 갈아탄다(A안) — 그때는

@@ -68,32 +68,42 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
       </header>
 
       <div className="menu wide-menu">
-        {/* 종목 전환 */}
+        {/* [stated] **한 줄에 셋** — 총격전 · 칼전 · 친구.
+            앞의 둘은 전체 순위표, `친구` 는 친구끼리만 보는 순위표로 넘어간다 */}
         <div className="pick-row rb-tabs">
           {[['gun', t('mode.gun')], ['melee', t('mode.melee')]].map(([k, nm]) => (
-            <button key={k} className={'menu-btn pick' + (kind === k ? ' primary' : '')}
-                    onClick={() => setKind(k)}>
+            <button key={k}
+                    className={'menu-btn pick' + (!onlyFriends && kind === k ? ' primary' : '')}
+                    onClick={() => { setOnlyFriends(false); setKind(k); }}>
               <span className="t">{nm}</span>
             </button>
           ))}
+          <button className={'menu-btn pick' + (onlyFriends ? ' primary' : '')}
+                  onClick={() => setOnlyFriends(true)}>
+            <span className="t">{t('fr.rank')}</span>
+          </button>
         </div>
 
-        {/* [stated] 친구끼리만 보는 순위표.
+        {/* [stated] 친구 순위표에서도 종목이 갈린다 → **그때만** 아래에 종목 줄이 뜬다.
             **서버에 새로 물어볼 게 없다** — 친구 목록에 이미 점수가 들어 있어서
             나를 끼워 넣고 정렬하면 끝이다 */}
-        <div className="pick-row rb-tabs">
-          {[[false, t('rank.title')], [true, t('fr.rank')]].map(([v, nm]) => (
-            <button key={String(v)} className={'menu-btn pick' + (onlyFriends === v ? ' primary' : '')}
-                    onClick={() => setOnlyFriends(v)}>
-              <span className="t">{nm}</span>
-            </button>
-          ))}
-        </div>
+        {onlyFriends && (
+          <div className="pick-row rb-tabs">
+            {[['gun', t('mode.gun')], ['melee', t('mode.melee')]].map(([k, nm]) => (
+              <button key={k} className={'menu-btn pick' + (kind === k ? ' primary' : '')}
+                      onClick={() => setKind(k)}>
+                <span className="t">{nm}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* 내 자리. **목록보다 위에 둔다** — 30위 밖이면 목록에 없어서
             아래에 두면 스크롤을 끝까지 내려야 자기 등수를 본다 */}
         {/* 친구 순위표에서는 목록에 내가 이미 들어 있어 이 줄을 안 그린다 */}
+        {/* [stated] 내 칸 옆에도 등수를 매긴다 */}
         {!onlyFriends && <div className="rb-me">
+          <span className="rb-no">{(data && data.my && data.my.rank) || '-'}</span>
           <TierIcon score={scoreOf(kind)} />
           <span className="rb-nick">{myNick}</span>
           <span className="rb-tier">{tierName(tierOf(scoreOf(kind)))}</span>

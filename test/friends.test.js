@@ -126,12 +126,44 @@ console.log('친구 순위표');
 {
   const rb = fs.readFileSync('src/ui/screens/RankBoard.jsx', 'utf8');
   assert(/onlyFriends/.test(rb), '  친구 탭이 있다');
+  // [stated] **한 줄에 셋** (총격전·칼전·친구). 옛 `순위표/친구` 두 번째 줄은 없앴다
+  assert(!/t\('rank\.title'\)\], \[true/.test(rb), '  옛 순위표/친구 줄이 없다');
+  assert(/setOnlyFriends\(false\); setKind\(k\)/.test(rb), '  총격전·칼전은 전체 순위표로');
+  // 친구 순위표에서도 종목이 갈린다 → **그때만** 종목 줄이 뜬다
+  assert(/\{onlyFriends && \(\s*<div className="pick-row rb-tabs">/.test(rb),
+    '  친구를 고르면 아래에 종목 줄이 뜬다');
+  // [stated] 내 칸 옆에도 등수
+  assert(/<span className="rb-no">\{\(data && data\.my && data\.my\.rank\)/.test(rb),
+    '  내 줄에 등수가 붙는다');
   // **서버에 새로 물어볼 게 없다** — 친구 목록에 이미 점수가 들어 있다
   assert(/listFriends\(\)/.test(rb), '  친구 목록을 그대로 쓴다');
   assert(/sort\(\(a, b\) => b\.score - a\.score\)/.test(rb), '  점수순으로 세운다');
   assert(/const mine = \{ nick: myNick/.test(rb), '  나도 목록에 낀다');
   assert(/\{!onlyFriends && <div className="rb-me">/.test(rb),
     '  친구 탭에서는 내 자리 줄을 겹쳐 안 그린다');
+}
+
+// [stated] 친구는 홈이 아니라 **프로필 안, 칼전 줄 밑에** 둔다
+console.log('친구는 프로필 안에서 연다');
+{
+  const home = fs.readFileSync('src/ui/screens/Home.jsx', 'utf8');
+  const prof = fs.readFileSync('src/ui/ProfileTab.jsx', 'utf8');
+  assert(!/t\('fr\.title'\)/.test(home), '  홈에는 친구 버튼이 없다');
+  assert(/prof-link/.test(prof) && /onFriends\(\)/.test(prof), '  프로필 안에 친구 칸이 있다');
+  assert(/onClose\(\); onFriends\(\)/.test(prof), '  누르면 프로필을 닫고 넘어간다');
+}
+
+// [stated] 이름을 입력할 때 화면이 작아진다 → **키보드가 올라와도 크기는 그대로**
+console.log('키보드가 떠도 화면이 안 줄어든다');
+{
+  const sa = fs.readFileSync('src/state/safearea.js', 'utf8');
+  const css = fs.readFileSync('src/styles.css', 'utf8');
+  assert(/setProperty\('--vh'/.test(sa), '  높이를 JS 가 px 로 넣는다');
+  assert(/if \(w !== baseW\)/.test(sa), '  폭이 바뀔 때만 다시 잡는다 (회전)');
+  assert(/else if \(h > baseH\) baseH = h/.test(sa), '  커진 것만 반영한다 (키보드가 내려간 것)');
+  const scr = css.slice(css.indexOf('.screen{'), css.indexOf('}', css.indexOf('.screen{')));
+  assert(/height:var\(--vh\)/.test(scr) && !/bottom:var\(--sab\)/.test(scr),
+    '  .screen 은 bottom 이 아니라 height 로 잡는다 (bottom 은 키보드에 같이 줄어든다)');
 }
 
 console.log('friends.test.js 통과');

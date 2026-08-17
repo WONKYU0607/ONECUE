@@ -12,8 +12,10 @@
      상태바·내비게이션바 자리에 UI 가 겹친다. `safearea.js` 가 실제 값을 넣어 준다.
      여기 기본값 0 은 브라우저·PC 용 */
   --sat:0px; --sab:0px; --sal:0px; --sar:0px;
-  /* 실제로 쓸 수 있는 세로 크기. 100vh 는 상태바·내비게이션바까지 포함한 값이라
-     그대로 쓰면 화면이 그만큼 커져 아래가 잘린다 */
+  /* 실제로 쓸 수 있는 세로 크기. `safearea.js` 가 px 로 넣어 준다.
+     **키보드가 올라와도 안 줄어든다** — 100vh 를 그대로 쓰면 키보드가 뜰 때
+     화면 높이가 줄어 `--u` 가 같이 줄고 UI 전체가 쪼그라든다.
+     여기 기본값은 값이 아직 안 들어왔을 때만 쓰인다 */
   --vh:calc(100vh - var(--sat) - var(--sab));
   --u:calc(min(100vw, var(--vh) * 0.455) / 360);
   --fx:36px;   /* 틀 좌우 두께 */
@@ -48,7 +50,8 @@ font:900 21px/1 var(--gf);letter-spacing:2px;cursor:pointer}
    게임은 늘 폰 비율로 그려지는데 메뉴만 풀스크린이면 들어갈 때마다 크기가 널뛴다.
    캔버스 실측: 1917x950에서 466px, 1280x800에서 392px → 대략 높이의 0.455배 */
 /* **`inset:0` 이면 상태바·내비게이션바 밑까지 깔린다.** 안전 영역만큼 띄운다 */
-.screen{position:fixed;top:var(--sat);right:var(--sar);bottom:var(--sab);left:var(--sal);
+/* **높이를 `--vh` 로 못박는다.** `bottom` 으로 잡으면 키보드가 뜰 때 같이 줄어든다 */
+.screen{position:fixed;top:var(--sat);right:var(--sar);left:var(--sal);height:var(--vh);
 display:flex;flex-direction:column;align-items:center;
 justify-content:center;gap:18px;color:#e8e8f0;font-family:var(--gf);font-weight:700;padding:8px}
 /* 금속 틀. CSS border-image 가 9분할을 대신 해준다 —
@@ -463,6 +466,12 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .prof-nick{font:900 20px var(--gf);color:#ffe9a8}
 .prof-edit-row{flex:1 1 0;min-width:0;display:flex;gap:6px}
 .nick-input{flex:1 1 0;min-width:0;letter-spacing:1px;font-size:16px}
+/* 프로필 안의 친구 칸 — 점수 줄과 같은 결로 작게 */
+.prof-link{display:flex;align-items:center;gap:8px;padding:7px 9px;width:100%;
+  text-align:left;font:inherit;color:var(--txt);cursor:pointer}
+.prof-link .nm{font-size:12px;font-weight:700}
+.prof-link .val{margin-left:auto;font-size:14px;color:var(--dim)}
+
 /* 계정 칸. 연결 전에는 버튼 + 설명, 연결 뒤에는 계정 이름만 */
 .prof-acc{display:flex;align-items:center;gap:8px;padding:6px 8px;flex-wrap:wrap}
 .prof-acc .nm{font-size:12px;font-weight:700}

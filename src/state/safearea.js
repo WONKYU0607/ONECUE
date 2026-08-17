@@ -8,6 +8,10 @@
 // 글자 그대로 `env(...)` 가 돌아온다. 실제로 적용한 요소의 **계산된 값**을 읽어야 숫자가 나온다
 let cur = { top: 0, bottom: 0, left: 0, right: 0 };
 
+/** **`window` 없이도 돌아야 한다** — 가짜 캔버스로 도는 검사에서는 전역만 있다 */
+const winW = () => (typeof window !== 'undefined' ? window.innerWidth : globalThis.innerWidth) || 0;
+const winH = () => (typeof window !== 'undefined' ? window.innerHeight : globalThis.innerHeight) || 0;
+
 export function measureSafeArea(){
   if (typeof document === 'undefined') return cur;
   try {
@@ -32,16 +36,30 @@ export function measureSafeArea(){
   s.setProperty('--sab', cur.bottom + 'px');
   s.setProperty('--sal', cur.left + 'px');
   s.setProperty('--sar', cur.right + 'px');
+  setLayoutH();
   return cur;
 }
+
+// [stated] 이름을 입력할 때 화면이 작아진다 → **키보드가 올라와도 화면 크기는 그대로.**
+//
+// 안드로이드는 키보드가 뜨면 창 높이를 줄인다. 그 값을 그대로 쓰면 `--u`(한 칸 단위)가
+// 같이 줄어 **UI 전체가 쪼그라든다.** 그래서 **가로 폭이 같은 동안은 가장 큰 높이를 기억**하고
+// 그걸 쓴다. 회전하면 폭이 바뀌므로 그때 다시 잡는다
+let baseW = 0, baseH = 0;
+function setLayoutH(){
+  const w = winW(), h = winH() - cur.top - cur.bottom;
+  if (w !== baseW){ baseW = w; baseH = h; }      // 회전 등 — 새로 잡는다
+  else if (h > baseH) baseH = h;                 // 커진 건 진짜 (키보드가 내려간 것)
+  if (typeof document !== 'undefined')
+    document.documentElement.style.setProperty('--vh', Math.max(1, baseH) + 'px');
+}
+
+/** 키보드를 뺀, 화면을 그릴 때 쓰는 높이 */
+export const layoutH = () => baseH || usableH();
 
 /** 지금 값 (재기 전이면 전부 0) */
 export const safeArea = () => ({ ...cur });
 
-/** 실제로 쓸 수 있는 화면 크기 — 캔버스는 이 안에 맞춰야 한다.
- *  **`window` 없이도 돌아야 한다** — 가짜 캔버스로 도는 검사에서는 전역만 있다 */
-const winW = () => (typeof window !== 'undefined' ? window.innerWidth : globalThis.innerWidth) || 0;
-const winH = () => (typeof window !== 'undefined' ? window.innerHeight : globalThis.innerHeight) || 0;
 export const usableW = () => Math.max(1, winW() - cur.left - cur.right);
 export const usableH = () => Math.max(1, winH() - cur.top - cur.bottom);
 

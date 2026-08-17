@@ -143,8 +143,8 @@ export default function App(){
       {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
                                      onSettings={() => setShowSettings(true)} onHelp={() => setShowHelp(true)}
                                      onRanks={k => { setRankKind(k); setScreen('ranks'); }}
-                                     onFriends={() => setScreen('friends')}
-                                     onJoin={beginPvp} />}
+                                     onJoin={beginPvp}
+                                     onFriends={() => setScreen('friends')} />}
       {screen === 'ranks'    && <RankBoard kind={rankKind} onBack={goHome} />}
       {screen === 'friends'  && <Friends onBack={goHome} />}
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} onMelee={startMelee} />}

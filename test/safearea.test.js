@@ -32,8 +32,12 @@ console.log('화면이 안전 영역 안에 들어간다');
   // `inset:0` 이면 상태바·내비게이션바 밑까지 깔린다
   const scr = css.slice(css.indexOf('.screen{'), css.indexOf('}', css.indexOf('.screen{')));
   assert(!/inset:0/.test(scr), '  .screen 이 inset:0 이 아니다');
-  for (const v of ['--sat', '--sab', '--sal', '--sar'])
+  for (const v of ['--sat', '--sal', '--sar'])
     assert(scr.includes(v), `  .screen 이 ${v} 를 쓴다`);
+  // 아래쪽은 `--sab` 대신 `height:--vh` 로 잡는다.
+  // [stated] 키보드가 올라와도 화면이 안 줄어들어야 해서 — `bottom` 은 같이 줄어든다.
+  // `--vh` 는 `--sab` 를 이미 뺀 값이라 안전 영역은 그대로 지켜진다
+  assert(/height:var\(--vh\)/.test(scr), '  .screen 높이는 --vh 로 못박는다');
   const wrap = css.slice(css.indexOf('.wrap{'), css.indexOf('}', css.indexOf('.wrap{')));
   assert(/var\(--sat\)/.test(wrap) && /var\(--sab\)/.test(wrap),
     '  게임 캔버스 자리도 안전 영역 안 (아래 조작 패드가 내비게이션바에 가렸다)');
@@ -42,7 +46,9 @@ console.log('화면이 안전 영역 안에 들어간다');
 console.log('크기 계산이 쓸 수 있는 높이를 쓴다');
 {
   // 100vh 는 상태바·내비게이션바까지 포함한 값이라 그대로 쓰면 화면이 그만큼 커진다
-  assert(/--vh:calc\(100vh - var\(--sat\) - var\(--sab\)\)/.test(css), '  쓸 수 있는 높이를 따로 둔다');
+  assert(/--vh:calc\(100vh - var\(--sat\) - var\(--sab\)\)/.test(css),
+    '  쓸 수 있는 높이를 따로 둔다 (JS 가 넣기 전 기본값)');
+  assert(/setProperty\('--vh'/.test(sa), '  실제 값은 safearea.js 가 px 로 넣는다');
   assert(/--u:calc\(min\(100vw, var\(--vh\)/.test(css), '  한 칸 단위가 그 높이를 쓴다');
   assert(!/45\.5vh/.test(css), '  옛 45.5vh 가 남아 있지 않다');
   assert(/usableW\(\), usableH\(\)/.test(game), '  캔버스도 뺀 크기로 맞춘다');
