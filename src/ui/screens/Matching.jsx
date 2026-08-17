@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { connectAndWait, disconnect, serverUrl, pickTeam } from '../../net/connection.js';
 import { getColor } from '../../state/profile.js';
 import { spendFor } from '../../state/tickets.js';
+import InviteFriends from '../InviteFriends.jsx';
 import { t } from '../../i18n/index.js';
 
 // **열쇠만 담는다.** 여기서 t()를 부르면 파일을 읽을 때 한 번만 계산돼
@@ -73,6 +74,9 @@ export default function Matching({ session, onCancel, onMatched }){
             친구에게 알려주면 이 코드로 들어온다
             {session?.n > 2 ? ' ' + t('match.needN', { n: session.n }) : ''}
           </span>
+          {/* [stated] 친구 목록에서 바로 초대 */}
+          <InviteFriends room={{ code, n: session?.n || 2,
+                                 melee: !!session?.melee, ffa: !!session?.ffa }} />
         </div>
       )}
 

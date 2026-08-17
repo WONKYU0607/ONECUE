@@ -4,7 +4,7 @@
 // 여기서는 진짜 시뮬 상태를 만들어 넣고, 띄워야 할 것이 나오는지 검사한다.
 import { uiPrompt, negText, resultFor, matchSummary } from '../src/game/ui-state.js';
 import { newState, step, NOIN } from '../src/game/sim.js';
-import { PH_READY, PH_COUNT, PH_PLAY, NEG_TICKS } from '../src/game/config.js';
+import { PH_READY, PH_COUNT, PH_PLAY, NEG_TICKS  } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 const IN = n => Array.from({ length: n }, () => ({ ...NOIN }));
@@ -227,6 +227,28 @@ console.log('수락되면 가운데 알림이 뜬다');
   // 문구가 실제로 만들어지는가
   for (const [kind, melee] of [['fast', false], ['bare', false], ['bare', true]])
     assert(negText(kind, 'name', melee).length > 0, `  ${kind} 이름이 있다`);
+}
+
+
+// [stated] **게임 시작 카운트다운이 시작되면 신청 버튼은 사라진다** —
+// 곧 시작되는데 신청을 받아봐야 답할 시간이 없다
+console.log('카운트다운이 시작되면 신청 버튼이 사라진다');
+{
+  const s = newState(2);
+  s.phase = PH_READY;
+  assert(uiPrompt(s, 0, true).offer.length > 0, '  준비 단계에는 버튼이 있다');
+  s.phase = PH_COUNT;
+  assert(uiPrompt(s, 0, true).offer.length === 0, '  카운트다운에는 없다');
+  // 칼전도 마찬가지. 다만 **준비 단계에는 남아 있어야** 한다 — 거기가 유일한 기회다
+  const m = newState(4, true, false);
+  m.phase = PH_READY;
+  assert(uiPrompt(m, 0, true).offer.includes('bare'), '  칼전은 준비 단계에 버튼이 있다');
+  m.phase = PH_COUNT;
+  assert(uiPrompt(m, 0, true).offer.length === 0, '  칼전도 카운트다운엔 없다');
+  // 이미 오간 신청의 답은 카운트다운 중에도 떠야 한다 (그동안 카운트가 멈춘다)
+  const w = newState(2);
+  w.phase = PH_COUNT; w.fastBy = 2; w.fastT = 300;
+  assert(uiPrompt(w, 0, true).ask, '  받은 신청에는 카운트다운 중에도 답할 수 있다');
 }
 
 console.log('uistate.test.js 통과');

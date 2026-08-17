@@ -17,6 +17,9 @@ const GRACE_MS = 10_000;         // 끊긴 사람을 기다리는 시간. 판이
 let nextRoomId = 1;
 const rooms = new Map();         // id -> Room
 const codes = new Map();         // 코드 -> Room (친구방)
+// 지금 붙어 있는 사람들 (uid -> 소켓 수). 친구 목록의 '접속 중' 표시에 쓴다.
+// **소켓을 들고 있는 이 서버만 알 수 있다** — Firestore 로는 알 방법이 없다
+const online = new Map();
 const waiting = new Map();       // '인원수:모드' -> 대기 소켓 목록. 섞이면 안 된다
 const qkey = (n, melee, ffa) => `${n}:${melee ? 'm' : 's'}${ffa ? ':f' : ''}`;
 // [stated] 사람이 모자랄 때 빈 자리를 AI 로 채우기까지 기다리는 시간 (7초)
@@ -371,6 +374,39 @@ const http = createServer((req, res) => {
     return;
   }
 
+  // [stated] 친구 기능. **전부 쓰기라 증표(token)로 본인 확인**을 한다 —
+  // uid 만 받으면 남의 이름으로 신청을 보내거나 남의 친구를 끊을 수 있다.
+  // 목록에는 **접속 중인지**를 얹어 준다 (소켓을 들고 있는 이 서버만 안다)
+  if (req.url && req.url.startsWith('/friend')){
+    const q = new URL(req.url, 'http://x').searchParams;
+    const act = q.get('act') || 'list';
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    store.uidFromToken(q.get('token')).then(async me => {
+      if (!me) return { ok: false, auth: true };
+      if (act === 'add')    return store.friendRequest(me, q.get('nick') || '');
+      if (act === 'accept') return store.friendAccept(me, q.get('uid') || '');
+      if (act === 'reject') return store.friendReject(me, q.get('uid') || '');
+      if (act === 'remove') return store.friendRemove(me, q.get('uid') || '');
+      // [stated] 친구를 방으로 초대한다. **친구인지 서버가 확인**하고 넣는다
+      if (act === 'invite') return store.friendInvite(me, q.get('uid') || '', {
+        code: q.get('code'), n: +q.get('n') || 2,
+        melee: q.get('melee') === '1', ffa: q.get('ffa') === '1'
+      });
+      if (act === 'invites'){
+        const list = await store.invitesFor(me);
+        return { ok: !!list, invites: list || [] };
+      }
+      if (act === 'inviteClear') return store.inviteClear(me, q.get('uid') || '');
+      const v = await store.friendList(me);
+      if (!v) return { ok: false, why: 'err' };
+      const mark = a => a.map(x => ({ ...x, on: online.has(x.uid) }));
+      return { ok: true, friends: mark(v.friends), reqIn: mark(v.reqIn), reqOut: mark(v.reqOut) };
+    })
+      .then(r => res.end(JSON.stringify(r)))
+      .catch(() => res.end(JSON.stringify({ ok: false, why: 'err' })));
+    return;
+  }
+
   // 이름으로 친구 찾기. 유일하므로 한 명 아니면 없음.
   // 읽기만이라 증표는 안 받는다 — 대신 **공개해도 되는 것만** 돌려준다
   if (req.url && req.url.startsWith('/find')){
@@ -538,7 +574,10 @@ wss.on('connection', (ws, req) => {
   const ffa = q.get('ffa') === '1';         // 개인전
   const wantColor = q.has('color') ? +q.get('color') : -1;
   ws.nick = nick;      // 모든 경로(대기열·방·팀 로비)가 같이 쓴다
-  ws.uid = String(q.get('uid') || '').slice(0, 64);   // Firebase 익명 계정. 점수는 이 값으로 저장
+  ws.uid = String(q.get('uid') || '').slice(0, 64);   // 로그인 계정. 점수는 이 값으로 저장
+  // [stated] 친구 목록에 **접속 중인지 표시**한다. 소켓을 들고 있는 서버만 알 수 있다.
+  // 같은 사람이 탭을 여러 개 열 수 있으므로 수를 세고, 0 이 되면 지운다
+  if (ws.uid) online.set(ws.uid, (online.get(ws.uid) || 0) + 1);
   const melee = q.get('melee') === '1';      // 칼전인가
   ws.sid = sid;
 
@@ -650,6 +689,10 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
+    if (ws.uid){
+      const n = (online.get(ws.uid) || 1) - 1;
+      if (n > 0) online.set(ws.uid, n); else online.delete(ws.uid);
+    }
     const q = ws.qkey ? queueOf(ws.qkey) : null;
     const i = q ? q.indexOf(ws) : -1;
     if (i >= 0){ q.splice(i, 1); return; }

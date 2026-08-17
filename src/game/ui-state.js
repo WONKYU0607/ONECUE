@@ -106,9 +106,12 @@ export function uiPrompt(st, slot, online){
     else ask = { kind: pending.kind, sec: pending.sec };
   }
 
-  // 신청 버튼은 온라인에서만, 이미 켜졌거나 뭔가 오가는 중이면 숨긴다
+  // 신청 버튼은 온라인에서만, 이미 켜졌거나 뭔가 오가는 중이면 숨긴다.
+  // [stated] **게임 시작 카운트다운이 시작되면 버튼은 사라진다** —
+  // 곧 시작되는데 신청을 받아봐야 답할 시간이 없다.
+  // 이미 오간 신청의 답(`ask`/`waiting`)은 그대로 둔다 — 카운트다운이 멈춰 있다
   const offer = [];
-  if (online && !pending){
+  if (online && !pending && st.phase !== PH_COUNT){
     // [stated] 칼전에는 2배속을 안 쓴다 — 버프(이속 1.5 · 공속 1.5)만으로 충분히 빠르다.
     // 둘이 곱해지면 이동 3배·칼 주기 3배가 되어 과했다
     if (!st.fast && !st.melee) offer.push('fast');

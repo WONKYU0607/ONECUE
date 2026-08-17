@@ -35,8 +35,29 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
   }, [kind]);
 
   const me = fmtRank(data && data.my);
-  const list = (data && data.list) || [];
   const myNick = getNick();
+
+  // 친구 순위표: 친구 목록 + 나를 점수순으로 세운다
+  const [onlyFriends, setOnlyFriends] = useState(false);
+  const [fr, setFr] = useState(null);
+  useEffect(() => {
+    if (!onlyFriends || fr) return;
+    let live = true;
+    import('../../state/friends.js')
+      .then(m => m.listFriends())
+      .then(r => { if (live) setFr((r && r.ok && r.friends) || []); })
+      .catch(() => { if (live) setFr([]); });
+    return () => { live = false; };
+  }, [onlyFriends, fr]);
+
+  const friendRows = () => {
+    const mine = { nick: myNick, score: { [kind]: scoreOf(kind) } };
+    return [...(fr || []), mine]
+      .map(p => ({ nick: p.nick, score: ((p.score || {})[kind]) | 0 }))
+      .sort((a, b) => b.score - a.score)
+      .map((p, i) => ({ ...p, rank: i + 1 }));
+  };
+  const list = onlyFriends ? friendRows() : ((data && data.list) || []);
 
   return (
     <div className="screen list">
@@ -57,9 +78,22 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
           ))}
         </div>
 
+        {/* [stated] 친구끼리만 보는 순위표.
+            **서버에 새로 물어볼 게 없다** — 친구 목록에 이미 점수가 들어 있어서
+            나를 끼워 넣고 정렬하면 끝이다 */}
+        <div className="pick-row rb-tabs">
+          {[[false, t('rank.title')], [true, t('fr.rank')]].map(([v, nm]) => (
+            <button key={String(v)} className={'menu-btn pick' + (onlyFriends === v ? ' primary' : '')}
+                    onClick={() => setOnlyFriends(v)}>
+              <span className="t">{nm}</span>
+            </button>
+          ))}
+        </div>
+
         {/* 내 자리. **목록보다 위에 둔다** — 30위 밖이면 목록에 없어서
             아래에 두면 스크롤을 끝까지 내려야 자기 등수를 본다 */}
-        <div className="rb-me">
+        {/* 친구 순위표에서는 목록에 내가 이미 들어 있어 이 줄을 안 그린다 */}
+        {!onlyFriends && <div className="rb-me">
           <TierIcon score={scoreOf(kind)} />
           <span className="rb-nick">{myNick}</span>
           <span className="rb-tier">{tierName(tierOf(scoreOf(kind)))}</span>
@@ -67,14 +101,14 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
             {busy ? t('rank.loading') : (me ? t('rank.mine', { r: me.rank, n: me.total }) : t('rank.none'))}
           </span>
           <span className="rb-score">{scoreOf(kind).toLocaleString()}</span>
-        </div>
+        </div>}
 
         <div className="rb-list">
           {list.length === 0 && (
-            <p className="hint">{busy ? t('rank.loading') : t('rank.none')}</p>
+            <p className="hint">{(onlyFriends ? fr === null : busy) ? t('rank.loading') : t('rank.none')}</p>
           )}
           {list.map(row => (
-            <div key={row.rank}
+            <div key={row.rank + '-' + (row.nick || '')}
                  className={'rb-row' + (row.nick && row.nick === myNick ? ' me' : '')}>
               <span className="rb-no">{row.rank}</span>
               <TierIcon score={row.score | 0} />

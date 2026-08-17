@@ -6,6 +6,7 @@ import PracticeMenu from './ui/screens/PracticeMenu.jsx';
 import PvpMenu from './ui/screens/PvpMenu.jsx';
 import RankBoard from './ui/screens/RankBoard.jsx';
 import Login from './ui/screens/Login.jsx';
+import Friends from './ui/screens/Friends.jsx';
 import Matching from './ui/screens/Matching.jsx';
 import Result from './ui/screens/Result.jsx';
 import SettingsModal from './ui/SettingsModal.jsx';
@@ -28,7 +29,7 @@ export default function App(){
   // 각자 구독하게 하면 빠뜨리는 곳이 생긴다
   const [, bumpLang] = useState(0);
   useEffect(() => onLangChange(() => bumpLang(v => v + 1)), []);
-  const [screen, setScreen] = useState('splash');   // splash|login|home|ai|practice|pvp|matching|game|result|ranks
+  const [screen, setScreen] = useState('splash');   // splash|login|home|ai|practice|pvp|matching|game|result|ranks|friends
   const [rankKind, setRankKind] = useState('gun');  // 순위표에서 먼저 볼 종목
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
@@ -141,8 +142,11 @@ export default function App(){
       {screen === 'login'    && <Login onDone={() => { goHome(); goHomeFirst(); }} />}
       {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
                                      onSettings={() => setShowSettings(true)} onHelp={() => setShowHelp(true)}
-                                     onRanks={k => { setRankKind(k); setScreen('ranks'); }} />}
+                                     onRanks={k => { setRankKind(k); setScreen('ranks'); }}
+                                     onFriends={() => setScreen('friends')}
+                                     onJoin={beginPvp} />}
       {screen === 'ranks'    && <RankBoard kind={rankKind} onBack={goHome} />}
+      {screen === 'friends'  && <Friends onBack={goHome} />}
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} onMelee={startMelee} />}
       {screen === 'practice' && <PracticeMenu onBack={goHome} onStart={startPractice} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}

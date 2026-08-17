@@ -280,12 +280,18 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* 표지 그림이 화면을 꽉 채운다. 폰은 그림보다 세로로 길어서 cover로 채우고
    **위쪽을 기준으로** 잘라야 제목이 안 잘린다 (아래는 바닥 타일이라 잘려도 됨) */
 .screen.splash{
-  background-size:cover; background-position:center top; background-repeat:no-repeat;
+  /* [stated] 표지는 **안 자른다.** 기기마다 화면 비율이 달라서 `cover` 로 채우면
+     길쭉한 폰일수록 좌우가 잘린다(갤럭시 S25 에서 27%). `contain` 은 그림이 다 보이는
+     대신 위아래에 배경색 띠가 생기고, 그 띠 크기가 기기마다 달라진다.
+     늘리기(`100% 100%`)는 로고 글자가 홀쭉해져서 뺐다 */
+  background-size:contain; background-position:center center; background-repeat:no-repeat;
   background-color:#0d0d16;
   /* .screen 이 flex-direction:column 이라 **세로가 justify, 가로가 align** 이다.
      이걸 반대로 써서 문구가 아래가 아니라 오른쪽 가운데로 갔었다 */
   display:flex; align-items:center; justify-content:flex-end;
-  padding:0 0 max(38px, env(safe-area-inset-bottom, 0px)); cursor:default;
+  /* [stated] 터치 안내를 위로 (50 + 50 + 20 = 120px) — `contain` 으로 바뀌면서
+     아래 빈 띠가 생겨 글씨가 그림에서 너무 멀어졌다 */
+  padding:0 0 calc(120px + max(38px, env(safe-area-inset-bottom, 0px))); cursor:default;
 }
 .screen.splash.ready{cursor:pointer}
 .splash-foot{width:min(320px,80vw); text-align:center;
@@ -294,8 +300,9 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   background:radial-gradient(ellipse at center, rgba(8,8,14,.72), rgba(8,8,14,0) 72%)}
 /* 깜빡임: 완전히 사라지지 않게 0.35까지만 내린다. 다 꺼지면 눌러야 하는지 헷갈림 */
 .splash .tap{
-  margin:0; font:900 18px/1.4 var(--gf); letter-spacing:3px; color:#ffe9a8;
-  text-shadow:0 0 12px rgba(255,190,80,.55), 0 2px 4px rgba(0,0,0,.9);
+  /* [stated] 글자색은 **찐한 흰색** */
+  margin:0; font:900 18px/1.4 var(--gf); letter-spacing:3px; color:#fff;
+  text-shadow:0 0 12px rgba(255,255,255,.45), 0 2px 4px rgba(0,0,0,.9);
   animation:tapblink 1.15s ease-in-out infinite;
 }
 @keyframes tapblink{0%,100%{opacity:1}50%{opacity:.35}}
@@ -473,6 +480,36 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .rb-tabs .menu-btn{opacity:.55}
 .rb-tabs .menu-btn.primary{opacity:1;background:rgba(28,64,104,.5)}
 .rb-tabs .menu-btn.primary .t{color:#eaf7ff}
+
+/* 방 초대 — 방을 만들고 기다리는 동안 친구를 고른다 */
+.inv-open{margin-top:8px}
+.inv-box{margin-top:8px;max-height:38vh;overflow-y:auto;width:100%}
+/* 받은 초대 알림. 홈 상단 카드 바로 아래에 띄운다 */
+.inv-banner{position:absolute;z-index:26;
+  left:calc(var(--sal) + var(--h-barX,0) * var(--u));
+  right:calc(var(--sar) + var(--h-barX,0) * var(--u));
+  top:calc((var(--h-barY,2) + var(--h-rowH,20) * 2 + 7) * var(--u));
+  display:flex;align-items:center;gap:6px;padding:6px 8px;
+  background:rgba(16,32,54,.92);border:1px solid #5a96c8;border-radius:3px}
+.inv-txt{flex:1 1 auto;min-width:0;font-size:11px;color:#cfe4ff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 친구 화면 */
+.fr-input{flex:1 1 0;min-width:0;font-size:14px;letter-spacing:1px;text-align:left;padding:0 8px}
+.fr-head{margin:10px 0 4px;text-align:left;width:100%}
+.fr-note{margin-top:10px;opacity:.7}
+.fr-row{display:flex;align-items:center;gap:7px;padding:6px 8px;margin-bottom:3px;
+  background:rgba(10,18,30,.7);border:1px solid rgba(90,140,190,.28);border-radius:3px}
+/* 접속 중이면 켜지는 점 */
+.fr-dot{width:7px;height:7px;border-radius:50%;background:#3c4a60;flex:0 0 auto}
+.fr-dot.on{background:#4ad14a;box-shadow:0 0 6px rgba(74,209,74,.8)}
+.fr-nick{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fr-score{margin-left:auto;font-size:11px;color:var(--dim)}
+.fr-acts{display:flex;gap:4px;flex:0 0 auto}
+.fr-btn{font:700 11px var(--gf);color:#cfd8ee;padding:3px 7px;border-radius:3px;
+  background:rgba(18,18,28,.9);border:1px solid #4a5570;cursor:pointer}
+.fr-btn.ok{border-color:#5a96c8;color:#9fd4ff}
+.fr-btn:disabled{opacity:.5}
 
 /* 순위표 화면. 내 자리는 **목록보다 위**에 둔다 — 30위 밖이면 목록에 없어서
    아래에 두면 자기 등수를 보려고 끝까지 내려야 한다 */

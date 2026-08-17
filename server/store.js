@@ -173,6 +173,169 @@ export async function myRank(uid, kind = 'gun'){
   }
 }
 
+// ── 친구 ────────────────────────────────────────────────────────────
+// [stated] **닉네임으로 찾고, 상대가 수락해야 친구가 된다.**
+//
+// **왜 전부 서버를 거치나**: 규칙이 남의 문서를 못 읽고 못 쓰게 막아둔다.
+// 신청은 상대 문서에 써야 하고, 수락은 양쪽 문서에 동시에 써야 한다 →
+// Admin SDK 인 서버만 할 수 있다.
+//
+// 짜임새
+//   players/{나}/friends/{상대}   수락된 친구
+//   players/{나}/reqIn/{보낸이}   나에게 온 신청
+//   players/{나}/reqOut/{받는이}  내가 보낸 신청
+// 신청·수락은 **양쪽을 같이 고치므로 배치(batch)로** 한 번에 쓴다.
+// 한쪽만 써지면 "보냈는데 상대에겐 없는" 유령 신청이 남는다
+
+const pub = (uid, v) => ({
+  uid, nick: (v && v.nick) || '',
+  score: (v && v.score) || { gun: 1000, melee: 1000 }
+});
+
+/** 신청 보내기. 이름으로 찾아서 상대 `reqIn` 과 내 `reqOut` 에 같이 쓴다 */
+export async function friendRequest(me, nick){
+  if (!db) return { ok: false, off: true };
+  const target = await findByNick(nick);
+  if (!target) return { ok: false, why: 'none' };
+  if (target.uid === me) return { ok: false, why: 'self' };
+  try {
+    const already = await db.doc(`players/${me}/friends/${target.uid}`).get();
+    if (already.exists) return { ok: false, why: 'already' };
+    // 상대가 **나에게 이미 보냈으면** 신청 대신 바로 수락한다 (서로 보내고 둘 다 기다리는 일 방지)
+    const cross = await db.doc(`players/${me}/reqIn/${target.uid}`).get();
+    if (cross.exists) return friendAccept(me, target.uid);
+
+    const b = db.batch();
+    b.set(db.doc(`players/${target.uid}/reqIn/${me}`), { at: FieldValue.serverTimestamp() });
+    b.set(db.doc(`players/${me}/reqOut/${target.uid}`), { at: FieldValue.serverTimestamp() });
+    await b.commit();
+    return { ok: true, sent: pub(target.uid, target) };
+  } catch (e){
+    console.log('[store] 친구 신청 실패', e && e.code);
+    return { ok: false, why: 'err' };
+  }
+}
+
+/** 수락. **양쪽 friends 에 같이 넣고 신청 기록은 지운다** */
+export async function friendAccept(me, from){
+  if (!db) return { ok: false, off: true };
+  try {
+    const req = await db.doc(`players/${me}/reqIn/${from}`).get();
+    if (!req.exists) return { ok: false, why: 'none' };
+    const b = db.batch();
+    b.set(db.doc(`players/${me}/friends/${from}`), { at: FieldValue.serverTimestamp() });
+    b.set(db.doc(`players/${from}/friends/${me}`), { at: FieldValue.serverTimestamp() });
+    b.delete(db.doc(`players/${me}/reqIn/${from}`));
+    b.delete(db.doc(`players/${from}/reqOut/${me}`));
+    await b.commit();
+    return { ok: true };
+  } catch (e){
+    console.log('[store] 친구 수락 실패', e && e.code);
+    return { ok: false, why: 'err' };
+  }
+}
+
+/** 거절 — 신청 기록만 지운다 */
+export async function friendReject(me, from){
+  if (!db) return { ok: false, off: true };
+  try {
+    const b = db.batch();
+    b.delete(db.doc(`players/${me}/reqIn/${from}`));
+    b.delete(db.doc(`players/${from}/reqOut/${me}`));
+    await b.commit();
+    return { ok: true };
+  } catch { return { ok: false, why: 'err' }; }
+}
+
+/** 친구 끊기 — **양쪽에서 지운다.** 한쪽만 지우면 상대 목록엔 내가 남는다 */
+export async function friendRemove(me, other){
+  if (!db) return { ok: false, off: true };
+  try {
+    const b = db.batch();
+    b.delete(db.doc(`players/${me}/friends/${other}`));
+    b.delete(db.doc(`players/${other}/friends/${me}`));
+    await b.commit();
+    return { ok: true };
+  } catch { return { ok: false, why: 'err' }; }
+}
+
+/** 친구 목록 + 받은 신청 + 보낸 신청.
+ *  이름·점수는 각자의 `players` 문서에서 가져온다 (한 번에 읽는다) */
+export async function friendList(me){
+  if (!db) return null;
+  try {
+    const [fr, rin, rout] = await Promise.all([
+      db.collection(`players/${me}/friends`).limit(200).get(),
+      db.collection(`players/${me}/reqIn`).limit(100).get(),
+      db.collection(`players/${me}/reqOut`).limit(100).get()
+    ]);
+    const ids = [...new Set([...fr.docs, ...rin.docs, ...rout.docs].map(d => d.id))];
+    const info = new Map();
+    // `getAll` 은 한 번에 읽는다 — 하나씩 읽으면 친구 수만큼 왕복이 생긴다
+    if (ids.length){
+      const docs = await db.getAll(...ids.map(id => db.doc('players/' + id)));
+      docs.forEach((d, i) => info.set(ids[i], d.exists ? d.data() : null));
+    }
+    const map = ds => ds.docs.map(d => pub(d.id, info.get(d.id)));
+    return { friends: map(fr), reqIn: map(rin), reqOut: map(rout) };
+  } catch (e){
+    console.log('[store] 친구 목록 실패', e && e.code);
+    return null;
+  }
+}
+
+// ── 방 초대 ──────────────────────────────────────────────────────────
+// [stated] 친구 목록에서 방으로 초대한다.
+//
+// **소켓으로 밀어 넣지 않는다.** 클라는 PVP 에 들어갈 때만 소켓을 여는데,
+// 초대를 받을 사람은 보통 홈 화면에 있어서 소켓이 없다.
+// 그래서 상대 문서 밑에 적어두고, 받는 쪽이 **앱을 켜 둔 동안 지켜보다가** 집는다.
+//
+//   players/{받는이}/invites/{보낸이}  = { code, n, melee, ffa, nick, at }
+//
+// 보낸 사람 기준으로 한 칸만 쓴다 — 같은 사람이 여러 번 눌러도 쌓이지 않는다.
+const INVITE_TTL_MS = 5 * 60 * 1000;   // 5분 지난 초대는 안 보여준다
+
+/** 초대 보내기. **친구인지 확인하고** 보낸다 — 아무나 초대를 꽂을 수 있으면 스팸이 된다 */
+export async function friendInvite(me, to, room){
+  if (!db) return { ok: false, off: true };
+  if (!to || to === me) return { ok: false, why: 'none' };
+  try {
+    const ok = await db.doc(`players/${me}/friends/${to}`).get();
+    if (!ok.exists) return { ok: false, why: 'notfriend' };
+    const mine = await db.doc('players/' + me).get();
+    await db.doc(`players/${to}/invites/${me}`).set({
+      code: String(room.code || '').slice(0, 8),
+      n: room.n | 0, melee: !!room.melee, ffa: !!room.ffa,
+      nick: (mine.exists && mine.data().nick) || '',
+      at: Date.now()                       // 만료를 클라에서 바로 재려고 보통 숫자로 둔다
+    });
+    return { ok: true };
+  } catch (e){
+    console.log('[store] 초대 실패', e && e.code);
+    return { ok: false, why: 'err' };
+  }
+}
+
+/** 초대 지우기 (입장했거나 무시했을 때) */
+export async function inviteClear(me, from){
+  if (!db) return { ok: false, off: true };
+  try { await db.doc(`players/${me}/invites/${from}`).delete(); return { ok: true }; }
+  catch { return { ok: false, why: 'err' }; }
+}
+
+/** 나에게 온 초대. **오래된 건 걸러서** 준다 */
+export async function invitesFor(me){
+  if (!db) return null;
+  try {
+    const q = await db.collection(`players/${me}/invites`).limit(20).get();
+    const now = Date.now();
+    return q.docs
+      .map(d => ({ from: d.id, ...d.data() }))
+      .filter(v => now - (v.at || 0) < INVITE_TTL_MS);
+  } catch { return null; }
+}
+
 /** 순위표를 한 덩어리로 저장한다. [stated] 상위 **30명**.
  *  **문서 하나에 모아둔다** — 볼 때마다 30명을 각각 읽으면 읽기 할당량이 금방 닳는다.
  *  한 덩어리면 몇 명을 담든 조회 1회라, 인원을 늘려도 비용은 그대로다 */
