@@ -39,13 +39,14 @@ export default function ProfileTab({ onClose }){
     setBusy(true); setAccMsg('');
     try {
       const m = await import('../cloud/firebase.js');
-      const r = await m.linkGoogle();
+      const r = await m.signInGoogle();
       if (r.ok){
-        // 계정이 바뀌었으면 **구름 값으로 기기를 덮는다** (순서가 반대면 옛 기록이 날아간다)
-        if (r.mode === 'switch'){ await resyncAccount(); setAccMsg(t('acc.switched')); }
+        // 로그인한 계정의 기록으로 **기기를 덮는다.** 순서가 반대면 지금 기기 값이
+        // 그 계정 기록을 밀어낸다 (새로 깐 기기면 점수 1000·티켓 5 로 덮여 버린다)
+        await resyncAccount();
         setLinked(m.googleLinked());
         setAccName(m.accountName());
-        setN(getNick());          // 계정이 바뀌면 이름도 그 계정 것으로
+        setN(getNick());          // 계정 것으로 이름도 맞춘다
       } else if (r.reason !== 'cancel'){
         setAccMsg(t('acc.fail'));
       }

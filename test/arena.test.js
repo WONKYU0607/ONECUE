@@ -15,12 +15,21 @@ const inp = n => Array.from({ length: n }, () => ({ ...NOIN }));
 console.log('1대1 기준값 (바뀌면 결정론이 깨진다)');
 const a = newState(2);
 assert(GRID_COLS === 6 && GRID_ROWS === 14 && GRID_MIDROW === 7, '격자 6x14, 중앙 7');
-assert(PWf === 14 * FP && PHf === 16 * FP, '캐릭터 14x16');
-assert(YMIN_S[0] === Math.round(H / 2 * FP) && YMIN_S[1] === 0, '세로 하한이 예전 그대로');
-assert(YMAX_S[0] === Math.round((H - 16) * FP) && YMAX_S[1] === Math.round((H / 2 - 16) * FP),
-  '세로 상한이 예전 그대로');
-assert(a.p[0].x === 23970 && a.p[0].y === 74724, '슬롯0 스폰 좌표 고정');
-assert(a.p[1].x === 23970 && a.p[1].y === 795, '슬롯1 스폰 좌표 고정');
+// [stated] 1대1 배경이 화면을 꽉 채워 보인다 → **아레나를 88.4%로 줄이고 위아래 18씩 여백**.
+// 그림·격자·벽 표·캐릭터가 **같은 배율로 함께** 움직였다
+assert(PWf === 12 * FP && PHf === 14 * FP, '캐릭터 12x14 (아레나와 같은 비율로 줄임)');
+// **아레나가 화면 전체가 아니므로 H 가 아니라 격자 기준**이다.
+// 예전처럼 H/2·H-ph 를 쓰면 여백(아레나 밖)까지 걸어 나간다
+const cy1 = r => ARENA.y0 + ARENA.ch * r;
+assert(YMIN_S[0] === Math.round(cy1(7) * FP) && YMIN_S[1] === Math.round(ARENA.y0 * FP),
+  '세로 하한이 격자 기준');
+assert(YMAX_S[0] === Math.round((cy1(14) - 14) * FP) &&
+       YMAX_S[1] === Math.round((cy1(7) - 14) * FP), '세로 상한이 격자 기준');
+assert(YMIN_S[1] > 0, '위쪽 팀도 여백 밖으로 못 나간다');
+assert(a.p[0].x === 23913 && a.p[0].y === 70701, '슬롯0 스폰 좌표 고정');
+assert(a.p[1].x === 23913 && a.p[1].y === 5330, '슬롯1 스폰 좌표 고정');
+// 위아래 여백이 같아야 화면 뒤집기(flip)가 그대로 맞는다
+assert(Math.abs((311 - cy1(14)) - ARENA.y0) < 0.05, '위아래 여백이 같다');
 assert(cellOwner(6) === 1 && cellOwner(7) === 0, '1대1은 중립 행이 없다');
 
 console.log('2대2 아레나');
@@ -229,7 +238,7 @@ console.log('스냅샷 전 예측 (슬롯 2·3이 검은 화면으로 죽던 자
 console.log('1대1로 되돌아오는지');
 setArena(4);
 const back = newState(2);
-assert(GRID_COLS === 6 && PWf === 14 * FP && ARENA.bg === 'arena', '2대2 뒤에도 1대1이 원래대로');
+assert(GRID_COLS === 6 && PWf === 12 * FP && ARENA.bg === 'arena', '2대2 뒤에도 1대1이 원래대로');
 assert(back.p[0].x === a.p[0].x && back.p[0].y === a.p[0].y, '스폰 좌표도 그대로');
 assert(teamOf(0, 2) === 0 && teamOf(1, 2) === 1, '1대1 팀 배정 유지');
 

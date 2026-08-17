@@ -5,6 +5,7 @@ import AiStages from './ui/screens/AiStages.jsx';
 import PracticeMenu from './ui/screens/PracticeMenu.jsx';
 import PvpMenu from './ui/screens/PvpMenu.jsx';
 import RankBoard from './ui/screens/RankBoard.jsx';
+import Login from './ui/screens/Login.jsx';
 import Matching from './ui/screens/Matching.jsx';
 import Result from './ui/screens/Result.jsx';
 import SettingsModal from './ui/SettingsModal.jsx';
@@ -27,7 +28,7 @@ export default function App(){
   // 각자 구독하게 하면 빠뜨리는 곳이 생긴다
   const [, bumpLang] = useState(0);
   useEffect(() => onLangChange(() => bumpLang(v => v + 1)), []);
-  const [screen, setScreen] = useState('splash');   // splash|home|ai|practice|pvp|matching|game|result|ranks
+  const [screen, setScreen] = useState('splash');   // splash|login|home|ai|practice|pvp|matching|game|result|ranks
   const [rankKind, setRankKind] = useState('gun');  // 순위표에서 먼저 볼 종목
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
@@ -134,7 +135,10 @@ export default function App(){
 
   return (
     <>
-      {screen === 'splash'   && <Splash onDone={() => { goHome(); goHomeFirst(); }} />}
+      {/* [stated] **진입할 때 로그인시킨다.** 익명 계정이 없어서 로그인 전에는
+          순위표·점수 기록·이름 바꾸기가 전부 안 된다 */}
+      {screen === 'splash'   && <Splash onDone={() => setScreen('login')} />}
+      {screen === 'login'    && <Login onDone={() => { goHome(); goHomeFirst(); }} />}
       {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
                                      onSettings={() => setShowSettings(true)} onHelp={() => setShowHelp(true)}
                                      onRanks={k => { setRankKind(k); setScreen('ranks'); }} />}

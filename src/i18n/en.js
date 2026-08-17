@@ -205,6 +205,7 @@ export default {
   'acc.switched': 'Loaded the record from this Google account',
   'acc.fail': "Couldn't connect",
   'acc.why': 'Link an account to keep your record if the app is removed',
+  'acc.need': 'Sign in with Google to start',
   'rank.mine': '#{r} of {n}',
   'rank.none': 'No record',
   'rank.loading': 'Loading',

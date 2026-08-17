@@ -48,7 +48,8 @@ export function shieldBtn(uiH){
 export function hpBand(){
   const n = ARENA.n || 2;
   const mineRows = ARENA.ffa ? 1 : n / 2;          // 내 편 줄 수
-  const foeRows  = ARENA.ffa ? n - 1 : n / 2;      // 상대 줄 수
+  // [stated] 개인전은 상대 체력바를 안 그린다 (스틱과 겹쳤다) → 줄 수도 0
+  const foeRows  = ARENA.ffa ? 0 : n / 2;
   const two = mineRows > 1;
   const BH = two ? 4 : 5, gap = 1.5;
   const rows = Math.max(mineRows, foeRows);
@@ -68,13 +69,13 @@ export function uiBoxRect(uiH){
   // 개인전은 상대가 n-1줄이라 내 편(1줄)보다 길다 — 긴 쪽을 따라간다
   const n = ARENA.n || 2;
   const mineRows = ARENA.ffa ? 1 : n / 2;
-  const foeRows  = ARENA.ffa ? n - 1 : n / 2;
+  const foeRows  = ARENA.ffa ? 0 : n / 2;   // 개인전은 상대 체력바를 안 그린다
   const two = mineRows > 1;
   const BH = two ? 4 : 11, rowGap = 1.5;   // render.js와 같은 값
   const rows = Math.max(mineRows, foeRows);
   const top = H + (two ? 2.5 : 4.5);
   // **체력바 구간을 절대 안 벗어난다.** 예전엔 최소 18로 키워서 아래로 삐져나왔다.
-  // 개인전 6인은 상대 줄이 5개라 구간이 31px까지 커지므로 상한을 두고 세로 가운데
+  // (개인전은 이제 상대 줄이 없어 구간이 짧다)
   const blockH = rows * BH + (rows - 1) * rowGap;
   const h = Math.min(blockH, 22);
   return { x, y: top + (blockH - h) / 2, w, h };

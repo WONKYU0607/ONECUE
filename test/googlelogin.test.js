@@ -8,11 +8,17 @@ const fb = fs.readFileSync('src/cloud/firebase.js', 'utf8');
 const sync = fs.readFileSync('src/cloud/sync.js', 'utf8');
 const prof = fs.readFileSync('src/ui/ProfileTab.jsx', 'utf8');
 
-console.log('익명 계정을 승격시킨다 (기록이 따라간다)');
+// [stated] 출시 빌드라 **익명 계정은 안 만든다** — 구글 로그인만.
+// 익명이 없으니 승격(link)·계정 충돌 처리 자체가 필요 없다
+console.log('익명 계정을 만들지 않는다');
 {
-  assert(/linkWithCredential/.test(fb) && /linkWithPopup/.test(fb),
-    '  익명이면 link 로 승격한다 (새로 로그인하면 기록이 끊긴다)');
-  assert(/user && user\.isAnonymous/.test(fb), '  익명일 때만 link, 아니면 그냥 로그인');
+  assert(!/signInAnonymously/.test(fb), '  익명 로그인이 코드에 없다');
+  assert(!/linkWithCredential|linkWithPopup/.test(fb), '  승격(link) 경로가 없다');
+  assert(!/credential-already-in-use/.test(fb), '  계정 충돌 처리가 필요 없어졌다');
+  assert(/export async function signInGoogle/.test(fb), '  구글 로그인 하나만 있다');
+  assert(/export async function signOutAll/.test(fb), '  로그아웃도 있다 (계정 바꾸기)');
+  // 앱에서는 네이티브 쪽 계정 선택까지 지워야 다른 계정으로 바꿀 수 있다
+  assert(/FirebaseAuthentication\.signOut/.test(fb), '  앱에서는 네이티브 계정도 지운다');
 }
 
 console.log('앱과 웹이 가는 길이 다르다');
@@ -25,20 +31,35 @@ console.log('앱과 웹이 가는 길이 다르다');
   assert(/signInWithPopup/.test(fb), '  웹에서는 팝업');
 }
 
-// [stated] A안 — 이미 그 구글 계정에 기록이 있으면 **그쪽을 살리고 지금 익명 것은 버린다**
-console.log('이미 쓰던 구글 계정이면 그쪽으로 갈아탄다');
+// **로그인한 계정의 기록으로 기기를 덮어야 한다.**
+// 순서가 반대면 새로 깐 기기의 빈 값(점수 1000·티켓 5)이 그 계정 기록을 밀어낸다
+console.log('로그인하면 그 계정 기록을 내려받는다');
 {
-  assert(/credential-already-in-use/.test(fb), '  이미 쓰는 계정을 알아본다');
-  assert(/credentialFromError/.test(fb), '  그 오류에서 자격증명을 꺼내 다시 로그인한다');
-  assert(/mode: 'switch'/.test(fb), '  갈아탔다는 걸 알려준다');
-  // **이게 없으면 새 기기의 빈 기록이 옛 기록을 덮어쓴다**
-  assert(/export async function resyncAccount/.test(sync), '  계정이 바뀌면 다시 맞추는 길이 있다');
+  assert(/export async function resyncAccount/.test(sync), '  다시 맞추는 길이 있다');
   const i = sync.indexOf('resyncAccount');
   const body = sync.slice(i, i + 600);
   assert(body.indexOf('m.pull()') < body.indexOf('save()'),
-    '  **먼저 구름에서 읽고** 그다음에 올린다 (순서가 반대면 옛 기록이 날아간다)');
-  assert(/r\.mode === 'switch'.*resyncAccount/s.test(prof),
-    '  갈아탔을 때 화면이 다시 맞춘다');
+    '  **먼저 구름에서 읽고** 그다음에 올린다');
+  assert(/signInGoogle\(\);[\s\S]{0,200}resyncAccount\(\)/.test(prof),
+    '  로그인 성공하면 화면이 다시 맞춘다');
+}
+
+// [stated] **진입할 때 로그인시킨다.** 로그인 전에는 uid 가 없어서
+// 순위표·점수 기록·이름 바꾸기가 전부 안 된다
+console.log('홈보다 먼저 로그인 화면을 거친다');
+{
+  const app = fs.readFileSync('src/App.jsx', 'utf8');
+  const login = fs.readFileSync('src/ui/screens/Login.jsx', 'utf8');
+  assert(/screen === 'login'\s+&& <Login/.test(app), '  login 화면이 배선돼 있다');
+  assert(/<Splash onDone=\{\(\) => setScreen\('login'\)\}/.test(app),
+    '  진입창 다음이 홈이 아니라 로그인이다');
+  // 이미 로그인돼 있으면 그냥 지나가야 한다 (앱을 다시 켠 경우)
+  assert(/await m\.signIn\(\)/.test(login) && /if \(uid\)\{ onDone\(\); return; \}/.test(login),
+    '  이미 로그인돼 있으면 바로 통과');
+  // **막되 가둬두지는 않는다** — 실패하면 다시 눌러볼 수 있어야 한다
+  assert(/setBusy\(false\)/.test(login), '  실패해도 버튼이 다시 살아난다');
+  assert(/setMsg\(t\('acc\.fail'\)\)/.test(login), '  실패를 화면에 알린다');
+  assert(/resyncAccount/.test(login), '  로그인 뒤 그 계정 기록을 내려받는다');
 }
 
 console.log('취소는 오류가 아니다');

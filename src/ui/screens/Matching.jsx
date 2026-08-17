@@ -19,7 +19,7 @@ const LABEL = {
 
 export default function Matching({ session, onCancel, onMatched }){
   const [stage, setStage] = useState('waking');
-  const [tries, setTries] = useState([0, 0]);
+  const [, setTries] = useState([0, 0]);   // 재시도 횟수는 이제 화면에 안 쓴다
   const [code, setCode] = useState('');
   const [err, setErr] = useState('');
   const [lobby, setLobby] = useState(null);
@@ -59,7 +59,6 @@ export default function Matching({ session, onCancel, onMatched }){
   }, [onMatched, session]);
 
   const cancel = () => { disconnect(); onCancel(); };
-  const waking = stage === 'waking' || stage === 'retrying';
 
   return (
     <div className="screen center">
@@ -106,13 +105,8 @@ export default function Matching({ session, onCancel, onMatched }){
       )}
       {stage !== 'error' && <p className="hint">{sec}초</p>}
 
-      {waking && (
-        <p className="hint note">
-          무료 서버라 잠들어 있으면 깨우는 데 1분쯤 걸린다
-          {tries[1] ? ` (${tries[0]}/${tries[1]})` : ''}
-          <br />{t('match.slowHint')}
-        </p>
-      )}
+      {/* [stated] 서버 깨울 때 뜨던 안내문은 뺐다 — 사용자에게 보일 말이 아니다.
+          기다리는 동안 보이는 건 회전 표시와 지나간 시간뿐 */}
 
       {stage === 'error' && (
         <p className="hint note">

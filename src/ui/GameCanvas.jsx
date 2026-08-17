@@ -127,19 +127,12 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
 
       {/* 전투 전 안내·신청은 prompt() 하나가 정한다. 종류마다 마크업을 따로 쓰면
            한쪽만 틀리게 되므로(실제로 그래서 노템전 창이 안 떴다) 한 갈래로 그린다 */}
-      {(ready.prompt?.banner || []).map(k => (
-        <div key={k} className="link-note ui-overlay fast">{negText(k, 'on', ready.prompt?.melee)}</div>
-      ))}
-      {/* [stated] 수락되면 화면 가운데에 알림 문구를 잠깐 띄운다 */}
-      {ready.prompt?.done && (
-        <div className="negdone ui-overlay">
-          {t(ready.prompt.done.mine ? 'ready.doneMine' : 'ready.donePeer',
-             { what: negText(ready.prompt.done.kind, 'name', ready.prompt.done.melee) })}
-        </div>
-      )}
-      {/* [stated] 준비 상황과 신청 버튼을 **같은 크기로 최상단에 나란히** 놓는다 */}
-      {(placing || (ready.prompt?.offer || []).length > 0) && (
-        <div className="topbar ui-overlay">
+      {/* [stated] 신청·안내 상자를 **한 자리에 세로로 모은다.**
+          예전엔 배너(`.link-note`)와 신청 줄(`.topbar`)이 각자 떠 있어서
+          칼전에서는 배너가 준비 상자 위에 따로 놀았다. 하나로 묶어야 순서·크기가 맞는다 */}
+      {(((ready.prompt?.banner || []).length > 0) || placing ||
+        (ready.prompt?.offer || []).length > 0) && (
+        <div className="gtop ui-overlay">
           {placing && (
             <div className="topbox">
               <FitText>
@@ -148,12 +141,22 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
               </FitText>
             </div>
           )}
+          {(ready.prompt?.banner || []).map(k => (
+            <div key={k} className="topbox on"><FitText>{negText(k, 'on', ready.prompt?.melee)}</FitText></div>
+          ))}
           {(ready.prompt?.offer || []).map((k, i) => (
             <button key={k} className={'topbox btn' + (i ? ' bare' : '')}
                     onClick={() => gameRef.current?.request(k)}>
               <FitText>{negText(k, 'btn', ready.prompt?.melee)}</FitText>
             </button>
           ))}
+        </div>
+      )}
+      {/* [stated] 수락되면 화면 가운데에 알림 문구를 잠깐 띄운다 */}
+      {ready.prompt?.done && (
+        <div className="negdone ui-overlay">
+          {t(ready.prompt.done.mine ? 'ready.doneMine' : 'ready.donePeer',
+             { what: negText(ready.prompt.done.kind, 'name', ready.prompt.done.melee) })}
         </div>
       )}
       {ready.prompt?.waiting && (

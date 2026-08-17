@@ -26,7 +26,7 @@ html,body{height:100%;background:#07070d;overflow:hidden;touch-action:none;
 .wrap{height:100%;display:flex;align-items:center;justify-content:center;
   padding:var(--sat) var(--sar) var(--sab) var(--sal)}
 canvas{display:block;background:#12121c}
-.tune{position:fixed;right:6px;top:6px;display:flex;flex-direction:column;gap:5px;
+.tune{position:fixed;right:calc(var(--sar) + 6px);top:calc(var(--sat) + 6px);display:flex;flex-direction:column;gap:5px;
 z-index:10;font:11px/1 monospace;color:#7a7a95}
 .tune .row{display:flex;align-items:center;gap:5px;justify-content:flex-end}
 .tune .lbl{min-width:30px;text-align:right}
@@ -78,7 +78,7 @@ justify-content:center;gap:18px;color:#e8e8f0;font-family:var(--gf);font-weight:
 .logo.win{color:#4ec9f0}.logo.lose{color:#f0645a}.logo.draw{color:#e8e8f0}
 .hint{font:700 12px var(--gf);color:#8b9db0;letter-spacing:2px}
 .big{font:900 17px var(--gf);letter-spacing:2px}
-.ver{position:fixed;bottom:12px;font-size:11px;color:#4a4a63}
+.ver{position:fixed;bottom:calc(var(--sab) + 12px);font-size:11px;color:#4a4a63}
 
 /* 틀 두께(좌우)와 화면 패딩을 빼고 남는 만큼만. 안 그러면 폰에서 틀 밖으로 넘친다 */
 .menu{display:flex;flex-direction:column;gap:12px;
@@ -115,7 +115,17 @@ font-size:calc(11 * var(--u));line-height:1;cursor:pointer;padding:0}
    버튼이 흐름으로 떨어져 화면 한가운데로 간다. 반드시 --u를 곱할 것 */
 .top-right{position:absolute;right:calc(6 * var(--u));top:calc(var(--h-icoTop,42) * var(--u));z-index:30}
 .top-right2{position:absolute;right:calc(29 * var(--u));top:calc(var(--h-icoTop,42) * var(--u));z-index:30}
-.top-left{position:absolute;left:calc(6 * var(--u));top:calc(var(--h-icoTop,42) * var(--u));z-index:30}
+/* 게임 화면의 '‹'. **`position:absolute` 인데 위치 기준이 되는 조상이 없어서
+   화면 맨 위(상태바 밑)에 붙는다.** 그래서 안전 영역을 직접 더한다 */
+.top-left{position:absolute;left:calc(var(--sal) + 6 * var(--u));
+  top:calc(var(--sat) + var(--h-icoTop,42) * var(--u));z-index:30}
+
+/* 로그인 화면. 진입창과 같은 결로 단순하게 — 버튼 하나와 설명 한 줄 */
+.login{gap:14px}
+.login-title{font:900 min(40px,11vw)/1 var(--gf);letter-spacing:3px;color:#8fd8ff;
+  text-shadow:0 0 18px rgba(90,190,255,.45);margin-bottom:6px}
+.login .menu-btn{width:min(260px,72vw)}
+.login-why{max-width:min(300px,84vw);text-align:center;line-height:1.5}
 
 /* ---------- 진입창 ---------- */
 .bar{width:min(260px,70vw);height:4px;background:#1b1b2a;overflow:hidden}
@@ -154,7 +164,7 @@ border-radius:50%;transition:transform .15s,background .15s}
 .switch.on{background:rgba(78,201,240,.35)}
 .switch.on i{transform:translateX(18px);background:#4ec9f0}
 .hint.note{max-width:min(320px,80vw);text-align:center;line-height:1.6;color:#5f5f7a}
-.link-note{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:25;
+.link-note{position:fixed;left:50%;top:calc(var(--sat) + 14px);transform:translateX(-50%);z-index:25;
 padding:8px 14px;background:rgba(18,18,28,.94);border:1px solid #f0a81e;
 color:#f0c86e;font:700 12px/1.4 var(--gf);white-space:nowrap}
 .placebtn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;
@@ -212,14 +222,23 @@ pointer-events:none}
 
 /* [stated] 준비 상황·2배속·노템전을 **같은 크기로 최상단에 나란히** 놓는다.
    칸을 똑같이 나눠(1fr) 문구 길이와 상관없이 크기가 같다 */
-.topbar{position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:22;
-width:min(96vw,var(--gw,420px));display:grid;grid-auto-flow:column;
-grid-auto-columns:1fr;gap:6px;box-sizing:border-box;padding:0 6px}
-.topbox{height:34px;padding:0 6px;box-sizing:border-box;
+/* **떠 있는 것들은 `.screen` 밖이라 안전 영역이 자동으로 안 붙는다.**
+   상태바 높이를 각자 더해 줘야 시계·통신사 글자와 안 겹친다 */
+/* [stated] 신청 버튼들이 너무 위에 있다 → **카운트다운 숫자 위쪽으로 내리고
+   한 줄이 아니라 세 줄로** 쌓는다. 카운트다운은 월드 y 의 30% 언저리에 그려지므로
+   그보다 위에서 끝나도록 8% 지점 + 25px 에서 시작한다 */
+.gtop{position:fixed;left:50%;top:calc(var(--sat) + 8% + 25px);transform:translateX(-50%);z-index:25;
+display:flex;flex-direction:column;align-items:center;gap:5px}
+/* [stated] **전부 같은 크기, 다만 양옆 여백은 없앤다.**
+   글자 길이에 맞추면 `준비 1/2`(60px) 와 `노템전 신청`(79px) 이 달라 제각각으로 보이고,
+   넉넉히 잡으면 짧은 글자에 빈 곳이 크다 → **가장 긴 글자에 딱 맞춰** 못박는다.
+   실측: 가장 긴 `노템전 신청` 이 여백 없이 79px */
+.topbox{height:28px;width:min(28vw,86px);padding:0 3px;box-sizing:border-box;
 display:flex;align-items:center;justify-content:center;
-background:rgba(18,18,28,.92);border:2px solid #4a5570;color:#cfd8ee;
-font-family:var(--gf);font-weight:900;font-size:12px;letter-spacing:1px;
+background:rgba(18,18,28,.94);border:1px solid #4a5570;color:#cfd8ee;
+font-family:var(--gf);font-weight:700;font-size:12px;letter-spacing:1px;
 white-space:nowrap;overflow:hidden}
+.topbox.on{border-color:#f0a81e;color:#f0c86e}
 .topbox.btn{border-color:#8f6ef0;color:#c3adff;cursor:pointer}
 .topbox.btn.bare{border-color:#f0a81e;color:#f0c86e}
 .topbox.btn:active{background:#8f6ef0;color:#12121c}
@@ -235,7 +254,7 @@ transform-origin:center;white-space:nowrap}
 .ask-row{display:flex;gap:10px;width:100%}
 .ask-row .menu-btn{flex:1 1 0;min-width:0;align-items:center;text-align:center;padding:6px 8px}
 /* 게임 중엔 조절 패널을 접어두고 작은 버튼만 남긴다 */
-.tunetoggle{position:fixed;right:6px;top:6px;z-index:31;width:30px;height:30px;
+.tunetoggle{position:fixed;right:calc(var(--sar) + 6px);top:calc(var(--sat) + 6px);z-index:31;width:30px;height:30px;
 background:rgba(18,18,28,.75);border:1px solid #2a2a40;color:#5f5f7a;
 font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .tunetoggle:active{opacity:1;color:#8fd8ff}
@@ -561,6 +580,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .quit-ask .ask-row{display:flex;gap:8px;margin-top:12px}
 .quit-ask .ask-row .menu-btn{flex:1 1 0;min-width:0}
 /* 홈에서 뒤로가기 한 번 눌렀을 때 */
-.exit-hint{position:fixed;left:50%;bottom:8%;transform:translateX(-50%);z-index:60;
+.exit-hint{position:fixed;left:50%;bottom:calc(var(--sab) + 8%);transform:translateX(-50%);z-index:60;
   margin:0;padding:8px 16px;background:rgba(8,14,26,.92);border:1px solid #5a96c8;
   font:700 13px var(--gf);color:#dceaf6;white-space:nowrap}

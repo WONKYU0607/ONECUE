@@ -35,18 +35,22 @@ console.log('벽은 캐릭터를 막는다');
   assert(s.p[0].x > x1, '벽에 붙어서도 옆으로 미끄러진다');
 }
 
-console.log('드럼통은 막지 않는다');
+// [stated] "캐릭터도 통과는 못 해야지" — 드럼통도 벽처럼 막는다.
+// 예전엔 안 막았고, 이 검사도 통과하는 걸 확인하는 내용이었다
+console.log('드럼통도 막는다');
 {
   const s = newState();
   const r = 3;                                   // 상대 영역
   step(s, IN({ place: { k: ITEM.DRUM, c: 3, r } }, {}));
   const dr = itemRect(s.items[0]);
   start(s);
-  s.p[1].x = dr.x; s.p[1].y = dr.y + Math.round(20 * FP);
+  // 드럼통과 안 겹치는 자리에서 출발한다. **겹친 채로 시작하면 갇히지 않게 통과시킨다**
+  s.p[1].x = dr.x; s.p[1].y = dr.y + dr.h + Math.round(4 * FP);
   const y0 = s.p[1].y;
   for (let i = 0; i < 40; i++){ s.p[1].hp = MAXHP; step(s, IN({}, { dy: -Math.round(9 * FP) })); }
-  assert(s.p[1].y < dr.y, `드럼통 위를 지나간다 (y ${(s.p[1].y/FP).toFixed(1)} < ${(dr.y/FP).toFixed(1)})`);
-  assert(s.p[1].y < y0, '이동은 정상');
+  assert(s.p[1].y > dr.y + dr.h - FP,
+    `드럼통에 막힌다 (y ${(s.p[1].y/FP).toFixed(1)} / 드럼 아래 ${((dr.y+dr.h)/FP).toFixed(1)})`);
+  assert(s.p[1].y < y0, '드럼통 앞까지는 다가간다');
 }
 
 console.log('벽이 없으면 그대로');

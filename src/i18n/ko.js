@@ -205,6 +205,7 @@ export default {
   'acc.switched': '이 구글 계정의 기록을 불러왔습니다',
   'acc.fail': '연결하지 못했습니다',
   'acc.why': '계정을 연결하면 앱을 지워도 기록이 남습니다',
+  'acc.need': '시작하려면 구글 계정으로 로그인하세요',
   'rank.mine': '{r}등 / {n}명',
   'rank.none': '기록 없음',
   'rank.loading': '불러오는 중',

@@ -4,9 +4,8 @@
 // 보안은 Firestore 규칙으로 막는다(자기 문서만 읽기·쓰기, 점수는 서버만).
 import { initializeApp } from 'firebase/app';
 import {
-  getAuth, signInAnonymously, onAuthStateChanged,
-  GoogleAuthProvider, signInWithCredential, linkWithCredential,
-  signInWithPopup, linkWithPopup
+  getAuth, onAuthStateChanged,
+  GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
@@ -30,20 +29,23 @@ const waiters = [];
 
 export const getUid = () => uid;
 
-/** 익명 로그인. 이미 로그인돼 있으면 그대로 쓴다.
- *  **실패해도 게임은 돌아가야 한다** — 저장만 안 될 뿐이다 */
+/** **이미 로그인돼 있으면 그 계정을 쓴다. 없으면 그냥 없는 채로 둔다.**
+ *
+ *  [stated] 출시 빌드라 **익명 계정은 안 만든다** — 구글 로그인만 쓴다.
+ *  예전엔 켤 때마다 익명 계정을 만들었고, 그게 구글 세션을 밀어내서
+ *  로그인이 안 붙는 것처럼 보였다. 이제 그 충돌 자체가 없다.
+ *
+ *  로그인 안 한 상태로도 **게임은 돌아간다** — 기기 저장만 쓰고 구름·순위표만 빠진다 */
 export function signIn(){
   if (ready) return ready;
   ready = new Promise(resolve => {
     let done = false;
     const finish = v => { if (!done){ done = true; resolve(v); } };
     onAuthStateChanged(auth, u => {
-      if (u){ uid = u.uid; waiters.splice(0).forEach(f => f(u.uid)); finish(u.uid); }
+      uid = u ? u.uid : null;
+      if (u) waiters.splice(0).forEach(f => f(u.uid));
+      finish(uid);
     }, () => finish(null));
-    signInAnonymously(auth).catch(e => {
-      console.warn('[firebase] 익명 로그인 실패 — 기기 저장으로 돌아간다', e && e.code);
-      finish(null);
-    });
     // 망이 느리면 무한정 기다리지 않는다. 게임 시작을 막으면 안 된다
     setTimeout(() => finish(uid), 6000);
   });
@@ -79,57 +81,47 @@ async function nativeGoogleCredential(){
   return GoogleAuthProvider.credential(idToken, r.credential.accessToken);
 }
 
-/** 구글 계정 연결.
- *  돌려주는 값:
- *   - `{ ok:true, mode:'link' }`     익명 계정이 그대로 승격됐다 (기록 유지)
- *   - `{ ok:true, mode:'switch' }`   그 구글 계정에 **이미 기록이 있어** 그쪽으로 갈아탔다
- *   - `{ ok:false, reason }`         취소·실패
- *
- *  [stated] **A안**: 이미 쓰던 구글 계정이면 **그쪽 기록을 살리고 지금 익명 것은 버린다.**
- *  기기를 바꿔 새로 깔면 익명 계정이 새로 생기는데, 그 빈 기록으로 옛 기록을 덮으면 안 된다 */
-export async function linkGoogle(){
-  await signIn();                                  // 익명이라도 먼저 붙어 있어야 한다
+/** 구글 로그인. 익명 계정이 없으니 **승격(link)·충돌 처리가 필요 없다.**
+ *  돌려주는 값: `{ok:true}` 또는 `{ok:false, reason:'cancel'|'fail'}` */
+export async function signInGoogle(){
   const native = await isNative();
-  const user = auth.currentUser;
   try {
     if (native){
-      const cred = await nativeGoogleCredential();
-      if (user && user.isAnonymous) await linkWithCredential(user, cred);
-      else await signInWithCredential(auth, cred);
+      await signInWithCredential(auth, await nativeGoogleCredential());
     } else {
-      const provider = new GoogleAuthProvider();
-      if (user && user.isAnonymous) await linkWithPopup(user, provider);
-      else await signInWithPopup(auth, provider);
+      await signInWithPopup(auth, new GoogleAuthProvider());
     }
-    uid = auth.currentUser ? auth.currentUser.uid : uid;
-    return { ok: true, mode: 'link' };
+    uid = auth.currentUser ? auth.currentUser.uid : null;
+    return { ok: true };
   } catch (e){
     const code = (e && e.code) || '';
-    // **이미 그 구글 계정으로 쓰던 기록이 있다.** 승격이 안 되므로 그 계정으로 갈아탄다
-    if (code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use'){
-      try {
-        const cred = GoogleAuthProvider.credentialFromError(e);
-        if (!cred) return { ok: false, reason: 'inuse' };
-        await signInWithCredential(auth, cred);
-        uid = auth.currentUser ? auth.currentUser.uid : uid;
-        return { ok: true, mode: 'switch' };
-      } catch { return { ok: false, reason: 'inuse' }; }
-    }
     if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request')
       return { ok: false, reason: 'cancel' };
-    console.warn('[firebase] 구글 연결 실패', code || e);
+    console.warn('[firebase] 구글 로그인 실패', code || e);
     return { ok: false, reason: 'fail' };
   }
 }
 
-/** 지금 계정이 구글에 연결돼 있는가 */
+/** 로그아웃. 앱에서는 네이티브 쪽 계정 선택도 같이 지워야 다른 계정으로 바꿀 수 있다 */
+export async function signOutAll(){
+  try {
+    if (await isNative()){
+      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+      await FirebaseAuthentication.signOut().catch(() => {});
+    }
+  } catch { /* 무시 */ }
+  try { await signOut(auth); } catch { /* 무시 */ }
+  uid = null;
+}
+
+/** 지금 구글로 로그인돼 있는가 */
 export function googleLinked(){
   const u = auth.currentUser;
-  return !!(u && !u.isAnonymous && (u.providerData || []).some(p => p.providerId === 'google.com'));
+  return !!(u && (u.providerData || []).some(p => p.providerId === 'google.com'));
 }
 
 /** 화면에 보여줄 계정 이름 (없으면 null) */
 export function accountName(){
   const u = auth.currentUser;
-  return u && !u.isAnonymous ? (u.displayName || u.email || null) : null;
+  return u ? (u.displayName || u.email || null) : null;
 }

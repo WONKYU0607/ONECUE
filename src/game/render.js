@@ -367,8 +367,11 @@ export function createRenderer(canvas){
     mine.sort((a, b) => (a === SELF.slot ? -1 : b === SELF.slot ? 1 : a - b));
     const colOf = slot => viewOf(s)[slot];
     mine.forEach((slot, i) => bar(3, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), false));
-    foes.forEach((slot, i) =>
-      bar(W - 3 - BW, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), true));
+    // [stated] **개인전은 상대 체력바를 안 그린다.** 상대가 다섯이라 줄이 길어져
+    // 스와이프 스틱과 겹쳐 잘 안 보였다. 체력은 캐릭터 머리 위에 이미 뜬다
+    if (!ARENA.ffa)
+      foes.forEach((slot, i) =>
+        bar(W - 3 - BW, BY0 + i * (BH + rowGap), BH, s.p[slot].hp, colOf(slot), true));
 
     ctx.font = '900 ' + (8 * RS) + 'px ' + GF; ctx.textAlign = 'center';
     if (s.phase === PH_PLAY){
