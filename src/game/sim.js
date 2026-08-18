@@ -132,7 +132,7 @@ import {
 import {
   stepBall, stepBallInGoal, ballHome, KICKOFF, GOAL, FIELD,
   GOAL_HOLD, GOAL_SEQ, GOAL_TO_WIN, SOCCER_TICKS, TACKLE_TICKS, TACKLE_COOL, FOOT_OFF,
-  TACKLE_SLIDE, faceVec, SOC_STUN, RELEASE_TICKS, CHARGE_MS, TACKLE_HIT, KICKOFF_FREEZE,
+  TACKLE_SLIDE, faceVec, SOC_STUN, RELEASE_TICKS, CHARGE_MS, TACKLE_HIT,
   TACKLE_V
 } from './ball.js';
 
@@ -728,6 +728,11 @@ export function step(s, inp){
       // **축구도 방향이 필요하다.** `s.melee` 만 보고 있어서 축구에서는 face 가
       // 팀 기본값(위/아래)에 굳어 **좌우 모션이 영영 안 나왔다**
       if (s.soccer && (p.stun | 0) > 0){ dx = 0; dy = 0; }   // 쓰러진 동안은 못 움직인다
+      // [stated] **공을 잡은 사람은 15% 느리다** — 안 그러면 잡고 도망만 다니면 된다
+      if (s.soccer && s.ballOwner === i){
+        dx = Math.round(dx * 85 / 100);
+        dy = Math.round(dy * 85 / 100);
+      }
       if ((s.melee || s.soccer) && (dx || dy)){
         p.face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 2 : 3) : (dy < 0 ? 0 : 1);
       }
@@ -1273,11 +1278,11 @@ export function kickoff(s, scorer = -1){
     s.p[i].face = mine ? 0 : 1;
     s.p[i].stun = 0; s.p[i].tkl = 0; s.p[i].tklCool = 0;
   }
-  // [stated] **먹힌 쪽이 공을 잡고 시작한다.** 넣은 쪽은 잠깐 못 움직인다
+  // [stated] **먹힌 쪽이 공을 잡고 시작한다.** 자리만 놓으면 되지 기절시킬 이유는 없다
   if (scorer >= 0){
     for (let i = 0; i < s.n; i++){
       const t = teamOf(i, s.n);
-      if (t === scorer){ s.p[i].stun = KICKOFF_FREEZE; continue; }   // 넣은 쪽은 정지
+      if (t === scorer) continue;                                   // 넣은 쪽은 자기 골대 앞에
       if (s.ballOwner < 0){
         s.ballOwner = i;                                            // 먹힌 쪽 첫 사람이 소유
         const [fx, fy] = faceVec(s.p[i].face);

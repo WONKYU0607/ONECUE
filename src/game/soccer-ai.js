@@ -67,10 +67,14 @@ export function createSoccerAI(slot, level = 1){
         // "옆으로 드리블을 아예 안 한다"는 지적을 받았다.
         // 골대 앞에 오면 그때만 세로로 정렬한다 — 슛은 보는 방향으로 나가므로
         // 마지막엔 골대를 봐야 한다
+        // **골대 안으로 들고 들어가도 골이 아니다** → 골라인 앞에서 멈춰 차야 한다.
+        // 목표를 골대가 아니라 **골대 앞 지점**으로 잡는다
+        const standOff = 26 * FP;
+        const aimY = foeGoalY + (foeGoalY < cy ? standOff : -standOff);
         const toG = Math.abs(foeGoalY - cy);
         goal = toG > SHOOT_RANGE
-          ? { x: goalCx - half(PWf), y: foeGoalY - half(PHf), slop: FP }   // 대각선으로 접근
-          : { x: me.x, y: foeGoalY - half(PHf), slop: FP };                 // 앞에서는 곧장
+          ? { x: goalCx - half(PWf), y: aimY - half(PHf), slop: FP }   // 대각선으로 접근
+          : { x: me.x, y: aimY - half(PHf), slop: FP };                // 앞에서는 곧장
         const toGoal = foeGoalY - cy;
         const facingGoal = (toGoal < 0 && me.face === 0) || (toGoal > 0 && me.face === 1);
         // 골대 폭 안에 들어왔고 골대를 보고 있으면 찬다. 멀면 더 달린다

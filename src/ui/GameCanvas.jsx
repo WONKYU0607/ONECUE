@@ -64,8 +64,9 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
     if (!c) return { display: 'none' };
     const r = c.getBoundingClientRect();
     const w = Math.min(220, r.width * 0.55);
-    // 경기장 세로에서 내 진영 1/4 — 화면 아래쪽(내가 아래에 보인다)
-    const top = r.top + r.height * 0.75;
+    // 경기장 세로에서 내 진영 1/4 — 화면 아래쪽(내가 아래에 보인다).
+    // [stated] 거기서 **200px 더 위로** (타이머·점수판과 더 떨어지게)
+    const top = r.top + r.height * 0.75 - 200;
     return {
       left: (r.left + (r.width - w) / 2) + 'px', top: top + 'px',
       width: w + 'px', height: '34px', fontSize: '15px'

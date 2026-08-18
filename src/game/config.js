@@ -335,8 +335,11 @@ const A4_PW = 9, A4_PH = 9;
 // **표는 FP 단위다** — 월드 px 로 채웠다가 캐릭터가 화면 왼쪽 끝에 붙어 버렸다
 const W4L = new Array(311).fill(Math.round(F4.x0 * FP));
 const W4R = new Array(311).fill(Math.round((F4.x1 - A4_PW) * FP));
-const T4  = new Array(180).fill(Math.round(F4.y0 * FP));
-const B4  = new Array(180).fill(Math.round((F4.y1 - A4_PH) * FP));
+// **세로 한계는 골라인**이다. 경기장 사각형(61~259)으로 두면 캐릭터가 골라인(69) 을 넘어
+// 골대 안까지 걸어 들어간다 — 거기서 공을 놓으면 그대로 골이 됐다
+const G4_TOP = 69.0, G4_BOT = 249.3;
+const T4  = new Array(180).fill(Math.round(G4_TOP * FP));
+const B4  = new Array(180).fill(Math.round((G4_BOT - A4_PH) * FP));
 const A4 = {
   cols: A4_COLS, rows: A4_ROWS,
   x0: F4.x0, cw: (F4.x1 - F4.x0) / A4_COLS,
@@ -348,8 +351,8 @@ const A4 = {
   wl: W4L, wr: W4R, wt: T4, wb: B4,
   // 칼전처럼 **아레나 전체를 양쪽이 같이 쓴다** (중앙선도 진영도 없다)
   melee: true, soccer: true,
-  // 경기장이 짧은 만큼 이동 속도도 낮춘다 (198/275 ≈ 0.72)
-  spd: 0.72
+  // 경기장이 짧은 만큼 이동 속도도 낮춘다. [stated] 0.72 도 빨라서 **반으로** 더 줄였다
+  spd: 0.36
 };
 
 export const ARENA = { ...A1 };

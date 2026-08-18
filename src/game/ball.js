@@ -65,11 +65,16 @@ export const KICK_FX_TICKS = 10;
 export const PUSH_V = Math.round(1.1 * FP);        // 몸으로 밀기 — 절반으로 (66px/초, 28px 굴러감)
 // [stated] **공을 잡으면 발밑에 붙어 같이 다닌다** — 밀어서 모는 방식은 너무 어려웠다.
 // 이 거리 안에 들어오면 잡는다(주인이 없을 때만)
-export const PICK_R = Math.round(6 * FP);   // [stated] 너무 멀리서도 드리블돼서 좁힘
+// [stated] **잡히는 거리는 늘리고 발밑 간격은 줄인다.**
+// 6px 은 몸에 1.7px 파고들어야 잡히는 값이라 정확히 밟아야 했다.
+// 8.5 면 몸 표면과 공 표면이 닿을 때쯤 잡힌다
+export const PICK_R = Math.round(8.5 * FP);
 // [stated] **날아오는 공은 못 잡고 튕긴다.** "상대가 슛했는데 내가 맞으면 무조건 튕겨 나간다"
 // 이 속도 이하일 때만 잡을 수 있다 (몰던 공·거의 멈춘 공)
 export const CATCH_MAX = Math.round(2.2 * FP);
-export const FOOT_OFF = Math.round(4.5 * FP);      // 발밑 — 보는 방향으로 이만큼 앞 (더 붙임)
+// [stated] 발밑 간격 **2.5**. 공 중심이 몸 안쪽에 들어와 **캐릭터에 일부 가려질 수 있다**
+// (공을 캐릭터보다 먼저 그린다) — 실기에서 보고 이상하면 다시 올릴 것
+export const FOOT_OFF = Math.round(2.5 * FP);
 export const RELEASE_TICKS = 14;                   // 찬 뒤 이 동안은 아무도 못 잡는다
 // [stated] 슛에 **1초 차징**. 오래 누를수록 세게, 일찍 떼면 약하게.
 // 지금 세기(`KICK_V`)가 **꽉 채웠을 때**의 값이다.
@@ -177,6 +182,10 @@ export function stepBall(s, kicks, chs){
     } else {
       const f = footOf(p);
       b.x = f.x; b.y = f.y; b.vx = 0; b.vy = 0;
+      // **들고 있는 공은 골라인을 못 넘는다.** 안 그러면 발밑 공이 골대 안에 들어가 있다가
+      // 뺏기거나 놓는 순간 골이 된다 — 걸어 들어가서 넣는 것과 다를 게 없다
+      if (b.y < GOAL.top + BALL_R) b.y = GOAL.top + BALL_R;
+      if (b.y > GOAL.bot - BALL_R) b.y = GOAL.bot - BALL_R;
       if (kicks[own]){
         // 슛(1) 또는 태클로 건드림(2). 슛은 **차징 세기**를 쓴다
         const [fx, fy] = faceVec(p.face);
@@ -189,7 +198,10 @@ export function stepBall(s, kicks, chs){
     }
   }
   for (let i = 0; i < s.n; i++) if (s.p[i].kickCool > 0) s.p[i].kickCool--;
-  if (own >= 0) return goalCheck(s, b);            // 들고 있는 채로 골라인을 넘어도 골이다
+  // [stated] **들고 걸어 들어가면 골이 아니다.** 반드시 차야 들어간다 —
+  // 안 그러면 슛 버튼도 차징도 쓸 이유가 없어진다(봇이 슛 0 회로 3골을 넣었다).
+  // 잡고 있는 동안은 골 판정을 아예 안 본다
+  if (own >= 0) return null;
 
   // 2) 주인이 없는 공 — 굴러가고, 가까운 사람이 잡는다
   b.x += b.vx; b.y += b.vy;
