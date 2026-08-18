@@ -132,7 +132,7 @@ import {
 import {
   stepBall, stepBallInGoal, ballHome, KICKOFF, GOAL, FIELD,
   GOAL_HOLD, GOAL_SEQ, GOAL_TO_WIN, SOCCER_TICKS, TACKLE_TICKS, TACKLE_COOL,
-  TACKLE_SLIDE, faceVec, SOC_STUN, RELEASE_TICKS, CHARGE_MS
+  TACKLE_SLIDE, faceVec, SOC_STUN, RELEASE_TICKS, CHARGE_MS, TACKLE_HIT
 } from './ball.js';
 
 // ================= SIM (pure, deterministic) =================
@@ -1196,7 +1196,12 @@ export function step(s, inp){
           if (j === i || teamOf(j, s.n) === teamOf(i, s.n)) continue;
           const o = s.p[j];
           if (o.hp <= 0 || (o.stun | 0) > 0) continue;
-          if (!overlap(a.x, a.y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
+          // **몸이 정확히 겹칠 때만 보면 놓친다** — 미끄러지는 속도가 빨라 한 틱에 지나쳐 버린다.
+          // 겹침 또는 **가까운 거리** 둘 중 하나면 걸린 것으로 본다
+          // **몸 중심끼리** 재야 한다. 좌상단끼리 재면 크기만큼 어긋난다
+          const adx = (a.x - o.x), ady = (a.y - o.y);
+          const near2 = adx * adx + ady * ady <= TACKLE_HIT * TACKLE_HIT;
+          if (!near2 && !overlap(a.x, a.y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
           o.stun = SOC_STUN;
           if (s.ballOwner === j){ s.ballOwner = -1; s.freeT = RELEASE_TICKS; }
         }

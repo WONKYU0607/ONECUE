@@ -47,6 +47,7 @@ export function createGame(canvas, opts = {}){
   const isMelee = session.kind === 'melee' || (online ? !!SELF.melee : !!session.melee);
   // 축구는 온라인이면 서버가 hello 로 알려주고, 로컬이면 세션에 실려 온다
   const isSoccer = online ? !!SELF.soccer : !!session.soccer;
+  const practice0 = !online && session.kind === 'practice';
   // 개인전(각자 한 팀). 칼전 3~4인 전용
   const isFfa = online ? !!SELF.ffa : !!session.ffa;
   if (!online){ SELF.slot = 0; SELF.n = nLocal; }
@@ -65,7 +66,8 @@ export function createGame(canvas, opts = {}){
   // 온라인이면 내 슬롯만, 로컬(AI·디버그)이면 전원 이 클라가 입력을 넣는다
   const client = new Client(net, online ? [SELF.slot] : all);
   // AI는 슬롯마다 따로 만든다 (각자 상태를 들고 있다)
-  const aiSlots = (!online && (session.kind === 'ai' || isMelee)) ? all.filter(i => i !== SELF.slot) : [];
+  const aiSlots = (!online && (session.kind === 'ai' || isMelee) && !(practice0 && isSoccer))
+    ? all.filter(i => i !== SELF.slot) : [];
   const ais = new Map(aiSlots.map(i => [i, createAI(session.stage || 1)]));
   const ai = ais.get(aiSlots[0]) || null;   // 1대1 호환
   // 클라 기본 상태는 2인용이라, 4인 판이면 첫 프레임이 1대1 아레나로 그려졌다가
@@ -93,6 +95,18 @@ export function createGame(canvas, opts = {}){
     if (server) server.s.solo = true;
     client.s.solo = true;
     client.pred.solo = true;
+    // [stated] 축구 연습은 **나 혼자**. 상대가 있으면 헤집고 다녀 테스트가 안 된다.
+    // 상대 슬롯을 경기장 밖(관중석 쪽)으로 치우고 유령 처리해 공에 관여하지 않게 한다
+    if (isSoccer){
+      for (const st of [server && server.s, client.s, client.pred]){
+        if (!st) continue;
+        st.solo = true;
+        for (let i = 1; i < st.n; i++){
+          st.p[i].hp = 0;                    // 죽은 것으로 = 공을 못 잡는다
+          if (Array.isArray(st.off)) st.off[i] = 1;
+        }
+      }
+    }
   }
   // 아이템은 팀 소유라 팀마다 한 명만 놓는다. 사람이 있는 팀은 사람이 놓는다
   const placerOf = new Map();
@@ -534,6 +548,7 @@ export function createGame(canvas, opts = {}){
     ready(){ sfx.ready(); wantDone = true; nextDoneAt = 0; client.setReady(SELF.slot); },
     go(){ sfx.ready(); wantGo = true; nextGoAt = 0; client.setGo(SELF.slot); },
     isMelee(){ return !!client.pred.melee; },
+    isSoccer(){ return !!client.pred.soccer; },
     isReady(){ return !!(client.pred.ready || [])[SELF.slot]; },
     // 서버가 실제로 확정한 준비 상태 (예측이 아닌 것). 문제 진단용
     confirmedReady(){

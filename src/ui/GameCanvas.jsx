@@ -57,6 +57,22 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
     return () => { clearInterval(iv); removeEventListener('resize', upd); };
   }, [phase]);
 
+  // [stated] 축구는 준비완료 버튼이 **타이머와 겹친다** → 경기장 안, **내 진영 1/4 지점**으로 내린다.
+  // 캔버스가 차지한 자리를 기준으로 계산한다(축구장은 화면 위쪽 canvas 영역)
+  const soccerReadyStyle = () => {
+    const c = canvasRef.current;
+    if (!c) return { display: 'none' };
+    const r = c.getBoundingClientRect();
+    const w = Math.min(220, r.width * 0.55);
+    // 경기장 세로에서 내 진영 1/4 — 화면 아래쪽(내가 아래에 보인다)
+    const top = r.top + r.height * 0.75;
+    return {
+      left: (r.left + (r.width - w) / 2) + 'px', top: top + 'px',
+      width: w + 'px', height: '34px', fontSize: '15px'
+    };
+  };
+
+  const soccer = !!(gameRef.current && gameRef.current.isSoccer && gameRef.current.isSoccer());
   const boxStyle = box ? {
     left: box.left + 'px', top: box.top + 'px',
     width: box.width + 'px', height: box.height + 'px',
@@ -187,8 +203,10 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
         </button>
       )}
       {/* 2단계: 전원이 눌러야 시작한다 */}
+      {/* [stated] 누르면 **사라진다** — `!ready.me` 가 그 조건이다 */}
       {placing && ready.cnt?.meDone && !ready.me && (
-        <button className="panelbtn place go ui-overlay" style={boxStyle}
+        <button className="panelbtn place go ui-overlay"
+                style={soccer ? soccerReadyStyle() : boxStyle}
                 onClick={() => gameRef.current?.go()}>
           {t('ready.goDone')}
         </button>

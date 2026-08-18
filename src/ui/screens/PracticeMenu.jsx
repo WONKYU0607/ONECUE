@@ -17,6 +17,14 @@ export default function PracticeMenu({ onBack, onStart }){
         <button className="menu-btn" onClick={() => onStart({ melee: true })}>
           <span className="t">{t('mode.melee')}</span>
         </button>
+
+        {/* [stated] 봇이 헤집고 다녀 테스트가 안 된다 → **혼자만 있는 축구** */}
+
+        <button className="menu-btn" onClick={() => onStart({ melee: false, soccer: true })}>
+
+          <span className="t">{t('mode.soccer')}</span>
+
+        </button>
       </div>
     </div>
   );

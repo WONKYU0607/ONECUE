@@ -248,7 +248,7 @@ console.log('태클로 차면 슛보다 약하다');
 // [stated] 슛에 **1초 차징**. 지금 세기가 꽉 채웠을 때고, 일찍 떼면 비율만큼 약하게
 console.log('슛 차징');
 {
-  assert(CHARGE_MS === 1000, '  최대 1초');
+  assert(CHARGE_MS === 600, '  최대 0.6초');   // [stated] 1초는 너무 길었다
   assert(kickSpeed(100) === KICK_V, '  꽉 채우면 지금 세기 그대로');
   assert(kickSpeed(0) === Math.round(KICK_V * KICK_MIN), `  탭하면 최대의 ${KICK_MIN * 100}%`);
   // **바닥이 0 이면 안 된다** — 살짝 눌렀을 때 공이 발밑에서 안 떨어져 답답하다

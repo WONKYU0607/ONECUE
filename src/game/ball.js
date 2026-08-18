@@ -56,7 +56,7 @@ export const TACKLE_V = Math.round(3 * FP);
 export const TACKLE_TICKS = 26;                    // 미끄러지는 동안 (모션 길이)
 export const TACKLE_COOL = 48;                     // 연타 방지. 슛보다 길다
 // [stated] 태클하면 캐릭터가 **스윽 밀려난다**. 시작이 제일 빠르고 점점 느려진다
-export const TACKLE_SLIDE = Math.round(3.4 * FP);  // 첫 틱 속도 (틱당 월드px)
+export const TACKLE_SLIDE = Math.round(2.2 * FP);  // 첫 틱 속도 — [stated] 너무 멀리 날아가 30px 쯤으로 줄임
 // [stated] 슛할 때 **음파 터지는 듯한 연출**을 0.3초. 찼는지 안 찼는지 안 보였다.
 // **시뮬 상태에 둔다** — 양쪽 화면에 같이 떠야 하므로(폭발 이펙트와 같은 방식)
 // [stated] 전체로 퍼지는 큰 음파가 아니라 **공 근처에만 생기는 미세한 파문** +
@@ -71,7 +71,7 @@ export const RELEASE_TICKS = 14;                   // 찬 뒤 이 동안은 아�
 // [stated] 슛에 **1초 차징**. 오래 누를수록 세게, 일찍 떼면 약하게.
 // 지금 세기(`KICK_V`)가 **꽉 채웠을 때**의 값이다.
 // **바닥을 둔다** — 0 부터면 살짝 눌렀을 때 공이 발밑에서 안 떨어져 답답하다
-export const CHARGE_MS = 1000;
+export const CHARGE_MS = 600;      // [stated] 1초는 너무 길다 → 0.6초
 export const KICK_MIN = 0.30;                      // 탭했을 때 세기 (최대의 30%)
 /** 차징 0~100 → 실제 속도 */
 export const kickSpeed = ch => {
@@ -81,6 +81,8 @@ export const kickSpeed = ch => {
 // [stated] **태클에 맞으면 0.5초 쓰러진다**
 // (칼전에도 같은 이름이 있어 `SOC_STUN` 으로 둔다 — 같이 들여오면 이름이 겹친다)
 export const SOC_STUN = 30;
+// 태클이 스치기만 해도 뺏을 수 있게, 몸 겹침 말고 **거리로도** 본다
+export const TACKLE_HIT = Math.round(14 * FP);
 export const KICK_REACH = Math.round(11 * FP);     // (옛 방식) 밀어서 찰 때 쓰던 사거리
 export const KICK_COOL = 18;                       // 연타 방지 (틱)
 export const GOAL_TO_WIN = 3;

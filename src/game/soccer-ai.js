@@ -63,12 +63,20 @@ export function createSoccerAI(slot, level = 1){
 
       if (mineBall){
         // [stated] **잡으면 발밑에 붙는다** → 뒤로 돌아갈 필요가 없다. 골대로 달리다 찬다
-        goal = { x: goalCx - half(PWf), y: foeGoalY - half(PHf), slop: FP };
+        // **한 축씩 움직인다.** 대각선으로 가면 `face` 가 좌우로 잡혀 골대를 안 보게 되고,
+        // 슛은 보는 방향으로 나가므로 **영영 안 찬다**(단계 1·2 가 90초 내내 슛 0 이었다)
+        const offX = (goalCx - half(PWf)) - me.x;
+        goal = Math.abs(offX) > 8 * FP
+          ? { x: goalCx - half(PWf), y: me.y, slop: FP }        // 먼저 가로로 맞추고
+          : { x: me.x, y: foeGoalY - half(PHf), slop: FP };     // 그다음 골대로 곧장
         const toGoal = foeGoalY - cy;
         const facingGoal = (toGoal < 0 && me.face === 0) || (toGoal > 0 && me.face === 1);
         // 골대 폭 안에 들어왔고 골대를 보고 있으면 찬다. 멀면 더 달린다
-        const lined = b.x >= GOAL.lo - 8 * FP && b.x <= GOAL.hi + 8 * FP;
-        wantKick = facingGoal && lined && Math.abs(toGoal) < SHOOT_RANGE;
+        // **줄이 딱 맞을 때까지 기다리면 영영 안 찬다** — 잡은 채로 골대 앞을 서성이기만 했다.
+        // 골대 폭 안이면 멀어도 차고, 아주 가까우면 각도가 어긋나도 찬다
+        const lined = b.x >= GOAL.lo - 14 * FP && b.x <= GOAL.hi + 14 * FP;
+        const veryClose = Math.abs(toGoal) < 34 * FP;
+        wantKick = facingGoal && (veryClose || (lined && Math.abs(toGoal) < SHOOT_RANGE));
       } else if (foeBall){
         // 상대가 들고 있다 → **태클로 뺏는다.** 닿을 만하면 미끄러져 들어간다
         const o = s.p[owner];
