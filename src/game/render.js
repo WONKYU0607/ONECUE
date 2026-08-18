@@ -33,6 +33,8 @@ const SOC_FW = 80, SOC_FH = 52;
 const SOC_BODY = 44;
 // 8~11 = 태클 (앞·뒤·좌·우). face -> 자세
 const SOC_TACKLE = { 0: 9, 1: 8, 2: 10, 3: 11 };
+// 12 = 태클에 걸려 넘어진 모습 (방향 구분 없음)
+const SOC_FALL = 12;
 const SOC_STAND = { 0: 1, 1: 0, 2: 2, 3: 3 };        // face -> 서있는 자세
 // **화면이 뒤집히면 앞뒤·좌우도 뒤집어야 한다** — 안 그러면 상대가 등을 보이고 달린다
 const SOC_FLIP = { 0: 1, 1: 0, 2: 3, 3: 2 };
@@ -140,7 +142,9 @@ export function createRenderer(canvas){
       const face = flipped() ? SOC_FLIP[p.face || 0] : (p.face || 0);
       const run = (p.moving || 0) > 0;
       // [stated] 태클은 **보는 방향의 태클 모션**으로 나간다
-      const fc = (p.tkl | 0) > 0 ? SOC_TACKLE[face] : SOC_STAND[face] + (run ? 4 : 0);
+      // [stated] **태클에 걸리면 넘어지는 모션**(칸 12) — 태클을 거는 쪽(8~11)과 다른 그림이다
+      const fc = (p.stun | 0) > 0 ? SOC_FALL
+               : ((p.tkl | 0) > 0 ? SOC_TACKLE[face] : SOC_STAND[face] + (run ? 4 : 0));
       // **칸이 아니라 몸 높이(44)를 기준**으로 배율을 잡는다.
       // 칸 기준으로 잡으면 칸을 넓힐 때마다 캐릭터가 같이 작아진다
       const sc = ARENA.ph / SOC_BODY * 1.35;
@@ -369,42 +373,43 @@ export function createRenderer(canvas){
     // [stated] 축구는 체력이 없다 → **같은 자리에 점수판**을 그린다.
     // 왼쪽이 내 팀 골 수, 오른쪽이 상대, 가운데가 남은 시간
     if (ARENA.soccer){
-      // [stated] **한 줄로**: 닉네임 + 점수 - 타이머 - 점수 + 닉네임.
-      // 예전엔 상자 세 개로 나눠 그렸는데 배경·여백과 겹쳐 잘 안 보였다
+      // [stated] 한 줄로: **닉네임은 양 끝**, 점수는 **타이머에서 각각 100디바이스px** 떨어진 곳.
+      // 가운데로 몰려 있으면 보기 안 좋다
       const myT = teamOf(SELF.slot, s.p.length);
       const sc = s.score || [0, 0];
       const secs = Math.max(0, Math.ceil((s.clock || 0) / 60));
       const nm = Array.isArray(s.nick) ? s.nick : [];
-      const nameOf = team => {
-        for (let i2 = 0; i2 < s.p.length; i2++) if (teamOf(i2, s.p.length) === team) return nm[i2] || '';
-        return '';
+      const firstOf = team => {
+        for (let i2 = 0; i2 < s.p.length; i2++) if (teamOf(i2, s.p.length) === team) return i2;
+        return -1;
       };
+      const meSlot = firstOf(myT), foeSlot = firstOf(1 - myT);
+      // [stated] **닉네임 색을 캐릭터 색과 맞춘다** — 서로 달라 헷갈렸다
+      // `viewOf(s)` 가 슬롯별 **실제 표시 색 번호**를 준다 (프로필에서 고른 색이 여기 들어온다)
+      const colFor = slot => (slot >= 0 && COL.team[viewOf(s)[slot]]) || '#e8e8f0';
       const y0 = H + 2, hh = 13;
-      px(0, y0, W, hh, 'rgba(8,12,20,0.86)');       // 줄 전체에 어두운 바탕
+      px(0, y0, W, hh, 'rgba(8,12,20,0.86)');
       ctx.textBaseline = 'middle';
-      // 이름이 아직 안 왔을 때만 쓰는 대체 문구 — **문구는 i18n 에 둔다**
-      const my = (nameOf(myT) || t('sc.me')).slice(0, 6);
-      const fo = (nameOf(1 - myT) || t('sc.foe')).slice(0, 6);
       const cy2 = (y0 + hh / 2) * RS;
-      // 가운데 타이머부터 자리를 잡고, 좌우로 점수·이름을 붙인다 (**잘리지 않게**)
+      const GAP = 100 / RS;                         // 100 디바이스px 를 월드로
       ctx.textAlign = 'center';
       ctx.font = '900 ' + Math.round(9 * RS) + 'px ' + GF;
       ctx.fillStyle = secs <= 10 ? '#ff6b5a' : '#e8e8f0';
       ctx.fillText(String(secs), (W / 2) * RS, cy2);
       ctx.font = '900 ' + Math.round(10 * RS) + 'px ' + GF;
-      ctx.fillStyle = '#8fd8ff';
-      ctx.textAlign = 'right';
-      ctx.fillText(String(sc[myT] | 0), (W / 2 - 11) * RS, cy2);
-      ctx.fillStyle = '#ff9a8f';
-      ctx.textAlign = 'left';
-      ctx.fillText(String(sc[1 - myT] | 0), (W / 2 + 11) * RS, cy2);
+      ctx.fillStyle = colFor(meSlot);
+      ctx.fillText(String(sc[myT] | 0), (W / 2 - GAP) * RS, cy2);
+      ctx.fillStyle = colFor(foeSlot);
+      ctx.fillText(String(sc[1 - myT] | 0), (W / 2 + GAP) * RS, cy2);
       ctx.font = '700 ' + Math.round(8 * RS) + 'px ' + GF;
-      ctx.fillStyle = 'rgba(143,216,255,0.9)';
-      ctx.textAlign = 'right';
-      ctx.fillText(my, (W / 2 - 20) * RS, cy2);
-      ctx.fillStyle = 'rgba(255,154,143,0.9)';
+      const my = ((meSlot >= 0 && nm[meSlot]) || t('sc.me')).slice(0, 7);
+      const fo = ((foeSlot >= 0 && nm[foeSlot]) || t('sc.foe')).slice(0, 7);
       ctx.textAlign = 'left';
-      ctx.fillText(fo, (W / 2 + 20) * RS, cy2);
+      ctx.fillStyle = colFor(meSlot);
+      ctx.fillText(my, 4 * RS, cy2);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = colFor(foeSlot);
+      ctx.fillText(fo, (W - 4) * RS, cy2);
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     } else {
 
@@ -743,7 +748,7 @@ export function createRenderer(canvas){
 
   // 전투 중 투척 버튼 (배치 팔레트와 같은 자리)
   // 칼전 방패 버튼
-  function drawShieldBtn(s, uiH2){
+  function drawShieldBtn(s, uiH2, kickCharge = 0){
     const b = shieldBtn(uiH2);
     const me = s.p[SELF.slot];
     // [stated] 축구는 같은 자리가 **슛 버튼**이다. 쿨다운 동안 흐리게
@@ -755,6 +760,12 @@ export function createRenderer(canvas){
       px(b.x, b.y, b.w, 1, c2); px(b.x, b.y + b.h - 1, b.w, 1, c2);
       px(b.x, b.y, 1, b.h, c2); px(b.x + b.w - 1, b.y, 1, b.h, c2);
       circle(b.x + b.w / 2, b.y + b.h / 2, b.w * 0.22, on ? '#f2f2f2' : 'rgba(255,255,255,0.25)');
+      // [stated] **차징 게이지** — 누르고 있는 동안 아래에서 위로 찬다 (최대 1초)
+      const kc = kickCharge || 0;
+      if (kc > 0){
+        const h2 = b.h * Math.min(1, kc / 100);
+        px(b.x + 1, b.y + b.h - h2, 2, h2, kc >= 99 ? '#ffe07a' : '#8fd8ff');
+      }
       // 태클 버튼 — 슛 옆에. 쿨다운이면 흐리게
       const tb = tackleBtn(uiH2);
       const tOn = me ? (me.tklCool | 0) === 0 : true;
@@ -1028,7 +1039,7 @@ export function createRenderer(canvas){
     drawPanel(s, stick);
     if (left) drawPalette(s, uiH, left, drag);
     if (extra.ammo) drawThrowPad(s, uiH, extra.ammo, extra.charge);
-    if (ARENA.melee) drawShieldBtn(s, uiH);
+    if (ARENA.melee) drawShieldBtn(s, uiH, extra.kickCharge || 0);
     drawBlind(s, extra.softFlash);
     if (SHOW_HUD){
       ctx.font = '700 ' + (8*RS) + 'px ' + GF; ctx.textAlign = 'left';

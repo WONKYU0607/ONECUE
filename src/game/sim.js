@@ -132,7 +132,7 @@ import {
 import {
   stepBall, stepBallInGoal, ballHome, KICKOFF, GOAL, FIELD,
   GOAL_HOLD, GOAL_SEQ, GOAL_TO_WIN, SOCCER_TICKS, TACKLE_TICKS, TACKLE_COOL,
-  TACKLE_SLIDE, faceVec
+  TACKLE_SLIDE, faceVec, SOC_STUN, RELEASE_TICKS, CHARGE_MS
 } from './ball.js';
 
 // ================= SIM (pure, deterministic) =================
@@ -151,6 +151,8 @@ export function normalizeState(st){
   if (typeof st.goalT !== 'number') st.goalT = 0;
   if (typeof st.goalBy !== 'number') st.goalBy = -1;
   if (!st.kickFx || typeof st.kickFx.t !== 'number') st.kickFx = null;
+  if (typeof st.ballOwner !== 'number') st.ballOwner = -1;
+  if (typeof st.freeT !== 'number') st.freeT = 0;
   if (!Array.isArray(st.items)) st.items = [];
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
@@ -246,6 +248,8 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     goalT: 0,                   // 골 연출 남은 틱 (0이면 진행 중)
     goalBy: -1,                 // 방금 넣은 팀
     kickFx: null,               // 슛 연출 {x,y,t}. 양쪽 화면에 같이 뜬다
+    ballOwner: -1,              // 공을 잡고 있는 슬롯 (-1 = 자유)
+    freeT: 0,                   // 찬 직후 아무도 못 잡는 시간
     p: players,
     bullets: [],
     covers: newCovers(),
@@ -303,7 +307,7 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
 
 export const LAG_HIST = 40;             // 지연 보상용 위치 기록 길이 (틱)
 export const FACE_OPP = [1, 0, 3, 2];   // 마주 보는 방향 (위↔아래, 왼↔오른)
-export const NOIN = { dx:0, dy:0, fire:0, tkl:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0 };
+export const NOIN = { dx:0, dy:0, fire:0, fch:100, tkl:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0 };
 export function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
 
 export function overlap(ax,ay,aw,ah,bx,by,bw,bh){
@@ -574,7 +578,12 @@ export function blocked(s, x, y, self = -1){
     if (i === self) continue;
     const o = s.p[i];
     if (o.hp <= 0 || (s.off && s.off[i])) continue;   // 끊긴 사람은 유령 — 몸도 통과
-    if (overlap(x, y, PWf, PHf, o.x, o.y, PWf, PHf)) return true;
+    if (!overlap(x, y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
+    // [stated] **모서리에서 둘이 끼면 못 움직였다.**
+    // 이미 겹쳐 있는 상태라면 막지 않는다 — 아이템에 쓰는 규칙과 같다.
+    // 안 그러면 서로가 서로를 막아 둘 다 영영 못 빠져나온다
+    if (me && overlap(me.x, me.y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
+    return true;
   }
   return false;
 }
@@ -717,6 +726,7 @@ export function step(s, inp){
       // 바라보는 방향은 이동 입력을 따라간다. 멈추면 마지막 방향을 유지
       // **축구도 방향이 필요하다.** `s.melee` 만 보고 있어서 축구에서는 face 가
       // 팀 기본값(위/아래)에 굳어 **좌우 모션이 영영 안 나왔다**
+      if (s.soccer && (p.stun | 0) > 0){ dx = 0; dy = 0; }   // 쓰러진 동안은 못 움직인다
       if ((s.melee || s.soccer) && (dx || dy)){
         p.face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 2 : 3) : (dy < 0 ? 0 : 1);
       }
@@ -1153,11 +1163,12 @@ export function step(s, inp){
     } else {
       // [stated] **슛 옆에 태클 버튼.** 태클은 미끄러지는 동안 몸으로 공을 건드리고,
       // 공에 닿으면 **슛보다 약하게** 튕겨 나간다
-      const kicks = [];
+      const kicks = [], chs = [];
       for (let i = 0; i < s.n; i++){
         const p = s.p[i];
         const q = s.off[i] ? NOIN : (inp[i] || NOIN);
-        if (q.tkl && (p.tklCool | 0) === 0 && (p.tkl | 0) === 0){
+        if (p.stun > 0) p.stun--;                   // 쓰러진 동안은 아무것도 못 한다
+        if (q.tkl && (p.stun | 0) === 0 && (p.tklCool | 0) === 0 && (p.tkl | 0) === 0){
           p.tkl = TACKLE_TICKS; p.tklCool = TACKLE_COOL + TACKLE_TICKS;
           // **시작할 때 방향을 굳힌다** — 미끄러지는 동안 방향이 바뀌면 모션과 어긋난다
           p.tklF = p.face | 0;
@@ -1171,11 +1182,26 @@ export function step(s, inp){
           p.tkl--;
         }
         if (p.tklCool > 0) p.tklCool--;
-        // 태클 중에는 계속 약하게 밀어낸다. 아니면 버튼 슛
-        kicks.push(p.tkl > 0 ? 2 : (q.fire ? 1 : 0));
+        // 태클 중에는 계속 약하게 밀어낸다. 아니면 버튼 슛. 쓰러졌으면 아무것도 못 한다
+        kicks.push(p.stun > 0 ? 0 : (p.tkl > 0 ? 2 : (q.fire ? 1 : 0)));
+        // 차징 0~100. 안 실려 오면 꽉 찬 것으로 본다(옛 클라 호환)
+        chs.push(q.fch == null ? 100 : Math.max(0, Math.min(100, q.fch | 0)));
       }
       if (s.kickFx && --s.kickFx.t <= 0) s.kickFx = null;   // 연출은 0.3초만
-      const g = stepBall(s, kicks);
+      // [stated] **태클에 맞으면 상대가 0.5초 쓰러진다.** 공도 놓친다
+      for (let i = 0; i < s.n; i++){
+        const a = s.p[i];
+        if ((a.tkl | 0) === 0) continue;
+        for (let j = 0; j < s.n; j++){
+          if (j === i || teamOf(j, s.n) === teamOf(i, s.n)) continue;
+          const o = s.p[j];
+          if (o.hp <= 0 || (o.stun | 0) > 0) continue;
+          if (!overlap(a.x, a.y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
+          o.stun = SOC_STUN;
+          if (s.ballOwner === j){ s.ballOwner = -1; s.freeT = RELEASE_TICKS; }
+        }
+      }
+      const g = stepBall(s, kicks, chs);
       if (g){
         s.score[g.goal]++;
         s.goalBy = g.goal;
@@ -1268,6 +1294,7 @@ export function checksum(s){
     h = (h*31 + (s.score ? s.score[0]*13 + s.score[1]*29 : 0)) | 0;
     h = (h*31 + (s.goalT | 0) + (s.goalBy | 0)) | 0;
     h = (h*31 + (s.kickFx ? s.kickFx.t : 0)) | 0;
+    h = (h*31 + (s.ballOwner | 0) * 7 + (s.freeT | 0)) | 0;
   }
   return h | 0;
 }

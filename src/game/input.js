@@ -1,5 +1,6 @@
 import { NET, ARENA } from './config.js';
 import { stickVector, inStickZone, paletteSlots, throwSlots, shieldBtn, tackleBtn } from './layout.js';
+import { CHARGE_MS } from './ball.js';
 import { unlockAudio } from './audio.js';
 
 // 스틱 상태와 눌린 키를 들고 있다가 루프가 매 프레임 읽어간다.
@@ -13,6 +14,9 @@ export function attachInput(canvas, view, opts = {}){
   const keys = {};
   const drag = { on: false, id: null, k: -1, x: 0, y: 0, cell: null, from: null };
   // 투척: 누르고 있는 동안 차징, 떼면 던진다
+  // 슛 차징: 누른 시각과 포인터 id (0 이면 안 누르는 중)
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  let kickAt = 0, kickId = null;
   const charge = { on: false, id: null, k: -1, t0: 0, ch: 0, out: false };
   const atk = { on: false, id: null };   // 칼전 공격 버튼   // out = 아이콘 밖으로 밀어 취소된 상태
 
@@ -51,7 +55,10 @@ export function attachInput(canvas, view, opts = {}){
       if (ARENA.melee){
         const b = shieldBtn(view.uiH);
         if (wp.x >= b.x && wp.x <= b.x + b.w && wp.y >= b.y && wp.y <= b.y + b.h){
-          if (ARENA.soccer) opts.onKick?.(); else opts.onShield?.();
+          // [stated] 축구 슛은 **누른 시간이 세기**(최대 1초) → 뗄 때 한 번 보낸다.
+          // 누르는 동안 매 틱 보내면 입력이 낭비된다 (투척물과 같은 방식)
+          if (ARENA.soccer){ kickAt = now(); kickId = e.pointerId; }
+          else opts.onShield?.();
           return;
         }
         if (ARENA.soccer){
@@ -98,6 +105,13 @@ export function attachInput(canvas, view, opts = {}){
     Object.assign(stick, stickVector(worldPt(src), view.uiH));
   };
   const onUp = e => {
+    // [stated] 슛 차징 — **뗄 때 한 번** 보낸다. 누른 시간이 곧 세기
+    if (kickAt > 0 && e.pointerId === kickId){
+      const held = now() - kickAt;
+      opts.onKick?.(Math.max(0, Math.min(100, Math.round(held / CHARGE_MS * 100))));
+      kickAt = 0; kickId = null;
+      return;
+    }
     if (charge.on && e.pointerId === charge.id){
       if (!charge.out) opts.onThrow?.(charge.k, charge.ch);   // 밖에서 떼면 취소
       charge.on = false; charge.id = null; charge.k = -1; charge.ch = 0; charge.out = false;
@@ -135,6 +149,9 @@ export function attachInput(canvas, view, opts = {}){
 
   return {
     stick, keys, drag, charge, tick,
+    /** 지금 누르고 있는 슛 차징 0~100 (안 누르면 0). 게이지를 그리는 데 쓴다 */
+    kickCharge: () => (kickAt > 0
+      ? Math.max(0, Math.min(100, Math.round((now() - kickAt) / CHARGE_MS * 100))) : 0),
     detach(){
       removeEventListener('pointerdown', onDown);
       removeEventListener('pointermove', onMove);

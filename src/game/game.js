@@ -209,7 +209,7 @@ export function createGame(canvas, opts = {}){
     onShield: () => { sfx.ready?.(); client.raiseShield(SELF.slot); },
     // [stated] 축구 슛 — 입력의 `fire` 비트를 한 틱 세운다.
     // **사람과 AI 가 같은 길로 간다**(다른 조작과 마찬가지로)
-    onKick: () => { sfx.ready?.(); client.kick(SELF.slot); },
+    onKick: ch => { sfx.ready?.(); client.kick(SELF.slot, ch); },
     // [stated] 태클 — 미끄러지며 공을 약하게 밀어낸다
     onTackle: () => { sfx.slash?.(true); client.tackle(SELF.slot); }
   });
@@ -479,7 +479,8 @@ export function createGame(canvas, opts = {}){
     view.draw(client.pred, dbg, a, client, stick, input.drag, leftCount, okCell, {
       ammo: ammoLeft, charge: input.charge, softFlash: opts.softFlash?.() || false, juice,
       // 공도 캐릭터처럼 **부드럽게 따라가는 위치**로 그린다 (안 그러면 순간이동한다)
-      ball: client.ballRender ? client.ballRender(dt) : null
+      ball: client.ballRender ? client.ballRender(dt) : null,
+      kickCharge: input.kickCharge ? input.kickCharge() : 0
     });
 
     // 페이즈가 바뀔 때만 React에 알린다 (매 프레임 setState 하면 안 됨).

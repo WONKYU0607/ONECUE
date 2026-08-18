@@ -102,8 +102,9 @@ console.log('봇이 태클을 쓴다');
   assert(r.tackled > 0, `  태클을 낸다 (${r.tackled}회)`);
   // **내가 공을 잡았을 땐 안 한다** — 내 공을 스스로 걷어차는 꼴이 된다
   const ai = fs.readFileSync('src/game/soccer-ai.js', 'utf8');
-  assert(/if \(!near && \(me\.tklCool \| 0\) === 0\)/.test(ai), '  내가 공을 잡았으면 안 한다');
-  assert(/teamOf\(i, s\.n\) === team/.test(ai), '  같은 편에게는 안 한다');
+  // **상대가 들고 있을 때만** 태클한다 — 내 공을 스스로 걷어차거나 같은 편을 넘어뜨리면 안 된다
+  assert(/} else if \(foeBall\)/.test(ai), '  상대가 들고 있을 때만 태클한다');
+  assert(/const foeBall = owner >= 0 && !teamBall/.test(ai), '  같은 편은 상대로 안 친다');
 }
 
 // [stated] 태클하면 캐릭터가 **스윽 밀려난다**

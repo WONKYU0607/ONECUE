@@ -16,6 +16,8 @@ import { FIELD, GOAL, KICK_REACH, BALL_R } from './ball.js';
 
 // 태클로 닿을 수 있는 거리 — 미끄러지며 들어가므로 슛 사거리보다 멀다
 const TACKLE_RANGE = 26 * FP;
+// 이 안에 들어와야 슛을 쏜다 (골대까지 거리)
+const SHOOT_RANGE = 70 * FP;
 
 const LEVELS = [
   // **380ms 는 너무 느렸다** — 공이 작아진 뒤 90초 내내 0:0 이었다.
@@ -52,56 +54,37 @@ export function createSoccerAI(slot, level = 1){
 
     if (now >= nextAt){
       nextAt = now + L.react;
-      // **내가 공에 제일 가까운 우리 편인가** — 아니면 팀원끼리 서로 밀치며 엉킨다
-      let mineClosest = true;
-      for (let i = 0; i < s.n; i++){
-        if (i === slot || teamOf(i, s.n) !== team || s.p[i].hp <= 0) continue;
-        const oc = dist2(s.p[i].x + half(PWf), s.p[i].y + half(PHf), b.x, b.y);
-        if (oc < dist2(cx, cy, b.x, b.y)) mineClosest = false;
-      }
-
-      const near = dist2(cx, cy, b.x, b.y) <= KICK_REACH * KICK_REACH;
       wantKick = false; wantTackle = false;
 
-      // [stated] 봇도 태클로 **공을 뺏는다.**
-      // 상대가 공을 잡고 있고 내가 코앞이면 미끄러져 들어간다.
-      // 내가 이미 공을 잡았으면 안 한다 — 내 공을 스스로 걷어차는 꼴이 된다
-      if (!near && (me.tklCool | 0) === 0){
-        for (let i = 0; i < s.n; i++){
-          if (teamOf(i, s.n) === team || s.p[i].hp <= 0) continue;
-          const o = s.p[i];
-          const ox = o.x + half(PWf), oy = o.y + half(PHf);
-          const foeHasBall = dist2(ox, oy, b.x, b.y) <= (KICK_REACH * 3 / 2) * (KICK_REACH * 3 / 2);
-          const iCanReach = dist2(cx, cy, b.x, b.y) <= (TACKLE_RANGE * TACKLE_RANGE);
-          if (foeHasBall && iCanReach){ wantTackle = true; break; }
-        }
-      }
+      const owner = s.ballOwner == null ? -1 : s.ballOwner;
+      const mineBall = owner === slot;
+      const teamBall = owner >= 0 && teamOf(owner, s.n) === team;
+      const foeBall = owner >= 0 && !teamBall;
 
-      // **공이 나와 상대 골대 사이에 있는가.** 아니면 아무리 밀어도 우리 골대 쪽으로 간다
-      const toGoal = foeGoalY - b.y;
-      const behindBall = (toGoal < 0 && cy > b.y) || (toGoal > 0 && cy < b.y);
-
-      if (near && behindBall){
-        // **목표를 공이 아니라 골대로 잡는다.** 공에 목표를 두면 다 붙은 순간 입력이 0이 되어
-        // 방향(face)이 안 바뀌고, 그래서 영영 골대를 안 보게 된다 (실제로 그래서 골이 0이었다)
+      if (mineBall){
+        // [stated] **잡으면 발밑에 붙는다** → 뒤로 돌아갈 필요가 없다. 골대로 달리다 찬다
         goal = { x: goalCx - half(PWf), y: foeGoalY - half(PHf), slop: FP };
+        const toGoal = foeGoalY - cy;
         const facingGoal = (toGoal < 0 && me.face === 0) || (toGoal > 0 && me.face === 1);
-        wantKick = facingGoal;
-      } else if (mineClosest || near){
-        // 공 **뒤쪽**(골대 반대편)으로 돌아 들어간다. 옆에서 밀면 공이 옆으로만 간다.
-        // **너무 멀리 서면 안 된다** — 처음엔 몸 절반만큼 뒤로 잡았더니 사거리(11px) 밖인
-        // 3.7px 틈을 두고 멈춰서 공을 영영 안 건드렸다. 몸 중심이 공에서 8px 이 되게 잡는다
-        const back = (toGoal < 0 ? 1 : -1) * (BALL_R + 3 * FP);
-        // **여기서는 느슨함(slop)을 거의 안 준다.** 쉬움·보통 단계의 slop(6~10px)이
-        // 접근 거리(8px)보다 커서 "다 왔다"고 판단하고 멈춰 버렸다 —
-        // 공을 영영 안 건드려 90초 내내 0:0 이었다
-        goal = { x: b.x - half(PWf), y: b.y + back - half(PHf), slop: FP };
+        // 골대 폭 안에 들어왔고 골대를 보고 있으면 찬다. 멀면 더 달린다
+        const lined = b.x >= GOAL.lo - 8 * FP && b.x <= GOAL.hi + 8 * FP;
+        wantKick = facingGoal && lined && Math.abs(toGoal) < SHOOT_RANGE;
+      } else if (foeBall){
+        // 상대가 들고 있다 → **태클로 뺏는다.** 닿을 만하면 미끄러져 들어간다
+        const o = s.p[owner];
+        const ox = o.x + half(PWf), oy = o.y + half(PHf);
+        goal = { x: o.x, y: o.y, slop: FP };
+        if ((me.tklCool | 0) === 0 && dist2(cx, cy, ox, oy) <= TACKLE_RANGE * TACKLE_RANGE)
+          wantTackle = true;
+      } else if (teamBall){
+        // 팀원이 들고 있다 → 앞으로 벌려 준다 (뭉치면 서로 막는다)
+        goal = { x: goalCx - half(PWf) + (slot % 2 ? 22 * FP : -22 * FP),
+                 y: half(b.y + foeGoalY) - half(PHf), slop: L.slop };
       } else {
-        // 수비 — **우리 골대와 공 사이**에 선다
-        // 수비 자리는 정확할 필요가 없다 → 단계별 느슨함을 그대로 쓴다
-        goal = { x: half(b.x + goalCx) - half(PWf), y: half(b.y + ourGoalY) - half(PHf), slop: L.slop };
+        // 주인 없는 공 → **가는 앞을 노려** 달려간다. 굴러가는 공을 따라만 가면 못 잡는다
+        const lead = 12;
+        goal = { x: b.x + b.vx * lead - half(PWf), y: b.y + b.vy * lead - half(PHf), slop: FP };
       }
-      // 경기장 밖으로 목표를 잡지 않는다
       goal.x = Math.max(FIELD.x0, Math.min(FIELD.x1 - PWf, goal.x));
       goal.y = Math.max(GOAL.top, Math.min(GOAL.bot - PHf, goal.y));
     }
@@ -118,6 +101,7 @@ export function createSoccerAI(slot, level = 1){
     // **쿨다운 중에는 태클 입력을 안 낸다.** 계속 1로 내보내면 의미도 없고
     // 기록만 부풀려진다(90초에 800회가 찍혔다)
     const tkl = wantTackle && (me.tklCool | 0) === 0 && (me.tkl | 0) === 0 ? 1 : 0;
-    return { dx: dx | 0, dy: dy | 0, fire: wantKick ? 1 : 0, tkl };
+    // 슛은 **꽉 채워** 찬다 (골대 앞에서만 차므로 세게가 낫다)
+    return { dx: dx | 0, dy: dy | 0, fire: wantKick ? 1 : 0, fch: 100, tkl };
   };
 }

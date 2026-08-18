@@ -265,7 +265,7 @@ export class Server {
     }
     let f = this.inbox.get(m.tick);
     if (!f){ f = Array(this.n).fill(null); this.inbox.set(m.tick, f); }
-    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, tkl: m.tkl ? 1 : 0, sh: m.sh ? 1 : 0, ready: m.ready ? 1 : 0, go: m.go ? 1 : 0, place: m.place || null, thr: m.thr || null, fastReq: m.fastReq|0, fastAns: m.fastAns|0, bareReq: m.bareReq|0, bareAns: m.bareAns|0 };
+    f[m.pid] = { dx: m.dx | 0, dy: m.dy | 0, fire: m.fire ? 1 : 0, fch: m.fch == null ? 100 : (m.fch | 0), tkl: m.tkl ? 1 : 0, sh: m.sh ? 1 : 0, ready: m.ready ? 1 : 0, go: m.go ? 1 : 0, place: m.place || null, thr: m.thr || null, fastReq: m.fastReq|0, fastAns: m.fastAns|0, bareReq: m.bareReq|0, bareAns: m.bareAns|0 };
   }
   // 이 봇이 지금 아이템을 놓아도 되는가.
   // 같은 팀에 **아직 준비완료를 안 누른 사람**이 있으면 안 된다 (끊긴 사람은 기다리지 않는다)
@@ -404,7 +404,7 @@ export class Client {
     }
     this.pings = new Map(); this.pingId = 1; this.lastPing = -1e9;
     this.svTick = 0; this.svAt = CLOCK.now();
-    const blank = () => ({ dx:0, dy:0, fire:0, tkl:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0 });
+    const blank = () => ({ dx:0, dy:0, fire:0, fch:100, tkl:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0 });
     // 슬롯 수가 늘어도(3대3=6인) 자리가 있어야 한다. 4칸 고정이라
     // 칼전 3대3에서 setReady가 undefined에 쓰다 죽고 화면이 검게 남았다
     this.blank = blank;
@@ -523,15 +523,15 @@ export class Client {
         let dx = q.dx, dy = q.dy;
         const len = Math.sqrt(dx*dx + dy*dy);
         if (len > cap){ const k = cap / len; dx = Math.round(dx * k); dy = Math.round(dy * k); }
-        const e = { t:'in', pid, tick:t, dx, dy, fire:q.fire, tkl:q.tkl, sh:q.sh, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns, bareReq:q.bareReq, bareAns:q.bareAns };
+        const e = { t:'in', pid, tick:t, dx, dy, fire:q.fire, fch:q.fch, tkl:q.tkl, sh:q.sh, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns, bareReq:q.bareReq, bareAns:q.bareAns };
         this.net.clientSend(e);
         this.stats.sentIn++;
-        this.sent.push({ tick:t, pid, dx, dy, fire:q.fire, tkl:q.tkl, sh:q.sh, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns, bareReq:q.bareReq, bareAns:q.bareAns });
+        this.sent.push({ tick:t, pid, dx, dy, fire:q.fire, fch:q.fch, tkl:q.tkl, sh:q.sh, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns, bareReq:q.bareReq, bareAns:q.bareAns });
         // 못 실은 이동량만 남긴다. 탭이 오래 멈췄다 돌아왔을 때 몰아서 튀지 않게 상한을 둔다
         const BACKLOG = cap * 3;
         q.dx = clampi(q.dx - dx, -BACKLOG, BACKLOG);
         q.dy = clampi(q.dy - dy, -BACKLOG, BACKLOG);
-        q.fire = 0; q.tkl = 0; q.sh = 0; q.ready = 0; q.go = 0; q.place = null; q.thr = null; q.fastReq = 0; q.fastAns = 0; q.bareReq = 0; q.bareAns = 0;
+        q.fire = 0; q.fch = 100; q.tkl = 0; q.sh = 0; q.ready = 0; q.go = 0; q.place = null; q.thr = null; q.fastReq = 0; q.fastAns = 0; q.bareReq = 0; q.bareAns = 0;
       }
     }
   }
@@ -793,9 +793,11 @@ export class Client {
     this.slotIn(pid).sh = 1;
   }
   // 축구 슛. **입력의 `fire` 비트**를 세운다 — 다른 조작과 같은 길로 서버에 간다
-  kick(pid){
+  kick(pid, ch = 100){
     if (!this.controlled.includes(pid)) return;
-    this.slotIn(pid).fire = 1;
+    const q = this.slotIn(pid);
+    q.fire = 1;
+    q.fch = Math.max(0, Math.min(100, ch | 0));   // 차징 세기 0~100
   }
   // 축구 태클. 슛과 **다른 비트**여야 한다 — 같이 쓰면 세기를 구분 못 한다
   tackle(pid){

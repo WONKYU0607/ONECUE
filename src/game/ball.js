@@ -63,7 +63,25 @@ export const TACKLE_SLIDE = Math.round(3.4 * FP);  // 첫 틱 속도 (틱당 월
 // **화면이 아주 살짝 흔들리는** 정도. 캐릭터가 착지할 때 나는 그런 연출
 export const KICK_FX_TICKS = 10;
 export const PUSH_V = Math.round(1.1 * FP);        // 몸으로 밀기 — 절반으로 (66px/초, 28px 굴러감)
-export const KICK_REACH = Math.round(11 * FP);     // 이 안에 있어야 찰 수 있다 (8 은 너무 빡빡했다)
+// [stated] **공을 잡으면 발밑에 붙어 같이 다닌다** — 밀어서 모는 방식은 너무 어려웠다.
+// 이 거리 안에 들어오면 잡는다(주인이 없을 때만)
+export const PICK_R = Math.round(9 * FP);
+export const FOOT_OFF = Math.round(6 * FP);        // 발밑 — 보는 방향으로 이만큼 앞
+export const RELEASE_TICKS = 14;                   // 찬 뒤 이 동안은 아무도 못 잡는다
+// [stated] 슛에 **1초 차징**. 오래 누를수록 세게, 일찍 떼면 약하게.
+// 지금 세기(`KICK_V`)가 **꽉 채웠을 때**의 값이다.
+// **바닥을 둔다** — 0 부터면 살짝 눌렀을 때 공이 발밑에서 안 떨어져 답답하다
+export const CHARGE_MS = 1000;
+export const KICK_MIN = 0.30;                      // 탭했을 때 세기 (최대의 30%)
+/** 차징 0~100 → 실제 속도 */
+export const kickSpeed = ch => {
+  const c = Math.max(0, Math.min(100, ch | 0)) / 100;
+  return Math.round(KICK_V * (KICK_MIN + (1 - KICK_MIN) * c));
+};
+// [stated] **태클에 맞으면 0.5초 쓰러진다**
+// (칼전에도 같은 이름이 있어 `SOC_STUN` 으로 둔다 — 같이 들여오면 이름이 겹친다)
+export const SOC_STUN = 30;
+export const KICK_REACH = Math.round(11 * FP);     // (옛 방식) 밀어서 찰 때 쓰던 사거리
 export const KICK_COOL = 18;                       // 연타 방지 (틱)
 export const GOAL_TO_WIN = 3;
 export const SOCCER_TICKS = 90 * 60;               // 90초
@@ -127,57 +145,76 @@ export function stepBallInGoal(s, team){
   if (b.y > y1 - BALL_R){ b.y = y1 - BALL_R; b.vy = -b.vy; }
 }
 
+/** 공을 잡고 있는 사람의 발밑 좌표 */
+function footOf(p){
+  const [fx, fy] = faceVec(p.face);
+  return { x: p.x + half(PWf) + fx * FOOT_OFF, y: p.y + half(PHf) + fy * FOOT_OFF };
+}
+
 /** 한 틱. 공을 굴리고, 캐릭터와 부딪히고, 골을 판정한다.
- *  돌려주는 값: 골이면 `{ goal: 팀번호 }`, 아니면 `null` */
-export function stepBall(s, kicks){
+ *  돌려주는 값: 골이면 `{ goal: 팀번호 }`, 아니면 `null`
+ *
+ *  [stated] **공을 잡으면 발밑에 붙어 같이 다닌다.** 그 상태에서 슛 버튼을 누르면 나간다 */
+export function stepBall(s, kicks, chs){
   const b = s.ball;
   if (!b) return null;
+  if (s.freeT > 0) s.freeT--;                      // 찬 직후 잠깐은 아무도 못 잡는다
 
-  // 1) 버튼으로 차기 — **보는 방향으로**. 닿을 거리 안에 있어야 한다.
-  //    `kicks[i]` 가 2 면 태클(약하게), 1 이면 슛(세게)
-  for (let i = 0; i < s.n; i++){
-    if (!kicks[i] || (s.p[i].kickCool | 0) > 0) continue;
-    const p = s.p[i];
-    const cx = p.x + half(PWf), cy = p.y + half(PHf);
-    const dx = b.x - cx, dy = b.y - cy;
-    if (dx * dx + dy * dy > KICK_REACH * KICK_REACH) continue;
-    const [fx, fy] = FACE_V[p.face | 0] || FACE_V[0];
-    const v = kicks[i] === 2 ? TACKLE_V : KICK_V;
-    b.vx = fx * v; b.vy = fy * v;
-    p.kickCool = kicks[i] === 2 ? 0 : KICK_COOL;   // 태클 쿨은 태클 쪽에서 따로 센다
-    // 슛에만 연출을 띄운다 (태클은 스치듯 자주 닿아서 켜면 화면이 시끄럽다)
-    // [stated] 연출은 **공이 아니라 찬 사람 발치**에. 몸 아래쪽, 보는 방향으로 조금 앞
-    if (kicks[i] !== 2){
-      s.kickFx = {
-        x: cx + fx * Math.round(PWf * 0.45),
-        y: p.y + PHf - Math.round(PHf * 0.18) + fy * Math.round(PHf * 0.3),
-        f: p.face | 0,                 // 찬 방향 — 연출을 그 쪽으로 눕힌다
-        t: KICK_FX_TICKS
-      };
+  // 1) 잡고 있는 사람이 있으면 — 공은 발밑에 붙어 다닌다
+  let own = (s.ballOwner == null ? -1 : s.ballOwner);
+  if (own >= 0){
+    const p = s.p[own];
+    // 쓰러졌거나 죽었거나 끊기면 놓친다
+    if (!p || p.hp <= 0 || (p.stun | 0) > 0 || (s.off && s.off[own])){
+      s.ballOwner = -1; s.freeT = RELEASE_TICKS; own = -1;
+    } else {
+      const f = footOf(p);
+      b.x = f.x; b.y = f.y; b.vx = 0; b.vy = 0;
+      if (kicks[own]){
+        // 슛(1) 또는 태클로 건드림(2). 슛은 **차징 세기**를 쓴다
+        const [fx, fy] = faceVec(p.face);
+        const v = kicks[own] === 2 ? TACKLE_V : kickSpeed(chs ? chs[own] : 100);
+        b.vx = fx * v; b.vy = fy * v;
+        if (kicks[own] !== 2) p.kickCool = KICK_COOL;
+        s.kickFx = { x: f.x, y: f.y, f: p.face | 0, t: KICK_FX_TICKS };
+        s.ballOwner = -1; s.freeT = RELEASE_TICKS; own = -1;
+      }
     }
   }
   for (let i = 0; i < s.n; i++) if (s.p[i].kickCool > 0) s.p[i].kickCool--;
+  if (own >= 0) return goalCheck(s, b);            // 들고 있는 채로 골라인을 넘어도 골이다
 
-  // 2) 굴리기 + 마찰
+  // 2) 주인이 없는 공 — 굴러가고, 가까운 사람이 잡는다
   b.x += b.vx; b.y += b.vy;
   b.vx = (b.vx * FRICT_NUM / FRICT_DEN) | 0;
   b.vy = (b.vy * FRICT_NUM / FRICT_DEN) | 0;
   if (b.vx > -BALL_STOP && b.vx < BALL_STOP) b.vx = 0;
   if (b.vy > -BALL_STOP && b.vy < BALL_STOP) b.vy = 0;
 
-  // 3) 몸으로 밀기 — 닿으면 캐릭터 중심에서 바깥으로 밀린다
-  for (let i = 0; i < s.n; i++){
-    const p = s.p[i];
-    if (!hitRect(b.x, b.y, p.x, p.y, PWf, PHf)) continue;
-    const cx = p.x + half(PWf), cy = p.y + half(PHf);
-    let dx = b.x - cx, dy = b.y - cy;
-    if (dx === 0 && dy === 0) dy = -1;               // 정확히 겹치면 위로
-    // **정규화 대신 큰 축으로 민다** — 나눗셈·제곱근 없이 정수로 끝난다
-    if (dx * dx >= dy * dy){ b.vx = dx > 0 ? PUSH_V : -PUSH_V; b.x += b.vx; }
-    else                   { b.vy = dy > 0 ? PUSH_V : -PUSH_V; b.y += b.vy; }
+  if (s.freeT <= 0){
+    // **가장 가까운 사람**이 잡는다. 쓰러졌으면 못 잡는다
+    let best = -1, bd = PICK_R * PICK_R;
+    for (let i = 0; i < s.n; i++){
+      const p = s.p[i];
+      if (p.hp <= 0 || (p.stun | 0) > 0 || (s.off && s.off[i])) continue;
+      const dx = b.x - (p.x + half(PWf)), dy = b.y - (p.y + half(PHf));
+      const d = dx * dx + dy * dy;
+      if (d < bd){ bd = d; best = i; }
+    }
+    if (best >= 0){
+      s.ballOwner = best;
+      const f = footOf(s.p[best]);
+      b.x = f.x; b.y = f.y; b.vx = 0; b.vy = 0;
+      return goalCheck(s, b);
+    }
   }
 
-  // 4) 골 판정 — 골대 입구 안에서 골라인을 넘으면 골.
+  return goalCheck(s, b);
+}
+
+/** 골 판정과 벽 반사. 잡고 있을 때도 골라인은 봐야 한다 */
+function goalCheck(s, b){
+  // 골 판정 — 골대 입구 안에서 골라인을 넘으면 골.
   //    **넘는 순간 속도를 줄여** 골대 안에서 잠깐 구르게 한다
   const inMouth = b.x >= GOAL.lo && b.x <= GOAL.hi;
   if (inMouth && b.y <= GOAL.top){ damp(b); return { goal: 0 }; }   // 위 골대 = 아래 팀 득점

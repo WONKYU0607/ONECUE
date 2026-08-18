@@ -5,7 +5,8 @@
 import { FP, PWf, PHf, setArena } from '../src/game/config.js';
 import {
   stepBall, stepBallInGoal, ballHome, makeRoller, KICKOFF, FIELD, GOAL,
-  KICK_V, PUSH_V, BALL_R, KICK_COOL, GOAL_HOLD, GOAL_SEQ, TACKLE_V, TACKLE_TICKS, TACKLE_COOL
+  KICK_V, PUSH_V, BALL_R, KICK_COOL, GOAL_HOLD, GOAL_SEQ, TACKLE_V, TACKLE_TICKS, TACKLE_COOL,
+  PICK_R, FOOT_OFF, RELEASE_TICKS, SOC_STUN, kickSpeed, KICK_MIN, CHARGE_MS
 } from '../src/game/ball.js';
 import { assert } from './harness.js';
 
@@ -15,9 +16,11 @@ import { assert } from './harness.js';
 setArena(2, false, false, true);
 // 경기장 한가운데 (월드 한가운데가 아니다 — 돌벽 안쪽이 기준)
 const mid = ballHome();
+// 소유 방식이라 `ballOwner`·`freeT`·`hp`·`stun` 이 있어야 한다
 const world = () => ({
-  n: 2,
-  p: [{ x: 0, y: 0, face: 0, kickCool: 0 }, { x: 0, y: 0, face: 1, kickCool: 0 }],
+  n: 2, ballOwner: -1, freeT: 0,
+  p: [{ x: 0, y: 0, face: 0, kickCool: 0, hp: 100, stun: 0, tkl: 0 },
+      { x: 0, y: 0, face: 1, kickCool: 0, hp: 100, stun: 0, tkl: 0 }],
   ball: ballHome()
 });
 const roll = (s, ticks, kicks = [0, 0]) => {
@@ -41,7 +44,7 @@ console.log('같은 입력이면 언제나 같은 결과');
 {
   // 이게 깨지면 클라와 서버의 공 위치가 갈린다
   const once = () => {
-    const s = world();
+    const s = world(); s.freeT = 999;   // 굴러가는 것만 본다 (아무도 안 잡게)
     s.ball.vx = KICK_V; s.ball.vy = -KICK_V;
     roll(s, 400);
     return [s.ball.x, s.ball.y, s.ball.vx, s.ball.vy].join(',');
@@ -78,23 +81,49 @@ console.log('슛이 몸싸움보다 확실히 빠르다');
   assert(KICK_V > PUSH_V * 2, `  슛 ${KICK_V} > 미는 힘 ${PUSH_V} x2`);
 }
 
-console.log('버튼으로 보는 방향으로 찬다');
+// [stated] **공을 잡으면 발밑에 붙어 같이 다닌다.** 그 상태에서 슛을 누르면 나간다
+console.log('잡고 → 몰고 → 찬다');
 {
   const s = world();
-  // 공 바로 아래에 서서 위를 본다
   s.ball.x = mid.x; s.ball.y = mid.y;
-  s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y + 2 * FP; s.p[0].face = 0;
+  s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 5 * FP; s.p[0].face = 0;
+  s.p[1].x = FIELD.x0; s.p[1].y = GOAL.top;      // 상대는 멀리 둔다
+  stepBall(s, [0, 0]);
+  assert(s.ballOwner === 0, '  가까이 가면 잡는다');
+  const foot = () => {
+    const cx = s.p[0].x + (PWf >> 1), cy = s.p[0].y + (PHf >> 1);
+    return Math.hypot(s.ball.x - cx, s.ball.y - cy);
+  };
+  assert(Math.abs(foot() - FOOT_OFF) < 2, '  발밑에 붙는다');
+  for (let i2 = 0; i2 < 15; i2++){ s.p[0].x += 2 * FP; s.p[0].face = 3; stepBall(s, [0, 0]); }
+  assert(s.ballOwner === 0 && Math.abs(foot() - FOOT_OFF) < 2, '  움직여도 따라온다');
+  s.p[0].face = 0;
   stepBall(s, [1, 0]);
-  assert(s.p[0].kickCool > 0, '  쿨다운이 걸린다 (= 버튼으로 실제로 찼다)');
-  assert(s.ball.vy < 0, `  위로 나간다 (vy ${s.ball.vy})`);
-  // [stated] 연출은 **찬 사람 발치**에 뜬다 (공 자리가 아니다)
+  assert(s.ballOwner === -1, '  차면 놓는다');
+  // 찬 그 틱에 마찰이 한 번 적용되므로 정확히 KICK_V 는 아니다 (약 96%)
+  assert(s.ball.vy < 0 && Math.abs(s.ball.vy) >= KICK_V * 0.9,
+    `  보는 방향으로 슛 세기만큼 (${s.ball.vy} / ${-KICK_V})`);
+  assert(s.p[0].kickCool > 0, '  쿨다운이 걸린다');
   assert(s.kickFx && s.kickFx.t > 0, '  슛 연출이 생긴다');
-  assert(s.kickFx.y > s.ball.y, '  연출이 공보다 아래 — 찬 사람 발치');
-  // 연타로 계속 차이면 안 된다
-  const vy = s.ball.vy;
-  stepBall(s, [1, 0]);
-  assert(s.ball.vy > vy, '  쿨다운 중에는 다시 못 찬다 (마찰로 느려질 뿐)');
-  assert(KICK_COOL > 0, '  쿨다운 값이 있다');
+  // **찬 직후 곧바로 다시 주우면 안 된다** — 발에 붙어 제자리에서 튕긴다
+  assert(s.freeT === RELEASE_TICKS, '  잠깐 아무도 못 잡는다');
+  stepBall(s, [0, 0]);
+  assert(s.ballOwner === -1, '  바로 다시 안 잡힌다');
+}
+
+// [stated] **태클에 맞으면 쓰러진다** — 그때 공도 놓친다
+console.log('쓰러지면 놓친다');
+{
+  const s = world();
+  s.ball.x = mid.x; s.ball.y = mid.y;
+  s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 5 * FP;
+  s.p[1].x = FIELD.x0; s.p[1].y = GOAL.top;
+  stepBall(s, [0, 0]);
+  assert(s.ballOwner === 0, '  먼저 잡는다');
+  s.p[0].stun = SOC_STUN;
+  stepBall(s, [0, 0]);
+  assert(s.ballOwner === -1, '  쓰러지면 놓는다');
+  assert(s.freeT > 0, '  놓은 직후엔 아무도 못 잡는다');
 }
 
 console.log('멀면 못 찬다');
@@ -106,15 +135,8 @@ console.log('멀면 못 찬다');
   assert(s.ball.vx === 0 && s.ball.vy === 0, '  닿을 거리 밖이면 안 나간다');
 }
 
-console.log('몸으로 밀린다');
-{
-  const s = world();
-  s.ball.x = mid.x; s.ball.y = mid.y;
-  // 공에 겹치게 선다
-  s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 2 * FP;
-  stepBall(s, [0, 0]);
-  assert(s.ball.vx !== 0 || s.ball.vy !== 0, '  닿으면 밀린다');
-}
+// **몸으로 밀어서 모는 방식은 없어졌다** — 잡아서 끌고 다니는 방식으로 갈아엎었다.
+// (`PUSH_V` 는 자유 공이 사람과 부딪힐 때를 위해 값만 남아 있다)
 
 console.log('골 판정');
 {
@@ -202,24 +224,54 @@ console.log('굴러 보인다');
 }
 
 // [stated] **슛 옆에 태클 버튼.** 태클로 공을 차면 **슛보다 약하게** 튕겨 나간다
-console.log('태클은 슛보다 약하다');
+console.log('태클로 차면 슛보다 약하다');
 {
   assert(TACKLE_V < KICK_V, `  세기 ${TACKLE_V} < ${KICK_V}`);
-  assert(TACKLE_V > PUSH_V, `  그래도 몸으로 미는 것보다는 세다 (${TACKLE_V} > ${PUSH_V})`);
   assert(TACKLE_COOL > KICK_COOL, '  쿨다운은 슛보다 길다');
-  assert(TACKLE_TICKS > 0, '  미끄러지는 시간이 있다');
-  // 같은 자리에서 태클과 슛을 비교
+  assert(TACKLE_TICKS > 0 && SOC_STUN > 0, '  미끄러지는 시간과 기절 시간이 있다');
+  // **잡은 상태에서** 비교해야 한다 — 이제 안 잡으면 애초에 못 찬다
   const mk = () => {
     const s = world();
     s.ball.x = mid.x; s.ball.y = mid.y;
-    s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y + 2 * FP; s.p[0].face = 0;
+    s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 5 * FP; s.p[0].face = 0;
+    s.p[1].x = FIELD.x0; s.p[1].y = GOAL.top;
+    stepBall(s, [0, 0]);
     return s;
   };
   const a = mk(); stepBall(a, [2, 0]);      // 2 = 태클
   const b = mk(); stepBall(b, [1, 0]);      // 1 = 슛
-  assert(Math.abs(a.ball.vy) < Math.abs(b.ball.vy),
-    `  실제로도 약하다 (태클 ${a.ball.vy} / 슛 ${b.ball.vy})`);
   assert(a.ball.vy < 0 && b.ball.vy < 0, '  둘 다 보는 방향으로 나간다');
+  assert(Math.abs(a.ball.vy) < Math.abs(b.ball.vy),
+    `  태클이 약하다 (태클 ${a.ball.vy} / 슛 ${b.ball.vy})`);
+}
+
+// [stated] 슛에 **1초 차징**. 지금 세기가 꽉 채웠을 때고, 일찍 떼면 비율만큼 약하게
+console.log('슛 차징');
+{
+  assert(CHARGE_MS === 1000, '  최대 1초');
+  assert(kickSpeed(100) === KICK_V, '  꽉 채우면 지금 세기 그대로');
+  assert(kickSpeed(0) === Math.round(KICK_V * KICK_MIN), `  탭하면 최대의 ${KICK_MIN * 100}%`);
+  // **바닥이 0 이면 안 된다** — 살짝 눌렀을 때 공이 발밑에서 안 떨어져 답답하다
+  assert(kickSpeed(0) > 0, '  탭해도 공은 나간다');
+  let last = 0, ok = true;
+  for (let c = 0; c <= 100; c += 10){
+    const v = kickSpeed(c);
+    if (v < last) ok = false;
+    last = v;
+  }
+  assert(ok, '  오래 누를수록 세진다 (단조 증가)');
+  // 실제로 공에 반영되는지
+  const mk = ch => {
+    const s = world();
+    s.ball.x = mid.x; s.ball.y = mid.y;
+    s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 5 * FP; s.p[0].face = 0;
+    s.p[1].x = FIELD.x0; s.p[1].y = GOAL.top;
+    stepBall(s, [0, 0], [100, 100]);
+    stepBall(s, [1, 0], [ch, 100]);
+    return Math.abs(s.ball.vy);
+  };
+  const weak = mk(0), full = mk(100);
+  assert(weak < full, `  일찍 떼면 약하다 (${weak} < ${full})`);
 }
 
 console.log('ball.test.js 통과');
