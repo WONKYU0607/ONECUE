@@ -770,13 +770,27 @@ export function createRenderer(canvas){
         ctx.fillText(txt, (r.x + r.w / 2) * RS, (r.y + r.h / 2) * RS);
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       };
-      label(b, 'SHOOT', on ? '#ffd34d' : 'rgba(255,211,77,0.28)', on ? '#3a2d00' : 'rgba(58,45,0,0.5)');
-      // [stated] **차징 게이지** — 누르고 있는 동안 아래에서 위로 찬다 (최대 1초)
-      const kc = kickCharge || 0;
-      if (kc > 0){
-        const h2 = b.h * Math.min(1, kc / 100);
-        px(b.x + 1, b.y + b.h - h2, 2, h2, kc >= 99 ? '#ffffff' : '#7a5c00');
+      // [stated] 차징은 **버튼 자체가 아래에서 위로 진하게 채워진다** (옆의 흰 막대 대신)
+      const kc0 = Math.max(0, Math.min(100, kickCharge || 0));
+      label(b, 'SHOOT', on ? '#7a6420' : 'rgba(255,211,77,0.28)', on ? '#3a2d00' : 'rgba(58,45,0,0.5)');
+      if (on && kc0 > 0){
+        const fh = b.h * (kc0 / 100);
+        px(b.x, b.y + b.h - fh, b.w, fh, kc0 >= 99 ? '#fff2a8' : '#ffd34d');
+        ctx.fillStyle = '#3a2d00';
+        ctx.font = '900 ' + Math.round(Math.min(9, b.w / 5.4) * RS) + 'px ' + GF;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('SHOOT', (b.x + b.w / 2) * RS, (b.y + b.h / 2) * RS);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      } else if (on){
+        px(b.x, b.y, b.w, b.h, '#ffd34d');
+        ctx.fillStyle = '#3a2d00';
+        ctx.font = '900 ' + Math.round(Math.min(9, b.w / 5.4) * RS) + 'px ' + GF;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('SHOOT', (b.x + b.w / 2) * RS, (b.y + b.h / 2) * RS);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       }
+      // [stated] **차징 게이지** — 누르고 있는 동안 아래에서 위로 찬다 (최대 1초)
+
       const tb = tackleBtn(uiH2);
       const tOn = me ? (me.tklCool | 0) === 0 : true;
       label(tb, 'SLIDE', tOn ? '#f2f2f2' : 'rgba(242,242,242,0.28)',

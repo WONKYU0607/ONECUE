@@ -17,10 +17,10 @@ import { onLangChange, t } from './i18n/index.js';
 import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { scoreDelta } from './game/score.js';
-import { recordMatch, streakOf } from './state/tickets.js';
+import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
 import { recordResult, modeKey } from './state/progress.js';
-import { VIEW, SELF, HAND } from './game/config.js';
+import { VIEW, SELF, HAND, teamOf } from './game/config.js';
 
 // 화면 전환은 여기 한 곳에서만 한다.
 // GameCanvas는 'game'일 때만 마운트되므로, 화면을 벗어나면 게임 루프·소켓이 자동으로 정리된다.
@@ -109,7 +109,16 @@ export default function App(){
   const onFinish  = useCallback((r, summary) => {
     // **PVP만 점수를 매긴다.** AI·연습은 연습이므로 기록하지 않는다
     let sc = null;
-    if (session?.kind === 'pvp' && summary?.state){
+    if (session?.kind === 'pvp' && summary?.state && summary.state.soccer){
+      // [stated] **축구는 점수 계산이 다르다** — 이기면 골x100x연승, 지면 골x50.
+      // 순위표·티어 없이 0점에서 시작하고 1대1·2대2 구분도 없다
+      const st = summary.state;
+      const myT = teamOf(SELF.slot, st.n);
+      const goals = (st.score && st.score[myT]) | 0;
+      const delta = soccerDelta(r, goals, streakOf('soccer'));
+      const moved = recordMatch('soccer', r, delta, { local: true });
+      sc = { delta, ...moved, kind: 'soccer' };
+    } else if (session?.kind === 'pvp' && summary?.state){
       const kind = summary.melee ? 'melee' : 'gun';
       const d = scoreDelta(summary.state, SELF.slot, {
         streak: streakOf(kind) + (r === 'win' ? 1 : 0),

@@ -29,9 +29,9 @@ const empty = () => ({
   ffa: FFA_MAX,                              // 개인전 남은 판
   soc: SOC_MAX,                              // 축구 남은 판 (자정에 초기화)
   day: today(),                              // 개인전 초기화 기준 날짜
-  score: { gun: 1000, melee: 1000 },         // [stated] 총격전·칼전 점수를 따로
-  streak: { gun: 0, melee: 0 },
-  record: { gun: { w: 0, l: 0, d: 0 }, melee: { w: 0, l: 0, d: 0 } }
+  score: { gun: 1000, melee: 1000, soccer: 0 },         // [stated] 총격전·칼전 점수를 따로
+  streak: { gun: 0, melee: 0, soccer: 0 },
+  record: { gun: { w: 0, l: 0, d: 0 }, melee: { w: 0, l: 0, d: 0 }, soccer: { w:0, l:0, d:0 } }
 });
 
 function read(){
@@ -142,8 +142,10 @@ export const scoreOf = kind => cur.score[kind] | 0;
 
 // 한 판이 끝나면 점수·연승·전적을 한 번에 갱신한다.
 // **여기 한 곳에서만 쓴다** — 여러 곳에서 고치면 연승이 어긋난다
+// [stated] **축구는 점수를 따로 센다.** 총격전 점수에 올라가고 있었다.
+// 순위표·티어는 없고 0점에서 시작한다
 export function recordMatch(kind, result, delta, opt = {}){
-  const k = kind === 'melee' ? 'melee' : 'gun';
+  const k = kind === 'melee' ? 'melee' : (kind === 'soccer' ? 'soccer' : 'gun');
   const before = cur.score[k] | 0;
   cur.score[k] = Math.max(0, before + (delta | 0));       // [stated] 하한 0
   cur.streak[k] = result === 'win' ? (cur.streak[k] | 0) + 1 : 0;
@@ -154,6 +156,13 @@ export function recordMatch(kind, result, delta, opt = {}){
   return { before, after: cur.score[k], streak: cur.streak[k] };
 }
 export const streakOf = kind => cur.streak[kind] | 0;
+
+// [stated] 축구 점수 규칙 — **이기면 골 x100 x연승, 지면 골 x50.** 1대1·2대2 구분 없다
+export function soccerDelta(result, goals, streakBefore){
+  const g = Math.max(0, goals | 0);
+  if (result === 'win') return g * 100 * Math.max(1, (streakBefore | 0) + 1);
+  return g * 50;
+}
 export const recordOf = kind => ({ ...cur.record[kind] });
 export function getPlay(){ regen(); return JSON.parse(JSON.stringify(cur)); }
 export function __reset(){ cur = empty(); save(); return getPlay(); }

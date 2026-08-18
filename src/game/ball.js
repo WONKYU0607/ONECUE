@@ -52,7 +52,7 @@ export const BALL_STOP = Math.round(0.15 * FP);    // 이보다 느리면 세운
 // [stated] "현재 속도를 슛 속도로 하고 몰고 가는 건 반으로 줄여"
 export const KICK_V = Math.round(6 * FP);          // 슛 — 지금 속도 그대로 (굴러가는 거리 약 154px)
 // [stated] 태클로 공을 차면 **슛보다 약하게** 튕겨 나간다. 슛의 절반
-export const TACKLE_V = Math.round(3 * FP);
+export const TACKLE_V = Math.round(1.6 * FP);   // [stated] 태클로 그대로 골이 들어가 절반으로
 export const TACKLE_TICKS = 26;                    // 미끄러지는 동안 (모션 길이)
 export const TACKLE_COOL = 48;                     // 연타 방지. 슛보다 길다
 // [stated] 태클하면 캐릭터가 **스윽 밀려난다**. 시작이 제일 빠르고 점점 느려진다
@@ -178,7 +178,7 @@ export function stepBall(s, kicks, chs){
     const p = s.p[own];
     // 쓰러졌거나 죽었거나 끊기면 놓친다
     if (!p || p.hp <= 0 || (p.stun | 0) > 0 || (s.off && s.off[own])){
-      s.ballOwner = -1; s.freeT = RELEASE_TICKS; own = -1;
+      s.ballOwner = -1; s.freeT = RELEASE_TICKS; s.lastKicker = own; own = -1;
     } else {
       const f = footOf(p);
       b.x = f.x; b.y = f.y; b.vx = 0; b.vy = 0;
@@ -193,7 +193,7 @@ export function stepBall(s, kicks, chs){
         b.vx = fx * v; b.vy = fy * v;
         if (kicks[own] !== 2) p.kickCool = KICK_COOL;
         s.kickFx = { x: f.x, y: f.y, f: p.face | 0, t: KICK_FX_TICKS };
-        s.ballOwner = -1; s.freeT = RELEASE_TICKS; own = -1;
+        s.ballOwner = -1; s.freeT = RELEASE_TICKS; s.lastKicker = own; own = -1;
       }
     }
   }
@@ -232,12 +232,12 @@ export function stepBall(s, kicks, chs){
 
   // [stated] **날아오는 공은 사람 몸에 튕긴다** — "상대가 슛했는데 내가 맞으면 무조건 튕겨 나간다".
   // 위에서 못 잡은 공(빠르거나·찬 직후·쓰러진 사람뿐)만 여기 온다.
-  // **찬 직후(`freeT`)에는 안 튕긴다** — 공이 찬 사람 발밑(=몸 안)에서 출발하므로
-  // 그대로 두면 자기 몸에 맞고 되돌아온다
-  if (s.freeT > 0) return goalCheck(s, b);
+  // **찬 사람만 잠깐 제외한다.** 예전엔 `freeT` 동안 전부 안 튕기게 했는데,
+  // 그 14틱 사이에 공이 84px(경기장 절반)을 날아가 **아무도 못 막았다**
   for (let i = 0; i < s.n; i++){
     const p = s.p[i];
     if (p.hp <= 0 || (s.off && s.off[i])) continue;
+    if (s.freeT > 0 && i === s.lastKicker) continue;   // 찬 사람 몸은 잠깐 통과
     const nx = p.x < b.x ? (b.x > p.x + PWf ? p.x + PWf : b.x) : p.x;
     const ny = p.y < b.y ? (b.y > p.y + PHf ? p.y + PHf : b.y) : p.y;
     const dx = b.x - nx, dy = b.y - ny;

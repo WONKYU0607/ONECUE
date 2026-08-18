@@ -154,6 +154,7 @@ export function normalizeState(st){
   if (!st.kickFx || typeof st.kickFx.t !== 'number') st.kickFx = null;
   if (typeof st.ballOwner !== 'number') st.ballOwner = -1;
   if (typeof st.freeT !== 'number') st.freeT = 0;
+  if (typeof st.lastKicker !== 'number') st.lastKicker = -1;
   if (!Array.isArray(st.items)) st.items = [];
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
@@ -251,6 +252,7 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     kickFx: null,               // 슛 연출 {x,y,t}. 양쪽 화면에 같이 뜬다
     ballOwner: -1,              // 공을 잡고 있는 슬롯 (-1 = 자유)
     freeT: 0,                   // 찬 직후 아무도 못 잡는 시간
+    lastKicker: -1,             // 방금 찬 사람 (그 사람 몸만 잠깐 통과)
     p: players,
     bullets: [],
     covers: newCovers(),
@@ -730,8 +732,8 @@ export function step(s, inp){
       if (s.soccer && (p.stun | 0) > 0){ dx = 0; dy = 0; }   // 쓰러진 동안은 못 움직인다
       // [stated] **공을 잡은 사람은 15% 느리다** — 안 그러면 잡고 도망만 다니면 된다
       if (s.soccer && s.ballOwner === i){
-        dx = Math.round(dx * 80 / 100);   // [stated] 85 → 80
-        dy = Math.round(dy * 80 / 100);
+        dx = Math.round(dx * 70 / 100);   // [stated] 80 → 70
+        dy = Math.round(dy * 70 / 100);
       }
       if ((s.melee || s.soccer) && (dx || dy)){
         p.face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 2 : 3) : (dy < 0 ? 0 : 1);
@@ -1273,8 +1275,8 @@ export function kickoff(s, scorer = -1){
     let y;
     // [stated] **중앙선에서 시작하면 상대가 너무 빨리 붙는다** →
     // 먹힌 쪽은 **자기 진영**에서 공을 갖고 시작한다
-    if (conceded) y = mine ? GOAL.bot - Math.round(46 * FP) - PHf : GOAL.top + Math.round(46 * FP);
-    else          y = mine ? GOAL.bot - Math.round(14 * FP) - PHf : GOAL.top + Math.round(14 * FP);
+    // [stated] **양 팀 모두 자기 골대 바로 앞**에서 시작. 먹힌 쪽이 공을 갖는다
+    y = mine ? GOAL.bot - Math.round(14 * FP) - PHf : GOAL.top + Math.round(14 * FP);
     s.p[i].x = clampi(x, FIELD.x0, FIELD.x1 - PWf);
     s.p[i].y = y;
     s.p[i].face = mine ? 0 : 1;
