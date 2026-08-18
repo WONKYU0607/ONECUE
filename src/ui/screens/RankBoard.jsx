@@ -71,7 +71,8 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
         {/* [stated] **한 줄에 셋** — 총격전 · 칼전 · 친구.
             앞의 둘은 전체 순위표, `친구` 는 친구끼리만 보는 순위표로 넘어간다 */}
         <div className="pick-row rb-tabs">
-          {[['gun', t('mode.gun')], ['melee', t('mode.melee')]].map(([k, nm]) => (
+          {[['gun', t('mode.gun')], ['melee', t('mode.melee')], ['soccer', t('mode.soccer')]]
+            .map(([k, nm]) => (
             <button key={k}
                     className={'menu-btn pick' + (!onlyFriends && kind === k ? ' primary' : '')}
                     onClick={() => { setOnlyFriends(false); setKind(k); }}>
@@ -104,7 +105,8 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
         {/* [stated] 내 칸 옆에도 등수를 매긴다 */}
         {!onlyFriends && <div className="rb-me">
           <span className="rb-no">{(data && data.my && data.my.rank) || '-'}</span>
-          <TierIcon score={scoreOf(kind)} />
+          {/* [stated] 축구는 **티어를 안 나눈다** — 점수만 센다 */}
+          {kind !== 'soccer' && <TierIcon score={scoreOf(kind)} />}
           <span className="rb-nick">{myNick}</span>
           <span className="rb-tier">{tierName(tierOf(scoreOf(kind)))}</span>
           <span className="rb-rank">
@@ -121,7 +123,7 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
             <div key={row.rank + '-' + (row.nick || '')}
                  className={'rb-row' + (row.nick && row.nick === myNick ? ' me' : '')}>
               <span className="rb-no">{row.rank}</span>
-              <TierIcon score={row.score | 0} />
+              {kind !== 'soccer' && <TierIcon score={row.score | 0} />}
               <span className="rb-nick">{row.nick || '-'}</span>
               <span className="rb-score">{(row.score | 0).toLocaleString()}</span>
             </div>

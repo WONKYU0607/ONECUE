@@ -762,32 +762,28 @@ export function createRenderer(canvas){
       // [stated] 슛은 **노란 박스에 SHOOT**, 태클은 **흰 박스에 SLIDE**
       const cool = me ? (me.kickCool | 0) : 0;
       const on = cool === 0;
-      const label = (r, txt, fill, ink) => {
-        px(r.x, r.y, r.w, r.h, fill);
+      // [stated] 글씨를 **두껍게, 게임체로**. 얇아서 성의 없어 보였다 →
+      // 크기를 키우고 같은 글자를 겹쳐 찍어 굵기를 낸다(캔버스에는 굵기 단계가 없다)
+      const btnText = (r, txt, ink) => {
         ctx.fillStyle = ink;
-        ctx.font = '900 ' + Math.round(Math.min(9, r.w / 5.4) * RS) + 'px ' + GF;
+        ctx.font = '900 ' + Math.round(Math.min(11, r.w / 4.4) * RS) + 'px ' + GF;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(txt, (r.x + r.w / 2) * RS, (r.y + r.h / 2) * RS);
+        const cx2 = (r.x + r.w / 2) * RS, cy2 = (r.y + r.h / 2) * RS;
+        for (const [ox, oy] of [[0, 0], [0.6, 0], [-0.6, 0], [0, 0.6], [0, -0.6]])
+          ctx.fillText(txt, cx2 + ox * RS * 0.5, cy2 + oy * RS * 0.5);
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       };
+      const label = (r, txt, fill, ink) => { px(r.x, r.y, r.w, r.h, fill); btnText(r, txt, ink); };
       // [stated] 차징은 **버튼 자체가 아래에서 위로 진하게 채워진다** (옆의 흰 막대 대신)
       const kc0 = Math.max(0, Math.min(100, kickCharge || 0));
       label(b, 'SHOOT', on ? '#7a6420' : 'rgba(255,211,77,0.28)', on ? '#3a2d00' : 'rgba(58,45,0,0.5)');
       if (on && kc0 > 0){
         const fh = b.h * (kc0 / 100);
         px(b.x, b.y + b.h - fh, b.w, fh, kc0 >= 99 ? '#fff2a8' : '#ffd34d');
-        ctx.fillStyle = '#3a2d00';
-        ctx.font = '900 ' + Math.round(Math.min(9, b.w / 5.4) * RS) + 'px ' + GF;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('SHOOT', (b.x + b.w / 2) * RS, (b.y + b.h / 2) * RS);
-        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        btnText(b, 'SHOOT', '#3a2d00');
       } else if (on){
         px(b.x, b.y, b.w, b.h, '#ffd34d');
-        ctx.fillStyle = '#3a2d00';
-        ctx.font = '900 ' + Math.round(Math.min(9, b.w / 5.4) * RS) + 'px ' + GF;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('SHOOT', (b.x + b.w / 2) * RS, (b.y + b.h / 2) * RS);
-        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        btnText(b, 'SHOOT', '#3a2d00');
       }
       // [stated] **차징 게이지** — 누르고 있는 동안 아래에서 위로 찬다 (최대 1초)
 
