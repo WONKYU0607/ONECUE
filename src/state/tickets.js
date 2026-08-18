@@ -18,6 +18,9 @@ export const FFA_MAX = 3;
 // [stated] 축구 미니게임은 **전용 티켓 하루 3장.** 일반 티켓과 **별개 주머니**라
 // 축구를 해도 일반 티켓은 안 깎인다. **시간 충전도 없고** 다 쓰면 광고로만 받는다
 export const SOC_MAX = 3;
+// [stated] 디버깅 중에는 축구 티켓을 다 써서 게임을 못 하는 일이 없게 **무제한**.
+// **출시 전 반드시 false** — `DEBUG_INF_HP` 와 같은 부류다
+export const DEBUG_INF_SOCCER = true;
 const today = () => new Date().toISOString().slice(0, 10);
 
 const empty = () => ({
@@ -91,8 +94,12 @@ export function addFfa(n = 1){ rollDay(); cur.ffa = Math.min(FFA_MAX, cur.ffa + 
 export const leftFor = ffa => (ffa ? Math.min(ticketsLeft(), ffaLeft()) : ticketsLeft());
 
 /** 축구 남은 판. **일반 티켓과 별개**라 티켓이 0이어도 축구는 할 수 있다 */
-export function socLeft(){ rollDay(); return cur.soc | 0; }
+export function socLeft(){
+  if (DEBUG_INF_SOCCER) return SOC_MAX;      // 디버깅: 늘 가득 찬 것으로 보인다
+  rollDay(); return cur.soc | 0;
+}
 export function useSoccer(){
+  if (DEBUG_INF_SOCCER) return true;         // 디버깅: 안 깎는다
   rollDay();
   if (cur.soc <= 0) return false;
   cur.soc -= 1; saveLocalOnly();
