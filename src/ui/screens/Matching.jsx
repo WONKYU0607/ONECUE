@@ -3,6 +3,8 @@ import { connectAndWait, disconnect, serverUrl, pickTeam } from '../../net/conne
 import { getColor } from '../../state/profile.js';
 import { spendFor, useSoccer } from '../../state/tickets.js';
 import InviteFriends from '../InviteFriends.jsx';
+import VsIntro from '../VsIntro.jsx';
+import { SELF } from '../../game/config.js';
 import { t } from '../../i18n/index.js';
 
 // **열쇠만 담는다.** 여기서 t()를 부르면 파일을 읽을 때 한 번만 계산돼
@@ -25,6 +27,10 @@ export default function Matching({ session, onCancel, onMatched }){
   const [err, setErr] = useState('');
   const [lobby, setLobby] = useState(null);
   const [sec, setSec] = useState(0);
+  // [stated] 매칭되면 **양쪽 정보를 보여주는 화면**을 잠깐 띄운 뒤 게임으로 넘어간다
+  const [vs, setVs] = useState(null);
+  const vsRef = useRef(null);
+  const goneRef = useRef(false);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -38,6 +44,7 @@ export default function Matching({ session, onCancel, onMatched }){
       melee: !!session?.melee,
       ffa: !!session?.ffa,
       soccer: !!session?.soccer,
+      onVs: m => { if (alive.current){ vsRef.current = m; setVs(m); } },
       color: Number.isInteger(session?.color) ? session.color : -1,
       onCode: c => { if (alive.current) setCode(c); },
       onLobby: l => { if (alive.current) setLobby(prev => ({ ...prev, ...l })); },
@@ -52,7 +59,10 @@ export default function Matching({ session, onCancel, onMatched }){
         // **상대를 만난 뒤에 티켓을 뺀다.** 매칭에 실패하거나 도중에 나가면 안 빠진다.
         // [stated] 축구는 **전용 티켓**이라 일반 티켓을 안 건드린다
         if (session?.soccer) useSoccer(); else spendFor(!!session?.ffa);
-        setTimeout(onMatched, 400);
+        // VS 화면이 뜰 수 있게 여기서 바로 넘어가지 않는다.
+        // **정보가 안 오면 기다리지 않는다** — 0.6초 안에 없으면 그냥 진행
+        setStage('vs');
+        setTimeout(() => { if (alive.current && !vsRef.current) go(); }, 600);
       })
       .catch(e => { if (alive.current){ setErr(e?.message || ''); setStage('error'); } });
 
@@ -61,7 +71,16 @@ export default function Matching({ session, onCancel, onMatched }){
     return () => { alive.current = false; clearInterval(iv); };
   }, [onMatched, session]);
 
+  const go = () => { if (goneRef.current) return; goneRef.current = true; onMatched(); };
   const cancel = () => { disconnect(); onCancel(); };
+
+  if (stage === 'vs' && vs){
+    return (
+      <div className="screen center">
+        <VsIntro vs={vs} mySlot={SELF.slot} onDone={go} />
+      </div>
+    );
+  }
 
   return (
     <div className="screen center">

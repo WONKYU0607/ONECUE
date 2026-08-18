@@ -88,7 +88,7 @@ function openOnce(transport){
 
 // 접속해서 상대가 들어올 때까지 기다린다. onStage로 진행 상황을 알린다.
 // mode: 'queue'(랜덤) | 'create'(방 만들기) | 'join'(코드 입장)
-export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue', code = '', n = 2, melee = false, ffa = false, color = -1, soccer = false } = {}){
+export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'queue', code = '', n = 2, melee = false, ffa = false, color = -1, soccer = false } = {}){
   // 깨우기를 여러 번 두드린다. 한 번에 응답이 없어도 화면이 멈추지 않게 진행 상황을 알린다
   let health = null;
   for (let i = 0; i < 4 && !health; i++){
@@ -164,6 +164,9 @@ export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue',
         reject(new Error(m.reason === 'full' ? t('err.roomFull') : t('err.noRoom')));
       } else if (m.t === 'queued'){
         onStage?.('waiting', m.ahead);
+      } else if (m.t === 'vs'){
+        // [stated] 매칭 뒤 **양쪽 정보**. 구름을 읽어야 해서 `go` 보다 늦게 올 수 있다
+        onVs?.(m);
       } else if (m.t === 'go'){
         done();
       }

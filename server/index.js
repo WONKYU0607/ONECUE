@@ -3,7 +3,7 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { Server } from '../src/game/net.js';
-import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY } from '../src/game/config.js';
+import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY, PH_OVER } from '../src/game/config.js';
 import { scoreDelta } from '../src/game/score.js';
 import { createAI } from '../src/game/ai.js';
 import { createSoccerAI } from '../src/game/soccer-ai.js';
@@ -150,7 +150,8 @@ class Room {
     // 단계는 전투가 시작될 때 사람 점수에 맞춰 정한다. 그전엔 중간값
     // [stated] 축구는 **공을 쫓는 봇**이 따로 있다. 총·칼 봇은 공을 아예 안 본다
     this.server.bots.push({ slot: i, stage: 5,
-      ai: this.soccer ? createSoccerAI(i, 1) : createAI(5) });
+      // [stated] 축구 봇은 **쉬움(0)** 으로. 1 은 사람이 이기기 버거웠다
+      ai: this.soccer ? createSoccerAI(i, 0) : createAI(5) });
   }
 
   // 사람 점수에 맞춰 봇 단계를 정한다. 점수를 모르면 중간값 그대로
@@ -335,7 +336,10 @@ class Room {
     if (reconnected) this.send({ t: 'peer', slot, state: 'back' });
     // **봇 자리는 소켓이 없다.** `x.ws` 만 보면 봇이 낀 방은 영원히 안 차서
     // 클라가 매칭 화면에서 멈춘다 ("상대를 전혀 못 찾는다")
-    else if (this.seats.every(x => x.ws || x.bot)) this.send({ t: 'go' });
+    else if (this.seats.every(x => x.ws || x.bot)){
+      this.send({ t: 'go' });
+      this.sendVs();                       // [stated] 매칭되면 서로의 정보를 보여준다
+    }
     else this.sendLobby();
     return slot;
   }
@@ -352,10 +356,52 @@ class Room {
 
   // 사용자가 직접 나간 경우: 자리를 바로 비운다.
   // 이걸 구분 안 하면 다시 매칭을 눌러도 옛 방의 예약석으로 돌아가 상대를 못 만난다
+  /** [stated] 매칭 성사 뒤 **양쪽 정보**를 보낸다 — 닉네임·점수·전적·연승.
+   *  구름을 읽어야 하므로 늦게 도착할 수 있다. 클라는 없으면 없는 대로 그린다 */
+  sendVs(){
+    if (this.vsSent) return;               // 한 번만
+    this.vsSent = true;
+    const st = this.server.s;
+    const kind = st.soccer ? 'soccer' : (st.melee ? 'melee' : 'gun');
+    const uids = this.seats.map(x => (x.bot ? '' : (x.uid || '')));
+    store.publicOf(uids).then(list => {
+      const rows = list.map((v, i) => ({
+        slot: i,
+        bot: !!this.seats[i].bot,
+        nick: (v && v.nick) || (Array.isArray(st.nick) ? st.nick[i] : '') || '',
+        score: (v && v.score && v.score[kind]) != null ? v.score[kind] : null,
+        streak: (v && v.streak && v.streak[kind]) | 0,
+        record: (v && v.record && v.record[kind]) || null
+      }));
+      this.send({ t: 'vs', kind, rows });
+    }).catch(() => {});
+  }
+
+  /** 나간 자리를 AI 가 이어받는다 (축구). 이름 뒤에 표시를 붙여 사람이 아님을 알린다 */
+  takeOver(slot){
+    const st = this.server.s;
+    const seat = this.seats[slot];
+    seat.sid = 'bot:' + this.id + ':' + slot;   // 다른 사람이 못 앉게 자리를 잡아둔다
+    seat.bot = true; seat.ws = null;
+    setOff(st, slot, false);                   // 유령 표시를 지운다 — 다시 공을 다룬다
+    st.p[slot].stun = 0;
+    this.server.bots = this.server.bots || [];
+    if (!this.server.bots.some(b => b.slot === slot))
+      this.server.bots.push({ slot, stage: 5, ai: createSoccerAI(slot, 0) });
+  }
+
   quit(slot){
     const seat = this.seats[slot];
     this.pending.delete(seat.sid);
     seat.sid = null; seat.ws = null; seat.goneAt = 0;
+    // [stated] **축구는 나간 자리를 AI 가 이어받는다** — 판이 끊기지 않게.
+    // 나간 사람은 점수를 못 받는다(그 클라가 결과를 기록하지 못하므로 저절로 그렇게 된다)
+    if (this.soccer && this.server.s.phase !== PH_OVER){
+      this.takeOver(slot);
+      this.send({ t: 'peer', slot, state: 'left' });
+      if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
+      return;
+    }
     forfeit(this.server.s, slot);             // 1대1은 나간 사람 패배, 2대2는 계속 진행
     this.server.s.color[slot] = slot;        // 색을 다시 고를 수 있게
     this.send({ t: 'peer', slot, state: 'left' });
@@ -372,7 +418,9 @@ class Room {
       if (seat.bot) continue;                  // **봇은 소켓이 없다.** 나간 것으로 보면 안 된다
       if (seat.sid && !seat.ws && now - seat.goneAt > GRACE_MS){
         seat.sid = null; seat.goneAt = 0;
-        forfeit(this.server.s, i);             // 유예 시간이 지나면 완전히 나간 것으로
+        // 축구는 자리를 비우지 않고 AI 가 이어받는다
+        if (this.soccer && this.server.s.phase !== PH_OVER) this.takeOver(i);
+        else forfeit(this.server.s, i);         // 유예 시간이 지나면 완전히 나간 것으로
         this.send({ t: 'peer', slot: i, state: 'left' });
       }
     }

@@ -115,7 +115,8 @@ export async function readPlayers(uids){
         score: { gun: (d && d.score && d.score.gun) ?? 1000,
                  melee: (d && d.score && d.score.melee) ?? 1000 },
         streak: { gun: (d && d.streak && d.streak.gun) | 0,
-                  melee: (d && d.streak && d.streak.melee) | 0 }
+                  melee: (d && d.streak && d.streak.melee) | 0,
+                  soccer: (d && d.streak && d.streak.soccer) | 0 }
       });
     });
   } catch (e){
@@ -403,6 +404,35 @@ export async function invitesFor(me){
       .map(d => ({ from: d.id, ...d.data() }))
       .filter(v => now - (v.at || 0) < INVITE_TTL_MS);
   } catch { return null; }
+}
+
+/** [stated] 매칭되면 **서로의 공개 정보**를 보여준다 — 닉네임·점수·전적.
+ *  여러 명을 **한 번에** 읽는다(`getAll`) — 하나씩 읽으면 인원수만큼 왕복이 생긴다 */
+export async function publicOf(uids){
+  const list = (uids || []).map(u => String(u || ''));
+  const out = list.map(() => null);
+  if (!db) return out;
+  const want = [...new Set(list.filter(Boolean))];
+  if (!want.length) return out;
+  try {
+    const docs = await db.getAll(...want.map(id => db.doc('players/' + id)));
+    const byId = new Map();
+    docs.forEach((d, i) => byId.set(want[i], d.exists ? d.data() : null));
+    return list.map(u => {
+      const v = u ? byId.get(u) : null;
+      if (!v) return null;
+      const rec = v.record || {};
+      return {
+        nick: v.nick || '',
+        score: v.score || {},
+        streak: v.streak || {},
+        record: { gun: rec.gun || null, melee: rec.melee || null, soccer: rec.soccer || null }
+      };
+    });
+  } catch (e){
+    console.log('[store] 공개 정보 읽기 실패', e && e.code);
+    return out;
+  }
 }
 
 /** 순위표를 한 덩어리로 저장한다. [stated] 상위 **30명**.

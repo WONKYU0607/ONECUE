@@ -503,6 +503,43 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .inv-txt{flex:1 1 auto;min-width:0;font-size:11px;color:#cfe4ff;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
+/* 매칭 소개(VS) 화면 — 매칭 직후 잠깐 뜬다 */
+.vs-wrap{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;background:rgba(6,10,18,.92);cursor:pointer}
+/* [stated] **갈라지면서 맞붙는 연출** — 양쪽에서 미끄러져 들어와 가운데서 VS 가 터진다 */
+.vs-side{display:flex;flex-direction:column;gap:6px;align-items:center;width:82%;
+  animation:vsIn .42s cubic-bezier(.16,.9,.3,1.1) both}
+.vs-side.me{animation-name:vsInLeft}
+.vs-side.foe{animation-name:vsInRight;animation-delay:.06s}
+@keyframes vsInLeft{from{transform:translateX(-120%) skewX(-8deg);opacity:0}
+  to{transform:none;opacity:1}}
+@keyframes vsInRight{from{transform:translateX(120%) skewX(8deg);opacity:0}
+  to{transform:none;opacity:1}}
+/* 가운데를 가로지르는 섬광 — 두 카드가 부딪히는 순간 */
+.vs-wrap::after{content:'';position:absolute;left:0;right:0;top:50%;height:2px;
+  background:linear-gradient(90deg,transparent,#ffd34d,transparent);
+  transform:scaleX(0);animation:vsFlash .5s ease-out .34s both}
+@keyframes vsFlash{0%{transform:scaleX(0);opacity:0}
+  40%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1);opacity:0}}
+.vs-card{width:100%;padding:8px 10px;border-radius:4px;text-align:center;
+  background:rgba(14,22,36,.9);border:1px solid rgba(90,140,190,.4)}
+.vs-side.me .vs-card{border-color:#5a96c8}
+.vs-side.foe .vs-card{border-color:#c8705a}
+.vs-nick{display:block;font-size:15px;font-weight:900;color:#e8e8f0}
+.vs-score{display:block;font-size:20px;font-weight:900;color:#8fd8ff;margin-top:2px}
+.vs-side.foe .vs-score{color:#ff9a8f}
+.vs-rec{display:block;font-size:11px;color:var(--dim);margin-top:2px}
+.vs-streak{display:inline-block;margin-top:4px;padding:1px 6px;border-radius:2px;
+  font-size:10px;font-weight:700;color:#3a2d00;background:#ffd34d}
+.vs-mid{font:900 26px var(--gf);color:#ffd34d;letter-spacing:2px;
+  animation:vsPop .34s cubic-bezier(.2,1.6,.4,1) .36s both;
+  text-shadow:0 0 10px rgba(255,211,77,.8)}
+@keyframes vsPop{from{transform:scale(2.6) rotate(-12deg);opacity:0}
+  to{transform:none;opacity:1}}
+.vs-skip{font-size:11px;color:var(--dim);margin-top:4px}
+.vs-bar{width:60%;height:3px;background:rgba(255,255,255,.14);border-radius:2px;overflow:hidden}
+.vs-bar i{display:block;height:100%;background:#5a96c8}
+
 /* 친구 화면 */
 .fr-input{flex:1 1 0;min-width:0;font-size:14px;letter-spacing:1px;text-align:left;padding:0 8px}
 .fr-head{margin:10px 0 4px;text-align:left;width:100%}
