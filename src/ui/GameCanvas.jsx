@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { createGame } from '../game/game.js';
 import { PH_READY, SHOW_NETINFO } from '../game/config.js';
 import { negText } from '../game/ui-state.js';
-import TunePanel from './TunePanel.jsx';
 import { getConnection, disconnect, getRoomInfo } from '../net/connection.js';
 import { getSettings } from '../state/settings.js';
 import { t } from '../i18n/index.js';
@@ -108,8 +107,8 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
           </div>
         </div>
       )}
-      <button className="icon-btn top-left ui-overlay"
-              onClick={onBack} aria-label={t('common.leave')}>‹</button>
+      {/* [stated] 게임 안 '‹' 는 뺐다 — 나가기는 폰 뒤로가기로 한다.
+          `back.js` 가 그 버튼과 같은 확인 창을 띄우므로 나갈 길은 그대로 있다 */}
       {link.self === 'noconn' && (
         <div className="link-note ui-overlay">{t('link.noconn')}</div>
       )}
@@ -214,7 +213,8 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
       {placing && ready.me && ready.peer && (
         <div className="link-note ui-overlay">{t('ready.soon')}</div>
       )}
-      <TunePanel gameRef={gameRef} />
+      {/* [stated] 조율 패널(⚙)도 뺐다 — 값을 맞추려고 만든 개발용이라
+          출시 화면에 있을 것이 아니다. 파일은 남겨둔다(다시 붙일 수 있게) */}
     </div>
   );
 }

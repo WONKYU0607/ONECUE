@@ -318,6 +318,31 @@ const A3 = {
   wl: WALL3_L, wr: WALL3_R, wt: TOP3, wb: BOT3,
   melee: true
 };
+// [stated] 축구 미니게임. **격자가 필요 없다** — 아이템도 진영도 없고,
+// 벽 판정만 있으면 된다. 그래서 정원은 전부 0, 격자는 경기장 사각형을 그대로 덮는 값이다.
+// 경기장·골대 좌표는 `ball.js` 가 그림에서 잰 값을 들고 있다 (여기와 같은 수여야 한다)
+const F4 = { x0: 23.0, x1: 153.7, y0: 61.0, y1: 259.0 };
+const A4_COLS = 10, A4_ROWS = 16;
+const A4_PW = 12, A4_PH = 14;
+// 벽은 직선이라 표가 한 값으로 채워진다 (지그재그인 다른 아레나와 다르다).
+// **표는 FP 단위다** — 월드 px 로 채웠다가 캐릭터가 화면 왼쪽 끝에 붙어 버렸다
+const W4L = new Array(311).fill(Math.round(F4.x0 * FP));
+const W4R = new Array(311).fill(Math.round((F4.x1 - A4_PW) * FP));
+const T4  = new Array(180).fill(Math.round(F4.y0 * FP));
+const B4  = new Array(180).fill(Math.round((F4.y1 - A4_PH) * FP));
+const A4 = {
+  cols: A4_COLS, rows: A4_ROWS,
+  x0: F4.x0, cw: (F4.x1 - F4.x0) / A4_COLS,
+  y0: F4.y0, ch: (F4.y1 - F4.y0) / A4_ROWS, mid: A4_ROWS >> 1,
+  pw: A4_PW, ph: A4_PH, bg: 'arena4', neutral: false, hc: 5, tc: [3, 6],
+  flip: F4.y0 + F4.y1,
+  quota: [0, 0, 0, 0, 0], cover: { 1: 0, 2: 0 },
+  bands: [[0, A4_ROWS - 1, 0, A4_COLS - 1]],
+  wl: W4L, wr: W4R, wt: T4, wb: B4,
+  // 칼전처럼 **아레나 전체를 양쪽이 같이 쓴다** (중앙선도 진영도 없다)
+  melee: true, soccer: true
+};
+
 export const ARENA = { ...A1 };
 
 // 그 x 위치에서 바닥이 어디서 시작하고 끝나는지 (월드 y). 표가 없으면 아레나 전체
@@ -338,8 +363,8 @@ export const cellUsable = (c, r) => {
   return !!b && c >= b[0] && c <= b[1];
 };
 
-export function setArena(n, melee = false, ffa = false){
-  const a = melee ? A3 : (n > 2 ? A2 : A1);
+export function setArena(n, melee = false, ffa = false, soccer = false){
+  const a = soccer ? A4 : (melee ? A3 : (n > 2 ? A2 : A1));
   // 개인전 여부가 바뀌면 팀 판정이 통째로 달라지므로 아레나가 같아도 갱신해야 한다
   // **인원수도 봐야 한다.** 2대2와 3대3은 같은 아레나지만 시작 열 수가 다르다
   if (ARENA.bg === a.bg && ARENA.cols === a.cols && !!ARENA.ffa === !!ffa && ARENA.n === n) return ARENA;
@@ -398,7 +423,7 @@ export const aOwner = r => (r < ARENA.mid ? 1 : (r > ARENA.mid ? 0 : -1));   // 
 export const aWallL = i => (ARENA.wl || WALL_L)[i];
 export const aWallR = i => (ARENA.wr || WALL_R)[i];
 // 내 슬롯은 서버가 배정한다. 화면에선 항상 내가 아래쪽에 보이도록 렌더에서 뒤집는다
-export const SELF = { melee: false, ffa: false, slot: 0, n: 2 };
+export const SELF = { melee: false, ffa: false, soccer: false, slot: 0, n: 2 };
 // 서버와 클라가 같은 코드인지 확인하는 표식.
 // **sim.js 규칙이 바뀔 때마다 반드시 올릴 것.** 안 올리면 서버가 뒤처져도 검사를 통과해
 // 화면이 조용히 멈추고 원인을 짐작해야 한다 (자동 시작 규칙을 넣고도 안 올려서 겪음)
@@ -415,7 +440,7 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 67;
+export const PROTO_VER = 68;   // 축구 미니게임 (공·골·점수) 추가
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

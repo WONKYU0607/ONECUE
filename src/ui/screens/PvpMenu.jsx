@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getColor } from '../../state/profile.js';
-import { leftFor, maxFor } from '../../state/tickets.js';
+import { leftFor, maxFor, socLeft } from '../../state/tickets.js';
 import { t } from '../../i18n/index.js';
 import { setInnerBack } from '../../state/back.js';
 
@@ -23,6 +23,9 @@ export default function PvpMenu({ onBack, onStart }){
   // 티켓이 없으면 못 들어간다. 버튼을 흐리게 하고 눌러도 안 먹는다
   const out = (ffa = false) => leftFor(ffa) <= 0;
   const guard = (ffa, fn) => () => { if (!out(ffa)) fn(); };
+  // [stated] 축구는 **전용 티켓 하루 3장** — 일반 티켓과 별개 주머니라 따로 센다
+  const outSoccer = () => socLeft() <= 0;
+  const guardSoccer = fn => () => { if (!outSoccer()) fn(); };
   // 칼전을 고른 뒤의 단계들 ('melee' 고른 직후 · 팀전 · 개인전)
   const mkMelee = mk === 'melee' || mk === 'team' || mk === 'ffa';
   const back = () => {
@@ -91,6 +94,20 @@ export default function PvpMenu({ onBack, onStart }){
                 </div>
               </div>
             ))}
+            {/* [stated] 축구는 **칼전 밑에** 1대1·2대2 로. 미니게임이라 인원이 둘뿐이다 */}
+            <div className="pick-group">
+              <span className="pick-title">{t('mode.soccer')}</span>
+              <div className="pick-row">
+                {[2, 4].map(k => (
+                  <button key={k} className={'menu-btn pick' + (outSoccer() ? ' off' : '')}
+                          onClick={guardSoccer(() => onStart({ mode: 'queue', n: k, soccer: true,
+                                                               color: getColor() }))}>
+                    <span className="t">{k / 2} vs {k / 2}</span>
+                    <span className="tkn"><span className="tk-ico" />{socLeft()}/3</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             {/* 친구랑 하기는 아래에 작게 */}
             <div className="pick-row sub-row">
               <button className={'menu-btn small' + (mk ? ' primary' : '')}
@@ -129,8 +146,25 @@ export default function PvpMenu({ onBack, onStart }){
                   1: <button key="melee" className={'menu-btn pick' + (mkMelee ? ' primary' : '')}
                              onClick={() => { setMelee(true); setMk('melee'); }}>
                        <span className="t">{t('mode.melee')}</span>
+                     </button>,
+                  /* [stated] 방 만들기에서는 축구를 **칼전 옆에** */
+                  2: <button key="soc" className={'menu-btn pick' + (mk === 'soc' ? ' primary' : '')
+                                                  + (outSoccer() ? ' off' : '')}
+                             onClick={guardSoccer(() => { setMelee(false); setMk('soc'); })}>
+                       <span className="t">{t('mode.soccer')}</span>
                      </button>
                 })}
+
+                {/* 축구 인원은 축구 밑(2번 칸)에. 1대1·2대2 뿐이다 */}
+                {mk === 'soc' && stack(2,
+                  [2, 4].map(k => ({
+                    key: 's' + k,
+                    node: <button key={k} className={'menu-btn pick' + (outSoccer() ? ' off' : '')}
+                                  onClick={guardSoccer(() => onStart({ mode: 'create', n: k,
+                                                                       soccer: true, color: getColor() }))}>
+                            <span className="t">{k / 2} vs {k / 2}</span>
+                          </button>
+                  })))}
 
                 {/* 칼전만 한 단계 더 — 칼전 밑에 팀전, 그 옆에 개인전.
                     총격전은 진영이 위아래로 나뉘어 개인전이 성립하지 않는다 */}

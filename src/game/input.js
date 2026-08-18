@@ -1,5 +1,5 @@
 import { NET, ARENA } from './config.js';
-import { stickVector, inStickZone, paletteSlots, throwSlots, shieldBtn } from './layout.js';
+import { stickVector, inStickZone, paletteSlots, throwSlots, shieldBtn, tackleBtn } from './layout.js';
 import { unlockAudio } from './audio.js';
 
 // 스틱 상태와 눌린 키를 들고 있다가 루프가 매 프레임 읽어간다.
@@ -47,11 +47,19 @@ export function attachInput(canvas, view, opts = {}){
 
     // 전투 중: 투척 버튼을 누르면 차징 시작
     if (opts.canThrowNow?.()){
+      // 칼전 방패 / **축구 슛** — 같은 자리를 쓴다
       if (ARENA.melee){
         const b = shieldBtn(view.uiH);
         if (wp.x >= b.x && wp.x <= b.x + b.w && wp.y >= b.y && wp.y <= b.y + b.h){
-          opts.onShield?.();
+          if (ARENA.soccer) opts.onKick?.(); else opts.onShield?.();
           return;
+        }
+        if (ARENA.soccer){
+          const tb = tackleBtn(view.uiH);
+          if (wp.x >= tb.x && wp.x <= tb.x + tb.w && wp.y >= tb.y && wp.y <= tb.y + tb.h){
+            opts.onTackle?.();
+            return;
+          }
         }
       }
       for (const sl of throwSlots(view.uiH)){

@@ -32,6 +32,12 @@ function side(pd, total){
 }
 
 // 칼전 방패 버튼: 스틱 반대쪽. 스와이프와 확실히 떨어뜨린다
+/** [stated] 축구는 **슛 옆에 태클 버튼**. 슛 자리 오른쪽에 같은 크기로 붙인다 */
+export function tackleBtn(uiH){
+  const b = shieldBtn(uiH);
+  return { x: b.x + b.w + 6, y: b.y, w: b.w, h: b.h };
+}
+
 export function shieldBtn(uiH){
   const pd = padRect(uiH);
   // [stated] 맨 아래에 붙어 있어 누르기 불편하다 → **세로 가운데**로 올린다.

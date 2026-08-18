@@ -15,12 +15,16 @@ export const REGEN_MS = 10 * 60 * 1000;
 // [stated] **개인전은 대신 하루 3판 제한.** 티켓과 별개로 세는 **횟수 상한**이지
 // 따로 쓰는 주머니가 아니다 — 개인전을 하면 티켓도 같이 깎인다
 export const FFA_MAX = 3;
+// [stated] 축구 미니게임은 **전용 티켓 하루 3장.** 일반 티켓과 **별개 주머니**라
+// 축구를 해도 일반 티켓은 안 깎인다. **시간 충전도 없고** 다 쓰면 광고로만 받는다
+export const SOC_MAX = 3;
 const today = () => new Date().toISOString().slice(0, 10);
 
 const empty = () => ({
   tk: TICKET_MAX,
   at: Date.now(),                            // 마지막으로 충전을 셈한 시각
   ffa: FFA_MAX,                              // 개인전 남은 판
+  soc: SOC_MAX,                              // 축구 남은 판 (자정에 초기화)
   day: today(),                              // 개인전 초기화 기준 날짜
   score: { gun: 1000, melee: 1000 },         // [stated] 총격전·칼전 점수를 따로
   streak: { gun: 0, melee: 0 },
@@ -37,8 +41,9 @@ function read(){
     m.record = { ...empty().record, ...(v.record || {}) };
     m.tk = Math.max(0, Math.min(TICKET_MAX, m.tk | 0));
     m.ffa = Math.max(0, Math.min(FFA_MAX, m.ffa | 0));
+    m.soc = Math.max(0, Math.min(SOC_MAX, m.soc == null ? SOC_MAX : m.soc | 0));
     if (typeof m.at !== 'number' || !isFinite(m.at)) m.at = Date.now();
-    if (m.day !== today()){ m.day = today(); m.ffa = FFA_MAX; }   // 자정에 개인전만 초기화
+    if (m.day !== today()){ m.day = today(); m.ffa = FFA_MAX; m.soc = SOC_MAX; }   // 자정에 개인전·축구 초기화
     return m;
   } catch { return empty(); }
 }
@@ -84,6 +89,15 @@ export function useFfa(){
 export function addFfa(n = 1){ rollDay(); cur.ffa = Math.min(FFA_MAX, cur.ffa + n); save(); return cur.ffa; }
 // 개인전은 **티켓과 하루 횟수 둘 다** 걸리므로 더 빡빡한 쪽이 실제로 할 수 있는 판수다
 export const leftFor = ffa => (ffa ? Math.min(ticketsLeft(), ffaLeft()) : ticketsLeft());
+
+/** 축구 남은 판. **일반 티켓과 별개**라 티켓이 0이어도 축구는 할 수 있다 */
+export function socLeft(){ rollDay(); return cur.soc | 0; }
+export function useSoccer(){
+  rollDay();
+  if (cur.soc <= 0) return false;
+  cur.soc -= 1; saveLocalOnly();
+  return true;
+}
 
 /** 서버가 알려준 값으로 기기 사본을 맞춘다. **서버 값이 진짜다** */
 export function syncTickets(v){

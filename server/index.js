@@ -6,6 +6,7 @@ import { Server } from '../src/game/net.js';
 import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY } from '../src/game/config.js';
 import { scoreDelta } from '../src/game/score.js';
 import { createAI } from '../src/game/ai.js';
+import { createSoccerAI } from '../src/game/soccer-ai.js';
 import * as store from './store.js';
 import { forfeit, setOff } from '../src/game/sim.js';
 
@@ -21,7 +22,8 @@ const codes = new Map();         // 코드 -> Room (친구방)
 // **소켓을 들고 있는 이 서버만 알 수 있다** — Firestore 로는 알 방법이 없다
 const online = new Map();
 const waiting = new Map();       // '인원수:모드' -> 대기 소켓 목록. 섞이면 안 된다
-const qkey = (n, melee, ffa) => `${n}:${melee ? 'm' : 's'}${ffa ? ':f' : ''}`;
+// **축구는 대기열이 따로여야 한다** — 같은 인원수라도 규칙이 완전히 달라 섞이면 안 된다
+const qkey = (n, melee, ffa, soccer) => `${n}:${soccer ? 'b' : (melee ? 'm' : 's')}${ffa ? ':f' : ''}`;
 // [stated] 사람이 모자랄 때 빈 자리를 AI 로 채우기까지 기다리는 시간 (7초)
 const BOT_FILL_MS = 6500;   // 접속·왕복 시간을 더해도 7초를 안 넘게
 const queueOf = k => { if (!waiting.has(k)) waiting.set(k, []); return waiting.get(k); };
@@ -37,12 +39,13 @@ function newCode(){
 }
 
 class Room {
-  constructor(id, code = null, n = 2, melee = false, ffa = false){
+  constructor(id, code = null, n = 2, melee = false, ffa = false, soccer = false){
     this.id = id;
     this.code = code;
     this.n = n;
     this.melee = melee;          // 칼전 방인가 (총격전과 규칙이 다르다)
     this.ffa = ffa;              // 개인전인가 (각자 한 팀, 칼전 3~4인)
+    this.soccer = soccer;        // 축구 미니게임인가
     // 자리마다 세션 id를 기억한다. 소켓이 끊겨도 sid가 남아 있으면 그 자리는 예약 상태
     this.seats = Array.from({ length: n }, () => ({ sid: null, ws: null, goneAt: 0, uid: '' }));
     // 이 방에서 이미 티켓을 깎은 사람 — 재접속으로 또 깎지 않게
@@ -60,7 +63,7 @@ class Room {
     this.server = new Server({
       serverSend: (msg, pid) => this.send(msg, pid),
       toServer: null
-    }, n, melee, ffa);
+    }, n, melee, ffa, soccer);
     // 버프가 뜨는 자리를 정하는 씨앗. **서버가 정해 모두에게 내려보낸다** —
     // 클라마다 다르면 서로 다른 칸에 버프가 보인다.
     // Server 를 만든 **뒤에** 넣어야 한다 (앞에 두면 this.server 가 아직 없다)
@@ -145,7 +148,9 @@ class Room {
     }
     setOff(st, i, false);
     // 단계는 전투가 시작될 때 사람 점수에 맞춰 정한다. 그전엔 중간값
-    this.server.bots.push({ slot: i, ai: createAI(5), stage: 5 });
+    // [stated] 축구는 **공을 쫓는 봇**이 따로 있다. 총·칼 봇은 공을 아예 안 본다
+    this.server.bots.push({ slot: i, stage: 5,
+      ai: this.soccer ? createSoccerAI(i, 1) : createAI(5) });
   }
 
   // 사람 점수에 맞춰 봇 단계를 정한다. 점수를 모르면 중간값 그대로
@@ -161,7 +166,12 @@ class Room {
     const avg = sum / cnt;
     // 1000점 = 5단계 기준, 400점마다 한 단계
     const stage = Math.max(1, Math.min(10, Math.round(5 + (avg - 1000) / 400)));
-    for (const b of this.server.bots){ b.stage = stage; b.ai = createAI(stage); }
+    for (const b of this.server.bots){
+      b.stage = stage;
+      // 축구 봇은 단계가 셋뿐이라 1~10 을 0~2 로 접는다
+      b.ai = this.soccer ? createSoccerAI(b.slot, Math.min(2, Math.floor((stage - 1) / 4)))
+                         : createAI(stage);
+    }
     console.log(`봇 단계 ${stage} (사람 평균 ${Math.round(avg)}점)`);
   }
 
@@ -276,7 +286,7 @@ class Room {
   waitJoin(ws, sid, back = false){
     this.pending.set(sid, 0);
     this.waitingList.push(ws);
-    ws.send(JSON.stringify({ t: 'hello', pid: -1, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, back, ver: PROTO_VER }));
+    ws.send(JSON.stringify({ t: 'hello', pid: -1, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, soccer: this.soccer, back, ver: PROTO_VER }));
     this.sendLobby();
   }
   join(ws, sid, team, wantColor, nick){
@@ -319,7 +329,7 @@ class Room {
     ws.roomId = this.id; ws.slot = slot;
     this.emptyAt = 0;
 
-    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, back: reconnected, ver: PROTO_VER }));
+    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, soccer: this.soccer, back: reconnected, ver: PROTO_VER }));
     // 방은 이미 돌고 있으므로 현재 상태를 먼저 보내 시작점을 맞춘다
     this.snapshotTo(slot);
     if (reconnected) this.send({ t: 'peer', slot, state: 'back' });
@@ -464,6 +474,9 @@ const http = createServer((req, res) => {
     const detail = [...rooms.values()].map(r => ({
       id: r.id,
       code: r.code || null,
+      // **모드를 계기에 띄운다** — 축구를 골랐는데 총격전이 떴을 때
+      // 클라가 잘못 보냈는지 서버가 잘못 만들었는지 이걸로 갈린다
+      mode: r.soccer ? 'soccer' : (r.melee ? (r.ffa ? 'melee-ffa' : 'melee') : 'gun'),
       n: r.n,
       seats: r.seats.map(x => (x.ws ? 'on' : x.sid ? 'held' : 'empty')),
       ready: r.server.s.ready,
@@ -514,6 +527,7 @@ function fillWithBots(key){
   if (!q.length) return;
   const parts = key.split(':');
   const n = +parts[0], melee = parts[1] === 'm', ffa = parts[2] === 'f';
+  const soccer = parts[1] === 'b';   // 축구는 대기열이 따로다
   const now = Date.now();
   // 가장 오래 기다린 사람이 기준
   if (!q.some(ws => ws.botAt && now >= ws.botAt)) return;
@@ -523,7 +537,7 @@ function fillWithBots(key){
     if (ws.readyState === 1) picked.push(ws);
   }
   if (!picked.length) return;
-  const room = new Room(nextRoomId++, null, n, melee, ffa);
+  const room = new Room(nextRoomId++, null, n, melee, ffa, soccer);
   room.hasBots = true;
   rooms.set(room.id, room);
   for (const ws of picked){ ws.room = room; }
@@ -563,6 +577,7 @@ function pairUp(key){
   const q = queueOf(key);
   const parts = key.split(':');
   const n = +parts[0], melee = parts[1] === 'm', ffa = parts[2] === 'f';
+  const soccer = parts[1] === 'b';   // 축구는 대기열이 따로다
   while (q.length >= n){
     const picked = [];
     while (picked.length < n && q.length){
@@ -570,7 +585,7 @@ function pairUp(key){
       if (ws.readyState === 1) picked.push(ws); // 끊긴 소켓은 버린다
     }
     if (picked.length < n){ q.unshift(...picked); return; }
-    const room = new Room(nextRoomId++, null, n, melee, ffa);
+    const room = new Room(nextRoomId++, null, n, melee, ffa, soccer);
     rooms.set(room.id, room);
     for (const ws of picked){ ws.room = room; }
     if (n > 2 && !ffa){          // 개인전은 팀을 고를 게 없다
@@ -596,6 +611,7 @@ wss.on('connection', (ws, req) => {
   const resume = q.get('resume') === '1';    // 끊겼다 자동으로 다시 붙는 경우에만 true
   const want = [2, 3, 4, 5, 6].includes(+q.get('n')) ? +q.get('n') : 2;   // 원하는 인원수
   const ffa = q.get('ffa') === '1';         // 개인전
+  const soccer = q.get('soccer') === '1';   // 축구 미니게임
   const wantColor = q.has('color') ? +q.get('color') : -1;
   ws.nick = nick;      // 모든 경로(대기열·방·팀 로비)가 같이 쓴다
   ws.uid = String(q.get('uid') || '').slice(0, 64);   // 로그인 계정. 점수는 이 값으로 저장
@@ -625,7 +641,7 @@ wss.on('connection', (ws, req) => {
     console.log(`복귀: room ${back.id} slot ${ws.slot ?? -1} sid ${sid.slice(0, 8)}`);
   } else if (mode === 'create'){
     // 친구방 만들기: 코드를 발급하고 상대가 들어올 때까지 혼자 기다린다
-    const room = new Room(nextRoomId++, newCode(), want, melee, ffa);
+    const room = new Room(nextRoomId++, newCode(), want, melee, ffa, soccer);
     rooms.set(room.id, room);
     codes.set(room.code, room);
     ws.room = room;
@@ -657,7 +673,7 @@ wss.on('connection', (ws, req) => {
       }
     }
     ws.room = null;
-    const key = qkey(want, melee, ffa);     // 인원수·모드가 같은 사람끼리만 붙인다
+    const key = qkey(want, melee, ffa, soccer);   // 인원수·모드가 같은 사람끼리만 붙인다
     ws.qkey = key;
     ws.wantColor = wantColor;
     const q = queueOf(key);

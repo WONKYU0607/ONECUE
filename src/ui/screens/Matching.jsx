@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { connectAndWait, disconnect, serverUrl, pickTeam } from '../../net/connection.js';
 import { getColor } from '../../state/profile.js';
-import { spendFor } from '../../state/tickets.js';
+import { spendFor, useSoccer } from '../../state/tickets.js';
 import InviteFriends from '../InviteFriends.jsx';
 import { t } from '../../i18n/index.js';
 
@@ -37,6 +37,7 @@ export default function Matching({ session, onCancel, onMatched }){
       n: session?.n || 2,
       melee: !!session?.melee,
       ffa: !!session?.ffa,
+      soccer: !!session?.soccer,
       color: Number.isInteger(session?.color) ? session.color : -1,
       onCode: c => { if (alive.current) setCode(c); },
       onLobby: l => { if (alive.current) setLobby(prev => ({ ...prev, ...l })); },
@@ -48,8 +49,9 @@ export default function Matching({ session, onCancel, onMatched }){
     })
       .then(() => {
         if (!alive.current) return;
-        // **상대를 만난 뒤에 티켓을 뺀다.** 매칭에 실패하거나 도중에 나가면 안 빠진다
-        spendFor(!!session?.ffa);
+        // **상대를 만난 뒤에 티켓을 뺀다.** 매칭에 실패하거나 도중에 나가면 안 빠진다.
+        // [stated] 축구는 **전용 티켓**이라 일반 티켓을 안 건드린다
+        if (session?.soccer) useSoccer(); else spendFor(!!session?.ffa);
         setTimeout(onMatched, 400);
       })
       .catch(e => { if (alive.current){ setErr(e?.message || ''); setStage('error'); } });

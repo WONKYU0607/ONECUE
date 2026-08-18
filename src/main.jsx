@@ -27,6 +27,12 @@ for (const [name, file] of [['--tiers', 'tiers.webp'], ['--ticket', 'ticket.webp
 measureSafeArea();
 watchSafeArea(() => {});
 applyHomeUI();   // 홈 배치 수치를 CSS 변수로 내보낸다
+
+// [stated] **접속하자마자 서버를 깨운다.** 예전엔 PVP 를 누를 때 처음 두드려서
+// 거기서 1분을 기다렸다. 앱을 켠 순간 두드려 두면 사용자가 홈·프로필을 보는 동안
+// 서버가 일어나서, PVP 를 누를 때는 이미 데워져 있다.
+// **답을 안 기다린다** — 화면은 그대로 뜬다
+import('./net/connection.js').then(m => m.wakeServer(20000)).catch(() => {});
 // 익명 로그인 + 구름 기록 내려받기. **첫 화면을 막지 않는다** —
 // Firebase는 따로 받아오고, 실패해도 기기 저장으로 게임이 돌아간다
 setTimeout(() => { startSync().catch(() => {}); }, 0);

@@ -54,4 +54,25 @@ console.log('크기 계산이 쓸 수 있는 높이를 쓴다');
   assert(/usableW\(\), usableH\(\)/.test(game), '  캔버스도 뺀 크기로 맞춘다');
 }
 
+// [stated] **접속하자마자 서버를 깨운다.** 예전엔 PVP 를 누를 때 처음 두드려서
+// 거기서 1분을 기다렸다. 홈을 보는 동안 서버가 일어나면 PVP 는 이미 데워져 있다
+console.log('앱을 켤 때 서버를 깨운다');
+{
+  assert(/wakeServer\(/.test(main), '  시작할 때 깨우기를 부른다');
+  // **답을 기다리면 안 된다** — 잠든 서버가 붙잡고 있는 동안 화면이 안 뜬다
+  assert(!/await\s+import\('\.\/net\/connection\.js'\)/.test(main),
+    '  기다리지 않는다 (화면이 먼저 뜬다)');
+}
+
+// [stated] 게임 안 '‹' 와 조율 패널(⚙) 은 뺐다 — 나가기는 폰 뒤로가기로 한다
+console.log('게임 화면에 개발용 버튼이 없다');
+{
+  const gc = fs.readFileSync('src/ui/GameCanvas.jsx', 'utf8');
+  assert(!/top-left/.test(gc), '  화면 안 뒤로가기 버튼이 없다');
+  assert(!/TunePanel/.test(gc), '  조율 패널이 안 붙어 있다');
+  // 나갈 길은 남아 있어야 한다
+  const back = fs.readFileSync('src/state/back.js', 'utf8');
+  assert(back.length > 0, '  폰 뒤로가기 처리는 그대로 있다');
+}
+
 console.log('safearea.test.js 통과');

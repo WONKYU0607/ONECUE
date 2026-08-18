@@ -48,13 +48,14 @@ export function getSid(){
 
 // **닉네임도 같이 보낸다.** 게임 중 상대 이름은 서버가 뿌려야 한다 —
 // 저장소(Firebase)를 조회해서는 상대가 누군지 알 수도, 실시간으로 받을 수도 없다
-const wsUrl = (mode = 'queue', code = '', resume = false, n = 2, melee = false, ffa = false, color = -1) =>
+const wsUrl = (mode = 'queue', code = '', resume = false, n = 2, melee = false, ffa = false, color = -1, soccer = false) =>
   BASE + '?sid=' + encodeURIComponent(getSid()) +
   '&nick=' + encodeURIComponent(getNick()) +
   // 점수는 **서버가** 이 계정으로 쓴다. 클라가 쓰면 자기 점수를 자기가 올릴 수 있다
   (getUid() ? '&uid=' + encodeURIComponent(getUid()) : '') +
   '&mode=' + mode + (code ? '&code=' + encodeURIComponent(code) : '') +
   (n !== 2 ? '&n=' + n : '') + (melee ? '&melee=1' : '') + (ffa ? '&ffa=1' : '') +
+  (soccer ? '&soccer=1' : '') +
   (color >= 0 ? '&color=' + color : '') + (resume ? '&resume=1' : '');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -87,7 +88,7 @@ function openOnce(transport){
 
 // 접속해서 상대가 들어올 때까지 기다린다. onStage로 진행 상황을 알린다.
 // mode: 'queue'(랜덤) | 'create'(방 만들기) | 'join'(코드 입장)
-export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue', code = '', n = 2, melee = false, ffa = false, color = -1 } = {}){
+export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue', code = '', n = 2, melee = false, ffa = false, color = -1, soccer = false } = {}){
   // 깨우기를 여러 번 두드린다. 한 번에 응답이 없어도 화면이 멈추지 않게 진행 상황을 알린다
   let health = null;
   for (let i = 0; i < 4 && !health; i++){
@@ -102,7 +103,7 @@ export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue',
   let transport = null;
   for (let i = 0; i < TRIES; i++){
     onStage?.(i === 0 ? 'connecting' : 'retrying', i + 1, TRIES);
-    transport = new WsTransport(wsUrl(mode, code, false, n, melee, ffa, color));
+    transport = new WsTransport(wsUrl(mode, code, false, n, melee, ffa, color, soccer));
     try { await openOnce(transport); break; }
     catch { transport.close(); transport = null; await sleep(GAP_MS); }
   }
@@ -120,7 +121,7 @@ export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue',
       transport.auto = true;                // 이제부터 끊기면 자동으로 다시 붙는다
       // 자동 재접속은 '복귀'로 표시해야 서버가 원래 자리로 되돌려준다.
       // 반대로 사용자가 직접 새 매칭을 시작할 땐 이 표시가 없어야 새 방을 받는다
-      transport.url = wsUrl(mode, code, true, n, melee, ffa, color);
+      transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer);
       conn = { transport, slot, room };
       onStage?.('matched');
       resolve(conn);
@@ -139,11 +140,12 @@ export async function connectAndWait({ onStage, onCode, onLobby, mode = 'queue',
         SELF.slot = slot;                   // 내 슬롯과 인원수는 서버가 정한다
         SELF.n = m.n || 2;
         SELF.melee = !!m.melee;   // 스냅샷 전에도 아레나를 맞출 수 있게
+        SELF.soccer = !!m.soccer;
         SELF.ffa = !!m.ffa;
         // 방에 들어온 순간부터 자동 재접속을 켠다. 2대2는 팀을 고르기 전엔 자리가 없어서
         // done()까지 기다리면 팀 선택 중 끊겼을 때 아예 안 돌아온다
         transport.auto = true;
-        transport.url = wsUrl(mode, code, true, n, melee, ffa, color);
+        transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer);
         onStage?.('waiting');
         if (m.back && m.pid >= 0) done();    // 자리까지 돌려받은 재접속. 서버가 go를 다시 보내지 않는다
       } else if (m.t === 'lobby'){

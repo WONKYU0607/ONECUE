@@ -7,7 +7,8 @@ import {
   WALL_L, WALL_R, wallIdx, PWf,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS,
   viewColors} from './config.js';
-import { RS, computeLayout, stickGeom, shieldBtn } from './layout.js';
+import { makeRoller, BALL_R, GOAL_SEQ, GOAL_HOLD, GOAL_SCORE } from './ball.js';
+import { RS, computeLayout, stickGeom, shieldBtn, tackleBtn } from './layout.js';
 import { resultFor } from './ui-state.js';
 import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
@@ -24,6 +25,14 @@ const GF = '"Arial Black","Helvetica Neue",Impact,"Apple SD Gothic Neo","Malgun 
 const MELEE_FW = 484, MELEE_FH = 198, MELEE_BODY_H = 190;
 // 시트 열: 앞대기 앞공격 뒤대기 뒤공격 좌대기 좌공격 우대기 우공격
 // 화면이 뒤집힌 팀은 위·아래가 바뀌므로 그때만 앞뒤를 맞바꾼다
+// 축구 시트: 6행(색) x 8열. 자세 순서 0앞서 1뒤서 2좌서 3우서 4앞뛰 5뒤뛰 6좌뛰 7우뛰
+const SOC_FW = 42, SOC_FH = 48;
+// 8~11 = 태클 (앞·뒤·좌·우). face -> 자세
+const SOC_TACKLE = { 0: 9, 1: 8, 2: 10, 3: 11 };
+const SOC_STAND = { 0: 1, 1: 0, 2: 2, 3: 3 };        // face -> 서있는 자세
+// **화면이 뒤집히면 앞뒤·좌우도 뒤집어야 한다** — 안 그러면 상대가 등을 보이고 달린다
+const SOC_FLIP = { 0: 1, 1: 0, 2: 3, 3: 2 };
+
 const MELEE_COL = { 0: 2, 1: 0, 2: 4, 3: 6 };        // face -> 대기 열
 const MELEE_FLIP = { 0: 1, 1: 0, 2: 2, 3: 3 };       // 뒤집힌 화면에서의 face
 
@@ -54,6 +63,9 @@ export function createRenderer(canvas){
   const ctx = canvas.getContext('2d');
   const sheet = getImage('characters'), items = getImage('items');
   const melee = getImage('melee');          // 칼전 캐릭터 시트 (310x184, 4색 x 4자세)
+  const soccerImg = getImage('soccer');     // 축구 캐릭터 시트 (336x288, 6색 x 8자세)
+  const ballImg = getImage('ball');         // 축구공
+  const roll = makeRoller();                // 공 굴림 각도 (그리기 전용)
   const bgOf = () => getImage(ARENA.bg);   // 아레나에 따라 배경이 달라진다
   const boom = getImage('explosion');
   const flashfx = getImage('flashfx');
@@ -117,6 +129,24 @@ export function createRenderer(canvas){
     // 섬광에 당한 캐릭터는 지속 시간 내내 흰색으로 깜빡인다 (상대도 맞았는지 알 수 있게)
     const dazzled = blind > 0 && Math.floor(tick / 5) % 2 === 0;
     const hit = p.flash > 0 || dazzled;
+    if (ARENA.soccer && isReady(soccerImg)){
+      // 축구: 방향 4가지 x (서있기·뛰기). 움직이고 있으면 뛰는 자세
+      const col = (colorOf && colorOf[i] != null) ? colorOf[i] : TEAM_OF[i];
+      const face = flipped() ? SOC_FLIP[p.face || 0] : (p.face || 0);
+      const run = (p.moving || 0) > 0;
+      // [stated] 태클은 **보는 방향의 태클 모션**으로 나간다
+      const fc = (p.tkl | 0) > 0 ? SOC_TACKLE[face] : SOC_STAND[face] + (run ? 4 : 0);
+      // 칸 높이를 캐릭터 높이에 맞추고 **발을 바닥에** 붙인다
+      const sc = ARENA.ph / SOC_FH * 1.35;
+      const dw = SOC_FW * sc, dh = SOC_FH * sc;
+      if (hit) ctx.filter = 'grayscale(1) brightness(3.4)';
+      ctx.drawImage(soccerImg, fc * SOC_FW, col * SOC_FH, SOC_FW, SOC_FH,
+        Math.round((xw + ARENA.pw / 2 - dw / 2) * RS), Math.round((yw + ARENA.ph - dh) * RS),
+        Math.round(dw * RS), Math.round(dh * RS));
+      ctx.filter = 'none';
+      if (off) ctx.globalAlpha = 1;
+      return;
+    }
     if (ARENA.melee && isReady(melee)){
       // 칼전 시트: 4행(색) x 4열(앞대기·앞공격·뒤대기·뒤공격), 프레임 310x184
       // 몸통(193x180)이 한 칸이 되도록 배율을 잡고 **왼쪽 아래**를 캐릭터 자리에 맞춘다
@@ -330,6 +360,29 @@ export function createRenderer(canvas){
     px(0, H, W, uiH, '#0d0d16');
     px(0, H, W, 0.6, 'rgba(78,201,240,0.55)');
 
+    // [stated] 축구는 체력이 없다 → **같은 자리에 점수판**을 그린다.
+    // 왼쪽이 내 팀 골 수, 오른쪽이 상대, 가운데가 남은 시간
+    if (ARENA.soccer){
+      const myT = teamOf(SELF.slot, s.p.length);
+      const sc = s.score || [0, 0];
+      const secs = Math.max(0, Math.ceil((s.clock || 0) / 60));
+      const y0 = H + 3, hh = 12;
+      const box = (x, txt, col) => {
+        px(x, y0, 40, hh, 'rgba(10,16,26,0.78)');
+        ctx.fillStyle = col;
+        ctx.font = '900 ' + Math.round(10 * RS) + 'px ' + GF;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(txt, (x + 20) * RS, (y0 + hh / 2) * RS);
+      };
+      box(4, String(sc[myT] | 0), '#8fd8ff');
+      box(W - 44, String(sc[1 - myT] | 0), '#ff9a8f');
+      ctx.fillStyle = secs <= 10 ? '#ff6b5a' : '#e8e8f0';
+      ctx.font = '900 ' + Math.round(11 * RS) + 'px ' + GF;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(secs), (W / 2) * RS, (y0 + hh / 2) * RS);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    } else {
+
     // 상단 바: 우리 팀(왼쪽) / 상대 팀(오른쪽) / 가운데 남은 시간
     const n = s.p.length;
     const myTeam = teamOf(SELF.slot, n);
@@ -380,6 +433,30 @@ export function createRenderer(canvas){
       ctx.fillText(String(left).padStart(2, '0'), W / 2 * RS, (H + 9.5) * RS);
     }
     ctx.textAlign = 'left';
+    }   // 축구가 아닐 때의 체력바 끝
+
+    // 골 연출 글자. 공이 골대에 머무는 2초 동안은 안 띄우고, 그 뒤 4초를 나눠 쓴다
+    if (ARENA.soccer && (s.goalT | 0) > 0){
+      const left = s.goalT;
+      const showText = left <= GOAL_SEQ - GOAL_HOLD && left > GOAL_SCORE;
+      const showScore = left <= GOAL_SCORE;
+      if (showText || showScore){
+        px(0, 0, W, H, 'rgba(6,10,18,0.55)');
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const myT = teamOf(SELF.slot, s.p.length);
+        const sc = s.score || [0, 0];
+        if (showText){
+          ctx.fillStyle = s.goalBy === myT ? '#ffe07a' : '#ff9a8f';
+          ctx.font = '900 ' + Math.round(30 * RS) + 'px ' + GF;
+          ctx.fillText('GOAL!', (W / 2) * RS, (H * 0.42) * RS);
+        } else {
+          ctx.fillStyle = '#e8e8f0';
+          ctx.font = '900 ' + Math.round(34 * RS) + 'px ' + GF;
+          ctx.fillText(`${sc[myT] | 0} : ${sc[1 - myT] | 0}`, (W / 2) * RS, (H * 0.42) * RS);
+        }
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      }
+    }
 
     const g = stickGeom(uiH);
     circle(g.cx, g.cy, g.r, 'rgba(255,255,255,0.045)', 'rgba(255,255,255,0.18)', 0.8);
@@ -444,6 +521,8 @@ export function createRenderer(canvas){
   function drawMiniHp(s, rx, ry){
     // 전투 중에만. 시작 전에는 같은 자리에 "나" 표시가 뜬다
     if (s.phase !== PH_PLAY) return;
+    // [stated] 축구는 **체력이 없으니 체력바도 없다** (머리 위 것도)
+    if (ARENA.soccer) return;
     const BW = ARENA.pw * 0.9, BH = 1.3;
     for (let i = 0; i < s.p.length; i++){
       const p = s.p[i];
@@ -642,6 +721,28 @@ export function createRenderer(canvas){
   function drawShieldBtn(s, uiH2){
     const b = shieldBtn(uiH2);
     const me = s.p[SELF.slot];
+    // [stated] 축구는 같은 자리가 **슛 버튼**이다. 쿨다운 동안 흐리게
+    if (ARENA.soccer){
+      const cool = me ? (me.kickCool | 0) : 0;
+      const on = cool === 0;
+      px(b.x, b.y, b.w, b.h, on ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.03)');
+      const c2 = on ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.14)';
+      px(b.x, b.y, b.w, 1, c2); px(b.x, b.y + b.h - 1, b.w, 1, c2);
+      px(b.x, b.y, 1, b.h, c2); px(b.x + b.w - 1, b.y, 1, b.h, c2);
+      circle(b.x + b.w / 2, b.y + b.h / 2, b.w * 0.22, on ? '#f2f2f2' : 'rgba(255,255,255,0.25)');
+      // 태클 버튼 — 슛 옆에. 쿨다운이면 흐리게
+      const tb = tackleBtn(uiH2);
+      const tOn = me ? (me.tklCool | 0) === 0 : true;
+      px(tb.x, tb.y, tb.w, tb.h, tOn ? 'rgba(255,190,80,0.14)' : 'rgba(255,255,255,0.03)');
+      const c3 = tOn ? 'rgba(255,200,110,0.60)' : 'rgba(255,255,255,0.14)';
+      px(tb.x, tb.y, tb.w, 1, c3); px(tb.x, tb.y + tb.h - 1, tb.w, 1, c3);
+      px(tb.x, tb.y, 1, tb.h, c3); px(tb.x + tb.w - 1, tb.y, 1, tb.h, c3);
+      // 미끄러지는 모양 — 비스듬한 획 두 개
+      const tc = tOn ? '#ffd28a' : 'rgba(255,255,255,0.25)';
+      px(tb.x + tb.w * 0.22, tb.y + tb.h * 0.56, tb.w * 0.5, 1.4, tc);
+      px(tb.x + tb.w * 0.32, tb.y + tb.h * 0.40, tb.w * 0.42, 1.4, tc);
+      return;
+    }
     const up = me && me.shield > 0;
     const ready2 = me && me.hp > 0 && (me.shCool || 0) === 0 && (me.stun || 0) === 0;
     px(b.x, b.y, b.w, b.h, up ? 'rgba(159,232,255,0.30)'
@@ -783,8 +884,11 @@ export function createRenderer(canvas){
   }
 
   function draw(s, dbg, a, cl, stick, drag, left, ok, extra = {}){
-    // **ffa까지 넘겨야 한다.** 예전에 melee를 빠뜨려 배경이 딴 모드로 나온 적이 있다
-    setArena(s && s.n ? s.n : 2, s && s.melee, s && s.ffa);
+    // **모드를 하나라도 빠뜨리면 배경이 딴 모드로 나온다.** melee 를 빠뜨려 한 번,
+    // **soccer 를 빠뜨려 또 한 번** 겪었다 — 시뮬은 축구인데 매 프레임 여기서
+    // 총격전 아레나로 되돌려놔서 화면만 총격전이었다.
+    // 이 줄은 **매 프레임** 도는 곳이라, 여기서 되돌리면 다른 데서 아무리 맞춰도 소용없다
+    setArena(s && s.n ? s.n : 2, s && s.melee, s && s.ffa, s && s.soccer);
     const j = extra.juice;
     const sh = j ? j.offset() : { x: 0, y: 0 };
     ctx.save();
@@ -792,6 +896,25 @@ export function createRenderer(canvas){
     const bg = bgOf();
     if (isReady(bg)) ctx.drawImage(bg, 0, 0, W * RS, H * RS);
     else px(0, 0, W, H, COL.bg);
+
+    // [stated] 골 연출: 2초 골대 안 → 2초 `GOAL!` → 2초 스코어
+    // (그리기만 한다. 시간 배분은 시뮬의 `goalT` 가 정한다)
+    // 축구공. **굴림 각도는 여기서만 쓴다** — 시뮬 상태에 넣으면 체크섬이 갈린다
+    if (ARENA.soccer && s.ball){
+      const ang = roll(s.ball);
+      const bx = s.ball.x / FP, by = fy(s.ball.y / FP, 0);
+      const r = BALL_R / FP;
+      if (isReady(ballImg)){
+        ctx.save();
+        ctx.translate(bx * RS, by * RS);
+        ctx.rotate(ang);
+        ctx.drawImage(ballImg, Math.round(-r * RS), Math.round(-r * RS),
+          Math.round(r * 2 * RS), Math.round(r * 2 * RS));
+        ctx.restore();
+      } else {
+        circle(bx, by, r, '#f2f2f2');
+      }
+    }
     if (VIEW.grid){
       for (let c = 0; c <= GRID_COLS; c++) px(cellX(c), GRID_Y0, 0.4, GRID_CH*GRID_ROWS, 'rgba(255,255,255,0.14)');
       for (let r = 0; r <= GRID_ROWS; r++) px(GRID_X0, cellY(r), GRID_CW*GRID_COLS, 0.4, 'rgba(255,255,255,0.14)');

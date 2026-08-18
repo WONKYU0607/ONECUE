@@ -111,7 +111,9 @@ export function uiPrompt(st, slot, online){
   // 곧 시작되는데 신청을 받아봐야 답할 시간이 없다.
   // 이미 오간 신청의 답(`ask`/`waiting`)은 그대로 둔다 — 카운트다운이 멈춰 있다
   const offer = [];
-  if (online && !pending && st.phase !== PH_COUNT){
+  // [stated] 축구는 미니게임이라 2배속·노템전 신청이 없다.
+  // **버튼만 없애면 고친 클라가 신청할 수 있어** 여기서 통째로 막는다
+  if (online && !pending && st.phase !== PH_COUNT && !st.soccer){
     // [stated] 칼전에는 2배속을 안 쓴다 — 버프(이속 1.5 · 공속 1.5)만으로 충분히 빠르다.
     // 둘이 곱해지면 이동 3배·칼 주기 3배가 되어 과했다
     if (!st.fast && !st.melee) offer.push('fast');

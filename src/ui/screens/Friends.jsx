@@ -98,9 +98,6 @@ export default function Friends({ onBack }){
           </>
         )}
 
-        {/* [stated] 친구 목록에서 방 초대 — 지금은 방 코드를 알려주는 방식이다.
-            서버가 상대에게 밀어 넣는 알림은 아직 없다 */}
-        <p className="hint fr-note">{t('fr.inviteHow')}</p>
       </div>
     </div>
   );

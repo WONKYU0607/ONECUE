@@ -129,6 +129,11 @@ import {
 ,
   NEG_SHOW, BARR_BLAST_DMG, BARR_FIRE_DMG,
 } from './config.js';
+import {
+  stepBall, stepBallInGoal, ballHome, KICKOFF, GOAL, FIELD,
+  GOAL_HOLD, GOAL_SEQ, GOAL_TO_WIN, SOCCER_TICKS, TACKLE_TICKS, TACKLE_COOL,
+  TACKLE_SLIDE, faceVec
+} from './ball.js';
 
 // ================= SIM (pure, deterministic) =================
 export function newItems(){ return []; }
@@ -136,8 +141,15 @@ export function newItems(){ return []; }
 // 서버가 보내준 상태에 새 필드가 없을 수 있다(서버가 옛 버전일 때).
 // 없는 채로 두면 렌더·배치 코드가 예외를 내고 그리기 루프가 통째로 죽는다.
 export function normalizeState(st){
-  setArena(st && st.n, st && st.melee);
+  // **soccer 를 빠뜨리면 축구 방인데 화면이 총격전으로 뜬다.**
+  // 스냅샷을 받은 클라가 여기서 아레나를 정하는데, 그때 축구 여부가 안 넘어갔다
+  setArena(st && st.n, st && st.melee, st && st.ffa, st && st.soccer);
   if (!st) return st;
+  st.soccer = !!st.soccer;
+  if (st.soccer && !st.ball) st.ball = ballHome();
+  if (!Array.isArray(st.score)) st.score = [0, 0];
+  if (typeof st.goalT !== 'number') st.goalT = 0;
+  if (typeof st.goalBy !== 'number') st.goalBy = -1;
   if (!Array.isArray(st.items)) st.items = [];
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
@@ -197,8 +209,8 @@ export function newCovers(){
   // 예) c.push({x:19*FP, y:147*FP, w:32*FP, h:10*FP, hp:4});
   return [];
 }
-export function newState(n = 2, melee = false, ffa = false){
-  setArena(n, melee, ffa);
+export function newState(n = 2, melee = false, ffa = false, soccer = false){
+  setArena(n, melee, ffa, soccer);
   const players = [];
   for (let i = 0; i < n; i++){
     const team = teamOf(i, n);
@@ -226,6 +238,12 @@ export function newState(n = 2, melee = false, ffa = false){
     tick: 0,
     n,                          // 플레이어 수 (2 또는 4)
     melee,                      // 칼전이면 true. 총알·아이템 없이 칼로만 싸운다
+    // [stated] 축구 미니게임. 공을 몰아 골대에 넣는다. 점수·순위표는 없다
+    soccer,
+    ball: soccer ? ballHome() : null,
+    score: [0, 0],              // 팀별 골 수
+    goalT: 0,                   // 골 연출 남은 틱 (0이면 진행 중)
+    goalBy: -1,                 // 방금 넣은 팀
     p: players,
     bullets: [],
     covers: newCovers(),
@@ -283,7 +301,7 @@ export function newState(n = 2, melee = false, ffa = false){
 
 export const LAG_HIST = 40;             // 지연 보상용 위치 기록 길이 (틱)
 export const FACE_OPP = [1, 0, 3, 2];   // 마주 보는 방향 (위↔아래, 왼↔오른)
-export const NOIN = { dx:0, dy:0, fire:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0 };
+export const NOIN = { dx:0, dy:0, fire:0, tkl:0, sh:0, ready:0, go:0, place:null, thr:null, fastReq:0, fastAns:0, bareReq:0, bareAns:0 };
 export function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
 
 export function overlap(ax,ay,aw,ah,bx,by,bw,bh){
@@ -304,7 +322,7 @@ export function itemRect(it){
 // 해당 슬롯이 이 칸에 이 아이템을 놓을 수 있는가
 // 이 슬롯이 놓아야 할 아이템을 전부 놓았는가 (설치 완료 조건)
 export function allPlaced(s, slot){
-  setArena(s.n, s.melee, s.ffa);
+  setArena(s.n, s.melee, s.ffa, s.soccer);
   const team = teamOf(slot, s.n);
   // 엄폐물은 **칸 수마다** 따로 센다 (1칸 2개 · 2칸 1개)
   for (const c of coverSizes())
@@ -318,7 +336,7 @@ export function allPlaced(s, slot){
 }
 // 내가 놓은 아이템 찾기 (옮기려고 집을 때)
 export function myItemAt(s, slot, c, r){
-  setArena(s.n, s.melee, s.ffa);
+  setArena(s.n, s.melee, s.ffa, s.soccer);
   const team = teamOf(slot, s.n);
   return (s.items || []).find(it => {
     const w = ITEM_DEF[it.k].cells;
@@ -328,7 +346,7 @@ export function myItemAt(s, slot, c, r){
 
 // from을 주면 그 자리의 내 아이템은 없는 셈 치고 검사한다 (자리 옮기기)
 export function canPlace(s, slot, k, c, r, from){
-  setArena(s.n, s.melee, s.ffa);
+  setArena(s.n, s.melee, s.ffa, s.soccer);
   const team = teamOf(slot, s.n);
   const def = ITEM_DEF[k];
   if (!def) return false;
@@ -383,7 +401,7 @@ export function canPlace(s, slot, k, c, r, from){
 // 칸 (c,r)을 중심으로 rad칸 범위를 터뜨린다. 드럼통·수류탄이 함께 쓴다
 // 정중앙 칸에 서 있는가 (직격 판정)
 export function atCenter(s, i, c, r){
-  setArena(s.n, s.melee, s.ffa);
+  setArena(s.n, s.melee, s.ffa, s.soccer);
   const x0 = Math.round(cellX(c) * FP), x1 = Math.round(cellX(c + 1) * FP);
   const y0 = Math.round(cellY(r) * FP), y1 = Math.round(cellY(r + 1) * FP);
   const p = s.p[i];
@@ -423,7 +441,7 @@ export function addDealt(s, by, amount){
   s.dealt[by] += Math.max(0, amount);
 }
 export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
-  setArena(s.n, s.melee, s.ffa);
+  setArena(s.n, s.melee, s.ffa, s.soccer);
   const x0 = Math.round(cellX(c - rad) * FP);
   const x1 = Math.round(cellX(c + rad + 1) * FP);
   const y0 = Math.round(cellY(r - rad) * FP);
@@ -496,13 +514,13 @@ export function throwRow(slot, charge, n = 2, melee = false){
 // 연결 끊김 표시. 1대1은 나간 사람이 지고, 2대2는 그대로 두고 계속 굴린다
 // (한 명 끊겼다고 나머지 셋의 판을 망치는 게 더 이상하다는 판단)
 export function setOff(s, slot, v){
-  setArena(s.n, s.melee, s.ffa);
+  setArena(s.n, s.melee, s.ffa, s.soccer);
   if (!Array.isArray(s.off)) s.off = Array(s.n).fill(false);
   s.off[slot] = !!v;
 }
 // 자리를 완전히 뜬 경우 (직접 나감 / 유예 시간 초과)
 export function forfeit(s, slot){
-  setArena(s.n, s.melee, s.ffa);
+  setArena(s.n, s.melee, s.ffa, s.soccer);
   setOff(s, slot, true);
   if (s.phase === PH_OVER || s.solo) return;
   // **나간 사람은 죽은 것으로 본다.** 예전엔 3인 이상이면 아무 처리도 안 해서
@@ -526,7 +544,7 @@ export function forfeit(s, slot){
   }
 }
 export function canThrow(s, slot, k){
-  setArena(s.n, s.melee, s.ffa);
+  setArena(s.n, s.melee, s.ffa, s.soccer);
   if (s.phase !== PH_PLAY) return false;
   if (s.bare) return false;                            // 노템전은 투척물이 없다
   if (!s.p[slot] || s.p[slot].hp <= 0) return false;   // 죽으면 관전. 던지기도 안 된다
@@ -538,7 +556,7 @@ export function canThrow(s, slot, k){
 // 이 위치에 서면 엄폐물과 겹치는가. 드럼통은 함정이라 막지 않는다
 // (막으면 안 보이는 상태에서 길이 막혀 위치가 드러난다)
 export function blocked(s, x, y, self = -1){
-  setArena(s.n, s.melee, s.ffa);
+  setArena(s.n, s.melee, s.ffa, s.soccer);
   // **이미 그 안에 서 있으면 막지 않는다.** 안 그러면 아이템 안에 갇혀 영영 못 나온다
   // (드럼통은 상대가 서 있는 자리에도 놓일 수 있다)
   const me = self >= 0 && s.p ? s.p[self] : null;
@@ -560,7 +578,7 @@ export function blocked(s, x, y, self = -1){
 }
 
 export function step(s, inp){
-  setArena(s.n, s.melee, s.ffa);
+  setArena(s.n, s.melee, s.ffa, s.soccer);
   s.tick++;
 
   // 대기/종료 화면: START 입력(fire)으로만 카운트다운 시작
@@ -579,9 +597,9 @@ export function step(s, inp){
       const pending = s.fastBy || s.bareBy;
       // 칼전은 2배속을 받지 않는다. **버튼만 없애면 고친 클라가 신청할 수 있어**
       // 여기서도 막는다
-      if (q.fastReq && !s.fast && !s.melee && !pending){ s.fastBy = i + 1; s.fastT = NEG_TICKS; s.negOk = []; }
+      if (q.fastReq && !s.fast && !s.melee && !s.soccer && !pending){ s.fastBy = i + 1; s.fastT = NEG_TICKS; s.negOk = []; }
       // [stated] 칼전에도 신청 가능. 칼전은 없앨 아이템이 없으므로 **버프를 끈다**
-      if (q.bareReq && !s.bare && !pending){ s.bareBy = i + 1; s.bareT = NEG_TICKS; s.negOk = []; }
+      if (q.bareReq && !s.bare && !s.soccer && !pending){ s.bareBy = i + 1; s.bareT = NEG_TICKS; s.negOk = []; }
 
       const by = s.fastBy || s.bareBy;
       if (!q.fastAns && !q.bareAns) continue;
@@ -742,6 +760,8 @@ export function step(s, inp){
         tx = best;
       }
       p.x = tx;
+      // 축구: 움직이고 있으면 뛰는 자세로 그린다. **시뮬이 정해야** 예측·보간과 어긋나지 않는다
+      if (s.soccer) p.moving = (tx !== ox || ty !== oy) ? 6 : Math.max(0, (p.moving | 0) - 1);
     }
     if (p.invul > 0) p.invul--;
     if (p.flash > 0) p.flash--;
@@ -751,7 +771,12 @@ export function step(s, inp){
     // 답을 기다리는 동안엔 카운트를 멈춘다. 안 그러면 3초 안에 못 누른다.
     // 제한 시간(5초)이 있어 영영 멈추지는 않는다
     if (s.fastBy > 0 || s.bareBy > 0) return;
-    if (--s.timer <= 0){ s.phase = PH_PLAY; s.timer = 0; s.clock = s.n > 2 ? ROUND_TICKS_4 : ROUND_TICKS; }
+    if (--s.timer <= 0){
+      s.phase = PH_PLAY; s.timer = 0;
+      // [stated] 축구는 90초. **여기서 안 넣으면 시계가 0으로 시작해** 점수판이 0으로 굳는다
+      s.clock = s.soccer ? SOCCER_TICKS : (s.n > 2 ? ROUND_TICKS_4 : ROUND_TICKS);
+      if (s.soccer) kickoff(s, -1);            // 시작 배치도 여기서
+    }
     return;
   }
 
@@ -910,10 +935,13 @@ export function step(s, inp){
   // 폭발 연출 수명
   for (let i = s.fx.length - 1; i >= 0; i--) if (--s.fx[i].t <= 0) s.fx.splice(i, 1);
 
+  // [stated] 축구는 **싸우지 않는다** — 공만 다룬다.
+  // 이걸 안 막았더니 축구판에서 자동 발사가 돌아 서로 쏴 죽였고,
+  // 12초 만에 '팀 전멸'로 판이 끝났다(체력 4 / -4)
   // 전투 중: 클릭 없이 coolT 간격 자동 발사 (칼전은 총이 없다).
   // **연습 모드도 쏜다** — 총격전은 조준·회피가 전부인데 총알이 없으면 연습이 안 된다.
   // 허수아비는 죽어도 체력이 되돌아가므로 계속 연습할 수 있다
-  if (!s.melee)
+  if (!s.melee && !s.soccer)
   for (let i = 0; i < s.n; i++){
     const p = s.p[i];
     if (p.hp <= 0) continue;                   // 죽으면 관전
@@ -991,8 +1019,8 @@ export function step(s, inp){
     }
     if (gone) s.bullets.splice(k,1);
   }
-  // 한 팀이 전멸하면 끝. 동시에 전멸하면 무승부
-  if (!s.solo && !s.over && s.phase === PH_PLAY){
+  // 한 팀이 전멸하면 끝. 동시에 전멸하면 무승부. **축구는 싸우지 않으니 건너뛴다**
+  if (!s.solo && !s.soccer && !s.over && s.phase === PH_PLAY){
     // 개인전은 **마지막 한 명**이 남으면 끝. 팀전은 한 팀 전멸
     const tc = teamCount(s.n);
     const alive = Array(tc).fill(0);
@@ -1111,8 +1139,57 @@ export function step(s, inp){
         if (s.bf[i][k] > 0) s.bf[i][k]--;
   }
 
+  // ── 축구 ──────────────────────────────────────────────────────
+  // [stated] 90초, 선취 3골. 골 뒤: 공은 가운데, **먹힌 쪽이 중앙선**, 넣은 쪽은 자기 골대 앞
+  if (s.soccer && s.phase === PH_PLAY && !s.over){
+    if (s.goalT > 0){
+      // 연출 중: 공은 골대 안에서만 구르고 캐릭터·시계는 멈춘다
+      if (s.goalT > GOAL_SEQ - GOAL_HOLD) stepBallInGoal(s, s.goalBy);
+      if (--s.goalT === 0) kickoff(s, s.goalBy);
+    } else {
+      // [stated] **슛 옆에 태클 버튼.** 태클은 미끄러지는 동안 몸으로 공을 건드리고,
+      // 공에 닿으면 **슛보다 약하게** 튕겨 나간다
+      const kicks = [];
+      for (let i = 0; i < s.n; i++){
+        const p = s.p[i];
+        const q = s.off[i] ? NOIN : (inp[i] || NOIN);
+        if (q.tkl && (p.tklCool | 0) === 0 && (p.tkl | 0) === 0){
+          p.tkl = TACKLE_TICKS; p.tklCool = TACKLE_COOL + TACKLE_TICKS;
+          // **시작할 때 방향을 굳힌다** — 미끄러지는 동안 방향이 바뀌면 모션과 어긋난다
+          p.tklF = p.face | 0;
+        }
+        if (p.tkl > 0){
+          // [stated] 태클하면 **스윽 밀려난다**. 남은 시간에 비례해 점점 느려진다
+          const [fx, fy] = faceVec(p.tklF);
+          const v = Math.round(TACKLE_SLIDE * p.tkl / TACKLE_TICKS);
+          p.x = clampi(p.x + fx * v, FIELD.x0, FIELD.x1 - PWf);
+          p.y = clampi(p.y + fy * v, GOAL.top, GOAL.bot - PHf);
+          p.tkl--;
+        }
+        if (p.tklCool > 0) p.tklCool--;
+        // 태클 중에는 계속 약하게 밀어낸다. 아니면 버튼 슛
+        kicks.push(p.tkl > 0 ? 2 : (q.fire ? 1 : 0));
+      }
+      const g = stepBall(s, kicks);
+      if (g){
+        s.score[g.goal]++;
+        s.goalBy = g.goal;
+        s.goalT = GOAL_SEQ;
+        // 선취 3골이면 즉시 끝
+        if (s.score[g.goal] >= GOAL_TO_WIN){
+          s.over = true; s.phase = PH_OVER; s.winner = g.goal + 1; s.goalT = 0;
+        }
+      }
+      // 시계는 연출 중엔 안 간다 — 골 넣고 시간이 깎이면 억울하다
+      if (s.clock > 0 && --s.clock === 0){
+        s.over = true; s.phase = PH_OVER;
+        s.winner = s.score[0] === s.score[1] ? 0 : (s.score[0] > s.score[1] ? 1 : 2);
+      }
+    }
+  }
+
   // 제한 시간. 다 되면 체력이 많은 쪽 승, 같으면 무승부
-  if (!s.solo && !s.over && s.phase === PH_PLAY && s.clock > 0 && --s.clock === 0){
+  if (!s.soccer && !s.solo && !s.over && s.phase === PH_PLAY && s.clock > 0 && --s.clock === 0){
     s.over = true; s.phase = PH_OVER;
     // 시간이 다 되면 팀 체력 합이 많은 쪽 승
     const sum = [0, 0];
@@ -1122,8 +1199,32 @@ export function step(s, inp){
 
 }
 
+/** 골 뒤 배치. [stated] 공은 가운데, **먹힌 쪽이 중앙선**(킥오프), 넣은 쪽은 자기 골대 앞 */
+export function kickoff(s, scorer = -1){
+  s.ball = ballHome();
+  s.goalBy = -1;
+  const midY = KICKOFF.y;
+  for (let i = 0; i < s.n; i++){
+    const t = teamOf(i, s.n);
+    const mine = t === 0;                       // 팀0은 아래(자기 골대가 아래)
+    const conceded = scorer >= 0 && t !== scorer;
+    // 같은 팀이 여럿이면 가로로 나눠 선다
+    const per = Math.max(1, s.n / 2);
+    const k = i % per;
+    // **전부 FP 단위다.** 한 번 더 FP 를 곱했다가 화면 왼쪽 끝에 붙어 버렸다
+    const span = FIELD.x1 - FIELD.x0;
+    const x = FIELD.x0 + Math.round(span * (k + 1) / (per + 1)) - (PWf >> 1);
+    let y;
+    if (conceded) y = mine ? midY + Math.round(6 * FP) : midY - Math.round(6 * FP) - PHf;
+    else          y = mine ? GOAL.bot - Math.round(14 * FP) - PHf : GOAL.top + Math.round(14 * FP);
+    s.p[i].x = clampi(x, FIELD.x0, FIELD.x1 - PWf);
+    s.p[i].y = y;
+    s.p[i].face = mine ? 0 : 1;
+  }
+}
+
 export function checksum(s){
-  setArena(s.n, s.melee, s.ffa);
+  setArena(s.n, s.melee, s.ffa, s.soccer);
   let h = s.tick + s.maxStep + s.bulletV + s.coolT + s.phase * 7 + s.timer + s.clock;
   h = (h*31 + (s.rdy | 0)) | 0;
   h = (h*31 + (s.seed | 0) + (s.noBuff ? 7 : 0)) | 0;
@@ -1154,6 +1255,13 @@ export function checksum(s){
   for (let i = 0; i < s.n; i++){
     h = (h*31 + s.blind[i] * (i + 1)) | 0;
     for (let k = 0; k < s.ammo[i].length; k++) h = (h*31 + s.ammo[i][k] * (7 + k*4)) | 0;
+  }
+  // 축구는 공·점수가 상태의 일부다 — 빠뜨리면 어긋나도 검사가 못 잡는다
+  if (s.soccer && s.ball){
+    h = (h*31 + s.ball.x) | 0; h = (h*31 + s.ball.y) | 0;
+    h = (h*31 + s.ball.vx) | 0; h = (h*31 + s.ball.vy) | 0;
+    h = (h*31 + (s.score ? s.score[0]*13 + s.score[1]*29 : 0)) | 0;
+    h = (h*31 + (s.goalT | 0) + (s.goalBy | 0)) | 0;
   }
   return h | 0;
 }

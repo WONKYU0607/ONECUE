@@ -45,10 +45,12 @@ export function createGame(canvas, opts = {}){
   const nLocal = (!online && [3, 4, 5, 6].includes(session.n)) ? session.n : 2;
   // 칼전 여부: 로컬은 session, 온라인은 서버가 hello로 알려준 값
   const isMelee = session.kind === 'melee' || (online ? !!SELF.melee : !!session.melee);
+  // 축구는 온라인이면 서버가 hello 로 알려주고, 로컬이면 세션에 실려 온다
+  const isSoccer = online ? !!SELF.soccer : !!session.soccer;
   // 개인전(각자 한 팀). 칼전 3~4인 전용
   const isFfa = online ? !!SELF.ffa : !!session.ffa;
   if (!online){ SELF.slot = 0; SELF.n = nLocal; }
-  const server = online ? null : new Server(net, nLocal, isMelee, isFfa);
+  const server = online ? null : new Server(net, nLocal, isMelee, isFfa, isSoccer);
   // AI 모드: 단계가 오를수록 상대가 조금씩 빨라진다.
   // 자동 발사 게임이라 회피와 공격이 서로 배타적이어서, 판단만으로는 난이도가 안 갈렸다
   if (server && session.kind === 'ai' && session.stage){
@@ -70,10 +72,10 @@ export function createGame(canvas, opts = {}){
   // 스냅샷이 와서야 바뀐다(맵이 깜빡임). 슬롯 2·3은 그 사이 존재하지 않아 예측이 죽는다.
   // 인원수는 시작 전에 이미 알고 있으니 미리 맞춰둔다
   const n0 = online ? (SELF.n || 2) : nLocal;
-  if (n0 !== client.s.n || isMelee || isFfa){
-    client.s = newState(n0, isMelee, isFfa); client.pred = newState(n0, isMelee, isFfa);
+  if (n0 !== client.s.n || isMelee || isFfa || isSoccer){
+    client.s = newState(n0, isMelee, isFfa, isSoccer); client.pred = newState(n0, isMelee, isFfa, isSoccer);
   }
-  setArena(n0, isMelee, isFfa);
+  setArena(n0, isMelee, isFfa, isSoccer);
   // [stated] 프로필에서 고른 색으로 앞으로 계속 플레이한다.
   // 온라인은 접속 URL로 서버에 보내 서버가 정하지만, **AI·연습은 서버가 없어서**
   // `color[i]=i` 기본값 그대로였다 — 무슨 색을 골라도 내 캐릭터는 늘 파랑이었다.
@@ -204,7 +206,12 @@ export function createGame(canvas, opts = {}){
     canThrowNow: () => client.pred.phase === PH_PLAY,
     ammo: ammoLeft,
     onThrow: (k, ch) => { if (canThrow(client.pred, SELF.slot, k)) client.throwItem(SELF.slot, k, ch); },
-    onShield: () => { sfx.ready?.(); client.raiseShield(SELF.slot); }
+    onShield: () => { sfx.ready?.(); client.raiseShield(SELF.slot); },
+    // [stated] 축구 슛 — 입력의 `fire` 비트를 한 틱 세운다.
+    // **사람과 AI 가 같은 길로 간다**(다른 조작과 마찬가지로)
+    onKick: () => { sfx.ready?.(); client.kick(SELF.slot); },
+    // [stated] 태클 — 미끄러지며 공을 약하게 밀어낸다
+    onTackle: () => { sfx.slash?.(true); client.tackle(SELF.slot); }
   });
 
   // **상태바·내비게이션바를 뺀 크기로 맞춘다.** 그냥 innerWidth/innerHeight 를 쓰면
