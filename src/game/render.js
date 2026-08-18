@@ -386,7 +386,12 @@ export function createRenderer(canvas){
       const meSlot = firstOf(myT), foeSlot = firstOf(1 - myT);
       // [stated] **닉네임 색을 캐릭터 색과 맞춘다** — 서로 달라 헷갈렸다
       // `viewOf(s)` 가 슬롯별 **실제 표시 색 번호**를 준다 (프로필에서 고른 색이 여기 들어온다)
-      const colFor = slot => (slot >= 0 && COL.team[viewOf(s)[slot]]) || '#e8e8f0';
+      // **`COL.team` 은 없다.** 팀 색 팔레트는 `TEAMS[번호].m` 이다 —
+      // 없는 걸 인덱싱해서 그리기가 통째로 멈췄다("reading '0'")
+      const colFor = slot => {
+        const idx = slot >= 0 ? viewOf(s)[slot] : -1;
+        return (TEAMS[idx] && TEAMS[idx].m) || '#e8e8f0';
+      };
       const y0 = H + 2, hh = 13;
       px(0, y0, W, hh, 'rgba(8,12,20,0.86)');
       ctx.textBaseline = 'middle';
