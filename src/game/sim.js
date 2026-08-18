@@ -131,8 +131,9 @@ import {
 } from './config.js';
 import {
   stepBall, stepBallInGoal, ballHome, KICKOFF, GOAL, FIELD,
-  GOAL_HOLD, GOAL_SEQ, GOAL_TO_WIN, SOCCER_TICKS, TACKLE_TICKS, TACKLE_COOL,
-  TACKLE_SLIDE, faceVec, SOC_STUN, RELEASE_TICKS, CHARGE_MS, TACKLE_HIT
+  GOAL_HOLD, GOAL_SEQ, GOAL_TO_WIN, SOCCER_TICKS, TACKLE_TICKS, TACKLE_COOL, FOOT_OFF,
+  TACKLE_SLIDE, faceVec, SOC_STUN, RELEASE_TICKS, CHARGE_MS, TACKLE_HIT, KICKOFF_FREEZE,
+  TACKLE_V
 } from './ball.js';
 
 // ================= SIM (pure, deterministic) =================
@@ -1192,6 +1193,19 @@ export function step(s, inp){
       for (let i = 0; i < s.n; i++){
         const a = s.p[i];
         if ((a.tkl | 0) === 0) continue;
+        // **공 자체에 닿아도 뺏는다.** 상대 몸을 아슬아슬하게 비켜 가면 아무 일도 안 일어나
+        // "태클해도 안 먹는다"가 됐다. 미끄러지는 사람이 공 근처를 지나면 그것으로 충분하다
+        if (s.ballOwner >= 0 && teamOf(s.ballOwner, s.n) !== teamOf(i, s.n)){
+          const bdx = s.ball.x - (a.x + (PWf >> 1)), bdy = s.ball.y - (a.y + (PHf >> 1));
+          if (bdx * bdx + bdy * bdy <= TACKLE_HIT * TACKLE_HIT){
+            const v = s.p[s.ballOwner];
+            if (v && (v.stun | 0) === 0) v.stun = SOC_STUN;
+            s.ballOwner = -1; s.freeT = RELEASE_TICKS;
+            // [stated] **태클한 길로 공이 흘러나간다** — 미끄러진 방향으로 굴러간다
+            const [tx, ty] = faceVec(a.tklF == null ? a.face : a.tklF);
+            s.ball.vx = tx * TACKLE_V; s.ball.vy = ty * TACKLE_V;
+          }
+        }
         for (let j = 0; j < s.n; j++){
           if (j === i || teamOf(j, s.n) === teamOf(i, s.n)) continue;
           const o = s.p[j];
@@ -1239,6 +1253,7 @@ export function step(s, inp){
 export function kickoff(s, scorer = -1){
   s.ball = ballHome();
   s.goalBy = -1;
+  s.ballOwner = -1; s.freeT = 0;
   const midY = KICKOFF.y;
   for (let i = 0; i < s.n; i++){
     const t = teamOf(i, s.n);
@@ -1256,6 +1271,21 @@ export function kickoff(s, scorer = -1){
     s.p[i].x = clampi(x, FIELD.x0, FIELD.x1 - PWf);
     s.p[i].y = y;
     s.p[i].face = mine ? 0 : 1;
+    s.p[i].stun = 0; s.p[i].tkl = 0; s.p[i].tklCool = 0;
+  }
+  // [stated] **먹힌 쪽이 공을 잡고 시작한다.** 넣은 쪽은 잠깐 못 움직인다
+  if (scorer >= 0){
+    for (let i = 0; i < s.n; i++){
+      const t = teamOf(i, s.n);
+      if (t === scorer){ s.p[i].stun = KICKOFF_FREEZE; continue; }   // 넣은 쪽은 정지
+      if (s.ballOwner < 0){
+        s.ballOwner = i;                                            // 먹힌 쪽 첫 사람이 소유
+        const [fx, fy] = faceVec(s.p[i].face);
+        s.ball.x = s.p[i].x + (PWf >> 1) + fx * FOOT_OFF;
+        s.ball.y = s.p[i].y + (PHf >> 1) + fy * FOOT_OFF;
+        s.ball.vx = 0; s.ball.vy = 0;
+      }
+    }
   }
 }
 

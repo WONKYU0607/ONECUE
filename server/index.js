@@ -150,8 +150,7 @@ class Room {
     // 단계는 전투가 시작될 때 사람 점수에 맞춰 정한다. 그전엔 중간값
     // [stated] 축구는 **공을 쫓는 봇**이 따로 있다. 총·칼 봇은 공을 아예 안 본다
     this.server.bots.push({ slot: i, stage: 5,
-      // **단계 0 을 쓴다.** 1·2 는 잡고만 있고 슛을 안 내는 문제가 남아 있다(원인 미상)
-      ai: this.soccer ? createSoccerAI(i, 0) : createAI(5) });
+      ai: this.soccer ? createSoccerAI(i, 1) : createAI(5) });
   }
 
   // 사람 점수에 맞춰 봇 단계를 정한다. 점수를 모르면 중간값 그대로

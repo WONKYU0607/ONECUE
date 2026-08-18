@@ -63,12 +63,14 @@ export function createSoccerAI(slot, level = 1){
 
       if (mineBall){
         // [stated] **잡으면 발밑에 붙는다** → 뒤로 돌아갈 필요가 없다. 골대로 달리다 찬다
-        // **한 축씩 움직인다.** 대각선으로 가면 `face` 가 좌우로 잡혀 골대를 안 보게 되고,
-        // 슛은 보는 방향으로 나가므로 **영영 안 찬다**(단계 1·2 가 90초 내내 슛 0 이었다)
-        const offX = (goalCx - half(PWf)) - me.x;
-        goal = Math.abs(offX) > 8 * FP
-          ? { x: goalCx - half(PWf), y: me.y, slop: FP }        // 먼저 가로로 맞추고
-          : { x: me.x, y: foeGoalY - half(PHf), slop: FP };     // 그다음 골대로 곧장
+        // **멀리서는 대각선으로 몬다.** 한 축씩만 움직이게 했더니 직선으로만 다녀
+        // "옆으로 드리블을 아예 안 한다"는 지적을 받았다.
+        // 골대 앞에 오면 그때만 세로로 정렬한다 — 슛은 보는 방향으로 나가므로
+        // 마지막엔 골대를 봐야 한다
+        const toG = Math.abs(foeGoalY - cy);
+        goal = toG > SHOOT_RANGE
+          ? { x: goalCx - half(PWf), y: foeGoalY - half(PHf), slop: FP }   // 대각선으로 접근
+          : { x: me.x, y: foeGoalY - half(PHf), slop: FP };                 // 앞에서는 곧장
         const toGoal = foeGoalY - cy;
         const facingGoal = (toGoal < 0 && me.face === 0) || (toGoal > 0 && me.face === 1);
         // 골대 폭 안에 들어왔고 골대를 보고 있으면 찬다. 멀면 더 달린다

@@ -65,8 +65,11 @@ export const KICK_FX_TICKS = 10;
 export const PUSH_V = Math.round(1.1 * FP);        // 몸으로 밀기 — 절반으로 (66px/초, 28px 굴러감)
 // [stated] **공을 잡으면 발밑에 붙어 같이 다닌다** — 밀어서 모는 방식은 너무 어려웠다.
 // 이 거리 안에 들어오면 잡는다(주인이 없을 때만)
-export const PICK_R = Math.round(9 * FP);
-export const FOOT_OFF = Math.round(6 * FP);        // 발밑 — 보는 방향으로 이만큼 앞
+export const PICK_R = Math.round(6 * FP);   // [stated] 너무 멀리서도 드리블돼서 좁힘
+// [stated] **날아오는 공은 못 잡고 튕긴다.** "상대가 슛했는데 내가 맞으면 무조건 튕겨 나간다"
+// 이 속도 이하일 때만 잡을 수 있다 (몰던 공·거의 멈춘 공)
+export const CATCH_MAX = Math.round(2.2 * FP);
+export const FOOT_OFF = Math.round(4.5 * FP);      // 발밑 — 보는 방향으로 이만큼 앞 (더 붙임)
 export const RELEASE_TICKS = 14;                   // 찬 뒤 이 동안은 아무도 못 잡는다
 // [stated] 슛에 **1초 차징**. 오래 누를수록 세게, 일찍 떼면 약하게.
 // 지금 세기(`KICK_V`)가 **꽉 채웠을 때**의 값이다.
@@ -81,6 +84,8 @@ export const kickSpeed = ch => {
 // [stated] **태클에 맞으면 0.5초 쓰러진다**
 // (칼전에도 같은 이름이 있어 `SOC_STUN` 으로 둔다 — 같이 들여오면 이름이 겹친다)
 export const SOC_STUN = 30;
+// 골 뒤 킥오프: 넣은 쪽은 이 동안 못 움직인다 (먹힌 쪽이 먼저 나간다)
+export const KICKOFF_FREEZE = 90;
 // 태클이 스치기만 해도 뺏을 수 있게, 몸 겹침 말고 **거리로도** 본다
 export const TACKLE_HIT = Math.round(14 * FP);
 export const KICK_REACH = Math.round(11 * FP);     // (옛 방식) 밀어서 찰 때 쓰던 사거리
@@ -193,8 +198,10 @@ export function stepBall(s, kicks, chs){
   if (b.vx > -BALL_STOP && b.vx < BALL_STOP) b.vx = 0;
   if (b.vy > -BALL_STOP && b.vy < BALL_STOP) b.vy = 0;
 
-  if (s.freeT <= 0){
-    // **가장 가까운 사람**이 잡는다. 쓰러졌으면 못 잡는다
+  const slow = (b.vx * b.vx + b.vy * b.vy) <= CATCH_MAX * CATCH_MAX;
+  if (s.freeT <= 0 && slow){
+    // **가장 가까운 사람**이 잡는다. 쓰러졌으면 못 잡는다.
+    // 빠른 공(슛)은 여기 안 걸리고 아래에서 몸에 튕긴다
     let best = -1, bd = PICK_R * PICK_R;
     for (let i = 0; i < s.n; i++){
       const p = s.p[i];
@@ -208,6 +215,28 @@ export function stepBall(s, kicks, chs){
       const f = footOf(s.p[best]);
       b.x = f.x; b.y = f.y; b.vx = 0; b.vy = 0;
       return goalCheck(s, b);
+    }
+  }
+
+  // [stated] **날아오는 공은 사람 몸에 튕긴다** — "상대가 슛했는데 내가 맞으면 무조건 튕겨 나간다".
+  // 위에서 못 잡은 공(빠르거나·찬 직후·쓰러진 사람뿐)만 여기 온다.
+  // **찬 직후(`freeT`)에는 안 튕긴다** — 공이 찬 사람 발밑(=몸 안)에서 출발하므로
+  // 그대로 두면 자기 몸에 맞고 되돌아온다
+  if (s.freeT > 0) return goalCheck(s, b);
+  for (let i = 0; i < s.n; i++){
+    const p = s.p[i];
+    if (p.hp <= 0 || (s.off && s.off[i])) continue;
+    const nx = p.x < b.x ? (b.x > p.x + PWf ? p.x + PWf : b.x) : p.x;
+    const ny = p.y < b.y ? (b.y > p.y + PHf ? p.y + PHf : b.y) : p.y;
+    const dx = b.x - nx, dy = b.y - ny;
+    if (dx * dx + dy * dy > BALL_R * BALL_R) continue;
+    // 많이 파고든 축으로 되튕긴다
+    if (Math.abs(dx) >= Math.abs(dy)){
+      b.x = dx >= 0 ? nx + BALL_R : nx - BALL_R;
+      b.vx = -b.vx;
+    } else {
+      b.y = dy >= 0 ? ny + BALL_R : ny - BALL_R;
+      b.vy = -b.vy;
     }
   }
 

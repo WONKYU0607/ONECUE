@@ -6,7 +6,7 @@ import { FP, PWf, PHf, setArena } from '../src/game/config.js';
 import {
   stepBall, stepBallInGoal, ballHome, makeRoller, KICKOFF, FIELD, GOAL,
   KICK_V, PUSH_V, BALL_R, KICK_COOL, GOAL_HOLD, GOAL_SEQ, TACKLE_V, TACKLE_TICKS, TACKLE_COOL,
-  PICK_R, FOOT_OFF, RELEASE_TICKS, SOC_STUN, kickSpeed, KICK_MIN, CHARGE_MS
+  PICK_R, FOOT_OFF, RELEASE_TICKS, SOC_STUN, kickSpeed, KICK_MIN, CHARGE_MS, CATCH_MAX
 } from '../src/game/ball.js';
 import { assert } from './harness.js';
 
@@ -86,7 +86,7 @@ console.log('잡고 → 몰고 → 찬다');
 {
   const s = world();
   s.ball.x = mid.x; s.ball.y = mid.y;
-  s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 5 * FP; s.p[0].face = 0;
+  s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 3 * FP; s.p[0].face = 0;
   s.p[1].x = FIELD.x0; s.p[1].y = GOAL.top;      // 상대는 멀리 둔다
   stepBall(s, [0, 0]);
   assert(s.ballOwner === 0, '  가까이 가면 잡는다');
@@ -116,7 +116,7 @@ console.log('쓰러지면 놓친다');
 {
   const s = world();
   s.ball.x = mid.x; s.ball.y = mid.y;
-  s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 5 * FP;
+  s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 3 * FP;
   s.p[1].x = FIELD.x0; s.p[1].y = GOAL.top;
   stepBall(s, [0, 0]);
   assert(s.ballOwner === 0, '  먼저 잡는다');
@@ -233,7 +233,7 @@ console.log('태클로 차면 슛보다 약하다');
   const mk = () => {
     const s = world();
     s.ball.x = mid.x; s.ball.y = mid.y;
-    s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 5 * FP; s.p[0].face = 0;
+    s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 3 * FP; s.p[0].face = 0;
     s.p[1].x = FIELD.x0; s.p[1].y = GOAL.top;
     stepBall(s, [0, 0]);
     return s;
@@ -264,7 +264,7 @@ console.log('슛 차징');
   const mk = ch => {
     const s = world();
     s.ball.x = mid.x; s.ball.y = mid.y;
-    s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 5 * FP; s.p[0].face = 0;
+    s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - (PHf >> 1) + 3 * FP; s.p[0].face = 0;
     s.p[1].x = FIELD.x0; s.p[1].y = GOAL.top;
     stepBall(s, [0, 0], [100, 100]);
     stepBall(s, [1, 0], [ch, 100]);
@@ -272,6 +272,28 @@ console.log('슛 차징');
   };
   const weak = mk(0), full = mk(100);
   assert(weak < full, `  일찍 떼면 약하다 (${weak} < ${full})`);
+}
+
+// [stated] **자유 공은 사람 몸에 튕긴다** — 앞을 막고 있는데 그냥 통과했다
+// [stated] "**상대가 드리블하다 슛을 했는데 내가 맞았다. 그럼 무조건 튕겨 나가야 한다**"
+console.log('날아오는 공은 못 잡고 튕긴다');
+{
+  const s = world();
+  s.ball.x = mid.x; s.ball.y = mid.y;
+  s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y - 18 * FP;   // 앞을 막고 선다
+  s.p[1].x = FIELD.x0; s.p[1].y = GOAL.bot - PHf;
+  s.ball.vy = -KICK_V;
+  let bounced = false, caught = false;
+  for (let i = 0; i < 25; i++){
+    const v = s.ball.vy;
+    stepBall(s, [0, 0]);
+    if (v < 0 && s.ball.vy > 0) bounced = true;
+    if (s.ballOwner >= 0) caught = true;
+  }
+  assert(bounced, '  맞으면 튕겨 되돌아온다');
+  assert(!caught, '  슛은 몸으로 못 잡는다');
+  // 느린 공은 잡을 수 있어야 드리블이 된다
+  assert(CATCH_MAX > 0 && CATCH_MAX < KICK_V, '  잡을 수 있는 속도 한계가 슛보다 낮다');
 }
 
 console.log('ball.test.js 통과');
