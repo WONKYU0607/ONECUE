@@ -730,8 +730,8 @@ export function step(s, inp){
       if (s.soccer && (p.stun | 0) > 0){ dx = 0; dy = 0; }   // 쓰러진 동안은 못 움직인다
       // [stated] **공을 잡은 사람은 15% 느리다** — 안 그러면 잡고 도망만 다니면 된다
       if (s.soccer && s.ballOwner === i){
-        dx = Math.round(dx * 85 / 100);
-        dy = Math.round(dy * 85 / 100);
+        dx = Math.round(dx * 80 / 100);   // [stated] 85 → 80
+        dy = Math.round(dy * 80 / 100);
       }
       if ((s.melee || s.soccer) && (dx || dy)){
         p.face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 2 : 3) : (dy < 0 ? 0 : 1);
@@ -1271,7 +1271,9 @@ export function kickoff(s, scorer = -1){
     const span = FIELD.x1 - FIELD.x0;
     const x = FIELD.x0 + Math.round(span * (k + 1) / (per + 1)) - (PWf >> 1);
     let y;
-    if (conceded) y = mine ? midY + Math.round(6 * FP) : midY - Math.round(6 * FP) - PHf;
+    // [stated] **중앙선에서 시작하면 상대가 너무 빨리 붙는다** →
+    // 먹힌 쪽은 **자기 진영**에서 공을 갖고 시작한다
+    if (conceded) y = mine ? GOAL.bot - Math.round(46 * FP) - PHf : GOAL.top + Math.round(46 * FP);
     else          y = mine ? GOAL.bot - Math.round(14 * FP) - PHf : GOAL.top + Math.round(14 * FP);
     s.p[i].x = clampi(x, FIELD.x0, FIELD.x1 - PWf);
     s.p[i].y = y;

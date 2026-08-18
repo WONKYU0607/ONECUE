@@ -759,30 +759,28 @@ export function createRenderer(canvas){
     const me = s.p[SELF.slot];
     // [stated] 축구는 같은 자리가 **슛 버튼**이다. 쿨다운 동안 흐리게
     if (ARENA.soccer){
+      // [stated] 슛은 **노란 박스에 SHOOT**, 태클은 **흰 박스에 SLIDE**
       const cool = me ? (me.kickCool | 0) : 0;
       const on = cool === 0;
-      px(b.x, b.y, b.w, b.h, on ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.03)');
-      const c2 = on ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.14)';
-      px(b.x, b.y, b.w, 1, c2); px(b.x, b.y + b.h - 1, b.w, 1, c2);
-      px(b.x, b.y, 1, b.h, c2); px(b.x + b.w - 1, b.y, 1, b.h, c2);
-      circle(b.x + b.w / 2, b.y + b.h / 2, b.w * 0.22, on ? '#f2f2f2' : 'rgba(255,255,255,0.25)');
+      const label = (r, txt, fill, ink) => {
+        px(r.x, r.y, r.w, r.h, fill);
+        ctx.fillStyle = ink;
+        ctx.font = '900 ' + Math.round(Math.min(9, r.w / 5.4) * RS) + 'px ' + GF;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(txt, (r.x + r.w / 2) * RS, (r.y + r.h / 2) * RS);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      };
+      label(b, 'SHOOT', on ? '#ffd34d' : 'rgba(255,211,77,0.28)', on ? '#3a2d00' : 'rgba(58,45,0,0.5)');
       // [stated] **차징 게이지** — 누르고 있는 동안 아래에서 위로 찬다 (최대 1초)
       const kc = kickCharge || 0;
       if (kc > 0){
         const h2 = b.h * Math.min(1, kc / 100);
-        px(b.x + 1, b.y + b.h - h2, 2, h2, kc >= 99 ? '#ffe07a' : '#8fd8ff');
+        px(b.x + 1, b.y + b.h - h2, 2, h2, kc >= 99 ? '#ffffff' : '#7a5c00');
       }
-      // 태클 버튼 — 슛 옆에. 쿨다운이면 흐리게
       const tb = tackleBtn(uiH2);
       const tOn = me ? (me.tklCool | 0) === 0 : true;
-      px(tb.x, tb.y, tb.w, tb.h, tOn ? 'rgba(255,190,80,0.14)' : 'rgba(255,255,255,0.03)');
-      const c3 = tOn ? 'rgba(255,200,110,0.60)' : 'rgba(255,255,255,0.14)';
-      px(tb.x, tb.y, tb.w, 1, c3); px(tb.x, tb.y + tb.h - 1, tb.w, 1, c3);
-      px(tb.x, tb.y, 1, tb.h, c3); px(tb.x + tb.w - 1, tb.y, 1, tb.h, c3);
-      // 미끄러지는 모양 — 비스듬한 획 두 개
-      const tc = tOn ? '#ffd28a' : 'rgba(255,255,255,0.25)';
-      px(tb.x + tb.w * 0.22, tb.y + tb.h * 0.56, tb.w * 0.5, 1.4, tc);
-      px(tb.x + tb.w * 0.32, tb.y + tb.h * 0.40, tb.w * 0.42, 1.4, tc);
+      label(tb, 'SLIDE', tOn ? '#f2f2f2' : 'rgba(242,242,242,0.28)',
+            tOn ? '#1a1f2a' : 'rgba(26,31,42,0.5)');
       return;
     }
     const up = me && me.shield > 0;

@@ -63,13 +63,16 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
     const c = canvasRef.current;
     if (!c) return { display: 'none' };
     const r = c.getBoundingClientRect();
-    const w = Math.min(220, r.width * 0.55);
-    // 경기장 세로에서 내 진영 1/4 — 화면 아래쪽(내가 아래에 보인다).
-    // [stated] 거기서 **200px 더 위로** (타이머·점수판과 더 떨어지게)
-    const top = r.top + r.height * 0.75 - 200;
+    // [stated] **글자에 딱 맞는 박스**로. 여백이 많아 너무 컸다
+    const w = Math.min(120, r.width * 0.34);
+    // 내 진영 1/4 에서 [stated] **250px 위로** (200 + 50)
+    const top = r.top + r.height * 0.75 - 250;
     return {
       left: (r.left + (r.width - w) / 2) + 'px', top: top + 'px',
-      width: w + 'px', height: '34px', fontSize: '15px'
+      width: w + 'px', height: '28px', fontSize: '13px', padding: '0',
+      // [stated] **배경이 없어 잘 안 보였다** → 진한 박스 + 테두리
+      background: 'rgba(10,16,26,0.92)', border: '1px solid #5a96c8',
+      borderRadius: '3px', color: '#cfe4ff', lineHeight: '26px'
     };
   };
 

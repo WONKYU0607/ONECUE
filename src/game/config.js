@@ -351,8 +351,8 @@ const A4 = {
   wl: W4L, wr: W4R, wt: T4, wb: B4,
   // 칼전처럼 **아레나 전체를 양쪽이 같이 쓴다** (중앙선도 진영도 없다)
   melee: true, soccer: true,
-  // 경기장이 짧은 만큼 이동 속도도 낮춘다. [stated] 0.72 도 빨라서 **반으로** 더 줄였다
-  spd: 0.36
+  // 경기장이 짧은 만큼 이동 속도도 낮춘다. [stated] 최종 **초당 65px** (기본 170 x 0.382)
+  spd: 0.382
 };
 
 export const ARENA = { ...A1 };
