@@ -244,6 +244,9 @@ export function createGame(canvas, opts = {}){
   }
 
   // 지난 프레임과 비교해 무슨 일이 일어났는지 알아내고 소리·연출을 낸다
+  // [stated] 슛하면 **화면이 아주 살짝 흔들린다.** 수치는 피격(1.1)·폭발(2.4)보다 작게 —
+  // 매 슛마다 나는 연출이라 크면 금방 피로해진다
+  let lastKickFx = 0;
   function reactTo(st, dt){
     const cur = snapshot(st);
     if (!prev){ prev = cur; return; }
@@ -464,11 +467,17 @@ export function createGame(canvas, opts = {}){
     input.tick(now, CHARGE_MAX_MS);
     FAST.on = !!client.pred.fast;      // 입력 곡선이 이 값을 본다
     BARE.on = !!client.pred.bare;     // 팔레트·투척 슬롯이 이 값을 본다
+    // 슛 연출이 새로 뜬 순간에만 한 번 흔든다 (매 프레임 흔들면 계속 떨린다)
+    const kf = client.pred && client.pred.kickFx;
+    if (kf && kf.t > lastKickFx) juice.shake(0.45);
+    lastKickFx = kf ? kf.t : 0;
     juice.update(dt);
     reactTo(client.pred, dt);
     client.updateRender(a, dt);
     view.draw(client.pred, dbg, a, client, stick, input.drag, leftCount, okCell, {
-      ammo: ammoLeft, charge: input.charge, softFlash: opts.softFlash?.() || false, juice
+      ammo: ammoLeft, charge: input.charge, softFlash: opts.softFlash?.() || false, juice,
+      // 공도 캐릭터처럼 **부드럽게 따라가는 위치**로 그린다 (안 그러면 순간이동한다)
+      ball: client.ballRender ? client.ballRender(dt) : null
     });
 
     // 페이즈가 바뀔 때만 React에 알린다 (매 프레임 setState 하면 안 됨).

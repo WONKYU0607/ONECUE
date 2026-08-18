@@ -411,7 +411,7 @@ export class Client {
     this.pend = Array.from({ length: MAX_PLAYERS }, blank);
     this.sent = [];                    // 아직 서버가 확정하지 않은 내 입력
     this.pred = newState();            // 예측 상태 (화면에 그리는 것)
-    this.rx = null; this.ry = null;    // 렌더 위치 (전원 같은 필터)
+    this.rx = null; this.ry = null; this.rb = null;   // 렌더 위치 (전원 같은 필터, rb=공)
     this.nextPos = null;               // 다음 틱 위치 (내 캐릭터 서브틱 보간용)
     this.hist = [];                    // 확정 위치 기록 [{tick, p:[[x,y],...]}]
     this.mhist = [];                   // 내 예측 위치 기록 (같은 방식으로 펴기 위해)
@@ -455,7 +455,7 @@ export class Client {
       if (this.awaitSnap && m.tick > 0){
         this.s = normalizeState(cloneState(m.st));
         for (const k of [...this.frames.keys()]) if (k <= m.tick) this.frames.delete(k);
-        this.rx = null; this.ry = null; this.hist = []; this.rt = null;
+        this.rx = null; this.ry = null; this.rb = null; this.hist = []; this.rt = null;
         this.mhist = []; this.mrt = null;
         this.awaitSnap = false;
       } else {
@@ -656,6 +656,24 @@ export class Client {
     if (this.rx || !st || !st.p) return;
     this.rx = st.p.map(q => q.x);
     this.ry = st.p.map(q => q.y);
+    // 공도 같이 (축구)
+    if (st.ball) this.rb = { x: st.ball.x, y: st.ball.y };
+  }
+
+  /** 그리기용 공 위치. **캐릭터와 같은 방식으로 부드럽게 따라간다.**
+   *  안 하면 서버 보정이 올 때마다 공이 순간이동한다 — 실제로 "뚝뚝 끊기고
+   *  순간이동한다"는 신고를 받았다 */
+  ballRender(dt){
+    const b = this.pred && this.pred.ball;
+    if (!b) return null;
+    if (!this.rb) this.rb = { x: b.x, y: b.y };
+    const k = 1 - Math.exp(-SMOOTH_RATE * Math.min(dt, 0.1));
+    this.rb.x += (b.x - this.rb.x) * k;
+    this.rb.y += (b.y - this.rb.y) * k;
+    // 킥오프처럼 **멀리 옮겨진 경우는 그냥 붙인다** (끌려가듯 미끄러지면 더 어색하다)
+    const dx = b.x - this.rb.x, dy = b.y - this.rb.y;
+    if (dx * dx + dy * dy > (40 * FP) * (40 * FP)){ this.rb.x = b.x; this.rb.y = b.y; }
+    return this.rb;
   }
   // 내 캐릭터는 틱 보간(지연 0), 상대는 따라가기 필터로 부드럽게.
   // 필터 계수를 프레임당 고정값으로 두면 주사율에 따라 수렴 속도가 달라진다

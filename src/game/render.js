@@ -7,7 +7,7 @@ import {
   WALL_L, WALL_R, wallIdx, PWf,
   THROW, THROW_DEF, FLY_TICKS, NADE_RADIUS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL, CHARGE_MAX_MS,
   viewColors} from './config.js';
-import { makeRoller, BALL_R, GOAL_SEQ, GOAL_HOLD, GOAL_SCORE } from './ball.js';
+import { makeRoller, BALL_R, GOAL_SEQ, GOAL_HOLD, GOAL_SCORE, KICK_FX_TICKS } from './ball.js';
 import { RS, computeLayout, stickGeom, shieldBtn, tackleBtn } from './layout.js';
 import { resultFor } from './ui-state.js';
 import { getImage, isReady } from './assets.js';
@@ -26,7 +26,11 @@ const MELEE_FW = 484, MELEE_FH = 198, MELEE_BODY_H = 190;
 // 시트 열: 앞대기 앞공격 뒤대기 뒤공격 좌대기 좌공격 우대기 우공격
 // 화면이 뒤집힌 팀은 위·아래가 바뀌므로 그때만 앞뒤를 맞바꾼다
 // 축구 시트: 6행(색) x 8열. 자세 순서 0앞서 1뒤서 2좌서 3우서 4앞뛰 5뒤뛰 6좌뛰 7우뛰
-const SOC_FW = 42, SOC_FH = 48;
+// 칸을 넓혔다 — 태클을 서 있는 것과 **같은 배율**로 담으려면 폭 75 가 필요하다.
+// 42 짜리 칸에 우겨넣느라 태클만 작게 그려졌었다
+const SOC_FW = 80, SOC_FH = 52;
+// 칸 안에서 **서 있는 캐릭터 높이**가 차지하는 비율. 그리기 배율을 여기에 맞춘다
+const SOC_BODY = 44;
 // 8~11 = 태클 (앞·뒤·좌·우). face -> 자세
 const SOC_TACKLE = { 0: 9, 1: 8, 2: 10, 3: 11 };
 const SOC_STAND = { 0: 1, 1: 0, 2: 2, 3: 3 };        // face -> 서있는 자세
@@ -65,6 +69,7 @@ export function createRenderer(canvas){
   const melee = getImage('melee');          // 칼전 캐릭터 시트 (310x184, 4색 x 4자세)
   const soccerImg = getImage('soccer');     // 축구 캐릭터 시트 (336x288, 6색 x 8자세)
   const ballImg = getImage('ball');         // 축구공
+  const kickImg = getImage('kickfx');       // 슛 충격 연출
   const roll = makeRoller();                // 공 굴림 각도 (그리기 전용)
   const bgOf = () => getImage(ARENA.bg);   // 아레나에 따라 배경이 달라진다
   const boom = getImage('explosion');
@@ -136,8 +141,9 @@ export function createRenderer(canvas){
       const run = (p.moving || 0) > 0;
       // [stated] 태클은 **보는 방향의 태클 모션**으로 나간다
       const fc = (p.tkl | 0) > 0 ? SOC_TACKLE[face] : SOC_STAND[face] + (run ? 4 : 0);
-      // 칸 높이를 캐릭터 높이에 맞추고 **발을 바닥에** 붙인다
-      const sc = ARENA.ph / SOC_FH * 1.35;
+      // **칸이 아니라 몸 높이(44)를 기준**으로 배율을 잡는다.
+      // 칸 기준으로 잡으면 칸을 넓힐 때마다 캐릭터가 같이 작아진다
+      const sc = ARENA.ph / SOC_BODY * 1.35;
       const dw = SOC_FW * sc, dh = SOC_FH * sc;
       if (hit) ctx.filter = 'grayscale(1) brightness(3.4)';
       ctx.drawImage(soccerImg, fc * SOC_FW, col * SOC_FH, SOC_FW, SOC_FH,
@@ -376,6 +382,18 @@ export function createRenderer(canvas){
       };
       box(4, String(sc[myT] | 0), '#8fd8ff');
       box(W - 44, String(sc[1 - myT] | 0), '#ff9a8f');
+      // [stated] 스코어 위에 **나와 상대의 이름**. 누가 어느 쪽인지 바로 보이게
+      const nm = Array.isArray(s.nick) ? s.nick : [];
+      const nameOf = team => {
+        for (let i = 0; i < s.p.length; i++) if (teamOf(i, s.p.length) === team) return nm[i] || '';
+        return '';
+      };
+      ctx.font = '700 ' + Math.round(6 * RS) + 'px ' + GF;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = 'rgba(143,216,255,0.85)';
+      ctx.fillText(nameOf(myT).slice(0, 8), 24 * RS, (y0 - 1.5) * RS);
+      ctx.fillStyle = 'rgba(255,154,143,0.85)';
+      ctx.fillText(nameOf(1 - myT).slice(0, 8), (W - 24) * RS, (y0 - 1.5) * RS);
       ctx.fillStyle = secs <= 10 ? '#ff6b5a' : '#e8e8f0';
       ctx.font = '900 ' + Math.round(11 * RS) + 'px ' + GF;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -899,10 +917,42 @@ export function createRenderer(canvas){
 
     // [stated] 골 연출: 2초 골대 안 → 2초 `GOAL!` → 2초 스코어
     // (그리기만 한다. 시간 배분은 시뮬의 `goalT` 가 정한다)
+    // [stated] 슛할 때 **음파 터지는 듯한** 연출. 찬 자리에서 고리가 퍼지며 옅어진다.
+    // 시뮬이 수명(`kickFx.t`)을 들고 있어 **양쪽 화면에 같이** 뜬다
+    if (ARENA.soccer && s.kickFx){
+      const k = s.kickFx;
+      const p0 = 1 - k.t / KICK_FX_TICKS;            // 0 → 1 로 퍼진다
+      const cx = k.x / FP, cy = fy(k.y / FP, 0);
+      // [stated] 슛 연출은 **사용자가 준 그림**(`kickfx.webp`)을 공 근처에 띄운다.
+      // 처음 30%에 확 커졌다가 남은 동안 옅어지며 조금 더 커진다
+      const grow = p0 < 0.3 ? p0 / 0.3 : 1;
+      const fade = p0 < 0.3 ? 1 : 1 - (p0 - 0.3) / 0.7;
+      // [stated] 공 지름의 **2.5배**. 0.9배로 줄여봤더니 13픽셀이라 그림 모양이
+      // 통째로 뭉개져 그냥 작은 고리로 보였다 — 그림을 쓴 의미가 없었다
+      const ballD = (BALL_R / FP) * 2;
+      const sz = ballD * (1.1 + grow * 1.4);            // 끝 크기 = 공 지름의 2.5배
+      if (isReady(kickImg)){
+        // [stated] **찬 방향으로 각을 세운다** — 공을 차서 튀어나온 것처럼 보이게.
+        // 화면이 뒤집히면(슬롯1) 위아래 방향도 뒤집어야 한다
+        const f2 = flipped() ? SOC_FLIP[k.f | 0] : (k.f | 0);
+        const ang = [-Math.PI / 2, Math.PI / 2, Math.PI, 0][f2] || 0;
+        ctx.save();
+        ctx.globalAlpha = fade;
+        ctx.translate(cx * RS, cy * RS);
+        ctx.rotate(ang + 0.35);              // 살짝 기울여 정면으로 안 보이게
+        const d2 = Math.max(2, Math.round(sz * RS));
+        ctx.drawImage(kickImg, -d2 / 2, -d2 / 2, d2, d2);
+        ctx.restore();
+        ctx.globalAlpha = 1;                 // **되돌리지 않으면 뒤가 전부 흐려진다**
+      }
+    }
+
     // 축구공. **굴림 각도는 여기서만 쓴다** — 시뮬 상태에 넣으면 체크섬이 갈린다
     if (ARENA.soccer && s.ball){
-      const ang = roll(s.ball);
-      const bx = s.ball.x / FP, by = fy(s.ball.y / FP, 0);
+      // **그리기용 위치를 쓴다.** 시뮬 좌표를 그대로 그리면 서버 보정마다 순간이동한다
+      const rb = extra.ball || s.ball;
+      const ang = roll(rb);
+      const bx = rb.x / FP, by = fy(rb.y / FP, 0);
       const r = BALL_R / FP;
       if (isReady(ballImg)){
         ctx.save();

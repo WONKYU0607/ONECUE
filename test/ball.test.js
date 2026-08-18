@@ -9,7 +9,10 @@ import {
 } from '../src/game/ball.js';
 import { assert } from './harness.js';
 
-setArena(2, false, false);
+// **축구 아레나로 맞춘다.** 총격전 아레나(캐릭터 14 높이)로 두면 몸 중심이 공에서
+// 9px 떨어져 사거리(8) 밖이 되고, 그런데도 **몸으로 미는 힘 때문에 공이 움직여**
+// 검사가 통과해 버린다 — 실제로 그렇게 지나갔다
+setArena(2, false, false, true);
 // 경기장 한가운데 (월드 한가운데가 아니다 — 돌벽 안쪽이 기준)
 const mid = ballHome();
 const world = () => ({
@@ -81,8 +84,11 @@ console.log('버튼으로 보는 방향으로 찬다');
   s.ball.x = mid.x; s.ball.y = mid.y;
   s.p[0].x = mid.x - (PWf >> 1); s.p[0].y = mid.y + 2 * FP; s.p[0].face = 0;
   stepBall(s, [1, 0]);
+  assert(s.p[0].kickCool > 0, '  쿨다운이 걸린다 (= 버튼으로 실제로 찼다)');
   assert(s.ball.vy < 0, `  위로 나간다 (vy ${s.ball.vy})`);
-  assert(s.p[0].kickCool > 0, '  쿨다운이 걸린다');
+  // [stated] 연출은 **찬 사람 발치**에 뜬다 (공 자리가 아니다)
+  assert(s.kickFx && s.kickFx.t > 0, '  슛 연출이 생긴다');
+  assert(s.kickFx.y > s.ball.y, '  연출이 공보다 아래 — 찬 사람 발치');
   // 연타로 계속 차이면 안 된다
   const vy = s.ball.vy;
   stepBall(s, [1, 0]);

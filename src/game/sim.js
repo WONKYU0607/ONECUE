@@ -150,6 +150,7 @@ export function normalizeState(st){
   if (!Array.isArray(st.score)) st.score = [0, 0];
   if (typeof st.goalT !== 'number') st.goalT = 0;
   if (typeof st.goalBy !== 'number') st.goalBy = -1;
+  if (!st.kickFx || typeof st.kickFx.t !== 'number') st.kickFx = null;
   if (!Array.isArray(st.items)) st.items = [];
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
@@ -244,6 +245,7 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     score: [0, 0],              // 팀별 골 수
     goalT: 0,                   // 골 연출 남은 틱 (0이면 진행 중)
     goalBy: -1,                 // 방금 넣은 팀
+    kickFx: null,               // 슛 연출 {x,y,t}. 양쪽 화면에 같이 뜬다
     p: players,
     bullets: [],
     covers: newCovers(),
@@ -713,7 +715,9 @@ export function step(s, inp){
       const oy = p.y, ox = p.x;
       const tm = teamOf(i, s.n);
       // 바라보는 방향은 이동 입력을 따라간다. 멈추면 마지막 방향을 유지
-      if (s.melee && (dx || dy)){
+      // **축구도 방향이 필요하다.** `s.melee` 만 보고 있어서 축구에서는 face 가
+      // 팀 기본값(위/아래)에 굳어 **좌우 모션이 영영 안 나왔다**
+      if ((s.melee || s.soccer) && (dx || dy)){
         p.face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 2 : 3) : (dy < 0 ? 0 : 1);
       }
       // **벽에 막힌 몫은 다른 축으로 넘긴다.** 대각선은 벡터 길이로 잘리는데,
@@ -1170,6 +1174,7 @@ export function step(s, inp){
         // 태클 중에는 계속 약하게 밀어낸다. 아니면 버튼 슛
         kicks.push(p.tkl > 0 ? 2 : (q.fire ? 1 : 0));
       }
+      if (s.kickFx && --s.kickFx.t <= 0) s.kickFx = null;   // 연출은 0.3초만
       const g = stepBall(s, kicks);
       if (g){
         s.score[g.goal]++;
@@ -1262,6 +1267,7 @@ export function checksum(s){
     h = (h*31 + s.ball.vx) | 0; h = (h*31 + s.ball.vy) | 0;
     h = (h*31 + (s.score ? s.score[0]*13 + s.score[1]*29 : 0)) | 0;
     h = (h*31 + (s.goalT | 0) + (s.goalBy | 0)) | 0;
+    h = (h*31 + (s.kickFx ? s.kickFx.t : 0)) | 0;
   }
   return h | 0;
 }

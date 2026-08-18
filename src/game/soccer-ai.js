@@ -18,9 +18,13 @@ import { FIELD, GOAL, KICK_REACH, BALL_R } from './ball.js';
 const TACKLE_RANGE = 26 * FP;
 
 const LEVELS = [
-  { react: 380, slop: 10 * FP, aim: 0.55, speed: 0.72 },   // 쉬움
-  { react: 240, slop: 6 * FP,  aim: 0.75, speed: 0.86 },   // 보통
-  { react: 120, slop: 3 * FP,  aim: 0.92, speed: 1.0 }     // 어려움
+  // **380ms 는 너무 느렸다** — 공이 작아진 뒤 90초 내내 0:0 이었다.
+  // 공을 놓치면 다시 붙는 데 그만큼 오래 걸린다
+  // **다시 생각하는 간격이 길면 공을 놓치고 못 따라간다.** 380ms 로 뒀더니
+  // 90초 내내 0:0 이었다. 단계 차이는 간격보다 **속도·정확도**로 준다
+  { react: 200, slop: 8 * FP, aim: 0.55, speed: 0.78 },   // 쉬움
+  { react: 170, slop: 5 * FP, aim: 0.75, speed: 0.88 },   // 보통
+  { react: 120, slop: 3 * FP, aim: 0.92, speed: 1.0 }     // 어려움
 ];
 
 const half = v => v >> 1;
@@ -87,7 +91,7 @@ export function createSoccerAI(slot, level = 1){
         // 공 **뒤쪽**(골대 반대편)으로 돌아 들어간다. 옆에서 밀면 공이 옆으로만 간다.
         // **너무 멀리 서면 안 된다** — 처음엔 몸 절반만큼 뒤로 잡았더니 사거리(11px) 밖인
         // 3.7px 틈을 두고 멈춰서 공을 영영 안 건드렸다. 몸 중심이 공에서 8px 이 되게 잡는다
-        const back = (toGoal < 0 ? 1 : -1) * (BALL_R + 4 * FP);
+        const back = (toGoal < 0 ? 1 : -1) * (BALL_R + 3 * FP);
         // **여기서는 느슨함(slop)을 거의 안 준다.** 쉬움·보통 단계의 slop(6~10px)이
         // 접근 거리(8px)보다 커서 "다 왔다"고 판단하고 멈춰 버렸다 —
         // 공을 영영 안 건드려 90초 내내 0:0 이었다
@@ -111,6 +115,9 @@ export function createSoccerAI(slot, level = 1){
     const len = Math.sqrt(dx * dx + dy * dy);
     const cap = 4 * FP * L.speed;
     if (len > cap){ dx = Math.round(dx / len * cap); dy = Math.round(dy / len * cap); }
-    return { dx: dx | 0, dy: dy | 0, fire: wantKick ? 1 : 0, tkl: wantTackle ? 1 : 0 };
+    // **쿨다운 중에는 태클 입력을 안 낸다.** 계속 1로 내보내면 의미도 없고
+    // 기록만 부풀려진다(90초에 800회가 찍혔다)
+    const tkl = wantTackle && (me.tklCool | 0) === 0 && (me.tkl | 0) === 0 ? 1 : 0;
+    return { dx: dx | 0, dy: dy | 0, fire: wantKick ? 1 : 0, tkl };
   };
 }

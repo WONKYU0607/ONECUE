@@ -6,6 +6,7 @@ export const ASSET_SRC = {
   arena3:     'assets/arena3.webp',   // 칼전 (던전)
   arena4:     'assets/arena4.webp',   // 축구 미니게임
   ball:       'assets/ball.webp',     // 축구공
+  kickfx:     'assets/kickfx.webp',   // 슛 충격 연출 (사용자가 준 그림)
   soccer:     'assets/soccer-chars.webp',  // 축구 캐릭터 6색 x 8자세(앞뒤좌우 x 서기·뛰기)
   melee:      'assets/melee.webp',    // 칼전 캐릭터 4색 x 4자세
   characters: 'assets/characters.png',

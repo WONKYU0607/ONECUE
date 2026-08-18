@@ -11,7 +11,11 @@
 //   · 상대를 **밀 수 있다**
 import { FP, PWf, PHf } from './config.js';
 
-export const BALL_R = Math.round(4 * FP);          // 공 반지름 (월드 4px)
+// [stated] "공이 너무 크다" → 4 → 3. 사거리·미는 거리도 같이 줄여야
+// 몸으로 몰 때 붙는 느낌이 유지된다
+// 공은 **캐릭터 대비**로 잡는다. 캐릭터 9 에 지름 5 (반지름 2.5) 면
+// 실제 축구의 사람:공 비율과 비슷하다
+export const BALL_R = Math.round(2.5 * FP);        // 공 반지름 (월드 2.5px)
 
 // [stated] **흰 선은 판정 기준이 아니다.** 라인 밖으로 나가든 말든 상관없고,
 // **아레나의 진짜 돌벽에만 튕긴다.** 아래 값은 `arena4.webp` 에서 잰 것 —
@@ -49,8 +53,13 @@ export const TACKLE_TICKS = 26;                    // 미끄러지는 동안 (�
 export const TACKLE_COOL = 48;                     // 연타 방지. 슛보다 길다
 // [stated] 태클하면 캐릭터가 **스윽 밀려난다**. 시작이 제일 빠르고 점점 느려진다
 export const TACKLE_SLIDE = Math.round(3.4 * FP);  // 첫 틱 속도 (틱당 월드px)
+// [stated] 슛할 때 **음파 터지는 듯한 연출**을 0.3초. 찼는지 안 찼는지 안 보였다.
+// **시뮬 상태에 둔다** — 양쪽 화면에 같이 떠야 하므로(폭발 이펙트와 같은 방식)
+// [stated] 전체로 퍼지는 큰 음파가 아니라 **공 근처에만 생기는 미세한 파문** +
+// **화면이 아주 살짝 흔들리는** 정도. 캐릭터가 착지할 때 나는 그런 연출
+export const KICK_FX_TICKS = 10;
 export const PUSH_V = Math.round(2.2 * FP);        // 132px/초
-export const KICK_REACH = Math.round(11 * FP);     // 이 안에 있어야 찰 수 있다
+export const KICK_REACH = Math.round(8 * FP);      // 이 안에 있어야 찰 수 있다
 export const KICK_COOL = 18;                       // 연타 방지 (틱)
 export const GOAL_TO_WIN = 3;
 export const SOCCER_TICKS = 90 * 60;               // 90초
@@ -132,6 +141,16 @@ export function stepBall(s, kicks){
     const v = kicks[i] === 2 ? TACKLE_V : KICK_V;
     b.vx = fx * v; b.vy = fy * v;
     p.kickCool = kicks[i] === 2 ? 0 : KICK_COOL;   // 태클 쿨은 태클 쪽에서 따로 센다
+    // 슛에만 연출을 띄운다 (태클은 스치듯 자주 닿아서 켜면 화면이 시끄럽다)
+    // [stated] 연출은 **공이 아니라 찬 사람 발치**에. 몸 아래쪽, 보는 방향으로 조금 앞
+    if (kicks[i] !== 2){
+      s.kickFx = {
+        x: cx + fx * Math.round(PWf * 0.45),
+        y: p.y + PHf - Math.round(PHf * 0.18) + fy * Math.round(PHf * 0.3),
+        f: p.face | 0,                 // 찬 방향 — 연출을 그 쪽으로 눕힌다
+        t: KICK_FX_TICKS
+      };
+    }
   }
   for (let i = 0; i < s.n; i++) if (s.p[i].kickCool > 0) s.p[i].kickCool--;
 
