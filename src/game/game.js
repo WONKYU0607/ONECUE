@@ -469,7 +469,9 @@ export function createGame(canvas, opts = {}){
     BARE.on = !!client.pred.bare;     // 팔레트·투척 슬롯이 이 값을 본다
     // 슛 연출이 새로 뜬 순간에만 한 번 흔든다 (매 프레임 흔들면 계속 떨린다)
     const kf = client.pred && client.pred.kickFx;
-    if (kf && kf.t > lastKickFx) juice.shake(0.45);
+    // [stated] "슛을 하는 건지 마는 건지 알 수가 없다" → 0.45 는 너무 약했다.
+    // 피격(1.1)보다 살짝 아래로 올린다
+    if (kf && kf.t > lastKickFx) juice.shake(0.9);
     lastKickFx = kf ? kf.t : 0;
     juice.update(dt);
     reactTo(client.pred, dt);

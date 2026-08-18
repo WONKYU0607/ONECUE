@@ -15,7 +15,7 @@ import { FP, PWf, PHf } from './config.js';
 // 몸으로 몰 때 붙는 느낌이 유지된다
 // 공은 **캐릭터 대비**로 잡는다. 캐릭터 9 에 지름 5 (반지름 2.5) 면
 // 실제 축구의 사람:공 비율과 비슷하다
-export const BALL_R = Math.round(2.5 * FP);        // 공 반지름 (월드 2.5px)
+export const BALL_R = Math.round(3.2 * FP);        // 공 반지름 — [stated] 조금 키움 (2.5 → 3.2)
 
 // [stated] **흰 선은 판정 기준이 아니다.** 라인 밖으로 나가든 말든 상관없고,
 // **아레나의 진짜 돌벽에만 튕긴다.** 아래 값은 `arena4.webp` 에서 잰 것 —
@@ -42,11 +42,15 @@ export const GOAL_SEQ = GOAL_HOLD + GOAL_TEXT + GOAL_SCORE;
 
 // 마찰: 매 틱 속도에 (252/256) 을 곱한다. 정수 나눗셈이라 어디서든 같은 값이 나온다.
 // **처음엔 240 이었는데 0.8초 만에 서서 공이 안 굴러갔다** — 굴러간 거리 51px(경기장 세로 311)
-export const FRICT_NUM = 252, FRICT_DEN = 256;
+// **252 는 너무 잘 굴렀다.** 살짝 스치기만 해도 공이 141px 날아가서
+// 몰 때 몸에서 평균 19px, 최대 66px 까지 벌어졌다 — 사거리(8) 밖이라
+// **슛 버튼을 눌러도 거의 안 맞았다.** 246 이면 한 번 툭 미는 게 28px
+export const FRICT_NUM = 246, FRICT_DEN = 256;
 export const BALL_STOP = Math.round(0.15 * FP);    // 이보다 느리면 세운다
 // 캐릭터 속도가 170px/초. 슛은 그보다 확실히 빨라야 하고,
 // 미는 속도는 조금 느려야 **따라가며 몰 수 있다**(빠르면 공이 도망간다)
-export const KICK_V = Math.round(6 * FP);          // 360px/초. 굴러가는 거리 약 384px
+// [stated] "현재 속도를 슛 속도로 하고 몰고 가는 건 반으로 줄여"
+export const KICK_V = Math.round(6 * FP);          // 슛 — 지금 속도 그대로 (굴러가는 거리 약 154px)
 // [stated] 태클로 공을 차면 **슛보다 약하게** 튕겨 나간다. 슛의 절반
 export const TACKLE_V = Math.round(3 * FP);
 export const TACKLE_TICKS = 26;                    // 미끄러지는 동안 (모션 길이)
@@ -58,8 +62,8 @@ export const TACKLE_SLIDE = Math.round(3.4 * FP);  // 첫 틱 속도 (틱당 월
 // [stated] 전체로 퍼지는 큰 음파가 아니라 **공 근처에만 생기는 미세한 파문** +
 // **화면이 아주 살짝 흔들리는** 정도. 캐릭터가 착지할 때 나는 그런 연출
 export const KICK_FX_TICKS = 10;
-export const PUSH_V = Math.round(2.2 * FP);        // 132px/초
-export const KICK_REACH = Math.round(8 * FP);      // 이 안에 있어야 찰 수 있다
+export const PUSH_V = Math.round(1.1 * FP);        // 몸으로 밀기 — 절반으로 (66px/초, 28px 굴러감)
+export const KICK_REACH = Math.round(11 * FP);     // 이 안에 있어야 찰 수 있다 (8 은 너무 빡빡했다)
 export const KICK_COOL = 18;                       // 연타 방지 (틱)
 export const GOAL_TO_WIN = 3;
 export const SOCCER_TICKS = 90 * 60;               // 90초

@@ -664,7 +664,10 @@ export class Client {
    *  안 하면 서버 보정이 올 때마다 공이 순간이동한다 — 실제로 "뚝뚝 끊기고
    *  순간이동한다"는 신고를 받았다 */
   ballRender(dt){
-    const b = this.pred && this.pred.ball;
+    // **확정 상태의 공을 쓴다.** 예측으로 그리면, 공은 **모두의 입력**에 따라 움직이는데
+    // 클라는 상대 입력을 모르니 매 프레임 어긋나고 서버 보정 때마다 튄다.
+    // 확정본은 조금 늦지만 흔들리지 않는다 — 공은 내 조작이 아니라 반응이 늦어도 티가 덜 난다
+    const b = (this.s && this.s.ball) || (this.pred && this.pred.ball);
     if (!b) return null;
     if (!this.rb) this.rb = { x: b.x, y: b.y };
     const k = 1 - Math.exp(-SMOOTH_RATE * Math.min(dt, 0.1));

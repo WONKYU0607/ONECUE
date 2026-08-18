@@ -57,7 +57,10 @@ export const spdMult   = () => TUNE.spd.v / 600;   // BASE_MAX_STEP(=600px/s)에
 export const bulletFP  = () => Math.max(1, Math.round(TUNE.bul.v / 60 * FP));
 export const coolTicks = () => Math.max(2, Math.round(TUNE.rate.v * 60));
 export const BASE_MAX_STEP = Math.round(10 * FP);    // 틱당 이동 상한 = 600px/s (배속 1.0)
-export const stepCap = () => Math.round(BASE_MAX_STEP * spdMult());
+// [stated] "축구할 때만 움직임이 너무 빠르고 부자연스럽다"
+// 축구장은 세로 198 로 다른 아레나(275)보다 **28% 짧은데 속도는 같았다.**
+// 경기장 대비로는 40% 빨리 달리는 셈이라 미끄러지듯 보였다 → 아레나 비율만큼 낮춘다
+export const stepCap = () => Math.round(BASE_MAX_STEP * spdMult() * (ARENA.spd || 1));
 export const RENDER_MAXJUMP = 30 * FP; // 이보다 크게 튀면 보간 생략 (라운드 리셋 등)
 // **무적은 발사 간격보다 짧아야 한다.** 54틱(0.9초)이면 발사 간격 27틱(0.45초)의 두 배라
 // 총알의 정확히 절반이 무적 중에 들어와 사라졌다 — 20발 쏘면 10발만 박혔다.
@@ -344,7 +347,9 @@ const A4 = {
   bands: [[0, A4_ROWS - 1, 0, A4_COLS - 1]],
   wl: W4L, wr: W4R, wt: T4, wb: B4,
   // 칼전처럼 **아레나 전체를 양쪽이 같이 쓴다** (중앙선도 진영도 없다)
-  melee: true, soccer: true
+  melee: true, soccer: true,
+  // 경기장이 짧은 만큼 이동 속도도 낮춘다 (198/275 ≈ 0.72)
+  spd: 0.72
 };
 
 export const ARENA = { ...A1 };

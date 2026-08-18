@@ -25,7 +25,7 @@ const waiting = new Map();       // '인원수:모드' -> 대기 소켓 목록. 
 // **축구는 대기열이 따로여야 한다** — 같은 인원수라도 규칙이 완전히 달라 섞이면 안 된다
 const qkey = (n, melee, ffa, soccer) => `${n}:${soccer ? 'b' : (melee ? 'm' : 's')}${ffa ? ':f' : ''}`;
 // [stated] 사람이 모자랄 때 빈 자리를 AI 로 채우기까지 기다리는 시간 (7초)
-const BOT_FILL_MS = 6500;   // 접속·왕복 시간을 더해도 7초를 안 넘게
+const BOT_FILL_MS = 4500;   // [stated] 7초 → 5초. 접속·왕복 시간을 더해도 5초를 안 넘게
 const queueOf = k => { if (!waiting.has(k)) waiting.set(k, []); return waiting.get(k); };
 const waitingCount = () => [...waiting.values()].reduce((a, q) => a + q.length, 0);
 
@@ -680,7 +680,7 @@ wss.on('connection', (ws, req) => {
     q.push(ws);
     ws.send(JSON.stringify({ t: 'queued', ahead: q.length - 1 }));
     pairUp(key);
-    // [stated] **10초 안에 상대가 잡히게 한다.** 사람이 모자라면 빈 자리를 AI 로 채운다
+    // [stated] **5초 안에 상대가 잡히게 한다.** 사람이 모자라면 빈 자리를 AI 로 채운다
     ws.botAt = Date.now() + BOT_FILL_MS;
   }
 
@@ -778,7 +778,7 @@ setInterval(() => {
 }, TICK_MS);
 
 // 끊긴 소켓 정리 (모바일은 연결이 조용히 죽는 경우가 많다)
-// [stated] 10초 안에 상대가 잡히게. 대기열을 훑어 오래 기다린 사람이 있으면 봇으로 채운다
+// [stated] 5초 안에 상대가 잡히게. 대기열을 훑어 오래 기다린 사람이 있으면 봇으로 채운다
 setInterval(() => {
   // **`pairUp` 도 여기서 다시 시도해야 한다.** 예전엔 사람이 대기열에 들어올 때만
   // 불렀는데, 서버가 아직 안 데워져 그때 걸러지면 **다시 부르는 곳이 없어서**

@@ -369,35 +369,42 @@ export function createRenderer(canvas){
     // [stated] 축구는 체력이 없다 → **같은 자리에 점수판**을 그린다.
     // 왼쪽이 내 팀 골 수, 오른쪽이 상대, 가운데가 남은 시간
     if (ARENA.soccer){
+      // [stated] **한 줄로**: 닉네임 + 점수 - 타이머 - 점수 + 닉네임.
+      // 예전엔 상자 세 개로 나눠 그렸는데 배경·여백과 겹쳐 잘 안 보였다
       const myT = teamOf(SELF.slot, s.p.length);
       const sc = s.score || [0, 0];
       const secs = Math.max(0, Math.ceil((s.clock || 0) / 60));
-      const y0 = H + 3, hh = 12;
-      const box = (x, txt, col) => {
-        px(x, y0, 40, hh, 'rgba(10,16,26,0.78)');
-        ctx.fillStyle = col;
-        ctx.font = '900 ' + Math.round(10 * RS) + 'px ' + GF;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(txt, (x + 20) * RS, (y0 + hh / 2) * RS);
-      };
-      box(4, String(sc[myT] | 0), '#8fd8ff');
-      box(W - 44, String(sc[1 - myT] | 0), '#ff9a8f');
-      // [stated] 스코어 위에 **나와 상대의 이름**. 누가 어느 쪽인지 바로 보이게
       const nm = Array.isArray(s.nick) ? s.nick : [];
       const nameOf = team => {
-        for (let i = 0; i < s.p.length; i++) if (teamOf(i, s.p.length) === team) return nm[i] || '';
+        for (let i2 = 0; i2 < s.p.length; i2++) if (teamOf(i2, s.p.length) === team) return nm[i2] || '';
         return '';
       };
-      ctx.font = '700 ' + Math.round(6 * RS) + 'px ' + GF;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-      ctx.fillStyle = 'rgba(143,216,255,0.85)';
-      ctx.fillText(nameOf(myT).slice(0, 8), 24 * RS, (y0 - 1.5) * RS);
-      ctx.fillStyle = 'rgba(255,154,143,0.85)';
-      ctx.fillText(nameOf(1 - myT).slice(0, 8), (W - 24) * RS, (y0 - 1.5) * RS);
+      const y0 = H + 2, hh = 13;
+      px(0, y0, W, hh, 'rgba(8,12,20,0.86)');       // 줄 전체에 어두운 바탕
+      ctx.textBaseline = 'middle';
+      // 이름이 아직 안 왔을 때만 쓰는 대체 문구 — **문구는 i18n 에 둔다**
+      const my = (nameOf(myT) || t('sc.me')).slice(0, 6);
+      const fo = (nameOf(1 - myT) || t('sc.foe')).slice(0, 6);
+      const cy2 = (y0 + hh / 2) * RS;
+      // 가운데 타이머부터 자리를 잡고, 좌우로 점수·이름을 붙인다 (**잘리지 않게**)
+      ctx.textAlign = 'center';
+      ctx.font = '900 ' + Math.round(9 * RS) + 'px ' + GF;
       ctx.fillStyle = secs <= 10 ? '#ff6b5a' : '#e8e8f0';
-      ctx.font = '900 ' + Math.round(11 * RS) + 'px ' + GF;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(String(secs), (W / 2) * RS, (y0 + hh / 2) * RS);
+      ctx.fillText(String(secs), (W / 2) * RS, cy2);
+      ctx.font = '900 ' + Math.round(10 * RS) + 'px ' + GF;
+      ctx.fillStyle = '#8fd8ff';
+      ctx.textAlign = 'right';
+      ctx.fillText(String(sc[myT] | 0), (W / 2 - 11) * RS, cy2);
+      ctx.fillStyle = '#ff9a8f';
+      ctx.textAlign = 'left';
+      ctx.fillText(String(sc[1 - myT] | 0), (W / 2 + 11) * RS, cy2);
+      ctx.font = '700 ' + Math.round(8 * RS) + 'px ' + GF;
+      ctx.fillStyle = 'rgba(143,216,255,0.9)';
+      ctx.textAlign = 'right';
+      ctx.fillText(my, (W / 2 - 20) * RS, cy2);
+      ctx.fillStyle = 'rgba(255,154,143,0.9)';
+      ctx.textAlign = 'left';
+      ctx.fillText(fo, (W / 2 + 20) * RS, cy2);
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     } else {
 
