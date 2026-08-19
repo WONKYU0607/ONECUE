@@ -115,6 +115,8 @@ export default function App(){
       const st = summary.state;
       const myT = teamOf(SELF.slot, st.n);
       const goals = (st.score && st.score[myT]) | 0;
+      // **기기에만 반영한다.** 구름에는 서버가 쓴다 — 여기서 올리면 서버 값과 부딪히고,
+      // 자기 점수를 자기가 올리는 길이 열린다 (총·칼과 같은 규칙)
       const delta = soccerDelta(r, goals, streakOf('soccer'));
       const moved = recordMatch('soccer', r, delta, { local: true });
       sc = { delta, ...moved, kind: 'soccer' };

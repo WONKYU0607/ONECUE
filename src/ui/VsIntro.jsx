@@ -13,24 +13,30 @@ import { t } from '../i18n/index.js';
 // [stated] **3초짜리 막대가 다 줄면 들어간다.** 탭을 기다리면 안 누르는 사람은 영영 안 들어간다
 const SHOW_MS = 3000;
 
-// 종목별 캐릭터 시트와 칸 크기 (앞모습 한 칸만 쓴다)
+// 종목별 캐릭터 시트. **칸 크기와 시트 크기를 실제 값으로 맞춰야 한다** —
+// 칼전을 968x297(실제 484x198), 총격전을 14x16(실제 42x48)로 잡아 그림이 깨졌다.
+//   soccer  1040x312, 칸 80x52 (13열 6행). 색 = 행, 자세 = 열
+//   melee   3872x1188, 칸 484x198 (8열 6행). 색 = 행, 자세 = 열(대기 = 2)
+//   gun     1008x48,  칸 42x48 (24열 1행). **색과 앞/뒤가 열에 같이 들어 있다** — 색*2
 const SHEET = {
-  soccer: { src: 'assets/soccer-chars.webp', cw: 80, ch: 52, cols: 13, pose: 0 },
-  melee:  { src: 'assets/melee.webp',        cw: 968, ch: 297, cols: 4, pose: 2 },
-  gun:    { src: 'assets/characters.png',    cw: 14, ch: 16, cols: 2, pose: 0 }
+  soccer: { src: 'assets/soccer-chars.webp', cw: 80,  ch: 52,  cols: 13, rows: 6, col: c => 0,     row: c => c },
+  melee:  { src: 'assets/melee.webp',        cw: 484, ch: 198, cols: 8,  rows: 6, col: () => 2,    row: c => c },
+  gun:    { src: 'assets/characters.png',    cw: 42,  ch: 48,  cols: 24, rows: 1, col: c => c * 2, row: () => 0 }
 };
 
 function Portrait({ kind, color }){
   const sh = SHEET[kind] || SHEET.gun;
-  const col = Math.max(0, color | 0);
-  // 시트에서 한 칸만 잘라 보여준다 — 배율은 칸 높이를 48px 로 맞춘다
-  const k = 92 / sh.ch;   // [stated] 캐릭터를 키운다
+  const ci = Math.max(0, color | 0);
+  const cx = sh.col(ci), cy = sh.row(ci);
+  // 칸 높이를 이 크기에 맞춘다. **가로·세로 배율을 따로 주면 안 된다** — 찌그러진다
+  const k = 92 / sh.ch;
   return (
     <span className="vs-por" style={{
       width: Math.round(sh.cw * k) + 'px', height: '92px',
       backgroundImage: `url(${sh.src})`,
-      backgroundSize: `${Math.round(sh.cw * sh.cols * k)}px auto`,
-      backgroundPosition: `-${Math.round(sh.pose * sh.cw * k)}px -${Math.round(col * sh.ch * k)}px`
+      // **시트 전체 크기**를 지정해야 칸이 정확히 맞는다 (auto 로 두면 세로가 어긋난다)
+      backgroundSize: `${Math.round(sh.cw * sh.cols * k)}px ${Math.round(sh.ch * sh.rows * k)}px`,
+      backgroundPosition: `-${Math.round(cx * sh.cw * k)}px -${Math.round(cy * sh.ch * k)}px`
     }} />
   );
 }

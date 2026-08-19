@@ -510,17 +510,19 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   background:rgba(10,16,26,.9);border:1px solid #5a96c8;color:#cfe4ff;cursor:pointer}
 .prac-out:active{background:rgba(20,32,52,.95)}
 
+/* 준비완료를 누른 뒤 — 사라지지 않고 눌린 표시만 남는다 (다 같이 사라지려고) */
+.panelbtn.place.go.done{opacity:.5;filter:saturate(.5)}
+
 /* 매칭 소개(VS) 화면 — [stated] 배경을 **사선으로 반** 갈라 위아래에서 충돌시킨다.
    부딪힌 자리에 번개 두 개, 그 사이에 VS. 정보는 미리 붙어 있는 채로 부딪힌다 */
 .vs-wrap{position:absolute;inset:0;z-index:40;overflow:hidden;background:#060a12}
 /* 사선은 **정확히 반** — 두 조각이 같은 대각선을 공유해야 틈이 안 생긴다 */
 /* 두 조각은 화면 전체를 덮고 **잘라내기(clip-path)로만** 나뉜다.
    그래서 내용은 각자 **자기 쪽 끝으로** 붙여야 한다 — 가운데 정렬하면 둘이 겹친다 */
-/* [stated] **틀까지 통째로** 잘린다 — 두 조각이 각자 금속 틀을 달고 부딪힌다.
-   그래서 `.screen` 과 같은 테두리를 각 조각에 준다 */
+/* [stated] **있던 틀 하나로** 가른다 — 조각마다 틀을 그렸더니 틀 안에 틀이 생겼다.
+   조각은 `.screen` 안쪽을 덮기만 하고, 틀은 `.screen` 것을 그대로 쓴다 */
 .vs-half{position:absolute;left:0;right:0;top:0;height:100%;display:flex;
-  border-style:solid;border-width:var(--fy) var(--fx);border-color:#0a0c12;
-  border-image:var(--frame) 86 fill stretch;background:#0a0c12}
+  background:#0a0c12}
 /* [stated] **사선을 훨씬 가파르게** — 왼쪽 72%, 오른쪽 28% 를 잇는다(약 42도).
    예전 42~58% 는 거의 수평이라 "자른" 느낌이 안 났다 */
 .vs-half.top{top:0;clip-path:polygon(0 0,100% 0,100% 28%,0 72%);
@@ -532,23 +534,22 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* 사선이 왼쪽으로 내려가므로 **위 조각은 왼쪽이, 아래 조각은 오른쪽이** 넓다.
    각자 넓은 쪽에 정보를 붙인다 */
 .vs-half.top{align-items:flex-start;justify-content:flex-start}
-.vs-half.bot{align-items:flex-end;justify-content:flex-end}
-.vs-half.top .vs-pad{width:84%;padding:14% 0 0 20px}
-.vs-half.bot .vs-pad{width:84%;padding:0 20px 14% 0;text-align:right}
-.vs-half.bot .vs-row{flex-direction:row-reverse}
-.vs-half.bot .vs-info{align-items:flex-end}
-.vs-half.bot .vs-score{flex-direction:row-reverse}
+.vs-half.bot{align-items:flex-end;justify-content:flex-start}
+.vs-half.top .vs-pad{width:92%;padding:14% 0 0 16px}
+.vs-half.bot .vs-pad{width:92%;padding:0 0 14% 16px}
+/* 아래 조각도 **왼쪽부터** 읽는 순서를 지킨다 — 뒤집었더니 트로피가 숫자 뒤로 갔다 */
+.vs-half.bot .vs-info{align-items:flex-start}
 
 .vs-row{display:flex;align-items:center;gap:16px;padding:8px 0}
 .vs-por{display:block;flex:0 0 auto;background-repeat:no-repeat;image-rendering:auto;
   filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
-.vs-info{display:flex;flex-direction:column;gap:2px;min-width:0}
-.vs-nick{font-size:21px;font-weight:900;color:#e8e8f0;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
+.vs-info{display:flex;flex-direction:column;gap:2px}
+.vs-nick{font-size:20px;font-weight:900;color:#e8e8f0;white-space:nowrap}
 .vs-score{display:flex;align-items:center;gap:6px;font:900 28px var(--gf);color:#ffd34d}
 .vs-cup{display:inline-block;width:16px;height:16px;border-radius:2px;
   background:linear-gradient(180deg,#ffd34d,#c8901a)}
-.vs-rec{font-size:15px;font-weight:700;color:#b9c6dc}
+/* 칼전 캐릭터가 넓어 전적이 두 줄로 접혔다 → 줄바꿈 금지 */
+.vs-rec{font-size:15px;font-weight:700;color:#b9c6dc;white-space:nowrap}
 
 /* 부딪힌 자리 — 사선을 따라 기울인다 (42%~58% 를 잇는 각) */
 /* 사선 각도와 같게 기울인다. 폭을 넉넉히 잡아야 끝이 화면 밖까지 이어진다 */

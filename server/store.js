@@ -112,8 +112,10 @@ export async function readPlayers(uids){
       const d = s.exists ? s.data() : null;
       out.set(uids[i], {
         nick: (d && d.nick) || '',
+        // [stated] 축구는 **0점에서 시작**한다 (총·칼은 1000)
         score: { gun: (d && d.score && d.score.gun) ?? 1000,
-                 melee: (d && d.score && d.score.melee) ?? 1000 },
+                 melee: (d && d.score && d.score.melee) ?? 1000,
+                 soccer: (d && d.score && d.score.soccer) ?? 0 },
         streak: { gun: (d && d.streak && d.streak.gun) | 0,
                   melee: (d && d.streak && d.streak.melee) | 0,
                   soccer: (d && d.streak && d.streak.soccer) | 0 }
@@ -131,7 +133,8 @@ export async function writeResults(rows){
   try {
     const batch = db.batch();
     for (const r of rows){
-      const kind = r.kind === 'melee' ? 'melee' : 'gun';
+      // **축구를 빠뜨리면 총격전 점수에 쌓인다** — 클라에서 이미 한 번 겪었다
+      const kind = r.kind === 'melee' ? 'melee' : (r.kind === 'soccer' ? 'soccer' : 'gun');
       batch.set(db.doc('players/' + r.uid), {
         score: { [kind]: Math.max(0, r.score | 0) },
         streak: { [kind]: Math.max(0, r.streak | 0) },

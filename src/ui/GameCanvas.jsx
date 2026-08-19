@@ -179,7 +179,9 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
       {/* [stated] 수락되면 화면 가운데에 알림 문구를 잠깐 띄운다 */}
       {ready.prompt?.done && (
         <div className="negdone ui-overlay">
-          {t(ready.prompt.done.mine ? 'ready.doneMine' : 'ready.donePeer',
+          {/* [stated] 문구가 반대로 나왔다. `done.mine` 은 **내가 신청했다**는 뜻이므로
+              그때는 "상대방이 수락했다"가 맞다 */}
+          {t(ready.prompt.done.mine ? 'ready.donePeer' : 'ready.doneMine',
              { what: negText(ready.prompt.done.kind, 'name', ready.prompt.done.melee) })}
         </div>
       )}
@@ -212,9 +214,13 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
         </button>
       )}
       {/* 2단계: 전원이 눌러야 시작한다 */}
-      {/* [stated] 누르면 **사라진다** — `!ready.me` 가 그 조건이다 */}
-      {placing && ready.cnt?.meDone && !ready.me && (
-        <button className="panelbtn place go ui-overlay"
+      {/* [stated] **모두가 준비돼 시작할 때 버튼이 한꺼번에 사라져야 한다.**
+          예전엔 내가 누르는 순간 이 버튼만 먼저 사라지고 신청 버튼은 나중에 없어져
+          따로따로 없어지는 것처럼 보였다. 눌러도 남겨두되 눌린 표시만 하고,
+          카운트다운이 시작되면(=`placing` 이 꺼지면) 다 같이 사라진다 */}
+      {placing && ready.cnt?.meDone && (
+        <button className={'panelbtn place go ui-overlay' + (ready.me ? ' done' : '')}
+                disabled={ready.me}
                 style={soccer ? soccerReadyStyle() : boxStyle}
                 onClick={() => gameRef.current?.go()}>
           {t('ready.goDone')}

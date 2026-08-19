@@ -184,7 +184,8 @@ class Room {
     if (!store.isOn()) return;
     const uids = this.seats.map(x => x && x.uid).filter(Boolean);
     if (!uids.length) return;
-    const kind = this.melee ? 'melee' : 'gun';
+    // 축구도 자기 종목 점수를 읽어야 한다 (안 그러면 총격전 점수로 계산된다)
+    const kind = this.soccer ? 'soccer' : (this.melee ? 'melee' : 'gun');
     store.readPlayers(uids).then(m => {
       this.seats.forEach((seat, i) => {
         const v = seat && seat.uid && m.get(seat.uid);
@@ -199,12 +200,28 @@ class Room {
     if (!st.over || this.settled) return;
     this.settled = true;
     if (!store.isOn()) return;
-    const kind = st.melee ? 'melee' : 'gun';
+    const kind = st.soccer ? 'soccer' : (st.melee ? 'melee' : 'gun');
     const rows = [];
     for (let i = 0; i < this.n; i++){
       const seat = this.seats[i];
       if (!seat || !seat.uid) continue;                 // 로그인 안 한 사람은 건너뛴다
-      const before = this.preScore[i] || { score: 1000, streak: 0 };
+      if (seat.bot) continue;                           // AI 가 이어받은 자리는 점수를 안 준다
+      const before = this.preScore[i] || { score: st.soccer ? 0 : 1000, streak: 0 };
+      // [stated] **축구는 점수 규칙이 다르다** — 이기면 골x100x연승, 지면 골x50.
+      // 티어도 강약 차등도 없다
+      if (st.soccer){
+        const team = teamOf(i, st.n);
+        const goals = (st.score && st.score[team]) | 0;
+        const win = st.winner === team + 1;
+        const streak = win ? before.streak + 1 : 0;
+        const delta = win ? goals * 100 * Math.max(1, streak) : goals * 50;
+        rows.push({
+          uid: seat.uid, kind, result: win ? 'win' : 'lose',
+          score: Math.max(0, before.score + delta),
+          streak
+        });
+        continue;
+      }
       const d = scoreDelta(st, i, {
         streak: before.streak + 1,
         left: !!st.off[i],
