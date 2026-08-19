@@ -5,7 +5,7 @@
 //
 // **정보가 없어도 화면은 뜬다** — 구름을 읽어야 해서 늦거나 못 올 수 있고,
 // 봇은 계정이 없어 점수·전적이 아예 없다. 없는 칸은 `-` 로 둔다.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { teamOf, TEAMS } from '../game/config.js';
 import { getColor } from '../state/profile.js';
 import { t } from '../i18n/index.js';
@@ -36,17 +36,15 @@ function Portrait({ kind, color }){
 }
 
 export default function VsIntro({ vs, mySlot, onDone }){
-  const [left, setLeft] = useState(SHOW_MS);
-
+  // [stated] **막대는 없애고 3초 뒤에 그냥 들어간다.**
+  // `onDone` 을 의존성에 두면 부모가 다시 그릴 때마다 시작 시각이 초기화된다 —
+  // 그래서 막대가 줄다 다시 차오르고 게임이 안 시작됐다. 참조로 붙잡아 한 번만 건다
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
   useEffect(() => {
-    const t0 = Date.now();
-    const iv = setInterval(() => {
-      const rest = SHOW_MS - (Date.now() - t0);
-      setLeft(rest);
-      if (rest <= 0) onDone?.();
-    }, 100);
-    return () => clearInterval(iv);
-  }, [onDone]);
+    const id = setTimeout(() => doneRef.current?.(), SHOW_MS);
+    return () => clearTimeout(id);
+  }, []);
 
   const rows = (vs && vs.rows) || [];
   const n = rows.length || 2;
@@ -92,9 +90,6 @@ export default function VsIntro({ vs, mySlot, onDone }){
         <div className="vs-pad">{lower.map(line)}</div>
       </div>
 
-      {/* 잘린 자국 — 번개가 없는 구간에도 경계가 이어진다 */}
-      <div className="vs-cut" />
-
       {/* 부딪힌 자리 — 번개 두 개 사이에 VS */}
       <div className="vs-seam">
         <img className="vs-bolt l" src="assets/vsbolt.webp" alt="" />
@@ -102,7 +97,6 @@ export default function VsIntro({ vs, mySlot, onDone }){
         <img className="vs-bolt r" src="assets/vsbolt.webp" alt="" />
       </div>
 
-      <div className="vs-bar"><i style={{ width: Math.max(0, left) / SHOW_MS * 100 + '%' }} /></div>
     </div>
   );
 }
