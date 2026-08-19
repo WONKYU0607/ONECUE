@@ -116,6 +116,11 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
   return (
     <div className="game-root">
       <div className="wrap"><canvas ref={canvasRef} /></div>
+      {/* [stated] 연습 모드에는 **나가기 버튼**을 둔다 — 화면 안 '‹' 를 없앤 뒤로 나갈 길이
+          폰 뒤로가기뿐이었다. 폰 뒤로가기도 같은 확인 창을 띄운다 */}
+      {session?.kind === 'practice' && (
+        <button className="prac-out ui-overlay" onClick={onBack}>{t('game.leave')}</button>
+      )}
       {crash && (
         <div className="modal-back">
           <div className="modal ask">

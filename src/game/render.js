@@ -144,16 +144,31 @@ export function createRenderer(canvas){
       const run = (p.moving || 0) > 0;
       // [stated] 태클은 **보는 방향의 태클 모션**으로 나간다
       // [stated] **태클에 걸리면 넘어지는 모션**(칸 12) — 태클을 거는 쪽(8~11)과 다른 그림이다
+      // **옆모습 그림은 좌우 둘 다 왼쪽을 본다** (원화의 "우측면"은 오른쪽 옆구리를 본다는 뜻).
+      // 그래서 옆을 볼 때는 **왼쪽 그림 하나만 쓰고, 오른쪽이면 좌우를 뒤집어** 그린다
+      const sideways = face === 2 || face === 3;
+      const mirror = face === 3;
       const fc = (p.stun | 0) > 0 ? SOC_FALL
-               : ((p.tkl | 0) > 0 ? SOC_TACKLE[face] : SOC_STAND[face] + (run ? 4 : 0));
+               : ((p.tkl | 0) > 0 ? (sideways ? 10 : SOC_TACKLE[face])
+                                  : (sideways ? (run ? 6 : 2) : SOC_STAND[face] + (run ? 4 : 0)));
       // **칸이 아니라 몸 높이(44)를 기준**으로 배율을 잡는다.
       // 칸 기준으로 잡으면 칸을 넓힐 때마다 캐릭터가 같이 작아진다
       const sc = ARENA.ph / SOC_BODY * 1.35;
       const dw = SOC_FW * sc, dh = SOC_FH * sc;
       if (hit) ctx.filter = 'grayscale(1) brightness(3.4)';
-      ctx.drawImage(soccerImg, fc * SOC_FW, col * SOC_FH, SOC_FW, SOC_FH,
-        Math.round((xw + ARENA.pw / 2 - dw / 2) * RS), Math.round((yw + ARENA.ph - dh) * RS),
-        Math.round(dw * RS), Math.round(dh * RS));
+      const dx0 = Math.round((xw + ARENA.pw / 2 - dw / 2) * RS);
+      const dy0 = Math.round((yw + ARENA.ph - dh) * RS);
+      if (mirror){
+        ctx.save();
+        ctx.translate(dx0 + Math.round(dw * RS), dy0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(soccerImg, fc * SOC_FW, col * SOC_FH, SOC_FW, SOC_FH,
+          0, 0, Math.round(dw * RS), Math.round(dh * RS));
+        ctx.restore();
+      } else {
+        ctx.drawImage(soccerImg, fc * SOC_FW, col * SOC_FH, SOC_FW, SOC_FH,
+          dx0, dy0, Math.round(dw * RS), Math.round(dh * RS));
+      }
       ctx.filter = 'none';
       if (off) ctx.globalAlpha = 1;
       return;

@@ -1,15 +1,39 @@
-// 매칭이 되면 잠깐 뜨는 **대결 소개 화면**.
+// 매칭 소개(VS) 화면.
 //
-// [stated] "상대를 찾았다" 한 줄 대신 **양쪽 닉네임·점수·전적·승률**을 보여준다.
+// [stated] 배경을 **사선으로 정확히 반** 갈라 위아래에서 **충돌**시킨다.
+// 부딪힌 자리에 **번개 두 개**를 잇고 그 사이에 **VS**. 정보는 **미리 붙어 있는 채로** 부딪힌다.
 //
-// **정보가 없어도 화면은 뜬다** — 구름을 읽어야 해서 늦게 오거나 아예 못 올 수 있고,
-// 봇은 계정이 없어 점수·전적이 처음부터 없다. 없는 칸은 `-` 로 둔다.
+// **정보가 없어도 화면은 뜬다** — 구름을 읽어야 해서 늦거나 못 올 수 있고,
+// 봇은 계정이 없어 점수·전적이 아예 없다. 없는 칸은 `-` 로 둔다.
 import { useEffect, useState } from 'react';
-import { teamOf } from '../game/config.js';
+import { teamOf, TEAMS } from '../game/config.js';
+import { getColor } from '../state/profile.js';
 import { t } from '../i18n/index.js';
 
-// 연출이 끝나기 전에 넘어가면 안 되므로 **들어오는 시간(약 0.7초)보다 넉넉히** 잡는다
-const SHOW_MS = 2600;                 // 이 시간이 지나면 저절로 넘어간다
+// [stated] **3초짜리 막대가 다 줄면 들어간다.** 탭을 기다리면 안 누르는 사람은 영영 안 들어간다
+const SHOW_MS = 3000;
+
+// 종목별 캐릭터 시트와 칸 크기 (앞모습 한 칸만 쓴다)
+const SHEET = {
+  soccer: { src: 'assets/soccer-chars.webp', cw: 80, ch: 52, cols: 13, pose: 0 },
+  melee:  { src: 'assets/melee.webp',        cw: 968, ch: 297, cols: 4, pose: 2 },
+  gun:    { src: 'assets/characters.png',    cw: 14, ch: 16, cols: 2, pose: 0 }
+};
+
+function Portrait({ kind, color }){
+  const sh = SHEET[kind] || SHEET.gun;
+  const col = Math.max(0, color | 0);
+  // 시트에서 한 칸만 잘라 보여준다 — 배율은 칸 높이를 48px 로 맞춘다
+  const k = 92 / sh.ch;   // [stated] 캐릭터를 키운다
+  return (
+    <span className="vs-por" style={{
+      width: Math.round(sh.cw * k) + 'px', height: '92px',
+      backgroundImage: `url(${sh.src})`,
+      backgroundSize: `${Math.round(sh.cw * sh.cols * k)}px auto`,
+      backgroundPosition: `-${Math.round(sh.pose * sh.cw * k)}px -${Math.round(col * sh.ch * k)}px`
+    }} />
+  );
+}
 
 export default function VsIntro({ vs, mySlot, onDone }){
   const [left, setLeft] = useState(SHOW_MS);
@@ -26,37 +50,58 @@ export default function VsIntro({ vs, mySlot, onDone }){
 
   const rows = (vs && vs.rows) || [];
   const n = rows.length || 2;
+  const kind = (vs && vs.kind) || 'gun';
   const myTeam = teamOf(mySlot, n);
-  const mine = rows.filter(r => teamOf(r.slot, n) === myTeam);
-  const foes = rows.filter(r => teamOf(r.slot, n) !== myTeam);
+  const ours = rows.filter(r => teamOf(r.slot, n) === myTeam);
+  const theirs = rows.filter(r => teamOf(r.slot, n) !== myTeam);
+  // [stated] **점수가 높은 쪽이 위로 간다.** 내가 아래라는 규칙보다 이게 먼저다.
+  // 점수가 없으면(봇·정보 못 받음) 낮은 것으로 본다
+  const sum = list => list.reduce((a, r) => a + (r.score == null ? -1 : (r.score | 0)), 0);
+  const oursUp = sum(ours) > sum(theirs);
+  const upper = oursUp ? ours : theirs;
+  const lower = oursUp ? theirs : ours;
 
-  const side = (list, cls) => (
-    <div className={'vs-side ' + cls}>
-      {list.map(r => {
-        const rec = r.record || null;
-        const w = rec ? (rec.w | 0) : 0, l = rec ? (rec.l | 0) : 0;
-        const played = w + l;
-        return (
-          <div key={r.slot} className="vs-card">
-            <span className="vs-nick">{r.nick || (r.bot ? 'AI' : '-')}</span>
-            <span className="vs-score">{r.score == null ? '-' : (r.score | 0).toLocaleString()}</span>
-            <span className="vs-rec">
-              {played ? `${w}${t('vs.w')} ${l}${t('vs.l')} · ${Math.round(w / played * 100)}%` : '-'}
-            </span>
-            {r.streak > 1 && <span className="vs-streak">{t('vs.streak', { n: r.streak })}</span>}
-          </div>
-        );
-      })}
-    </div>
-  );
+  const line = r => {
+    const rec = r.record || null;
+    const w = rec ? (rec.w | 0) : 0, l = rec ? (rec.l | 0) : 0;
+    const played = w + l;
+    const color = r.slot === mySlot ? getColor() : (r.slot % 6);
+    return (
+      <div key={r.slot} className="vs-row">
+        <Portrait kind={kind} color={color} />
+        <span className="vs-info">
+          <b className="vs-nick">{r.nick || (r.bot ? 'AI' : '-')}</b>
+          <span className="vs-score">
+            <i className="vs-cup" />{r.score == null ? '-' : (r.score | 0).toLocaleString()}
+          </span>
+          <span className="vs-rec">
+            {played ? `${w}${t('vs.w')} ${l}${t('vs.l')} · ${Math.round(w / played * 100)}%` : '-'}
+          </span>
+        </span>
+      </div>
+    );
+  };
 
   return (
-    // [stated] 탭하면 바로 넘어간다 — 매번 2.5초를 기다리면 답답하다
-    <div className="vs-wrap" onClick={() => onDone?.()}>
-      {side(mine, 'me')}
-      <div className="vs-mid">VS</div>
-      {side(foes, 'foe')}
-      <div className="vs-skip">{t('vs.skip')}</div>
+    <div className="vs-wrap">
+      {/* 위아래 반쪽이 사선으로 잘려 부딪힌다. 정보는 이미 붙어 있다 */}
+      <div className="vs-half top">
+        <div className="vs-pad">{upper.map(line)}</div>
+      </div>
+      <div className="vs-half bot">
+        <div className="vs-pad">{lower.map(line)}</div>
+      </div>
+
+      {/* 잘린 자국 — 번개가 없는 구간에도 경계가 이어진다 */}
+      <div className="vs-cut" />
+
+      {/* 부딪힌 자리 — 번개 두 개 사이에 VS */}
+      <div className="vs-seam">
+        <img className="vs-bolt l" src="assets/vsbolt.webp" alt="" />
+        <span className="vs-mid">VS</span>
+        <img className="vs-bolt r" src="assets/vsbolt.webp" alt="" />
+      </div>
+
       <div className="vs-bar"><i style={{ width: Math.max(0, left) / SHOW_MS * 100 + '%' }} /></div>
     </div>
   );

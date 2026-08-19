@@ -168,7 +168,7 @@ export default function App(){
       {askExit && <QuitAsk exit
                            onQuit={() => { setAskExit(false); exitApp(); }}
                            onStay={() => setAskExit(false)} />}
-      {askQuit && <QuitAsk pvp={session?.kind === 'pvp'}
+      {askQuit && <QuitAsk pvp={session?.kind === 'pvp'} practice={session?.kind === 'practice'}
                            onQuit={() => { setAskQuit(false); goHome(); }}
                            onStay={() => setAskQuit(false)} />}
       {exitHint && <p className="exit-hint">{t('quit.again')}</p>}
