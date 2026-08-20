@@ -14,16 +14,19 @@ import { serverUrl } from '../net/connection.js';
 // 실측: 섞었을 때 진입 묶음 1,120kB(gzip 306), 동적만 쓰면 292kB(gzip 100)
 
 const HTTP = serverUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
-const KINDS = ['gun', 'melee'];
-const norm = k => (k === 'melee' ? 'melee' : 'gun');
+const KINDS = ['gun', 'melee', 'soccer'];
+// **축구를 빠뜨리면 총격전·칼전 순위표가 그대로 나온다** — 이 프로젝트에서 세 번째 같은 실수
+const norm = k => (k === 'melee' ? 'melee' : (k === 'soccer' ? 'soccer' : 'gun'));
 
 // 같은 값을 화면 여러 곳(홈·프로필)에서 쓰므로 한 번만 받아 나눠 쓴다.
 // 판이 끝나면 바뀌므로 오래 붙들지는 않는다
 const CACHE_MS = 60 * 1000;
-const cache = { gun: null, melee: null };      // { at, my, list }
-const inflight = { gun: null, melee: null };
+const cache = { gun: null, melee: null, soccer: null };   // { at, my, list, err }
+const inflight = { gun: null, melee: null, soccer: null };
 
 const empty = () => ({ my: null, list: [] });
+/** 못 받았다는 표시. `null`(기록 없음)과 구분한다 */
+export const ERR = Object.freeze({ err: true });
 
 async function fetchMy(kind){
   let uid = null;
@@ -36,8 +39,10 @@ async function fetchMy(kind){
       { cache: 'no-store', signal: ac.signal });
     clearTimeout(timer);
     const j = await res.json();
+    // **"기록이 없다"와 "못 받았다"는 다르다.** 서버가 자고 있으면 응답이 안 오는데,
+    // 그걸 기록 없음으로 보여주면 **`기록 없음` → `3,847등` 으로 글자가 튄다**
     return j && j.ok ? { rank: j.rank | 0, total: j.total | 0, score: j.score | 0 } : null;
-  } catch { return null; }
+  } catch { return ERR; }
 }
 
 async function fetchList(kind){
@@ -61,8 +66,10 @@ export function loadRank(kindRaw, force = false){
   if (inflight[kind]) return inflight[kind];
   inflight[kind] = Promise.all([fetchMy(kind), fetchList(kind)])
     .then(([my, list]) => {
-      const v = { at: Date.now(), my, list };
-      cache[kind] = v;
+      const bad = my === ERR;
+      const v = { at: Date.now(), my: bad ? null : my, list, err: bad };
+      // **못 받은 값은 오래 붙들지 않는다** — 서버가 깨면 곧 다시 받아야 한다
+      cache[kind] = bad ? null : v;
       return v;
     })
     .catch(() => ({ at: Date.now(), ...empty() }))
@@ -70,15 +77,15 @@ export function loadRank(kindRaw, force = false){
   return inflight[kind];
 }
 
-/** 두 종목을 한 번에 */
+/** 세 종목을 한 번에. **축구를 빠뜨리면 홈 카드가 옛 값을 쥔 채 안 바뀐다** */
 export const loadAllRanks = (force = false) =>
-  Promise.all(KINDS.map(k => loadRank(k, force))).then(([gun, melee]) => ({ gun, melee }));
+  Promise.all(KINDS.map(k => loadRank(k, force)))
+    .then(([gun, melee, soccer]) => ({ gun, melee, soccer }));
 
 /** 이미 받아둔 값 (없으면 null) — 화면이 먼저 뜨고 값은 나중에 채워지게 */
 export const cachedRank = kindRaw => cache[norm(kindRaw)] || null;
 
 /** 판이 끝나면 다음에 볼 때 새로 받는다 */
-export function invalidateRanks(){ cache.gun = null; cache.melee = null; }
 
 /** `3,847등 / 10,231명` — 아직 못 받았으면 null */
 export function fmtRank(my){

@@ -15,7 +15,6 @@ export const NICK_MAX = 10;           // 영문 기준 최대 글자 수 (안내
 export const NICK_MAX_KO = 6;         // 한글 기준 (10 / 1.6 = 6.25)
 
 const wide = ch => /[\u1100-\u11FF\u3000-\u303F\u3040-\u30FF\u3130-\u318F\u4E00-\u9FFF\uAC00-\uD7AF\uFF00-\uFF60]/.test(ch);
-export const nickWidth = v => [...String(v || '')].reduce((a, ch) => a + (wide(ch) ? 1.6 : 1), 0);
 
 // [stated] 닉네임은 **유일해야 한다** (친구를 이름으로 찾기 때문).
 // 겹치는지 볼 때 쓰는 열쇠 — **화면에 보이는 이름과 따로 둔다.**
@@ -95,4 +94,3 @@ export function hydrateNick(v){
   return false;
 }
 
-export function __resetNick(){ try { localStorage.removeItem(KEY); } catch { /* 무시 */ } cur = read(); return cur.nick; }

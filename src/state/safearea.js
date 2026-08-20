@@ -55,10 +55,8 @@ function setLayoutH(){
 }
 
 /** 키보드를 뺀, 화면을 그릴 때 쓰는 높이 */
-export const layoutH = () => baseH || usableH();
 
 /** 지금 값 (재기 전이면 전부 0) */
-export const safeArea = () => ({ ...cur });
 
 export const usableW = () => Math.max(1, winW() - cur.left - cur.right);
 export const usableH = () => Math.max(1, winH() - cur.top - cur.bottom);

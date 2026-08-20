@@ -10,7 +10,6 @@ export const TIERS = [
   { key: 'platinum', nameKey: 'tier.platinum', min: 10000 },
   { key: 'diamond',  nameKey: 'tier.diamond',   min: 20000 }
 ];
-export const TIER_PX = 96;   // 시트 한 칸
 
 // 티어 이름은 **부를 때** 번역한다. 표에 미리 넣으면 언어를 바꿔도 안 바뀐다
 export const tierName = tier => t(tier.nameKey);
@@ -19,11 +18,4 @@ export function tierOf(score = 0){
   let i = 0;
   for (let k = 0; k < TIERS.length; k++) if ((score | 0) >= TIERS[k].min) i = k;
   return { ...TIERS[i], index: i };
-}
-
-// 다음 티어까지 남은 점수 (다이아면 null)
-export function toNextTier(score = 0){
-  const t = tierOf(score);
-  const next = TIERS[t.index + 1];
-  return next ? { name: t(next.nameKey), left: next.min - (score | 0) } : null;
 }

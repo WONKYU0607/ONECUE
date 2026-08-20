@@ -12,10 +12,10 @@
 //
 // 어려움은 `react`(다시 생각하는 간격)와 `slop`(목표에 얼마나 정확히 붙는가)로 준다.
 import { FP, PWf, PHf, teamOf } from './config.js';
-import { FIELD, GOAL, KICK_REACH, BALL_R } from './ball.js';
+import { FIELD, GOAL } from './ball.js';
 
 // 태클로 닿을 수 있는 거리 — 미끄러지며 들어가므로 슛 사거리보다 멀다
-const TACKLE_RANGE = 26 * FP;
+const TACKLE_RANGE = 34 * FP;   // [stated] 봇이 태클을 안 해서 넓혔다
 // 이 안에 들어와야 슛을 쏜다 (골대까지 거리)
 const SHOOT_RANGE = 70 * FP;
 
@@ -62,6 +62,14 @@ export function createSoccerAI(slot, level = 1){
       const mineBall = owner === slot;
       const teamBall = owner >= 0 && teamOf(owner, s.n) === team;
       const foeBall = owner >= 0 && !teamBall;
+      // **우리 편 중 내가 공에 제일 가까운가.** 아니면 수비로 내려선다 —
+      // 다 같이 달려들면 한 자리에 몰려 서로 막고 벽에 낀다
+      let mineClosest = true;
+      const myD = dist2(cx, cy, b.x, b.y);
+      for (let i = 0; i < s.n; i++){
+        if (i === slot || teamOf(i, s.n) !== team || s.p[i].hp <= 0) continue;
+        if (dist2(s.p[i].x + half(PWf), s.p[i].y + half(PHf), b.x, b.y) < myD) mineClosest = false;
+      }
 
       if (mineBall){
         // [stated] **잡으면 발밑에 붙는다** → 뒤로 돌아갈 필요가 없다. 골대로 달리다 찬다
@@ -86,20 +94,36 @@ export function createSoccerAI(slot, level = 1){
         const veryClose = Math.abs(toGoal) < 34 * FP;
         wantKick = facingGoal && (veryClose || (lined && Math.abs(toGoal) < SHOOT_RANGE));
       } else if (foeBall){
-        // 상대가 들고 있다 → **태클로 뺏는다.** 닿을 만하면 미끄러져 들어간다
+        // 상대가 들고 있다 → **한 명만 달려들고 나머지는 수비로 내려선다.**
+        // 전에는 `ourGoalY` 를 아무도 안 써서 **모두가 공만 쫓았다** — 2대2에서 셋이
+        // 한 자리에 몰려 벽에 끼는 원인이기도 했다(린트가 안 쓰는 변수로 잡아 드러났다)
         const o = s.p[owner];
         const ox = o.x + half(PWf), oy = o.y + half(PHf);
-        goal = { x: o.x, y: o.y, slop: FP };
-        if ((me.tklCool | 0) === 0 && dist2(cx, cy, ox, oy) <= TACKLE_RANGE * TACKLE_RANGE)
-          wantTackle = true;
+        if (!mineClosest && s.n > 2){
+          // 우리 골대와 공 사이에 서서 길을 막는다
+          goal = { x: half(b.x + goalCx) - half(PWf),
+                   y: half(b.y + ourGoalY) - half(PHf), slop: L.slop };
+        } else {
+          goal = { x: o.x, y: o.y, slop: FP };
+          const dBody = dist2(cx, cy, ox, oy);
+          const dBall = dist2(cx, cy, b.x, b.y);
+          if ((me.tklCool | 0) === 0 && (me.tkl | 0) === 0 &&
+              Math.min(dBody, dBall) <= TACKLE_RANGE * TACKLE_RANGE)
+            wantTackle = true;
+        }
       } else if (teamBall){
         // 팀원이 들고 있다 → 앞으로 벌려 준다 (뭉치면 서로 막는다)
         goal = { x: goalCx - half(PWf) + (slot % 2 ? 22 * FP : -22 * FP),
                  y: half(b.y + foeGoalY) - half(PHf), slop: L.slop };
-      } else {
+      } else if (mineClosest){
         // 주인 없는 공 → **가는 앞을 노려** 달려간다. 굴러가는 공을 따라만 가면 못 잡는다
         const lead = 12;
         goal = { x: b.x + b.vx * lead - half(PWf), y: b.y + b.vy * lead - half(PHf), slop: FP };
+      } else {
+        // **가까운 한 명만 쫓는다.** 다 같이 달려들면 한 자리에 몰려 서로 막고 벽에 낀다
+        // (실측: 넷이 다 쫓으면 90초의 99% 를 셋 이상이 붙어 있었다)
+        goal = { x: half(b.x + goalCx) - half(PWf) + (slot % 2 ? 20 * FP : -20 * FP),
+                 y: half(b.y + ourGoalY) - half(PHf), slop: L.slop };
       }
       goal.x = Math.max(FIELD.x0, Math.min(FIELD.x1 - PWf, goal.x));
       goal.y = Math.max(GOAL.top, Math.min(GOAL.bot - PHf, goal.y));

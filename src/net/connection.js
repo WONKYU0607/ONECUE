@@ -61,12 +61,31 @@ const wsUrl = (mode = 'queue', code = '', resume = false, n = 2, melee = false, 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 잠든 서버는 HTTP 요청으로도 깨어난다. 소켓보다 먼저 두드려 둔다.
 // 시간 제한이 없으면 잠든 서버가 요청을 붙잡고 있는 동안 화면이 멈춘 것처럼 보인다.
+// **서버가 깨어난 순간을 다른 화면도 알아야 한다.**
+// 순위표가 잠든 서버에 대고 헛되이 두드리는 대신 여기서 알려주면 한 번에 받는다
+const wakeWaiters = [];
+let awake = false;
+/** 서버가 깨면 한 번 불린다. 이미 깨어 있으면 즉시 부른다 */
+export function onServerAwake(fn){
+  if (awake){ try { fn(); } catch { /* 무시 */ } return; }
+  wakeWaiters.push(fn);
+}
+function markAwake(){
+  if (awake) return;
+  awake = true;
+  const list = wakeWaiters.splice(0);
+  for (const fn of list){ try { fn(); } catch { /* 무시 */ } }
+}
+
 export async function wakeServer(timeoutMs = 9000){
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
     const res = await fetch(HTTP_URL + '/health', { cache: 'no-store', signal: ac.signal });
-    return res.ok ? await res.json() : null;
+    if (!res.ok) return null;
+    const j = await res.json();
+    markAwake();                       // 이제 순위표가 받아도 된다
+    return j;
   } catch {
     return null;                     // 실패해도 소켓 쪽에서 다시 시도한다
   } finally {

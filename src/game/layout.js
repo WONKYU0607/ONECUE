@@ -11,7 +11,6 @@ export const RS = 3;
 export const UI_TOP = 14, UI_ROW = 0, UI_PAD_MIN = 72;
 export const UI_MIN = UI_TOP + UI_ROW + UI_PAD_MIN;   // 86
 export const UI_MAX = 130;
-export const STICK_R_MAX = 36;
 
 // 아레나 높이는 고정, 화면에서 남는 세로를 UI 패널이 흡수한다
 export function computeLayout(innerW, innerH){
@@ -49,19 +48,6 @@ export function shieldBtn(uiH){
 // 화면 위에 겹쳐 띄우는 버튼·배너가 차지할 자리 (월드 좌표).
 // 팔레트 위쪽을 쓰되, 칼전처럼 팔레트가 비어 있으면 패드 전체를 기준으로 잡는다.
 // (예전엔 game.js가 sl[0].y를 그냥 읽어 칼전에서 화면이 통째로 죽었다)
-// 체력바가 차지하는 세로 구간. **render.js와 이 값을 공유해야** 준비 버튼이
-// 정확히 그 사이에 들어간다 (예전엔 각자 계산해서 버튼이 아래로 삐져나왔다)
-export function hpBand(){
-  const n = ARENA.n || 2;
-  const mineRows = ARENA.ffa ? 1 : n / 2;          // 내 편 줄 수
-  // [stated] 개인전은 상대 체력바를 안 그린다 (스틱과 겹쳤다) → 줄 수도 0
-  const foeRows  = ARENA.ffa ? 0 : n / 2;
-  const two = mineRows > 1;
-  const BH = two ? 4 : 5, gap = 1.5;
-  const rows = Math.max(mineRows, foeRows);
-  return { y: H + (two ? 2.5 : 4.5), h: rows * BH + (rows - 1) * gap, BH, gap };
-}
-
 export function uiBoxRect(uiH){
   const pd = padRect(uiH);
   const sl = paletteSlots(uiH);

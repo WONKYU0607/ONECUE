@@ -89,11 +89,8 @@ export const kickSpeed = ch => {
 // [stated] **태클에 맞으면 0.5초 쓰러진다**
 // (칼전에도 같은 이름이 있어 `SOC_STUN` 으로 둔다 — 같이 들여오면 이름이 겹친다)
 export const SOC_STUN = 30;
-// 골 뒤 킥오프: 넣은 쪽은 이 동안 못 움직인다 (먹힌 쪽이 먼저 나간다)
-export const KICKOFF_FREEZE = 90;
 // 태클이 스치기만 해도 뺏을 수 있게, 몸 겹침 말고 **거리로도** 본다
 export const TACKLE_HIT = Math.round(14 * FP);
-export const KICK_REACH = Math.round(11 * FP);     // (옛 방식) 밀어서 찰 때 쓰던 사거리
 export const KICK_COOL = 18;                       // 연타 방지 (틱)
 export const GOAL_TO_WIN = 3;
 export const SOCCER_TICKS = 90 * 60;               // 90초
@@ -104,7 +101,6 @@ const half = v => v >> 1;
 // 살짝 아래로 어긋난다 — 성벽이 위아래로 대칭이 아니라서(실측 차이 3px)
 export const KICKOFF = { x: Math.round(89.5 * FP), y: Math.round(157.0 * FP) };
 export const ballHome = () => ({ x: KICKOFF.x, y: KICKOFF.y, vx: 0, vy: 0 });
-export const goalX = () => ({ lo: GOAL.lo, hi: GOAL.hi });
 
 // 사각형(캐릭터)과 원(공)이 닿았는가. **거리 제곱으로만 본다** — 제곱근은 기기마다 다르다
 function hitRect(bx, by, rx, ry, rw, rh){

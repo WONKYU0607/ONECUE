@@ -48,8 +48,6 @@ export function push(data, delay = 1500){
 }
 
 export const uid = () => whenSignedIn();
-export const isLoaded = () => loaded;
-export const isDirty = () => dirty;
 
 // 앱을 닫기 전에 밀린 걸 밀어 넣는다 (모바일은 조용히 죽는다)
 export function flushOnHide(getData){

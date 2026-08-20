@@ -176,7 +176,6 @@ export const MELEE_DAMAGE = 8;          // 한 방에 최대 체력의 8%
 export const ATK_TICKS = 18;            // 휘두르는 모션 길이 (0.3초)
 export const ATK_HIT = 12;              // 이 틱에 판정 (모션 중간)
 export const MELEE_COOL = 30;           // 다음 공격까지 0.5초
-export const MELEE_REACH = 1;           // 앞으로 한 칸
 // 방패: 누르면 0.5초간 방어 자세. 그 사이 상대 칼을 막으면 상대가 1초 기절한다.
 // 공격은 방패를 들고 있어도 그대로 나간다(사용자 확정)
 export const SHIELD_TICKS = 30;         // 방패를 드는 시간 0.5초
@@ -429,11 +428,6 @@ export function setArena(n, melee = false, ffa = false, soccer = false){
   return ARENA;
 }
 // 아레나 기준 헬퍼 (격자·진영·벽)
-export const aCellX = c => ARENA.x0 + ARENA.cw * c;
-export const aCellY = r => ARENA.y0 + ARENA.ch * r;
-export const aOwner = r => (r < ARENA.mid ? 1 : (r > ARENA.mid ? 0 : -1));   // -1 = 중립
-export const aWallL = i => (ARENA.wl || WALL_L)[i];
-export const aWallR = i => (ARENA.wr || WALL_R)[i];
 // 내 슬롯은 서버가 배정한다. 화면에선 항상 내가 아래쪽에 보이도록 렌더에서 뒤집는다
 export const SELF = { melee: false, ffa: false, soccer: false, slot: 0, n: 2 };
 // 서버와 클라가 같은 코드인지 확인하는 표식.

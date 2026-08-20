@@ -59,9 +59,12 @@ export default function App(){
   // 하단 뒤로가기. **위에 뜬 것부터 닫고**, 마지막에 홈에서 두 번 눌러야 나간다.
   // 한 번에 꺼지면 매칭 중이던 것도 날아가므로 반드시 두 단계로 둔다
   const exitAt = useRef(0);
+  const quitAt = useRef(0);   // 게임에서 나간 시각 — 직후 뒤로가기를 무시하는 데 쓴다
   useEffect(() => { initBack(); }, []);
   useEffect(() => {
     setBackHandler(() => {
+      // 게임에서 막 나온 직후의 뒤로가기는 흘려보낸다 (창을 닫은 그 입력이 또 오는 경우)
+      if (Date.now() - quitAt.current < 700) return true;
       if (askExit){ setAskExit(false); return true; }
       if (askQuit){ setAskQuit(false); return true; }
       if (showHelp){ setShowHelp(false); return true; }
@@ -171,7 +174,14 @@ export default function App(){
                            onQuit={() => { setAskExit(false); exitApp(); }}
                            onStay={() => setAskExit(false)} />}
       {askQuit && <QuitAsk pvp={session?.kind === 'pvp'} practice={session?.kind === 'practice'}
-                           onQuit={() => { setAskQuit(false); goHome(); }}
+                           onQuit={() => {
+                             setAskQuit(false);
+                             // [stated] 나가기를 눌렀는데 **앱이 통째로 꺼졌다.**
+                             // 창을 닫는 순간 안드로이드 기본 뒤로가기가 한 번 더 먹으면
+                             // 홈에서 종료 확인으로 이어진다 → 잠깐 뒤로가기를 무시한다
+                             quitAt.current = Date.now();
+                             goHome();
+                           }}
                            onStay={() => setAskQuit(false)} />}
       {exitHint && <p className="exit-hint">{t('quit.again')}</p>}
     </>

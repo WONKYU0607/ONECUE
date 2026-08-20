@@ -658,10 +658,22 @@ function pairUp(key){
   const n = +parts[0], melee = parts[1] === 'm', ffa = parts[2] === 'f';
   const soccer = parts[1] === 'b';   // 축구는 대기열이 따로다
   while (q.length >= n){
-    const picked = [];
-    while (picked.length < n && q.length){
-      const ws = q.shift();
-      if (ws.readyState === 1) picked.push(ws); // 끊긴 소켓은 버린다
+    // 끊긴 소켓은 먼저 걷어낸다
+    for (let i = q.length - 1; i >= 0; i--) if (q[i].readyState !== 1) q.splice(i, 1);
+    if (q.length < n) return;
+    // [stated] **점수가 가까운 사람끼리** 붙인다(B안). 대기 인원이 적을 때 범위를 좁히면
+    // 아무도 못 만나므로, 기다리게 하지 않고 **지금 대기 중인 사람 중 제일 가까운 쪽**을 고른다.
+    // 점수를 모르는 사람(로그인 안 함·못 읽음)은 한가운데로 본다
+    const mid = 1000;
+    const sc = w => (typeof w.qScore === 'number' ? w.qScore : mid);
+    // 가장 오래 기다린 사람을 기준으로, 점수가 가까운 순으로 채운다.
+    // **기준을 맨 앞으로 두어야** 오래 기다린 사람이 계속 밀리지 않는다
+    const head = q[0];
+    const rest = q.slice(1).sort((a, b) => Math.abs(sc(a) - sc(head)) - Math.abs(sc(b) - sc(head)));
+    const picked = [head, ...rest.slice(0, n - 1)];
+    for (const ws of picked){
+      const i = q.indexOf(ws);
+      if (i >= 0) q.splice(i, 1);
     }
     if (picked.length < n){ q.unshift(...picked); return; }
     const room = new Room(nextRoomId++, null, n, melee, ffa, soccer);
@@ -758,6 +770,16 @@ wss.on('connection', (ws, req) => {
     const q = queueOf(key);
     q.push(ws);
     ws.send(JSON.stringify({ t: 'queued', ahead: q.length - 1 }));
+    // [stated] **점수가 가까운 사람끼리 붙인다.** 점수를 알아야 고를 수 있으므로 미리 읽어 둔다.
+    // 못 읽어도 매칭은 진행한다 — 그때는 점수를 모르는 사람으로 보고 아무나와 붙는다
+    if (ws.uid && store.isOn()){
+      const kind = soccer ? 'soccer' : (melee ? 'melee' : 'gun');
+      store.readPlayers([ws.uid]).then(m => {
+        const v = m.get(ws.uid);
+        if (v) ws.qScore = (v.score && v.score[kind]);
+        pairUp(key);
+      }).catch(() => pairUp(key));
+    }
     pairUp(key);
     // [stated] **5초 안에 상대가 잡히게 한다.** 사람이 모자라면 빈 자리를 AI 로 채운다
     ws.botAt = Date.now() + BOT_FILL_MS;

@@ -194,7 +194,7 @@ export default {
   'quit.pvp': 'Leaving now counts as a loss and costs you points.',
   'quit.ai': 'Your current match will be lost.',
   'quit.yes': 'Leave',
-  'quit.no': 'Keep playing',
+  'quit.no': 'Cancel',
   'quit.again': 'Press back again to exit',
   'quit.appTitle': 'Exit the app?',
   'quit.appDesc': 'You will return to your home screen.',

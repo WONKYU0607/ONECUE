@@ -8,18 +8,27 @@ import { useState, useEffect } from 'react';
 import { scoreOf } from '../state/tickets.js';
 import TierIcon from './TierIcon.jsx';
 import { loadAllRanks, cachedRank, fmtRank } from '../state/ranks.js';
+import { onServerAwake } from '../net/connection.js';
 import { t } from '../i18n/index.js';
 
 export default function RankCards({ onOpen }){
-  const [ranks, setRanks] = useState(() => ({ gun: cachedRank('gun'), melee: cachedRank('melee') }));
+  const [ranks, setRanks] = useState(() => ({
+    gun: cachedRank('gun'), melee: cachedRank('melee'), soccer: cachedRank('soccer')
+  }));
   useEffect(() => {
     let live = true;
-    loadAllRanks().then(r => { if (live) setRanks(r); }).catch(() => {});
+    // [stated] **서버가 깨어난 걸 알고 받는다.** 잠든 서버에 헛되이 두드리는 대신
+    // 깨자마자 한 번 받는다. 이미 깨어 있으면 바로 받는다
+    const go = force => loadAllRanks(force).then(r => { if (live) setRanks(r); }).catch(() => {});
+    go(false);
+    onServerAwake(() => { if (live) go(true); });
     return () => { live = false; };
   }, []);
 
   const line = v => {
-    if (!v) return t('rank.loading');
+    // **못 받았으면 계속 '불러오는 중'** — 서버가 자고 있을 뿐인데 '기록 없음'을
+    // 보여주면 잠시 뒤 등수로 바뀌어 글자가 튄다
+    if (!v || v.err) return t('rank.loading');
     const f = fmtRank(v.my);
     return f ? t('rank.mine', { r: f.rank, n: f.total }) : t('rank.none');
   };

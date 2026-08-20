@@ -194,7 +194,7 @@ export default {
   'quit.pvp': '지금 나가면 패배로 처리되고 점수가 깎입니다.',
   'quit.ai': '진행 중인 판이 사라집니다.',
   'quit.yes': '나가기',
-  'quit.no': '계속하기',
+  'quit.no': '취소',
   'quit.again': '한 번 더 누르면 종료됩니다',
   'quit.appTitle': '앱을 종료하시겠습니까?',
   'quit.appDesc': '홈 화면으로 돌아갑니다.',

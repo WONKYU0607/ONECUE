@@ -16,7 +16,13 @@ const proc = spawn(process.execPath, ['server/index.js'], {
 const logs = [];
 proc.stdout.on('data', d => logs.push(String(d)));
 proc.stderr.on('data', d => logs.push('ERR ' + d));
-await sleep(600);
+// **고정 대기는 또 깨진다.** 예전에도 300ms 로 두었다가 서버가 조금 느려지자 실패했고,
+// 이번엔 봇 계정 심기가 붙으면서 600ms 로도 모자랐다 → **뜰 때까지 기다린다**
+for (let i = 0; i < 100; i++){
+  if (logs.some(l => l.includes('대기중'))) break;
+  await sleep(100);
+}
+await sleep(150);
 
 // 브라우저 WebSocket 대신 ws 모듈을 쓰는 전송 계층 (WsTransport와 같은 인터페이스)
 function makeTransport(sid, resume = false){
