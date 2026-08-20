@@ -103,7 +103,7 @@ export default function PvpMenu({ onBack, onStart }){
                           onClick={guardSoccer(() => onStart({ mode: 'queue', n: k, soccer: true,
                                                                color: getColor() }))}>
                     <span className="t">{k / 2} vs {k / 2}</span>
-                    <span className="tkn"><span className="tk-ico" />{socLeft()}/3</span>
+                    <span className="tkn"><span className="tk-ico soc" />{socLeft()}/3</span>
                   </button>
                 ))}
               </div>

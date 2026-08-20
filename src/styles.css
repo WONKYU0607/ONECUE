@@ -447,6 +447,9 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   image-rendering:pixelated}
 .tk-ico{flex:0 0 calc(var(--h-tkW,13) * var(--u));height:calc(var(--h-tkH,13) * var(--u));
   background:var(--ticket) center/contain no-repeat}
+/* [stated] 축구는 **전용 티켓 그림**을 쓴다. 가로로 긴 그림이라 자리를 조금 넓게 */
+.tk-ico.soc{background-image:url(assets/ticket-soccer.webp);
+  flex:0 0 calc(var(--h-tkW,13) * var(--u) * 1.55)}
 .pbar-warn{position:absolute;left:0;right:0;
   top:calc((var(--h-barY,2) + var(--h-rowH,20) + 3) * var(--u));
   z-index:24;font-family:var(--gf);font-weight:700;font-size:calc(var(--h-warnSz,8) * var(--u));
@@ -513,6 +516,11 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* 준비완료를 누른 뒤 — 사라지지 않고 눌린 표시만 남는다 (다 같이 사라지려고) */
 .panelbtn.place.go.done{opacity:.5;filter:saturate(.5)}
 
+.negdone.lost{color:#ffb08a}
+
+/* 축구 결과 — 골 수만 크게 */
+.res-goals{font:900 34px var(--gf);color:#ffd34d;letter-spacing:2px}
+
 /* 매칭 소개(VS) 화면 — [stated] 배경을 **사선으로 반** 갈라 위아래에서 충돌시킨다.
    부딪힌 자리에 번개 두 개, 그 사이에 VS. 정보는 미리 붙어 있는 채로 부딪힌다 */
 .vs-wrap{position:absolute;inset:0;z-index:40;overflow:hidden;background:#060a12}
@@ -536,20 +544,27 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .vs-half.top{align-items:flex-start;justify-content:flex-start}
 .vs-half.bot{align-items:flex-end;justify-content:flex-start}
 .vs-half.top .vs-pad{width:92%;padding:14% 0 0 16px}
+/* [stated] 4~5명은 **옆 여백을 써서 두 줄**로 (한 줄로 세우면 너무 작아진다) */
+.vs-pad.two{display:flex;flex-wrap:wrap;align-content:flex-start}
+.vs-pad.two .vs-row{width:50%;box-sizing:border-box;padding-right:8px}
+/* 사선이 오른쪽으로 갈수록 올라간다 → **오른쪽 열만 조금 내려** 번개를 피한다 */
+.vs-half.bot .vs-pad.two .vs-row:nth-child(2n){margin-top:34px}
+.vs-half.top .vs-pad.two .vs-row:nth-child(2n){margin-bottom:34px}
 .vs-half.bot .vs-pad{width:92%;padding:0 0 14% 16px}
 /* 아래 조각도 **왼쪽부터** 읽는 순서를 지킨다 — 뒤집었더니 트로피가 숫자 뒤로 갔다 */
 .vs-half.bot .vs-info{align-items:flex-start}
 
-.vs-row{display:flex;align-items:center;gap:16px;padding:8px 0}
+/* 글자 크기는 `font-size` 배율을 따라간다 (인원수에 맞춰 줄이려고) */
+.vs-row{display:flex;align-items:center;gap:1em;padding:.4em 0;font-size:16px}
 .vs-por{display:block;flex:0 0 auto;background-repeat:no-repeat;image-rendering:auto;
   filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
 .vs-info{display:flex;flex-direction:column;gap:2px}
-.vs-nick{font-size:20px;font-weight:900;color:#e8e8f0;white-space:nowrap}
-.vs-score{display:flex;align-items:center;gap:6px;font:900 28px var(--gf);color:#ffd34d}
-.vs-cup{display:inline-block;width:16px;height:16px;border-radius:2px;
+.vs-nick{font-size:1.25em;font-weight:900;color:#e8e8f0;white-space:nowrap}
+.vs-score{display:flex;align-items:center;gap:6px;font:900 1.75em var(--gf);color:#ffd34d}
+.vs-cup{display:inline-block;width:1em;height:1em;border-radius:2px;
   background:linear-gradient(180deg,#ffd34d,#c8901a)}
 /* 칼전 캐릭터가 넓어 전적이 두 줄로 접혔다 → 줄바꿈 금지 */
-.vs-rec{font-size:15px;font-weight:700;color:#b9c6dc;white-space:nowrap}
+.vs-rec{font-size:.95em;font-weight:700;color:#b9c6dc;white-space:nowrap}
 
 /* 부딪힌 자리 — 사선을 따라 기울인다 (42%~58% 를 잇는 각) */
 /* 사선 각도와 같게 기울인다. 폭을 넉넉히 잡아야 끝이 화면 밖까지 이어진다 */

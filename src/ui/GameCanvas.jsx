@@ -185,6 +185,10 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
              { what: negText(ready.prompt.done.kind, 'name', ready.prompt.done.melee) })}
         </div>
       )}
+      {/* [stated] 내 신청이 밀렸을 때 — 다음 창을 내 것으로 오해하지 않게 */}
+      {ready.prompt?.lost && (
+        <div className="negdone ui-overlay lost">{t('ready.lost')}</div>
+      )}
       {ready.prompt?.waiting && (
         <div className="link-note ui-overlay">
           {negText(ready.prompt.waiting.kind, 'wait', ready.prompt?.melee)} · {t('ready.waitPeer', { n: ready.prompt.waiting.sec })}

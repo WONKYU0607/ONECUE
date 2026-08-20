@@ -175,6 +175,7 @@ export default {
   'buff.heal': 'Heal',
   'ready.placeDone': 'Start as is',
   'ready.goDone': 'Ready',
+  'ready.lost': 'Their request arrived first — yours was cancelled',
   'match.slowHint': 'If this takes over 30s, open the server address in a browser to check',
   'pvp.enter': 'Join',
   'err.noServer': 'Cannot reach the server',

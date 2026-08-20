@@ -175,6 +175,7 @@ export default {
   'buff.heal': '체력 회복',
   'ready.placeDone': '이대로 시작',
   'ready.goDone': '준비 완료',
+  'ready.lost': '상대 신청이 먼저 도착해 내 신청은 취소되었습니다',
   'match.slowHint': '30초가 넘으면 서버 주소를 브라우저로 열어 확인해봐라',
   'pvp.enter': '입장',
   'err.noServer': '서버에 연결할 수 없다',

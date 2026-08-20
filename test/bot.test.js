@@ -37,8 +37,11 @@ console.log('봇인 걸 드러내지 않는다');
 {
   const srv = fs.readFileSync('server/index.js', 'utf8');
   const add = srv.slice(srv.indexOf('addBots(){'), srv.indexOf('tuneBots(){'));
-  assert(/'player'/.test(add), '사람과 같은 꼴의 이름을 쓴다');
-  assert(!/bot|AI|봇/i.test(add.match(/st\.nick\[i\] = [^;]+;/)?.[0] || ''),
+  // [stated] 이제 봇은 **실제 계정 50개**를 돌려 쓴다 — 이름도 그 계정 것을 그대로 쓴다.
+  // 예전처럼 `player12` 를 즉석에서 만들지 않는다
+  assert(/pickBot\(/.test(add), '봇 계정 명단에서 고른다');
+  assert(/st\.nick\[i\] = bot\.nick;/.test(add), '이름은 그 계정 닉네임을 쓴다');
+  assert(!/bot|AI|봇/i.test(add.match(/st\.nick\[i\] = [^;]+;/)?.[0].replace(/bot\.nick/, '') || ''),
     '이름에 봇 표시가 없다');
   // 상태에 "봇이다" 라는 표시가 클라로 나가면 안 된다
   const sim = fs.readFileSync('src/game/sim.js', 'utf8');

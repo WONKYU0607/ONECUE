@@ -7,6 +7,7 @@ import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY, PH_OVER } from '../src/game/co
 import { scoreDelta } from '../src/game/score.js';
 import { createAI } from '../src/game/ai.js';
 import { createSoccerAI } from '../src/game/soccer-ai.js';
+import { BOTS, pickBot } from './bots.js';
 import * as store from './store.js';
 import { forfeit, setOff } from '../src/game/sim.js';
 
@@ -139,8 +140,13 @@ class Room {
     if (this.server.bots.some(b => b.slot === i)) return;
     seat.sid = 'bot:' + this.id + ':' + i;          // 자리를 잡아둔다 (다른 사람이 못 앉게)
     seat.bot = true;
+    // [stated] **봇도 계정을 쓴다** — 점수·전적이 실제로 쌓이고 순위표에도 올라간다.
+    // 한 방에 같은 계정이 두 번 앉지 않게 이미 쓴 uid 는 건너뛴다
+    const used = new Set(this.seats.map(x => x && x.uid).filter(Boolean));
+    const bot = pickBot(this.id, i, used);
+    seat.uid = bot.uid;
     if (!Array.isArray(st.nick)) st.nick = new Array(this.n).fill('');
-    st.nick[i] = 'player' + (10 + Math.floor(Math.random() * 89));
+    st.nick[i] = bot.nick;
     if (st.color){
       // **자기 자리는 빼고 본다.** 자리를 잡자마자 그 자리의 초기 색(=슬롯 번호)이
       // '이미 쓰는 색'으로 잡혀 엉뚱하게 밀린다
@@ -205,7 +211,7 @@ class Room {
     for (let i = 0; i < this.n; i++){
       const seat = this.seats[i];
       if (!seat || !seat.uid) continue;                 // 로그인 안 한 사람은 건너뛴다
-      if (seat.bot) continue;                           // AI 가 이어받은 자리는 점수를 안 준다
+      // 봇 계정은 점수를 쌓는다. 다만 **사람이 나가 AI 가 이어받은 자리**는 uid 가 없어 저절로 건너뛴다
       const before = this.preScore[i] || { score: st.soccer ? 0 : 1000, streak: 0 };
       // [stated] **축구는 점수 규칙이 다르다** — 이기면 골x100x연승, 지면 골x50.
       // 티어도 강약 차등도 없다
@@ -390,7 +396,7 @@ class Room {
         streak: (v && v.streak && v.streak[kind]) | 0,
         record: (v && v.record && v.record[kind]) || null
       }));
-      this.send({ t: 'vs', kind, rows });
+      this.send({ t: 'vs', kind, ffa: !!st.ffa, rows });
     }).catch(() => {});
   }
 
@@ -400,6 +406,8 @@ class Room {
     const seat = this.seats[slot];
     seat.sid = 'bot:' + this.id + ':' + slot;   // 다른 사람이 못 앉게 자리를 잡아둔다
     seat.bot = true; seat.ws = null;
+    // 나간 사람의 uid 는 지운다 — 그 사람 점수에 봇 결과가 쌓이면 안 된다
+    seat.uid = '';
     setOff(st, slot, false);                   // 유령 표시를 지운다 — 다시 공을 다룬다
     st.p[slot].stun = 0;
     this.server.bots = this.server.bots || [];
@@ -578,7 +586,11 @@ const http = createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server: http });
-http.listen(PORT, () => console.log(`듀얼 서버 대기중 :${PORT}`));
+http.listen(PORT, () => {
+  console.log(`듀얼 서버 대기중 :${PORT}`);
+  // [stated] 봇 계정 50개를 심는다. **없는 것만** 만들고, 이미 있으면 그동안 쌓인 점수를 둔다
+  store.seedBots(BOTS).catch(() => {});
+});
 store.warmup();   // **첫 판이 아니라 부팅 때** Firestore 연결을 연다
 
 // 대기열: 새로 들어온 사람은 방에 바로 앉히지 않는다.

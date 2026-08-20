@@ -172,6 +172,8 @@ export function normalizeState(st){
   for (const k of ['fastT', 'bareT']) if (typeof st[k] !== 'number') st[k] = 0;
   if (!Array.isArray(st.negOk)) st.negOk = [];
   if (st.negDone === undefined) st.negDone = null;
+  if (st.negLost === undefined) st.negLost = null;
+  if (!Array.isArray(st.negNo)) st.negNo = [];
   if (!Array.isArray(st.nick) || st.nick.length !== (st.n || 2))
     st.nick = Array.from({ length: st.n || 2 }, (_, i) => (st.nick && st.nick[i]) || '');
   if (!Array.isArray(st.dealt) || st.dealt.length !== (st.n || 2))
@@ -275,7 +277,8 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     fastT: 0,                   // 신청 응답 제한 시간 (틱). 0이 되면 저절로 취소
     bareT: 0,
     negOk: [],
-    negDone: null,              // 방금 수락된 신청 (가운데 알림용)
+    negDone: null,
+    negNo: [],                  // 자리별로 거절당한 신청 종류 (다시 못 건다)              // 방금 수락된 신청 (가운데 알림용)
     lag: 0,                     // 지연 보상 틱 수. 서버가 매 프레임 넣어준다
     pastP: [],                  // 최근 위치 기록 [[x,y]x인원] x LAG_HIST. 명중을 되감아 판정한다
     // 슬롯별 이동 속도 배율. **AI 모드 전용**(단계가 오를수록 상대가 조금씩 빨라진다).
@@ -581,6 +584,9 @@ export function blocked(s, x, y, self = -1){
     if (i === self) continue;
     const o = s.p[i];
     if (o.hp <= 0 || (s.off && s.off[i])) continue;   // 끊긴 사람은 유령 — 몸도 통과
+    // [stated] **축구는 캐릭터끼리 안 막는다** — 앞뒤를 둘이 막으면 가운데 사람이
+    // 영영 못 움직였다. 원래 규칙도 "상대를 밀 수 있다" 였다
+    if (s.soccer) continue;
     if (!overlap(x, y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
     // [stated] **모서리에서 둘이 끼면 못 움직였다.**
     // 이미 겹쳐 있는 상태라면 막지 않는다 — 아이템에 쓰는 규칙과 같다.
@@ -611,6 +617,11 @@ export function step(s, inp){
       const pending = s.fastBy || s.bareBy;
       // 칼전은 2배속을 받지 않는다. **버튼만 없애면 고친 클라가 신청할 수 있어**
       // 여기서도 막는다
+      // [stated] **내 신청이 조용히 버려지면 안 된다.** 봇·상대 신청이 한 발 먼저 도착하면
+      // 내 신청은 `pending` 에 막혀 사라지는데, 그러면 바로 뒤에 뜨는 창이 내 것인 줄 알고
+      // 수락해서 **엉뚱한 종류가 걸린다**(2배속을 눌렀는데 노템전이 진행됐다)
+      if ((q.fastReq || q.bareReq) && pending && pending !== i + 1)
+        s.negLost = { slot: i, t: NEG_SHOW };
       if (q.fastReq && !s.fast && !s.melee && !s.soccer && !pending){ s.fastBy = i + 1; s.fastT = NEG_TICKS; s.negOk = []; }
       // [stated] 칼전에도 신청 가능. 칼전은 없앨 아이템이 없으므로 **버프를 끈다**
       if (q.bareReq && !s.bare && !s.soccer && !pending){ s.bareBy = i + 1; s.bareT = NEG_TICKS; s.negOk = []; }
@@ -622,6 +633,13 @@ export function step(s, inp){
       const ans = s.fastBy ? q.fastAns : q.bareAns;
       if (!ans) continue;
       if (ans !== 1){                                        // 한 명이라도 거절하면 끝
+        // [stated] **거절당한 신청은 다시 못 건다** — 버튼이 계속 남아 있어 몇 번이고
+        // 신청하게 됐다. 신청한 사람 자리에 거절당한 종류를 남긴다
+        const kind = s.fastBy ? 'fast' : 'bare';
+        if (!Array.isArray(s.negNo)) s.negNo = [];
+        const who = by - 1;
+        if (!s.negNo[who]) s.negNo[who] = [];
+        if (!s.negNo[who].includes(kind)) s.negNo[who].push(kind);
         s.fastBy = 0; s.bareBy = 0; s.fastT = 0; s.bareT = 0; s.negOk = [];
         continue;
       }
@@ -639,11 +657,17 @@ export function step(s, inp){
         s.fastBy = 0; s.bareBy = 0; s.fastT = 0; s.bareT = 0; s.negOk = [];
       }
     }
-    // 제한 시간이 지나면 거절한 것으로 보고 창을 닫는다
+    // 제한 시간이 지나면 거절한 것으로 보고 창을 닫는다 (그 종류는 다시 못 건다)
     // 수락 알림은 잠깐 떴다 사라진다
     if (s.negDone && --s.negDone.t <= 0) s.negDone = null;
-    if (s.fastBy && --s.fastT <= 0){ s.fastBy = 0; s.fastT = 0; s.negOk = []; }
-    if (s.bareBy && --s.bareT <= 0){ s.bareBy = 0; s.bareT = 0; s.negOk = []; }
+    if (s.negLost && --s.negLost.t <= 0) s.negLost = null;
+    const deny = (who, kind) => {
+      if (!Array.isArray(s.negNo)) s.negNo = [];
+      if (!s.negNo[who]) s.negNo[who] = [];
+      if (!s.negNo[who].includes(kind)) s.negNo[who].push(kind);
+    };
+    if (s.fastBy && --s.fastT <= 0){ deny(s.fastBy - 1, 'fast'); s.fastBy = 0; s.fastT = 0; s.negOk = []; }
+    if (s.bareBy && --s.bareT <= 0){ deny(s.bareBy - 1, 'bare'); s.bareBy = 0; s.bareT = 0; s.negOk = []; }
   }
   if (s.phase === PH_READY){
     for (let i = 0; i < s.n; i++){
@@ -692,7 +716,9 @@ export function step(s, inp){
   }
 
   if (s.phase === PH_OVER){
-    if (inp[0].fire || inp[1].fire){
+    // [stated] **축구는 다시 시작되면 안 된다** — 슛 버튼이 `fire` 를 보내는데,
+    // 판이 끝난 뒤 그걸 누르면 재대전으로 읽혀 갑자기 준비 화면이 뜨고 새 판이 시작됐다
+    if (!s.soccer && (inp[0].fire || inp[1].fire)){
       const t = s.tick, ms = s.maxStep, bv = s.bulletV, ct = s.coolT, n = newState();
       n.tick = t; n.phase = PH_READY; n.timer = 0; n.rdy = readyLimit(n.melee);
       s.p = n.p; s.bullets = n.bullets; s.covers = n.covers;

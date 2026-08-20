@@ -59,7 +59,19 @@ export default function Result({ result, summary, score, session, onAgain, onHom
           </div>
         )}
 
-        {summary && (
+        {/* [stated] **축구는 체력·기여도가 없다** — 결과와 점수만 보여준다 */}
+        {summary && summary.soccer && (
+          <div className="resbox">
+            <div className="res-sum">
+              <span className="res-goals">
+                {summary.myGoals | 0} : {summary.foeGoals | 0}
+              </span>
+              {summary.timeout && <span className="res-tag">{t('res.timeUp')}</span>}
+            </div>
+          </div>
+        )}
+
+        {summary && !summary.soccer && (
           <div className="resbox">
             <div className="res-sum">
               {summary.ffa

@@ -409,6 +409,34 @@ export async function invitesFor(me){
   } catch { return null; }
 }
 
+/** [stated] **봇 계정 50개를 구름에 심는다.** 없는 것만 만든다 —
+ *  이미 있으면 그동안 쌓인 점수를 덮어쓰면 안 된다 */
+export async function seedBots(bots){
+  if (!db || !bots || !bots.length) return 0;
+  try {
+    const refs = bots.map(b => db.doc('players/' + b.uid));
+    const snaps = await db.getAll(...refs);
+    const batch = db.batch();
+    let made = 0;
+    snaps.forEach((snap, i) => {
+      if (snap.exists) return;                     // 있으면 그대로 둔다
+      const b = bots[i];
+      batch.set(refs[i], {
+        nick: b.nick, bot: true,
+        score: b.score, streak: b.streak, record: b.record,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      made++;
+    });
+    if (made) await batch.commit();
+    console.log(`[store] 봇 계정 ${made}개 새로 만듦 (전체 ${bots.length})`);
+    return made;
+  } catch (e){
+    console.log('[store] 봇 계정 심기 실패', e && e.code);
+    return 0;
+  }
+}
+
 /** [stated] 매칭되면 **서로의 공개 정보**를 보여준다 — 닉네임·점수·전적.
  *  여러 명을 **한 번에** 읽는다(`getAll`) — 하나씩 읽으면 인원수만큼 왕복이 생긴다 */
 export async function publicOf(uids){

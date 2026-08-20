@@ -153,7 +153,10 @@ export function createRenderer(canvas){
                                   : (sideways ? (run ? 6 : 2) : SOC_STAND[face] + (run ? 4 : 0)));
       // **칸이 아니라 몸 높이(44)를 기준**으로 배율을 잡는다.
       // 칸 기준으로 잡으면 칸을 넓힐 때마다 캐릭터가 같이 작아진다
-      const sc = ARENA.ph / SOC_BODY * 1.35;
+      // [stated] **넘어진 모션이 너무 작다** — 원화가 누운 자세라 칸 안 높이가
+      // 서 있는 것(44)의 절반도 안 된다(21). 그릴 때만 키워 몸 크기를 맞춘다
+      const fallBig = (p.stun | 0) > 0 ? 1.7 : 1;
+      const sc = ARENA.ph / SOC_BODY * 1.35 * fallBig;
       const dw = SOC_FW * sc, dh = SOC_FH * sc;
       if (hit) ctx.filter = 'grayscale(1) brightness(3.4)';
       const dx0 = Math.round((xw + ARENA.pw / 2 - dw / 2) * RS);

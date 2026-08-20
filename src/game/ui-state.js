@@ -35,6 +35,10 @@ export function matchSummary(st, slot){
     state: st,                    // 점수 계산은 시뮬 상태에서만 한다
     ffa: !!st.ffa,
     melee: !!st.melee,
+    // [stated] 축구는 체력·기여도가 없다 — 결과 화면이 **골 수만** 보여준다
+    soccer: !!st.soccer,
+    myGoals: st.soccer ? ((st.score || [])[me] | 0) : 0,
+    foeGoals: st.soccer ? ((st.score || [])[1 - me] | 0) : 0,
     n,
     rows,
     myHp: sum(me),
@@ -116,17 +120,22 @@ export function uiPrompt(st, slot, online){
   if (online && !pending && st.phase !== PH_COUNT && !st.soccer){
     // [stated] 칼전에는 2배속을 안 쓴다 — 버프(이속 1.5 · 공속 1.5)만으로 충분히 빠르다.
     // 둘이 곱해지면 이동 3배·칼 주기 3배가 되어 과했다
-    if (!st.fast && !st.melee) offer.push('fast');
+    // [stated] **거절당한 종류는 버튼을 없앤다** — 계속 남아 있어 몇 번이고 신청하게 됐다
+    const denied = (Array.isArray(st.negNo) && st.negNo[slot]) || [];
+    if (!st.fast && !st.melee && !denied.includes('fast')) offer.push('fast');
     // [stated] 칼전에도 신청할 수 있다 — 없앨 아이템이 없으므로 **버프를 끈다**.
     // 시뮬은 열어놨는데 이 목록에 `!st.melee` 가 남아 버튼이 안 떴다
-    if (!st.bare) offer.push('bare');
+    if (!st.bare && !denied.includes('bare')) offer.push('bare');
   }
   // [stated] 수락되면 화면 가운데에 알림을 띄운다.
   // 내가 신청했으면 "상대가 수락했다", 상대가 신청했으면 "내가 수락했다"
   const done = st.negDone
     ? { kind: st.negDone.kind, mine: st.negDone.by === slot, melee: !!st.melee }
     : null;
-  return { pre: true, banner, ask, waiting, offer, done, melee: !!st.melee };
+  // [stated] 내 신청이 밀려 버려졌으면 그 사실을 알려준다 — 안 그러면 바로 뒤에 뜨는 창을
+  // 내 것으로 알고 수락해 엉뚱한 종류가 걸린다
+  const lost = (st.negLost && st.negLost.slot === slot) ? { sec: sec(st.negLost.t) } : null;
+  return { pre: true, banner, ask, waiting, offer, done, lost, melee: !!st.melee };
 }
 
 // 신청 문구를 번역해서 돌려준다 (표는 열쇠만 담고 있다)
