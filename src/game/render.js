@@ -35,6 +35,9 @@ const SOC_BODY = 44;
 const SOC_TACKLE = { 0: 9, 1: 8, 2: 10, 3: 11 };
 // 12 = 태클에 걸려 넘어진 모습 (방향 구분 없음)
 const SOC_FALL = 12;
+// 자세별 그리기 배율. 서 있는 자세(0~7)는 1, **누운 자세는 긴 쪽을 48 로** 맞춘다.
+// 시트에서 잰 값: 앞태클 74 · 뒤태클 72 · 좌태클 73 · 우태클 72 · 넘어짐 51
+const SOC_SCALE = { 8: 0.65, 9: 0.67, 10: 0.66, 11: 0.67, 12: 0.94 };
 const SOC_STAND = { 0: 1, 1: 0, 2: 2, 3: 3 };        // face -> 서있는 자세
 // 화면 뒤집기는 **세로만** 한다(`fy()`가 y만 뒤집는다) → 앞뒤만 바꾸고 **좌우는 그대로**.
 // 좌우까지 바꿨더니 슬롯1에서 **오른쪽으로 가는데 왼쪽을 보고 달렸다**
@@ -153,10 +156,11 @@ export function createRenderer(canvas){
                                   : (sideways ? (run ? 6 : 2) : SOC_STAND[face] + (run ? 4 : 0)));
       // **칸이 아니라 몸 높이(44)를 기준**으로 배율을 잡는다.
       // 칸 기준으로 잡으면 칸을 넓힐 때마다 캐릭터가 같이 작아진다
-      // [stated] **넘어진 모션이 너무 작다** — 원화가 누운 자세라 칸 안 높이가
-      // 서 있는 것(44)의 절반도 안 된다(21). 그릴 때만 키워 몸 크기를 맞춘다
-      const fallBig = (p.stun | 0) > 0 ? 1.7 : 1;
-      const sc = ARENA.ph / SOC_BODY * 1.35 * fallBig;
+      // [stated] **넘어짐·슬라이딩 크기가 제각각이다. 정면 캐릭터 크기에 다 맞춘다.**
+      // 누운 자세는 칸 안에서 **가로로 길다**(태클 74, 넘어짐 51) — 서 있는 것(높이 44)과
+      // 같은 잣대로 그리면 태클은 커 보이고 넘어짐은 작아 보인다.
+      // 그래서 자세마다 **긴 쪽 길이를 48 로 맞추는** 배율을 따로 곱한다
+      const sc = ARENA.ph / SOC_BODY * 1.35 * (SOC_SCALE[fc] || 1);
       const dw = SOC_FW * sc, dh = SOC_FH * sc;
       if (hit) ctx.filter = 'grayscale(1) brightness(3.4)';
       const dx0 = Math.round((xw + ARENA.pw / 2 - dw / 2) * RS);

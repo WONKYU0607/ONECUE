@@ -386,7 +386,9 @@ class Room {
     this.vsSent = true;
     const st = this.server.s;
     const kind = st.soccer ? 'soccer' : (st.melee ? 'melee' : 'gun');
-    const uids = this.seats.map(x => (x.bot ? '' : (x.uid || '')));
+    // **봇도 계정이 있으므로 uid 를 그대로 쓴다.** 예전엔 봇을 빈 값으로 지웠는데,
+    // 계정을 붙인 뒤에도 그 줄이 남아 VS 화면에서 봇 점수가 계속 `-` 로 떴다
+    const uids = this.seats.map(x => (x && x.uid) || '');
     store.publicOf(uids).then(list => {
       const rows = list.map((v, i) => ({
         slot: i,

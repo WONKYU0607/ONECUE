@@ -76,10 +76,13 @@ export default function VsIntro({ vs, mySlot, onDone }){
   const sizeOf = cnt => ({
     two: cnt >= 4,
     // 두 줄은 **절반 폭에 들어가게** 더 줄인다 (0.66 은 오른쪽이 잘렸다)
-    zoom: cnt >= 4 ? 0.5 : cnt === 3 ? 0.7 : cnt === 2 ? 0.82 : 1,
+    // **자리는 그대로 두고 배율만 낮춰** 사선에 안 걸리는 값을 실제로 재서 찾았다
+    // (2대2 0.7 / 3대3 0.6 / 4명 이상 0.6 에서 잘림이 사라진다)
+    zoom: cnt >= 4 ? 0.6 : cnt === 3 ? 0.6 : cnt === 2 ? 0.7 : 1,
     // 위 조각은 위에서, 아래 조각은 아래에서 붙으므로 **여백을 키워야** 가운데로 온다
     // (줄였더니 오히려 바깥으로 밀렸다)
-    pad: cnt >= 4 ? 12 : cnt === 3 ? 14 : cnt === 2 ? 20 : 28
+    // **사선 쪽 줄이 잘렸다** — 조각은 사선까지밖에 안 보이므로 여백을 더 줘 안쪽으로 민다
+    pad: cnt >= 4 ? 4 : cnt === 3 ? 14 : cnt === 2 ? 20 : 28
   });
   const upSz = sizeOf(upper.length || 1);
   const loSz = sizeOf(lower.length || 1);

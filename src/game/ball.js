@@ -242,14 +242,23 @@ export function stepBall(s, kicks, chs){
     const ny = p.y < b.y ? (b.y > p.y + PHf ? p.y + PHf : b.y) : p.y;
     const dx = b.x - nx, dy = b.y - ny;
     if (dx * dx + dy * dy > BALL_R * BALL_R) continue;
-    // 많이 파고든 축으로 되튕긴다
-    if (Math.abs(dx) >= Math.abs(dy)){
-      b.x = dx >= 0 ? nx + BALL_R : nx - BALL_R;
-      b.vx = -b.vx;
-    } else {
-      b.y = dy >= 0 ? ny + BALL_R : ny - BALL_R;
+    // [stated] **막고 선 사람을 공이 감아 돌아 골이 들어갔다.**
+    // 파고든 깊이로 축을 고르면, 위로 날아온 공이 몸 옆을 스칠 때 **가로로 튕기고
+    // 세로 속도는 그대로 남아** 옆으로 미끄러져 지나간다 — 감아차기처럼 보인다.
+    // **날아온 방향(속도가 큰 축)으로 되튕겨야** 막힌 느낌이 난다
+    const vert = Math.abs(b.vy) >= Math.abs(b.vx);
+    if (vert){
+      b.y = (b.y >= ny) ? ny + BALL_R : ny - BALL_R;
       b.vy = -b.vy;
+      b.vx = (b.vx * 3 / 4) | 0;          // 옆으로 새는 몫은 줄인다
+    } else {
+      b.x = (b.x >= nx) ? nx + BALL_R : nx - BALL_R;
+      b.vx = -b.vx;
+      b.vy = (b.vy * 3 / 4) | 0;
     }
+    // 몸에 맞으면 힘이 죽는다 — 그대로 튀면 골대까지 계속 굴러간다
+    b.vx = (b.vx * 55 / 100) | 0;
+    b.vy = (b.vy * 55 / 100) | 0;
   }
 
   return goalCheck(s, b);
