@@ -21,7 +21,11 @@ export default function SettingsModal({ onClose }){
   const toggle = key => {
     const next = setSetting(key, !s[key]);
     setS(next);
-    if (key === 'sound' && next.sound){ unlockAudio(); sfx.place(); }   // 켠 순간 소리로 확인
+    // [stated] **음소거는 전부 끈다** — 효과음만 끄고 배경음이 남으면 음소거가 아니다
+    if (key === 'sound'){
+      if (next.sound){ unlockAudio(); sfx.place(); playMusic('lobby'); }   // 켠 순간 소리로 확인
+      else stopMusic();
+    }
     // [stated] 배경음은 따로 켜고 끈다 — 끄면 즉시 멈추고, 켜면 로비 곡이 다시 흐른다
     if (key === 'music'){ if (next.music){ unlockAudio(); playMusic('lobby'); } else stopMusic(); }
     if (key === 'showGrid') VIEW.grid = next.showGrid;   // 렌더는 이 값을 매 프레임 읽는다

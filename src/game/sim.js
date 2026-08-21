@@ -1230,6 +1230,7 @@ export function step(s, inp){
             // [stated] **태클한 길로 공이 흘러나간다** — 미끄러진 방향으로 굴러간다
             const [tx, ty] = faceVec(a.tklF == null ? a.face : a.tklF);
             s.ball.vx = tx * TACKLE_V; s.ball.vy = ty * TACKLE_V;
+            s.lastKicker = i;                     // 태클한 사람 몸은 잠깐 통과
           }
         }
         for (let j = 0; j < s.n; j++){
@@ -1243,7 +1244,17 @@ export function step(s, inp){
           const near2 = adx * adx + ady * ady <= TACKLE_HIT * TACKLE_HIT;
           if (!near2 && !overlap(a.x, a.y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
           o.stun = SOC_STUN;
-          if (s.ballOwner === j){ s.ballOwner = -1; s.freeT = RELEASE_TICKS; }
+          if (s.ballOwner === j){
+            s.ballOwner = -1; s.freeT = RELEASE_TICKS;
+            // [stated] **태클에 성공하면 공은 태클한 방향으로 튕겨 나간다.**
+            // 여기서 속도를 안 줘서 상대 발밑에 그대로 떨어졌다
+            // (공 근처를 지나가 뺏는 경로에는 있었는데 몸이 겹친 경로에는 빠져 있었다)
+            const [tx2, ty2] = faceVec(a.tklF == null ? a.face : a.tklF);
+            s.ball.vx = tx2 * TACKLE_V; s.ball.vy = ty2 * TACKLE_V;
+            // **태클한 사람 몸은 잠깐 통과시킨다.** 공이 그 사람 몸 안에서 출발하므로
+            // 그대로 두면 자기 몸에 부딪혀 힘이 죽는다(슛에 쓰던 것과 같은 처리)
+            s.lastKicker = i;
+          }
         }
       }
       const g = stepBall(s, kicks, chs);

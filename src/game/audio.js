@@ -53,7 +53,7 @@ const SFX_SRC = {
   tackle: 'tackle', tackleHit: 'tackle-hit',
   goal: 'goal', whistle: 'whistle',
   tap: 'tap', matched: 'matched',
-  vsClash: 'vs-clash', vsBolt: 'vs-bolt'
+  vsClash: 'vs-clash'
 };
 const BGM_SRC = { lobby: 'bgm-lobby', soccer: 'bgm-soccer' };
 const buf = {};                      // 이름 → AudioBuffer
@@ -94,10 +94,18 @@ let bgmNode = null, bgmGain = null, bgmName = '';
 const BGM_VOL = 0.34;
 
 export function playMusic(name){
-  if (!ctx || !getSettings().music){ stopMusic(); return; }
+  // [stated] **음소거를 누르면 배경음도 꺼진다** — `sound` 는 전체 스위치다
+  const st = getSettings();
+  if (!ctx || !st.sound || !st.music){ stopMusic(); return; }
   if (bgmName === name && bgmNode) return;     // 이미 그 곡이면 그대로 둔다
   stopMusic(0.35);
-  if (!buf[name]) { bgmName = name; return; }  // 아직 안 받았으면 이름만 기억
+  if (!buf[name]){
+    // **아직 안 받았으면 받고 나서 다시 시도한다.** 예전엔 이름만 기억하고 끝나서
+    // 축구 배경음이 영영 안 나왔다(경기 시작이 파일 받기보다 빨랐다)
+    bgmName = name;
+    preloadSfx().then(() => { if (bgmName === name && !bgmNode) { bgmName = ''; playMusic(name); } });
+    return;
+  }
   bgmName = name;
   const src = ctx.createBufferSource();
   src.buffer = buf[name];
@@ -124,7 +132,8 @@ export function stopMusic(fade = 0.4){
 
 /** 설정에서 배경음을 껐다 켰을 때 */
 export function refreshMusic(name){
-  if (getSettings().music) playMusic(name); else stopMusic();
+  const st = getSettings();
+  if (st.sound && st.music) playMusic(name); else stopMusic();
 }
 const at = () => ctx.currentTime;
 
@@ -298,7 +307,6 @@ export const sfx = {
   tap(){ shot('tap', { vol: 0.5 }); },
   matched(){ shot('matched', { vol: 0.8 }); },
   vsClash(){ shot('vsClash', { vol: 0.9 }); },
-  vsBolt(){ shot('vsBolt', { vol: 0.7 }); },
 
   // [stated] 결과 화면에서 **점수가 1점씩 굴러갈 때** 나는 소리.
   // 아주 짧은 '틱' 하나 — 빠르게 이어지면 '따르르륵' 으로 들린다.

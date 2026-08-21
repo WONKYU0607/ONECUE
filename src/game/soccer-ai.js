@@ -125,8 +125,18 @@ export function createSoccerAI(slot, level = 1){
         goal = { x: half(b.x + goalCx) - half(PWf) + (slot % 2 ? 20 * FP : -20 * FP),
                  y: half(b.y + ourGoalY) - half(PHf), slop: L.slop };
       }
-      goal.x = Math.max(FIELD.x0, Math.min(FIELD.x1 - PWf, goal.x));
-      goal.y = Math.max(GOAL.top, Math.min(GOAL.bot - PHf, goal.y));
+      // [stated] **공을 들고 모서리로 가면 껴서 안 움직였다.**
+      // 벽에 딱 붙는 자리를 목표로 잡으면 계속 벽을 밀며 제자리걸음을 한다 →
+      // **벽에서 한 뼘 떨어진 곳까지만** 목표로 삼는다
+      const M = 10 * FP;
+      goal.x = Math.max(FIELD.x0 + M, Math.min(FIELD.x1 - PWf - M, goal.x));
+      goal.y = Math.max(GOAL.top + M, Math.min(GOAL.bot - PHf - M, goal.y));
+      // 내가 이미 모서리에 몰려 있으면 **가운데로 한 번 빠져나온다**
+      const cornerX = cx < FIELD.x0 + 14 * FP || cx > FIELD.x1 - 14 * FP;
+      const cornerY = cy < GOAL.top + 14 * FP || cy > GOAL.bot - 14 * FP;
+      if (mineBall && cornerX && cornerY){
+        goal = { x: goalCx - half(PWf), y: half(GOAL.top + GOAL.bot) - half(PHf), slop: L.slop };
+      }
     }
 
     if (!goal) return { dx: 0, dy: 0, fire: 0, tkl: wantTackle ? 1 : 0 };

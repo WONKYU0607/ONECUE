@@ -50,8 +50,16 @@ function setLayoutH(){
   const w = winW(), h = winH() - cur.top - cur.bottom;
   if (w !== baseW){ baseW = w; baseH = h; }      // 회전 등 — 새로 잡는다
   else if (h > baseH) baseH = h;                 // 커진 건 진짜 (키보드가 내려간 것)
-  if (typeof document !== 'undefined')
-    document.documentElement.style.setProperty('--vh', Math.max(1, baseH) + 'px');
+  if (typeof document === 'undefined') return;
+  const el = document.documentElement.style;
+  // [stated] **두 값을 갈라 둔다.** 하나로 쓰면 둘 중 하나가 반드시 깨진다:
+  //   `--vh`   지금 보이는 높이 — **상자 크기**에 쓴다.
+  //            얼려두면 키보드가 떴을 때 804짜리 상자가 506 창을 넘쳐
+  //            웹뷰가 화면을 통째로 축소해 맞춘다(실측: 891→506, .screen 804)
+  //   `--vhmax` 가장 컸던 높이 — **UI 한 칸 단위(`--u`)**에만 쓴다.
+  //            이걸 지금 높이로 두면 키보드가 뜰 때 글씨·버튼이 쪼그라든다
+  el.setProperty('--vh', Math.max(1, h) + 'px');
+  el.setProperty('--vhmax', Math.max(1, baseH) + 'px');
 }
 
 /** 키보드를 뺀, 화면을 그릴 때 쓰는 높이 */

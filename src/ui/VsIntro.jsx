@@ -51,9 +51,9 @@ export default function VsIntro({ vs, mySlot, onDone }){
   useEffect(() => {
     const id = setTimeout(() => doneRef.current?.(), SHOW_MS);
     // 연출과 소리를 맞춘다 — 0.6초에 부딪히고, 1.0초에 번개가 다 뻗는다
+    // [stated] 번개 소리는 **뺐다** (별로였다). 충돌 소리만 남긴다
     const t1 = setTimeout(() => sfx.vsClash?.(), 560);
-    const t2 = setTimeout(() => sfx.vsBolt?.(), 600);
-    return () => { clearTimeout(id); clearTimeout(t1); clearTimeout(t2); };
+    return () => { clearTimeout(id); clearTimeout(t1); };
   }, []);
 
   const rows = (vs && vs.rows) || [];

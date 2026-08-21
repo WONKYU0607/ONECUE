@@ -17,7 +17,8 @@
      화면 높이가 줄어 `--u` 가 같이 줄고 UI 전체가 쪼그라든다.
      여기 기본값은 값이 아직 안 들어왔을 때만 쓰인다 */
   --vh:calc(100vh - var(--sat) - var(--sab));
-  --u:calc(min(100vw, var(--vh) * 0.455) / 360);
+  /* **UI 한 칸 단위는 얼린 높이(`--vhmax`)로.** 지금 높이로 두면 키보드가 뜰 때 쪼그라든다 */
+  --u:calc(min(100vw, var(--vhmax, var(--vh)) * 0.455) / 360);
   --fx:36px;   /* 틀 좌우 두께 */
   --fy:38px;   /* 틀 위아래 두께 */
 }
@@ -51,7 +52,9 @@ font:900 21px/1 var(--gf);letter-spacing:2px;cursor:pointer}
    캔버스 실측: 1917x950에서 466px, 1280x800에서 392px → 대략 높이의 0.455배 */
 /* **`inset:0` 이면 상태바·내비게이션바 밑까지 깔린다.** 안전 영역만큼 띄운다 */
 /* **높이를 `--vh` 로 못박는다.** `bottom` 으로 잡으면 키보드가 뜰 때 같이 줄어든다 */
+/* 높이는 **지금 보이는 만큼**. 넘치면 축소가 아니라 스크롤로 처리한다 */
 .screen{position:fixed;top:var(--sat);right:var(--sar);left:var(--sal);height:var(--vh);
+overflow-y:auto;overflow-x:hidden;
 display:flex;flex-direction:column;align-items:center;
 justify-content:center;gap:18px;color:#e8e8f0;font-family:var(--gf);font-weight:700;padding:8px}
 /* 금속 틀. CSS border-image 가 9분할을 대신 해준다 —

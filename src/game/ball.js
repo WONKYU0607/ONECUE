@@ -88,7 +88,7 @@ export const kickSpeed = ch => {
 };
 // [stated] **태클에 맞으면 0.5초 쓰러진다**
 // (칼전에도 같은 이름이 있어 `SOC_STUN` 으로 둔다 — 같이 들여오면 이름이 겹친다)
-export const SOC_STUN = 30;
+export const SOC_STUN = 48;   // [stated] 0.5초 → 0.8초
 // 태클이 스치기만 해도 뺏을 수 있게, 몸 겹침 말고 **거리로도** 본다
 export const TACKLE_HIT = Math.round(14 * FP);
 export const KICK_COOL = 18;                       // 연타 방지 (틱)
@@ -233,6 +233,9 @@ export function stepBall(s, kicks, chs){
   for (let i = 0; i < s.n; i++){
     const p = s.p[i];
     if (p.hp <= 0 || (s.off && s.off[i])) continue;
+    // [stated] **넘어진 사람은 공을 못 막는다.** 바닥에 누워 있는데 벽처럼 막으면,
+    // 정면에서 태클해 뺏은 공이 그 사람 몸에 맞고 **제자리로 되돌아왔다**
+    if ((p.stun | 0) > 0) continue;
     if (s.freeT > 0 && i === s.lastKicker) continue;   // 찬 사람 몸은 잠깐 통과
     const nx = p.x < b.x ? (b.x > p.x + PWf ? p.x + PWf : b.x) : p.x;
     const ny = p.y < b.y ? (b.y > p.y + PHf ? p.y + PHf : b.y) : p.y;

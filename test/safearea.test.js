@@ -49,7 +49,13 @@ console.log('크기 계산이 쓸 수 있는 높이를 쓴다');
   assert(/--vh:calc\(100vh - var\(--sat\) - var\(--sab\)\)/.test(css),
     '  쓸 수 있는 높이를 따로 둔다 (JS 가 넣기 전 기본값)');
   assert(/setProperty\('--vh'/.test(sa), '  실제 값은 safearea.js 가 px 로 넣는다');
-  assert(/--u:calc\(min\(100vw, var\(--vh\)/.test(css), '  한 칸 단위가 그 높이를 쓴다');
+  // [stated] **상자 높이와 UI 단위를 갈랐다.**
+  //   `--vh`    지금 보이는 높이 — 상자 크기. 얼려두면 키보드가 뜰 때 넘쳐서
+  //             웹뷰가 화면을 통째로 축소한다(실측: 창 891→506, .screen 804)
+  //   `--vhmax` 가장 컸던 높이 — 한 칸 단위(`--u`)에만. 지금 높이로 두면 UI 가 쪼그라든다
+  assert(/--u:calc\(min\(100vw, var\(--vhmax/.test(css), '  한 칸 단위는 얼린 높이를 쓴다');
+  assert(/setProperty\('--vhmax'/.test(sa), '  얼린 높이도 safearea.js 가 넣는다');
+  assert(/setProperty\('--vh', Math\.max\(1, h\)/.test(sa), '  상자 높이는 지금 값을 넣는다');
   assert(!/45\.5vh/.test(css), '  옛 45.5vh 가 남아 있지 않다');
   assert(/usableW\(\), usableH\(\)/.test(game), '  캔버스도 뺀 크기로 맞춘다');
 }
