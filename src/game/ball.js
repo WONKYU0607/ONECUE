@@ -50,7 +50,7 @@ export const BALL_STOP = Math.round(0.15 * FP);    // 이보다 느리면 세운
 // 캐릭터 속도가 170px/초. 슛은 그보다 확실히 빨라야 하고,
 // 미는 속도는 조금 느려야 **따라가며 몰 수 있다**(빠르면 공이 도망간다)
 // [stated] "현재 속도를 슛 속도로 하고 몰고 가는 건 반으로 줄여"
-export const KICK_V = Math.round(6 * FP);          // 슛 — 지금 속도 그대로 (굴러가는 거리 약 154px)
+export const KICK_V = Math.round(4.5 * FP);   // [stated] 슛 속도 25% 낮춤 (6 → 4.5)          // 슛 — 지금 속도 그대로 (굴러가는 거리 약 154px)
 // [stated] 태클로 공을 차면 **슛보다 약하게** 튕겨 나간다. 슛의 절반
 // [stated] **태클로 뺏은 공이 넘어진 사람 앞에 그대로 떨어진다.**
 // 방향은 맞는데 **35px 밖에 안 굴러** 둘 사이에 남아 있었다 → 60px 쯤 굴러가게.
@@ -93,7 +93,9 @@ export const kickSpeed = ch => {
 // (칼전에도 같은 이름이 있어 `SOC_STUN` 으로 둔다 — 같이 들여오면 이름이 겹친다)
 export const SOC_STUN = 48;   // [stated] 0.5초 → 0.8초
 // 태클이 스치기만 해도 뺏을 수 있게, 몸 겹침 말고 **거리로도** 본다
-export const TACKLE_HIT = Math.round(14 * FP);
+// [stated] **태클이 너무 멀리서도 먹힌다** — 캐릭터가 9px 인데 중심 거리 14px 이면
+// 몸이 5px 떨어져 있어도 걸렸다. 몸이 거의 닿을 때만 걸리게 좁힌다
+export const TACKLE_HIT = Math.round(10 * FP);
 export const KICK_COOL = 18;                       // 연타 방지 (틱)
 export const GOAL_TO_WIN = 3;
 export const SOCCER_TICKS = 90 * 60;               // 90초
@@ -189,7 +191,9 @@ export function stepBall(s, kicks, chs){
         // 슛(1) 또는 태클로 건드림(2). 슛은 **차징 세기**를 쓴다
         const [fx, fy] = faceVec(p.face);
         const v = kicks[own] === 2 ? TACKLE_V : kickSpeed(chs ? chs[own] : 100);
-        s.noGoal = 0;                    // **차면 다시 골이 될 수 있다**
+        // **태클로 차는 것도 '찼다'로 쳐서 골 금지를 풀고 있었다** — 그래서 태클 골이 계속 났다.
+        // 진짜 슛(1)일 때만 푼다. 태클(2)이면 오히려 금지를 건다
+        s.noGoal = kicks[own] === 2 ? 1 : 0;
         b.vx = fx * v; b.vy = fy * v;
         if (kicks[own] !== 2) p.kickCool = KICK_COOL;
         s.kickFx = { x: f.x, y: f.y, f: p.face | 0, t: KICK_FX_TICKS };

@@ -93,7 +93,10 @@ export const PORTAL_EVERY = 7 * 60;    // [stated] 7초마다 자리 옮김 (10�
 // 총격전은 설치할 게 있어 15초, 칼전은 놓을 게 없어 10초
 export const READY_TICKS = 15 * 60;
 export const READY_TICKS_MELEE = 10 * 60;
-export const readyLimit = melee => (melee ? READY_TICKS_MELEE : READY_TICKS);
+// [stated] **축구는 시작 전 10초.** 총격전은 배치할 게 많아 길고, 칼전·축구는 짧아도 된다
+export const READY_TICKS_SOCCER = 60 * 10;
+export const readyLimit = (melee, soccer) =>
+  (soccer ? READY_TICKS_SOCCER : (melee ? READY_TICKS_MELEE : READY_TICKS));
 export const PH_READY = 0, PH_COUNT = 1, PH_PLAY = 2, PH_OVER = 3;
 export const CD_STEP = 60, CD_GO = 45;                  // 3/2/1 각 1초 + GAME START 0.75초
 export const CD_TICKS = CD_STEP * 3 + CD_GO;

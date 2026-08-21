@@ -20,6 +20,8 @@ const TACKLE_RANGE = 34 * FP;   // [stated] 봇이 태클을 안 해서 넓혔�
 // [stated] "봇은 적당히 움직이고 적당히 슛하고 축구처럼만 하면 된다."
 // 골대 앞까지 못 가는 상황이 잦아 **멀리서도 차게** 넓혔다 — 완벽한 봇을 만들 이유가 없다
 const SHOOT_RANGE = 150 * FP;
+// 공을 들고 버틸 수 있는 시간 (2.5초). 넘으면 골대 쪽으로 그냥 찬다
+const HOLD_MAX = 150;
 
 const LEVELS = [
   // **380ms 는 너무 느렸다** — 공이 작아진 뒤 90초 내내 0:0 이었다.
@@ -40,6 +42,7 @@ const dist2 = (ax, ay, bx, by) => { const dx = ax - bx, dy = ay - by; return dx 
 export function createSoccerAI(slot, level = 1){
   const L = LEVELS[Math.max(0, Math.min(LEVELS.length - 1, level))];
   let nextAt = 0;
+  let held = 0;                        // 공을 연속으로 들고 있은 틱
   let goal = null;          // 이번에 갈 자리 {x, y}
   let wantKick = false;
   let wantTackle = false;
@@ -167,6 +170,15 @@ export function createSoccerAI(slot, level = 1){
     // 지금 잡고 있고 골대 쪽이면 그냥 찬다 — 봇은 이 정도로 충분하다
     const own = s.ballOwner == null ? -1 : s.ballOwner;
     let kickNow = false;
+    // [stated] **봇이 공을 잡고 버티면 사람이 할 수 있는 게 없다.**
+    // 오래 들고 있으면 골대 쪽으로 그냥 차 버린다 — 실제 축구도 계속 안 들고 있는다
+    if (own === slot) held++; else held = 0;
+    if (own === slot && held > HOLD_MAX){
+      const toG = foeGoalY - cy;
+      dx = 0;
+      dy = toG < 0 ? -L.speed * FP : L.speed * FP;
+      return { dx: dx | 0, dy: dy | 0, fire: 1, fch: 100, tkl: 0 };
+    }
     if (own === slot){
       const toG = foeGoalY - cy;
       const lined = b.x >= GOAL.lo - 26 * FP && b.x <= GOAL.hi + 26 * FP;

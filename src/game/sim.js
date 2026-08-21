@@ -201,7 +201,7 @@ export function normalizeState(st){
   if (typeof st.blindMax !== 'number') st.blindMax = 0;
   if (!Array.isArray(st.ammo)) st.ammo = st.p.map(() => THROW_DEF.map(d => d.count));
   if (typeof st.clock !== 'number') st.clock = 0;
-  if (typeof st.rdy !== 'number') st.rdy = readyLimit(st.melee);
+  if (typeof st.rdy !== 'number') st.rdy = readyLimit(st.melee, st.soccer);
   if (!Array.isArray(st.buffs)) st.buffs = [];
   if (!Array.isArray(st.bf) || st.bf.length !== (st.n || 2))
     st.bf = Array.from({ length: st.n || 2 }, (_, i) => (st.bf && st.bf[i]) || [0, 0, 0, 0]);
@@ -307,7 +307,7 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     noBuff: false,                               // 노버프전인가
 
     phase: PH_READY, timer: 0, clock: 0,
-    rdy: readyLimit(melee),   // 준비 단계 남은 틱. 0이 되면 자동으로 시작한다
+    rdy: readyLimit(melee, soccer),   // 준비 단계 남은 틱. 0이 되면 자동으로 시작한다
     maxStep: stepCap(),
     bulletV: bulletFP(),
     coolT:   coolTicks(),
@@ -718,7 +718,7 @@ export function step(s, inp){
     // 판이 끝난 뒤 그걸 누르면 재대전으로 읽혀 갑자기 준비 화면이 뜨고 새 판이 시작됐다
     if (!s.soccer && (inp[0].fire || inp[1].fire)){
       const t = s.tick, ms = s.maxStep, bv = s.bulletV, ct = s.coolT, n = newState();
-      n.tick = t; n.phase = PH_READY; n.timer = 0; n.rdy = readyLimit(n.melee);
+      n.tick = t; n.phase = PH_READY; n.timer = 0; n.rdy = readyLimit(n.melee, n.soccer);
       s.p = n.p; s.bullets = n.bullets; s.covers = n.covers;
       s.items = n.items; s.ready = n.ready; s.fx = n.fx;
       s.proj = n.proj; s.blind = n.blind; s.ammo = n.ammo; s.fire = n.fire;
@@ -1223,6 +1223,8 @@ export function step(s, inp){
         if ((a.tkl | 0) === 0) continue;
         // **공 자체에 닿아도 뺏는다.** 상대 몸을 아슬아슬하게 비켜 가면 아무 일도 안 일어나
         // "태클해도 안 먹는다"가 됐다. 미끄러지는 사람이 공 근처를 지나면 그것으로 충분하다
+        // [stated] **태클은 상하좌우 다 걸린다.** 방향 제한을 넣었다가 되돌렸다 —
+        // 사용자가 정한 규칙이 아니었다. 좁힌 건 **거리뿐**이다
         if (s.ballOwner >= 0 && teamOf(s.ballOwner, s.n) !== teamOf(i, s.n)){
           const bdx = s.ball.x - (a.x + (PWf >> 1)), bdy = s.ball.y - (a.y + (PHf >> 1));
           if (bdx * bdx + bdy * bdy <= TACKLE_HIT * TACKLE_HIT){
