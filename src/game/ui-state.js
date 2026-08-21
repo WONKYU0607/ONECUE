@@ -102,11 +102,14 @@ export function uiPrompt(st, slot, online){
                 : null;
   if (pending){
     const n = st.n || 2;
-    const mine = teamOf(slot, n) === teamOf(pending.by - 1, n);
-    const okd = (st.negOk || []).includes(slot);
-    // 신청한 팀은 기다리기만 하고, 상대 팀은 각자 답한다.
-    // 2대2는 **둘 다** 눌러야 하므로 이미 누른 사람은 대기 표시로 바꾼다
-    if (mine || okd) waiting = { kind: pending.kind, sec: pending.sec, mine };
+    const asker = pending.by - 1;
+    const answered = (st.negOk || []).includes(slot) || (st.negNo2 || []).includes(slot);
+    // [stated] **신청자 빼고 전원이 답한다** — 우리 팀도 물어본다.
+    // 예전엔 상대 팀에만 물어서 내 팀원이 멋대로 신청하면 거부할 기회가 없었다.
+    // 이미 답한 사람과 신청한 본인은 대기 표시로 바꾼다
+    const isAsker = slot === asker;
+    if (isAsker || answered)
+      waiting = { kind: pending.kind, sec: pending.sec, mine: isAsker };
     else ask = { kind: pending.kind, sec: pending.sec };
   }
 

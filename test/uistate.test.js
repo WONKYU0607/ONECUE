@@ -130,7 +130,9 @@ console.log('2대2 — 상대 팀 두 명에게만 창이 뜨고, 누른 사람�
   const mate = [1, 2, 3].find(v => teamOf(v, 4) === teamOf(0, 4));
   for (const v of foes) assert(P(s, v).ask?.kind === 'bare', `슬롯${v}에 수락 창`);
   assert(P(s, 0).waiting && !P(s, 0).ask, '신청한 사람은 대기');
-  assert(P(s, mate).waiting && !P(s, mate).ask, '팀원도 대기 (답할 게 없다)');
+  // [stated] **팀원에게도 물어본다** — 예전엔 상대에게만 물어서
+  // 내 팀원이 멋대로 신청하면 거부할 기회가 없었다
+  assert(P(s, mate).ask?.kind === 'bare', '팀원에게도 수락 창');
   // 한 명이 누르면 그 사람만 대기로 바뀌고 나머지 한 명은 계속 창
   const q2 = IN(4); q2[foes[0]].bareAns = 1;
   step(s, q2);

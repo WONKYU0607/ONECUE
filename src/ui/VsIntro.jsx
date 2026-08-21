@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react';
 import { teamOf, TEAMS } from '../game/config.js';
 import { getColor } from '../state/profile.js';
 import { t } from '../i18n/index.js';
+import { sfx } from '../game/audio.js';
 
 // [stated] **3초짜리 막대가 다 줄면 들어간다.** 탭을 기다리면 안 누르는 사람은 영영 안 들어간다
 const SHOW_MS = 3000;
@@ -49,7 +50,10 @@ export default function VsIntro({ vs, mySlot, onDone }){
   doneRef.current = onDone;
   useEffect(() => {
     const id = setTimeout(() => doneRef.current?.(), SHOW_MS);
-    return () => clearTimeout(id);
+    // 연출과 소리를 맞춘다 — 0.6초에 부딪히고, 1.0초에 번개가 다 뻗는다
+    const t1 = setTimeout(() => sfx.vsClash?.(), 560);
+    const t2 = setTimeout(() => sfx.vsBolt?.(), 600);
+    return () => { clearTimeout(id); clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
   const rows = (vs && vs.rows) || [];

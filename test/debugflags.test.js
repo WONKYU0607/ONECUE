@@ -4,14 +4,16 @@
 // 대신 **어떤 스위치가 켜져 있는지 한 곳에 찍어** 출시 직전에 눈으로 확인하게 한다.
 // 예전에 `DEBUG_INF_HP` 를 켜둔 채 한참 갔던 적이 있다.
 import fs from 'fs';
-import { DEBUG_INF_HP } from '../src/game/config.js';
+import { DEBUG_INF_HP, DEBUG_KEYBOARD } from '../src/game/config.js';
 import { DEBUG_INF_SOCCER } from '../src/state/tickets.js';
 import { assert } from './harness.js';
 process.chdir(new URL('..', import.meta.url).pathname);
 
 const flags = [
   ['DEBUG_INF_HP', DEBUG_INF_HP, 'src/game/config.js', '무한 체력 — 판이 안 끝난다'],
-  ['DEBUG_INF_SOCCER', DEBUG_INF_SOCCER, 'src/state/tickets.js', '축구 티켓 무제한']
+  ['DEBUG_INF_SOCCER', DEBUG_INF_SOCCER, 'src/state/tickets.js', '축구 티켓 무제한'],
+  // [stated] 키보드로 UI 가 줄어드는 원인을 재는 임시 표시 — 잡으면 스위치째 지운다
+  ['DEBUG_KEYBOARD', DEBUG_KEYBOARD, 'src/game/config.js', '키보드 값 화면 표시']
 ];
 
 console.log('출시 전 꺼야 하는 스위치');

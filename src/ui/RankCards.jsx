@@ -35,7 +35,8 @@ export default function RankCards({ onOpen }){
 
   return (
     <div className="rank-cards">
-      {[['gun', t('mode.gun')], ['melee', t('mode.melee')]].map(([k, nm]) => (
+      {/* [stated] **한 줄을 셋으로** — 축구까지 보이게 */}
+      {[['gun', t('mode.gun')], ['melee', t('mode.melee')], ['soccer', t('mode.soccer')]].map(([k, nm]) => (
         <button key={k} className="rank-card" onClick={() => onOpen && onOpen(k)}>
           <TierIcon score={scoreOf(k)} />
           <span className="rc-nm">{nm}</span>

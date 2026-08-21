@@ -16,6 +16,9 @@ import { getSettings, setSetting } from './state/settings.js';
 import { onLangChange, t } from './i18n/index.js';
 import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
 import QuitAsk from './ui/QuitAsk.jsx';
+import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
+import KeyboardProbe from './ui/KeyboardProbe.jsx';
+import { DEBUG_KEYBOARD } from './game/config.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -51,6 +54,26 @@ export default function App(){
   const goHomeFirst = useCallback(() => {
     if (!getSettings().seenHelp){ setSetting('seenHelp', true); setShowHelp(true); }
   }, []);
+
+  // [stated] **모든 버튼에 누르는 소리.** 화면마다 붙이면 빠뜨리는 곳이 생기므로
+  // 문서 전체에서 한 번만 듣는다. 캔버스 안 버튼은 캔버스가 따로 소리를 낸다
+  useEffect(() => {
+    const onTap = e => {
+      const el = e.target && e.target.closest && e.target.closest('button, .menu-btn, .rank-card');
+      if (el && !el.disabled) sfx.tap?.();
+    };
+    document.addEventListener('pointerdown', onTap, true);
+    return () => document.removeEventListener('pointerdown', onTap, true);
+  }, []);
+
+  // [stated] **로비 배경음.** 게임 화면에서는 게임이 알아서 갈아탄다(축구 곡).
+  // 소리는 사용자가 한 번 만져야 열리므로(브라우저 규칙) 진입창 탭에서 풀린다
+  useEffect(() => {
+    // 진입창에서는 아직 소리가 안 열려 있고, 게임 화면은 게임이 알아서 튼다
+    if (screen === 'splash') return;
+    if (screen === 'game'){ stopMusic(); return; }
+    playMusic('lobby');
+  }, [screen]);
 
   const goHome    = useCallback(() => { disconnect(); setSession(null); setResult(null); setScreen('home'); }, []);
 
@@ -152,7 +175,11 @@ export default function App(){
     <>
       {/* [stated] **진입할 때 로그인시킨다.** 익명 계정이 없어서 로그인 전에는
           순위표·점수 기록·이름 바꾸기가 전부 안 된다 */}
-      {screen === 'splash'   && <Splash onDone={() => setScreen('login')} />}
+      {screen === 'splash'   && <Splash onDone={() => {
+        // **첫 탭에서 소리를 연다.** 브라우저는 사용자가 만지기 전엔 소리를 못 낸다
+        unlockAudio(); preloadSfx();
+        setScreen('login');
+      }} />}
       {screen === 'login'    && <Login onDone={() => { goHome(); goHomeFirst(); }} />}
       {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
                                      onSettings={() => setShowSettings(true)} onHelp={() => setShowHelp(true)}
@@ -170,6 +197,8 @@ export default function App(){
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} onAgain={again} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      {/* [stated] 임시 — 키보드로 UI 가 줄어드는 원인을 재는 표시. 잡으면 지운다 */}
+      {DEBUG_KEYBOARD && <KeyboardProbe />}
       {askExit && <QuitAsk exit
                            onQuit={() => { setAskExit(false); exitApp(); }}
                            onStay={() => setAskExit(false)} />}

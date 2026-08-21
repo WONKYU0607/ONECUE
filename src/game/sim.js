@@ -174,6 +174,7 @@ export function normalizeState(st){
   if (st.negDone === undefined) st.negDone = null;
   if (st.negLost === undefined) st.negLost = null;
   if (!Array.isArray(st.negNo)) st.negNo = [];
+  if (!Array.isArray(st.negNo2)) st.negNo2 = [];
   if (!Array.isArray(st.nick) || st.nick.length !== (st.n || 2))
     st.nick = Array.from({ length: st.n || 2 }, (_, i) => (st.nick && st.nick[i]) || '');
   if (!Array.isArray(st.dealt) || st.dealt.length !== (st.n || 2))
@@ -278,7 +279,8 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     bareT: 0,
     negOk: [],
     negDone: null,
-    negNo: [],                  // 자리별로 거절당한 신청 종류 (다시 못 건다)              // 방금 수락된 신청 (가운데 알림용)
+    negNo: [],                  // 자리별로 거절당한 신청 종류 (다시 못 건다)
+    negNo2: [],                 // 이번 신청에 반대한 사람들              // 방금 수락된 신청 (가운데 알림용)
     lag: 0,                     // 지연 보상 틱 수. 서버가 매 프레임 넣어준다
     pastP: [],                  // 최근 위치 기록 [[x,y]x인원] x LAG_HIST. 명중을 되감아 판정한다
     // 슬롯별 이동 속도 배율. **AI 모드 전용**(단계가 오를수록 상대가 조금씩 빨라진다).
@@ -421,18 +423,6 @@ export function atCenter(s, i, c, r){
 }
 
 // centerDmg를 주면 정중앙 칸에 있는 사람만 그만큼 더 맞는다
-// 쓰러진 자리에 폭발을 한 번 띄우고 사라진다. 시신이 남아 있으면
-// 아레나가 지저분하고 누가 살아 있는지 헷갈린다
-function killFx(s, p){
-  if (s.melee) return;                 // 칼전은 폭발 연출 없이 그냥 쓰러진다
-  const c = Math.round(((p.x + PWf / 2) / FP - GRID_X0) / GRID_CW - 0.5);
-  const r = Math.round(((p.y + PHf / 2) / FP - GRID_Y0) / GRID_CH - 0.5);
-  s.fx.push({
-    c: Math.max(0, Math.min(GRID_COLS - 1, c)),
-    r: Math.max(0, Math.min(GRID_ROWS - 1, r)),
-    t: EXPLO_TICKS, k: 0
-  });
-}
 
 // 가한 피해를 더한다. **남은 체력을 넘겨 세지 않는다** — 10 남은 상대를 40으로 때려도 10만 인정
 // **결정론적 난수.** 서버와 클라가 같은 자리에 버프를 띄워야 하므로
@@ -475,7 +465,6 @@ export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
       const was = p.hp;
       addDealt(s, by, Math.min(d, Math.max(0, was)));
       p.hp -= d;
-      if (was > 0 && p.hp <= 0) killFx(s, p);
       // 승패는 아래 팀 전멸 판정에서 정한다. 여기서 정하면 2대2에서 한 명만 죽어도 끝난다.
       // **연습 모드는 승패가 없다** — 죽으면 끝내지 말고 체력을 되돌려 계속 연습하게 한다
       // (예전엔 여기서 끝내버려서 수류탄으로 허수아비를 잡으면 결과 창이 떴다)
@@ -629,24 +618,31 @@ export function step(s, inp){
       const by = s.fastBy || s.bareBy;
       if (!q.fastAns && !q.bareAns) continue;
       if (!by || by === i + 1) continue;
-      if (teamOf(i, s.n) === teamOf(by - 1, s.n)) continue;   // 같은 팀은 답할 게 없다
+      // [stated] **우리 팀이든 상대 팀이든 다 물어본다.** 예전엔 상대에게만 물어서
+      // **내 팀원이 멋대로 신청하면 나는 거부할 기회가 없었다**
       const ans = s.fastBy ? q.fastAns : q.bareAns;
       if (!ans) continue;
-      if (ans !== 1){                                        // 한 명이라도 거절하면 끝
-        // [stated] **거절당한 신청은 다시 못 건다** — 버튼이 계속 남아 있어 몇 번이고
-        // 신청하게 됐다. 신청한 사람 자리에 거절당한 종류를 남긴다
+      // [stated] **과반이면 진행한다.** 전원 동의로 하면 6인전에서 다섯 명이 다 눌러야 해
+      // 사실상 안 걸리고, 한 명이 어깃장을 놓으면 아무도 못 쓴다
+      if (!Array.isArray(s.negNo2)) s.negNo2 = [];
+      if (ans !== 1){
+        if (!s.negNo2.includes(i)) s.negNo2.push(i);
+      } else if (!s.negOk.includes(i)) s.negOk.push(i);
+      // 답해야 하는 사람 = 신청자 빼고 전원 (끊긴 사람은 못 누르므로 뺀다)
+      const voters = [];
+      for (let v = 0; v < s.n; v++) if (v !== by - 1 && !s.off[v] && s.p[v].hp > 0) voters.push(v);
+      const half = voters.length / 2;
+      // 반대가 과반을 넘어서면 더 볼 것 없이 끝
+      if (s.negNo2.length > half){
         const kind = s.fastBy ? 'fast' : 'bare';
         if (!Array.isArray(s.negNo)) s.negNo = [];
         const who = by - 1;
         if (!s.negNo[who]) s.negNo[who] = [];
         if (!s.negNo[who].includes(kind)) s.negNo[who].push(kind);
-        s.fastBy = 0; s.bareBy = 0; s.fastT = 0; s.bareT = 0; s.negOk = [];
+        s.fastBy = 0; s.bareBy = 0; s.fastT = 0; s.bareT = 0; s.negOk = []; s.negNo2 = [];
         continue;
       }
-      if (!s.negOk.includes(i)) s.negOk.push(i);
-      // 끊긴 사람은 못 누르므로 답할 수 있는 사람만 센다
-      const need = foesOf(by).filter(v => !s.off[v]);
-      if (need.every(v => s.negOk.includes(v))){
+      if (s.negOk.length > half){
         // [stated] 수락되면 화면 가운데에 알림을 띄운다.
         // **누가 신청했는지 남겨야** "상대가 수락했습니다"인지 가릴 수 있다
         // (아래에서 fastBy·bareBy 를 지우므로 여기서 미리 담아둔다)
@@ -654,7 +650,7 @@ export function step(s, inp){
         if (s.fastBy) s.fast = true;
         // 칼전은 없앨 아이템이 없으므로 **버프를 끈다** (= 노버프전)
         else { s.bare = true; s.items = []; if (s.melee) s.noBuff = true; }
-        s.fastBy = 0; s.bareBy = 0; s.fastT = 0; s.bareT = 0; s.negOk = [];
+        s.fastBy = 0; s.bareBy = 0; s.fastT = 0; s.bareT = 0; s.negOk = []; s.negNo2 = [];
       }
     }
     // 제한 시간이 지나면 거절한 것으로 보고 창을 닫는다 (그 종류는 다시 못 건다)
@@ -947,7 +943,6 @@ export function step(s, inp){
             addDealt(s, i, Math.min(MELEE_DAMAGE, Math.max(0, hp0[v])));   // 깎기 전 체력 기준
             if (!DEBUG_INF_HP) t.hp -= MELEE_DAMAGE;
             t.flash = FLASH_T; t.hitBy = i;
-            if (hp0[v] > 0 && t.hp <= 0) killFx(s, t);
           }
         }
       }
@@ -971,7 +966,6 @@ export function step(s, inp){
         const was = t.hp;
         addDealt(s, fr.by, Math.min(FIRE_DAMAGE, Math.max(0, t.hp)));
         t.hp -= FIRE_DAMAGE; t.flash = FLASH_T; t.hitBy = -1;
-        if (was > 0 && t.hp <= 0) killFx(s, t);
       }
       // [stated] 불길도 상대 바리케이트를 태운다
       hurtBarricades(s, x0, y0, x1, y1, fireTeam, BARR_FIRE_DMG);
@@ -1059,7 +1053,6 @@ export function step(s, inp){
           if (!DEBUG_INF_HP){
             addDealt(s, b.o, Math.min(BULLET_DAMAGE, Math.max(0, t.hp)));   // 깎기 전 체력 기준
             t.hp -= BULLET_DAMAGE;
-            if (t.hp <= 0) killFx(s, t);
           }
         }
         break;

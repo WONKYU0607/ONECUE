@@ -4,6 +4,7 @@ import { getColor } from '../../state/profile.js';
 import { spendFor, useSoccer } from '../../state/tickets.js';
 import InviteFriends from '../InviteFriends.jsx';
 import VsIntro from '../VsIntro.jsx';
+import { sfx } from '../../game/audio.js';
 import { SELF } from '../../game/config.js';
 import { t } from '../../i18n/index.js';
 
@@ -61,6 +62,7 @@ export default function Matching({ session, onCancel, onMatched }){
         if (session?.soccer) useSoccer(); else spendFor(!!session?.ffa);
         // VS 화면이 뜰 수 있게 여기서 바로 넘어가지 않는다.
         // **정보가 안 오면 기다리지 않는다** — 0.6초 안에 없으면 그냥 진행
+        sfx.matched?.();      // 매칭 성사
         setStage('vs');
         setTimeout(() => { if (alive.current && !vsRef.current) go(); }, 600);
       })

@@ -126,7 +126,8 @@ console.log('쓰러지면 사라진다');
   s.bullets.push({ x: s.p[2].x + 6*FP, y: s.p[2].y + 4*FP, vy: -Math.round(3*FP), o: 0 });
   for (let i = 0; i < 10; i++) step(s, IN(4));
   assert(s.p[2].hp <= 0, '체력 0');
-  assert(s.fx.length > 0, '쓰러진 자리에 폭발 연출');
+  // [stated] **죽을 때 폭발 연출을 없앴다** — 쓰러지면 그냥 사라진다
+  assert(s.fx.length === 0, '쓰러져도 폭발 연출이 없다');
 
   // 시신은 총알을 막지 않는다
   s.bullets.length = 0;

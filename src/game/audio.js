@@ -44,6 +44,88 @@ export function unlockAudio(){
 }
 
 const on = () => ready && ctx && getSettings().sound;
+
+// ── 소리 파일 ────────────────────────────────────────────────────────────
+// 코드로 만드는 소리와 달리 **파일은 미리 받아 풀어둬야** 첫 재생이 안 늦는다.
+// 받기 실패해도 게임은 그대로 돈다 — 그 소리만 안 날 뿐이다
+const SFX_SRC = {
+  kickStrong: 'kick-strong', kickWeak: 'kick-weak',
+  tackle: 'tackle', tackleHit: 'tackle-hit',
+  goal: 'goal', whistle: 'whistle',
+  tap: 'tap', matched: 'matched',
+  vsClash: 'vs-clash', vsBolt: 'vs-bolt'
+};
+const BGM_SRC = { lobby: 'bgm-lobby', soccer: 'bgm-soccer' };
+const buf = {};                      // 이름 → AudioBuffer
+let loading = null;
+
+async function loadOne(file){
+  const res = await fetch('assets/sfx/' + file + '.mp3', { cache: 'force-cache' });
+  if (!res.ok) throw new Error(file);
+  return ctx.decodeAudioData(await res.arrayBuffer());
+}
+/** 소리 파일을 미리 받아둔다. 여러 번 불러도 한 번만 받는다 */
+export function preloadSfx(){
+  if (loading || !ctx) return loading || Promise.resolve();
+  const all = { ...SFX_SRC, ...BGM_SRC };
+  loading = Promise.all(Object.entries(all).map(([k, f]) =>
+    loadOne(f).then(b => { buf[k] = b; }).catch(() => { /* 그 소리만 안 난다 */ })));
+  return loading;
+}
+
+/** 파일 한 번 재생. `rate` 로 음높이를, `vol` 로 크기를 바꾼다 */
+function shot(name, { vol = 1, rate = 1, t0 = 0 } = {}){
+  if (!on() || !buf[name]) return;
+  const src = ctx.createBufferSource();
+  src.buffer = buf[name];
+  src.playbackRate.value = rate;
+  const g = ctx.createGain();
+  g.gain.value = vol;
+  src.connect(g); g.connect(master);
+  // 공간감은 효과음에도 살짝 (코드 소리와 결을 맞춘다)
+  const w = ctx.createGain(); w.gain.value = vol * 0.12;
+  g.connect(w); w.connect(wet);
+  src.start(ctx.currentTime + t0);
+}
+
+// ── 배경음 ───────────────────────────────────────────────────────────────
+// **효과음과 따로 켜고 끈다**(설정의 `music`). 화면이 바뀔 때 부드럽게 갈아탄다
+let bgmNode = null, bgmGain = null, bgmName = '';
+const BGM_VOL = 0.34;
+
+export function playMusic(name){
+  if (!ctx || !getSettings().music){ stopMusic(); return; }
+  if (bgmName === name && bgmNode) return;     // 이미 그 곡이면 그대로 둔다
+  stopMusic(0.35);
+  if (!buf[name]) { bgmName = name; return; }  // 아직 안 받았으면 이름만 기억
+  bgmName = name;
+  const src = ctx.createBufferSource();
+  src.buffer = buf[name];
+  src.loop = true;                             // 이음새는 파일에서 이미 맞춰뒀다
+  const g = ctx.createGain();
+  g.gain.value = 0;
+  g.gain.linearRampToValueAtTime(BGM_VOL, ctx.currentTime + 0.6);
+  src.connect(g); g.connect(master);
+  src.start();
+  bgmNode = src; bgmGain = g;
+}
+
+export function stopMusic(fade = 0.4){
+  if (!bgmNode) { bgmName = ''; return; }
+  const node = bgmNode, g = bgmGain;
+  bgmNode = null; bgmGain = null; bgmName = '';
+  try {
+    g.gain.cancelScheduledValues(ctx.currentTime);
+    g.gain.setValueAtTime(g.gain.value, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0, ctx.currentTime + fade);
+    node.stop(ctx.currentTime + fade + 0.05);
+  } catch { /* 이미 멈췄으면 무시 */ }
+}
+
+/** 설정에서 배경음을 껐다 켰을 때 */
+export function refreshMusic(name){
+  if (getSettings().music) playMusic(name); else stopMusic();
+}
 const at = () => ctx.currentTime;
 
 // 잡음 버퍼는 한 번만 만들어 재활용한다
@@ -186,6 +268,53 @@ export const sfx = {
     [392, 311, 233].forEach((f, i) =>
       body({ t0: i * 0.13, dur:0.6, vol:0.16, f0:f, f1:f * 0.94, space:0.45 }));
     hiss({ t0:0.26, dur:0.5, vol:0.07, type:'lowpass', f0:700, f1:200 });
+  },
+
+  // [stated] 공이 몸·골포스트에 맞는 소리는 **코드로**.
+  // 짧고 자주 나는 소리라 파일보다 코드가 낫다 — 지연 없이 바로 난다.
+  // 세기를 받아 크기와 음높이를 바꾼다(살짝 스치는 것과 세게 맞는 것이 달라야 한다)
+  bounce(power = 1){
+    const v = Math.max(0.25, Math.min(1, power));
+    hiss({ dur:0.02, vol:0.05 * v, type:'highpass', f0:3000 });          // 맞는 순간 '틱'
+    body({ dur:0.09, vol:0.16 * v, f0:190 + 90 * v, f1:90, type:'triangle', space:0.25 });
+  },
+
+  // ── 파일 소리 ──────────────────────────────────────────────
+  // [stated] 축구 슛은 **차징 세기에 따라 두 소리**를 갈라 쓴다.
+  // 하나만 쓰고 음높이만 바꾸면 세게 찬 느낌이 안 산다
+  kick(power = 1){
+    const p = Math.max(0, Math.min(1, power));
+    if (p >= 0.55) shot('kickStrong', { vol: 0.55 + 0.45 * p, rate: 0.97 + 0.06 * p });
+    else           shot('kickWeak',   { vol: 0.7 + 0.3 * p,   rate: 0.98 + 0.08 * p });
+  },
+  tackle(){ shot('tackle', { vol: 0.85 }); },
+  tackleHit(){ shot('tackleHit', { vol: 0.9 }); },
+  goal(){ shot('goal', { vol: 0.95 }); },
+  // [stated] 휘슬은 시작·골·재시작·종료에 쓴다. **종료만 두 번** 짧게 (실제 축구가 그렇다)
+  whistle(twice = false){
+    shot('whistle', { vol: 0.8 });
+    if (twice) shot('whistle', { vol: 0.8, t0: 0.42 });
+  },
+  tap(){ shot('tap', { vol: 0.5 }); },
+  matched(){ shot('matched', { vol: 0.8 }); },
+  vsClash(){ shot('vsClash', { vol: 0.9 }); },
+  vsBolt(){ shot('vsBolt', { vol: 0.7 }); },
+
+  // [stated] 결과 화면에서 **점수가 1점씩 굴러갈 때** 나는 소리.
+  // 아주 짧은 '틱' 하나 — 빠르게 이어지면 '따르르륵' 으로 들린다.
+  // `up` 이면 조금 높게, 내려갈 때는 낮게
+  roll(up = true){
+    body({ dur:0.025, vol:0.07, f0: up ? 1250 : 820, f1: up ? 1500 : 700,
+           type:'square', space:0.08, attack:0.001 });
+  },
+
+  // [stated] **레트로 레벨업 음.** 사각파를 계단식으로 올린다 —
+  // 옛 게임의 '띠리링'. 음을 겹치지 않고 하나씩 끊어 올려야 그 느낌이 난다
+  rankUp(){
+    [523, 659, 784, 1046, 1319].forEach((f, i) =>
+      body({ t0: i * 0.07, dur:0.09, vol:0.15, f0:f, type:'square', space:0.2, attack:0.001 }));
+    // 마지막 음만 길게 남겨 마무리
+    body({ t0:0.35, dur:0.42, vol:0.13, f0:1568, type:'square', space:0.5 });
   }
 };
 

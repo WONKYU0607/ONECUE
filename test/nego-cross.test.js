@@ -130,4 +130,55 @@ console.log('내 신청이 밀리면 알려준다');
   assert(!uiPrompt(s, 1, true).lost, '  밀린 사람에게만 보인다');
 }
 
+// [stated] "팀에서 한 명이 신청하면 상대 중 한 명만 수락해도 다 그 게임을 진행한다.
+// 하기 싫은 사람이 있을 수도 있잖아" → **양 팀 모두에게 묻고 과반이면 진행**
+console.log('신청자 빼고 전원이 답한다');
+{
+  const blank = n => Array.from({ length: n }, () => ({ ...NOIN }));
+  const s = newState(6, false, false, false);
+  s.phase = PH_READY; s.timer = 600;
+  const req = blank(6); req[0].fastReq = 1; step(s, req);
+  assert(uiPrompt(s, 1, true).ask, '  신청자의 팀원에게도 창이 뜬다');
+  assert(uiPrompt(s, 3, true).ask, '  상대 팀에도 뜬다');
+  assert(uiPrompt(s, 0, true).waiting, '  신청한 본인은 기다린다');
+}
+
+console.log('과반이어야 걸린다');
+{
+  const blank = n => Array.from({ length: n }, () => ({ ...NOIN }));
+  const s = newState(6, false, false, false);
+  s.phase = PH_READY; s.timer = 600;
+  step(s, (() => { const r = blank(6); r[0].fastReq = 1; return r; })());
+  for (const i of [1, 2]){ const a = blank(6); a[i].fastAns = 1; step(s, a); }
+  assert(!s.fast, '  5명 중 2명 찬성으로는 안 걸린다');
+  const a3 = blank(6); a3[3].fastAns = 1; step(s, a3);
+  assert(s.fast, '  3명(과반) 찬성이면 걸린다');
+}
+
+console.log('반대가 과반이면 즉시 닫힌다');
+{
+  const blank = n => Array.from({ length: n }, () => ({ ...NOIN }));
+  const s = newState(6, false, false, false);
+  s.phase = PH_READY; s.timer = 600;
+  step(s, (() => { const r = blank(6); r[0].bareReq = 1; return r; })());
+  for (const i of [1, 2, 3]){ const a = blank(6); a[i].bareAns = 2; step(s, a); }
+  assert(s.bareBy === 0, '  더 안 기다리고 닫는다');
+  assert(!s.bare, '  안 걸린다');
+}
+
+console.log('1대1·2대2 도 같은 규칙');
+{
+  const blank = n => Array.from({ length: n }, () => ({ ...NOIN }));
+  const a = newState(2, false, false, false); a.phase = PH_READY; a.timer = 600;
+  step(a, (() => { const r = blank(2); r[0].fastReq = 1; return r; })());
+  step(a, (() => { const r = blank(2); r[1].fastAns = 1; return r; })());
+  assert(a.fast, '  1대1 은 상대 한 명이 곧 과반');
+  const b = newState(4, false, false, false); b.phase = PH_READY; b.timer = 600;
+  step(b, (() => { const r = blank(4); r[0].fastReq = 1; return r; })());
+  step(b, (() => { const r = blank(4); r[1].fastAns = 1; return r; })());
+  assert(!b.fast, '  2대2 는 1명으로 부족');
+  step(b, (() => { const r = blank(4); r[2].fastAns = 1; return r; })());
+  assert(b.fast, '  2명이면 과반');
+}
+
 console.log('nego-cross.test.js 통과');

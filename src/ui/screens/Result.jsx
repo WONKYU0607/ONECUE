@@ -1,5 +1,10 @@
+import { useEffect, useRef, useState } from 'react';
 import { TEAMS } from '../../game/config.js';
 import { t } from '../../i18n/index.js';
+import { sfx } from '../../game/audio.js';
+
+// [stated] 점수가 굴러가는 시간
+const ROLL_MS = 1000;
 
 // 라운드 결과 창.
 // 예전엔 캔버스에 YOU WIN만 띄우고 끝이라 **뭘 잘했는지 알 수가 없었다.**
@@ -20,6 +25,37 @@ function name(r, sum){
 }
 
 export default function Result({ result, summary, score, session, onAgain, onHome }){
+  // [stated] **기존 점수에서 1점씩 굴러 올라간다.** 걸리는 시간은 1초.
+  // 소리도 같이 나는데, 300점이 오르면 300번을 낼 수 없으므로
+  // **소리만 45ms 간격으로 솎아낸다** — 귀에는 '따르르륵' 으로 이어져 들린다
+  const from = score ? (score.before | 0) : 0;
+  const to = score ? (score.after | 0) : 0;
+  const [shown, setShown] = useState(from);
+  const lastBeep = useRef(0);
+  useEffect(() => {
+    setShown(from);
+    if (!score || from === to) return;
+    const up = to > from;
+    const t0 = performance.now();
+    let raf = 0;
+    const step = now => {
+      const k = Math.min(1, (now - t0) / ROLL_MS);
+      const v = Math.round(from + (to - from) * k);
+      setShown(v);
+      if (now - lastBeep.current >= 45){ lastBeep.current = now; sfx.roll?.(up); }
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [score, from, to]);
+
+  // [stated] **레트로 레벨업 음** — 점수가 올랐을 때 한 번. 승패 소리 뒤에 겹치지 않게 늦춘다
+  useEffect(() => {
+    if (!score || !(score.delta > 0)) return;
+    // 굴림이 끝나고 나서 울린다 (겹치면 둘 다 안 들린다)
+    const id = setTimeout(() => sfx.rankUp?.(), ROLL_MS + 120);
+    return () => clearTimeout(id);
+  }, [score]);
   const label = t(LABEL[result] || 'res.draw');
   const rows = summary?.rows || [];
   const total = summary?.totalDealt || 0;
@@ -45,7 +81,7 @@ export default function Result({ result, summary, score, session, onAgain, onHom
               <b className={'sc-delta ' + (score.delta > 0 ? 'up' : score.delta < 0 ? 'down' : '')}>
                 {score.delta > 0 ? '+' : ''}{score.delta}
               </b>
-              <span className="sc-after">{score.after.toLocaleString()}</span>
+              <span className="sc-after">{shown.toLocaleString()}</span>
             </div>
             <div className="sc-why">
               {score.reason === 'leave' && <span>{t('res.leaveP')}</span>}

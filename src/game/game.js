@@ -7,7 +7,7 @@ import { createRenderer } from './render.js';
 import { attachInput } from './input.js';
 import { createAI, AI_STAGES } from './ai.js';
 import { createJuice } from './juice.js';
-import { sfx, buzz, unlockAudio } from './audio.js';
+import { sfx, buzz, unlockAudio, playMusic, stopMusic } from './audio.js';
 import { canPlace, canThrow, allPlaced, myItemAt, newState } from './sim.js';
 import { getColor } from '../state/profile.js';
 import { usableW, usableH } from '../state/safearea.js';
@@ -159,8 +159,16 @@ export function createGame(canvas, opts = {}){
     items: (st.items || []).map(it => it.hp),
     phase: st.phase,
     timer: st.timer,
-    blind: (st.blind || [0,0]).slice()
+    blind: (st.blind || [0,0]).slice(),
+    // 축구 소리를 위한 값들 — 골·태클 성공·공 튕김을 이 차이로 잡는다
+    score: (st.score || [0, 0]).slice(),
+    stun: st.p.map(p => p.stun | 0),
+    bv: st.ball ? Math.abs(st.ball.vx) + Math.abs(st.ball.vy) : 0,
+    owner: st.ballOwner == null ? -1 : st.ballOwner
   });
+
+  // [stated] **축구 경기 중에는 전용 배경음.** 판이 끝나면 멈춘다
+  if (isSoccer) playMusic('soccer'); else stopMusic();
 
   const view = createRenderer(canvas);
 
@@ -223,9 +231,10 @@ export function createGame(canvas, opts = {}){
     onShield: () => { sfx.ready?.(); client.raiseShield(SELF.slot); },
     // [stated] 축구 슛 — 입력의 `fire` 비트를 한 틱 세운다.
     // **사람과 AI 가 같은 길로 간다**(다른 조작과 마찬가지로)
-    onKick: ch => { sfx.ready?.(); client.kick(SELF.slot, ch); },
+    // [stated] 슛은 **차징 세기에 따라** 소리가 갈린다 (전엔 '설치 완료' 소리를 빌려 썼다)
+    onKick: ch => { sfx.kick?.((ch | 0) / 100); client.kick(SELF.slot, ch); },
     // [stated] 태클 — 미끄러지며 공을 약하게 밀어낸다
-    onTackle: () => { sfx.slash?.(true); client.tackle(SELF.slot); }
+    onTackle: () => { sfx.tackle?.(); client.tackle(SELF.slot); }
   });
 
   // **상태바·내비게이션바를 뺀 크기로 맞춘다.** 그냥 innerWidth/innerHeight 를 쓰면
@@ -314,6 +323,27 @@ export function createGame(canvas, opts = {}){
     }
     // 투척물이 새로 날아감
     if (cur.proj > prev.proj) sfx.throw_();
+    // ── 축구 소리 ──────────────────────────────────────────────
+    if (st.soccer){
+      // 골 — 점수가 오른 순간. [stated] 휘슬도 같이 분다
+      for (let t = 0; t < cur.score.length; t++){
+        if (cur.score[t] > prev.score[t]){ sfx.goal?.(); sfx.whistle?.(); break; }
+      }
+      // 태클이 먹힌 순간 (누군가 새로 쓰러졌다)
+      for (let i = 0; i < n; i++){
+        if (cur.stun[i] > 0 && prev.stun[i] === 0){
+          sfx.tackleHit?.();
+          if (i === me){ juice.shake(1.3); buzz(18); }
+          break;
+        }
+      }
+      // 공이 몸·골포스트에 맞아 **속도가 확 꺾인 순간** — 코드로 만든 소리
+      if (cur.owner < 0 && prev.owner < 0 && prev.bv > 2 * FP && cur.bv < prev.bv * 0.75)
+        sfx.bounce?.(Math.min(1, prev.bv / (8 * FP)));
+      // 경기 시작·종료 휘슬
+      if (prev.phase !== PH_PLAY && cur.phase === PH_PLAY) sfx.whistle?.();
+      if (prev.phase === PH_PLAY && cur.phase !== PH_PLAY) sfx.whistle?.(true);
+    }
     // 카운트다운 숫자가 바뀔 때마다 한 번씩
     if (cur.phase === PH_COUNT){
       const a = Math.ceil(prev.timer / 60), b = Math.ceil(cur.timer / 60);
@@ -594,6 +624,7 @@ export function createGame(canvas, opts = {}){
       for (const pid of client.controlled) client.input(pid, 0, 0, 1);
     },
     stop(){
+      stopMusic();                 // 판을 떠나면 경기 배경음도 멈춘다
       running = false;
       cancelAnimationFrame(raf);
       removeEventListener('resize', doResize);

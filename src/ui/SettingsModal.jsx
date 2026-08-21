@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getSettings, setSetting } from '../state/settings.js';
-import { unlockAudio, sfx } from '../game/audio.js';
+import { unlockAudio, sfx, playMusic, stopMusic } from '../game/audio.js';
 import { VIEW, HAND } from '../game/config.js';
 import { t, LANGS, getLang, setLang } from '../i18n/index.js';
 
@@ -22,6 +22,8 @@ export default function SettingsModal({ onClose }){
     const next = setSetting(key, !s[key]);
     setS(next);
     if (key === 'sound' && next.sound){ unlockAudio(); sfx.place(); }   // 켠 순간 소리로 확인
+    // [stated] 배경음은 따로 켜고 끈다 — 끄면 즉시 멈추고, 켜면 로비 곡이 다시 흐른다
+    if (key === 'music'){ if (next.music){ unlockAudio(); playMusic('lobby'); } else stopMusic(); }
     if (key === 'showGrid') VIEW.grid = next.showGrid;   // 렌더는 이 값을 매 프레임 읽는다
     if (key === 'leftStick') HAND.left = next.leftStick;
   };

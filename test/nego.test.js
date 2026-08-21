@@ -217,10 +217,11 @@ console.log('2대2 노템전 — 상대 팀 두 명이 다 수락해야 켜진�
   assert(w.srv.s.bare === false, '**한 명만 수락하면 안 켜진다**');
   assert(w.srv.s.bareBy === 1, '신청은 그대로 살아 있다');
 
-  // 팀원이 눌러도 소용없다
+  // [stated] **팀원도 한 표다.** 2대2 는 신청자 빼고 3명 중 2명이면 과반 —
+  // 상대 1명 + 팀원 1명이 찬성하면 그 자리에서 걸린다
   SELF.slot = mate; w.cs[mate].answerBare(mate, true);
   w.run(30);
-  assert(w.srv.s.bare === false, '같은 팀이 눌러도 안 켜진다');
+  assert(w.srv.s.bare === true, '팀원 한 표로 과반이 채워진다');
 
   SELF.slot = foes[1]; w.cs[foes[1]].answerBare(foes[1], true);
   w.run(30);
@@ -241,7 +242,14 @@ console.log('2대2 — 한 명이 거절하면 즉시 끝난다');
   w.run(20);
   SELF.slot = foes[1]; w.cs[foes[1]].answerBare(foes[1], false);
   w.run(30);
-  assert(w.srv.s.bare === false && w.srv.s.bareBy === 0, '한 명 거절로 취소된다');
+  // [stated] **과반 방식**이라 한 명 거절로는 안 끝난다 — 찬성 1 · 반대 1 이면 아직 3명 중 미정
+  assert(w.srv.s.bare === false, '아직 안 켜진다');
+  assert(w.srv.s.bareBy !== 0, '신청은 살아 있다 (한 명 거절로는 안 끝난다)');
+  // 남은 팀원까지 거절하면 반대가 과반(3명 중 2명) → 그때 끝난다
+  const mate2 = [1, 2, 3].find(v => teamOf(v, 4) === teamOf(0, 4));
+  SELF.slot = mate2; w.cs[mate2].answerBare(mate2, false);
+  w.run(30);
+  assert(w.srv.s.bare === false && w.srv.s.bareBy === 0, '반대가 과반이면 취소된다');
 }
 
 console.log('nego.test.js 통과');

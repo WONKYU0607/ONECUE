@@ -381,8 +381,9 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   background:var(--chars) 0 0/2400% 100% no-repeat;image-rendering:pixelated}
 /* [stated] 총격전·칼전과 인원을 한 화면에. 모드마다 한 줄씩 */
 .pick-group{width:100%}
+/* [stated] PVP 메뉴의 종목 이름 — **진한 흰색으로, 3포인트 크게** */
 .pick-title{display:block;margin:6px 0 4px;font-family:var(--gf);font-weight:900;
-  font-size:12px;letter-spacing:2px;color:#9fb0cc;text-align:center}
+  font-size:15px;letter-spacing:2px;color:#f2f6ff;text-align:center}
 .pick-row{display:flex;gap:6px;width:100%}
 /* [stated] PVP 진입 화면의 칸이 너무 크다 → 훨씬 작게.
    **높이를 키운 건 글씨가 접힌 줄 수였다.** 칸 폭 108px 중 62px을
@@ -521,6 +522,13 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* 축구 결과 — 골 수만 크게 */
 .res-goals{font:900 34px var(--gf);color:#ffd34d;letter-spacing:2px}
 
+/* [stated] 키보드로 UI 가 줄어드는 문제를 재기 위한 **임시 표시**. 원인을 잡으면 지운다 */
+.kbprobe{position:fixed;z-index:9999;left:4px;top:4px;pointer-events:none;
+  padding:4px 6px;border-radius:3px;background:rgba(0,0,0,.82);
+  font:700 10px/1.35 monospace;color:#8fe;letter-spacing:0}
+.kbprobe b{color:#ffd34d}
+.kbprobe .kb-at{color:#789;font-weight:400}
+
 /* 매칭 소개(VS) 화면 — [stated] 배경을 **사선으로 반** 갈라 위아래에서 충돌시킨다.
    부딪힌 자리에 번개 두 개, 그 사이에 VS. 정보는 미리 붙어 있는 채로 부딪힌다 */
 .vs-wrap{position:absolute;inset:0;z-index:40;overflow:hidden;background:#060a12}
@@ -634,12 +642,13 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   display:flex;gap:calc(var(--h-boxGap,3) * var(--u))}
 /* [stated] 크기 반으로 — 세 줄을 한 줄로 접는다 (66 → 33px).
    티어는 프로필 창과 순위표 화면에 이미 있어서 여기선 뺐다 */
-.rank-card{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:5px;
-  height:calc(var(--h-rowH,20) * var(--u));padding:0 7px;
+/* 셋으로 나뉘면 칸이 좁다 — 여백과 사이 간격을 줄인다 */
+.rank-card{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:3px;
+  height:calc(var(--h-rowH,20) * var(--u));padding:0 5px;
   background:rgba(12,22,36,.72);border:1px solid rgba(90,140,190,.35);border-radius:3px;
   color:var(--txt);font:inherit;cursor:pointer}
-.rank-card .rc-nm{font-size:11px;font-weight:700;white-space:nowrap}
-.rank-card .rc-rank{margin-left:auto;font-size:11px;color:#6cf;
+.rank-card .rc-nm{font-size:10px;font-weight:700;white-space:nowrap}
+.rank-card .rc-rank{margin-left:auto;font-size:10px;color:#6cf;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prof-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
 .prof-row{display:flex;align-items:center;gap:10px;font:900 14px var(--gf);color:#c8d8e6}
