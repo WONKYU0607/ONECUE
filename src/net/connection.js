@@ -199,6 +199,11 @@ export function pickTeam(team, color){
   if (pending) pending.clientSend({ t: 'team', team, color });
 }
 
+/** [stated] 팀을 잘못 골랐을 때 되돌린다 — 자리를 비우고 다시 고를 수 있게 */
+export function unpickTeam(){
+  if (pending) pending.clientSend({ t: 'team', undo: 1 });
+}
+
 export function disconnect(){
   if (!conn) return;
   try { conn.transport.clientSend({ t: 'bye' }); } catch { /* 이미 끊겼으면 무시 */ }

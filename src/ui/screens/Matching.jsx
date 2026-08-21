@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { connectAndWait, disconnect, serverUrl, pickTeam } from '../../net/connection.js';
+import { connectAndWait, disconnect, serverUrl, pickTeam, unpickTeam } from '../../net/connection.js';
 import { getColor } from '../../state/profile.js';
 import { spendFor, useSoccer } from '../../state/tickets.js';
 import InviteFriends from '../InviteFriends.jsx';
@@ -93,10 +93,6 @@ export default function Matching({ session, onCancel, onMatched }){
         <div className="roomcode">
           <span className="lbl">{t('match.roomCode')}</span>
           <strong>{code}</strong>
-          <span className="hint">
-            친구에게 알려주면 이 코드로 들어온다
-            {session?.n > 2 ? ' ' + t('match.needN', { n: session.n }) : ''}
-          </span>
           {/* [stated] 친구 목록에서 바로 초대 */}
           <InviteFriends room={{ code, n: session?.n || 2,
                                  melee: !!session?.melee, ffa: !!session?.ffa }} />
@@ -117,12 +113,23 @@ export default function Matching({ session, onCancel, onMatched }){
               const need = lobby.need || 2;
               const mine = lobby.mine === tm;
               const full = cnt >= need;
+              const roster = (lobby.names && lobby.names[tm]) || [];
+              // [stated] **잘못 눌렀으면 되돌릴 수 있게** — 내 팀을 다시 누르면 취소된다
               return (
                 <button key={tm}
                   className={'menu-btn teambtn' + (mine ? ' primary' : '') + (full && !mine ? ' off' : '')}
-                  disabled={(full && !mine) || lobby.mine != null}
-                  onClick={() => pickTeam(tm, getColor())}>
+                  disabled={full && !mine}
+                  onClick={() => (mine ? unpickTeam() : pickTeam(tm, getColor()))}>
                   <span className="t">{tm === 0 ? t('match.teamA') : t('match.teamB')}</span>
+                  {/* [stated] **내가 어디에 속했는지 안 보였다** — 색만 살짝 달랐다 */}
+                  <span className="c">{cnt}/{need}</span>
+                  {/* [stated] **누가 어느 팀인지** 닉네임으로 보여준다 */}
+                  {roster.length > 0 && (
+                    <span className="roster">
+                      {roster.map(r => r.nick || t('match.teamAnon')).join(', ')}
+                    </span>
+                  )}
+                  {mine && <span className="me">{t('match.teamUndo')}</span>}
                 </button>
               );
             })}

@@ -108,9 +108,17 @@ export function uiPrompt(st, slot, online){
     // 예전엔 상대 팀에만 물어서 내 팀원이 멋대로 신청하면 거부할 기회가 없었다.
     // 이미 답한 사람과 신청한 본인은 대기 표시로 바꾼다
     const isAsker = slot === asker;
+    // [stated] **다른 사람들이 어떻게 투표했는지 보여준다** — 지금은 그냥 기다리기만 했다.
+    // 신청자 빼고 전원이 답하며, 과반이면 걸린다
+    const voters = [];
+    for (let v = 0; v < n; v++)
+      if (v !== asker && !(st.off || [])[v] && st.p[v] && st.p[v].hp > 0) voters.push(v);
+    const yes = (st.negOk || []).filter(v => voters.includes(v)).length;
+    const no = (st.negNo2 || []).filter(v => voters.includes(v)).length;
+    const vote = { yes, no, total: voters.length, need: Math.floor(voters.length / 2) + 1 };
     if (isAsker || answered)
-      waiting = { kind: pending.kind, sec: pending.sec, mine: isAsker };
-    else ask = { kind: pending.kind, sec: pending.sec };
+      waiting = { kind: pending.kind, sec: pending.sec, mine: isAsker, vote };
+    else ask = { kind: pending.kind, sec: pending.sec, vote };
   }
 
   // 신청 버튼은 온라인에서만, 이미 켜졌거나 뭔가 오가는 중이면 숨긴다.

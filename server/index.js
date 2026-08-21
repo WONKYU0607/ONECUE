@@ -3,7 +3,7 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { Server } from '../src/game/net.js';
-import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY, PH_OVER } from '../src/game/config.js';
+import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY, PH_OVER, PH_READY } from '../src/game/config.js';
 import { scoreDelta } from '../src/game/score.js';
 import { createAI } from '../src/game/ai.js';
 import { createSoccerAI } from '../src/game/soccer-ai.js';
@@ -297,7 +297,15 @@ class Room {
     if (this.ffa || this.n <= 2 || this.hasBots) return;
     const c = this.teamCounts();
     const taken = Array.from({ length: COLOR_COUNT }, (_, c) => c).filter(c => this.colorTaken(c));
-    const raw = { t: 'lobby', teams: c, need: this.n / 2, taken };
+    // [stated] **누가 어느 팀에 있는지 닉네임으로 보여준다** — 인원수만으로는 알 수 없다
+    const st0 = this.server.s;
+    const names = [[], []];
+    this.seats.forEach((x, i) => {
+      if (!x.sid) return;
+      const nick = ((st0.nick || [])[i] || '').trim();
+      names[i < this.n / 2 ? 0 : 1].push({ slot: i, nick });
+    });
+    const raw = { t: 'lobby', teams: c, need: this.n / 2, taken, names };
     for (const ws of this.waitingList) if (ws.readyState === 1) ws.send(JSON.stringify(raw));
     for (const st of this.seats) if (st.ws && st.ws.readyState === 1){
       st.ws.send(JSON.stringify({ ...raw, mine: st.ws.slot < this.n / 2 ? 0 : 1,
@@ -795,6 +803,21 @@ wss.on('connection', (ws, req) => {
     }
     if (m.t === 'team' && ws.room && ws.room.n > 2 && !ws.room.ffa){
       const room = ws.room, team = m.team === 1 ? 1 : 0;
+      // [stated] **잘못 눌렀으면 되돌릴 수 있어야 한다.** 같은 팀을 다시 누르면 자리를 비운다
+      if (ws.slot >= 0 && m.undo && room.server.s.phase === PH_READY){
+        // **`quit()` 을 쓰면 안 된다** — 축구에서는 나간 자리를 AI 가 이어받는다.
+        // 아직 시작도 안 한 팀 고르기 단계에서는 자리만 비우면 된다
+        const slot = ws.slot;
+        const seat = room.seats[slot];
+        room.pending.delete(seat.sid);
+        seat.sid = null; seat.ws = null; seat.bot = false; seat.uid = '';
+        ws.slot = -1;
+        if (!room.waitingList.includes(ws)) room.waitingList.push(ws);
+        room.send({ t: 'peer', slot, state: 'left' });
+        room.sendLobby();
+        console.log(`팀 취소: room ${room.id} slot ${slot}`);
+        return;
+      }
       if (ws.slot === undefined || ws.slot < 0){
         const seat = room.freeSeatIn(team);
         if (seat < 0){ ws.send(JSON.stringify({ t: 'teamfull', team })); return; }

@@ -192,12 +192,21 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
       {ready.prompt?.waiting && (
         <div className="link-note ui-overlay">
           {negText(ready.prompt.waiting.kind, 'wait', ready.prompt?.melee)} · {t('ready.waitPeer', { n: ready.prompt.waiting.sec })}
+          {ready.prompt.waiting.vote && ready.prompt.waiting.vote.total > 1 && (
+            <span className="votes">
+              {t('ready.votes', ready.prompt.waiting.vote)}
+            </span>
+          )}
         </div>
       )}
       {ready.prompt?.ask && (
         <div className="modal-back">
           <div className="modal ask">
             <p className="ask-t">{negText(ready.prompt.ask.kind, 'title', ready.prompt?.melee)}</p>
+            {/* 답하는 쪽에도 지금까지의 투표를 보여준다 */}
+            {ready.prompt.ask.vote && ready.prompt.ask.vote.total > 1 && (
+              <span className="votes">{t('ready.votes', ready.prompt.ask.vote)}</span>
+            )}
             <p className="ask-d">{negText(ready.prompt.ask.kind, 'desc', ready.prompt?.melee)}</p>
             <p className="ask-d">{t('ready.askTimeout', { n: ready.prompt.ask.sec })}</p>
             <div className="ask-row">

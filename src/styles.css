@@ -268,7 +268,16 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .tunetoggle:active{opacity:1;color:#8fd8ff}
 .tune .row.head{border-bottom:1px solid #2a2a40;padding-bottom:4px;margin-bottom:2px}
 .teampick{display:flex;gap:10px;width:min(340px,86vw);margin:6px 0}
-.teambtn{flex:1 1 0;min-width:0;align-items:center;text-align:center;padding:6px 8px}
+.teambtn{flex:1 1 0;min-width:0;align-items:center;text-align:center;padding:6px 8px;
+  display:flex;flex-direction:column;gap:2px;position:relative}
+/* [stated] 내가 어느 팀인지 안 보였다 — 인원수와 '내 팀' 표시를 붙인다 */
+.teambtn .c{font:700 12px var(--gf);color:#8fd8ff;letter-spacing:0}
+.teambtn .me{font:900 11px var(--gf);color:#0b1220;background:#ffd34d;
+  border-radius:3px;padding:1px 6px;letter-spacing:0}
+/* 그 팀에 있는 사람 이름 */
+.teambtn .roster{font:700 11px var(--gf);color:#cfe4ff;letter-spacing:0;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.teambtn.primary{box-shadow:0 0 0 2px #ffd34d inset}
 .teambtn.off{opacity:.4;cursor:default}
 /* 색이 6개로 늘어 좁은 폰에서 빠듯하다. 넘치면 줄바꿈 */
 .colorpick{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:2px 0 4px}
@@ -544,6 +553,10 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .vol-row input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
   background:#5a96c8;border:2px solid #cfe4ff;cursor:pointer}
 .vol-row .vol-num{flex:0 0 30px;text-align:right;font:700 12px var(--gf);color:#8fd8ff}
+
+/* [stated] 신청 투표 현황 — 다른 사람들이 어떻게 눌렀는지 보이게 */
+.link-note .votes{display:block;margin-top:2px;font:700 11px var(--gf);color:#8fd8ff;letter-spacing:0}
+.modal.ask .votes{display:block;margin-top:4px;font:700 12px var(--gf);color:#8fd8ff;letter-spacing:0}
 
 /* 매칭 소개(VS) 화면 — [stated] 배경을 **사선으로 반** 갈라 위아래에서 충돌시킨다.
    부딪힌 자리에 번개 두 개, 그 사이에 VS. 정보는 미리 붙어 있는 채로 부딪힌다 */
