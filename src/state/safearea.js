@@ -50,8 +50,8 @@ function setLayoutH(){
   const w = winW(), h = winH() - cur.top - cur.bottom;
   // [stated] **상단바 크기가 작아졌다 커졌다 한다.**
   // 앱이 켜지는 순간에는 웹뷰가 자리를 못 잡아 `env(safe-area-inset-*)` 이 **0 으로 읽힌다.**
-  // 그 값으로 `--vhmax` 를 굳히면 쓸 수 있는 높이보다 크게 잡혀(891 vs 843)
-  // **UI 가 5% 크게 고정되고**, 뒤늦게 진짜 값이 오면 화면이 튄다.
+  // 그 값으로 높이를 굳히면 쓸 수 있는 높이보다 크게 잡혀(891 vs 803)
+  // **UI 가 크게 고정되고**, 뒤늦게 진짜 값이 오면 화면이 튄다.
   // → 위쪽 여백이 잡히기 전에는 **굳히지 않는다**
   const ready = cur.top > 0 || cur.bottom > 0;
   if (w !== baseW){ baseW = w; baseH = h; settled = ready; }   // 회전 등 — 새로 잡는다
@@ -64,14 +64,10 @@ function setLayoutH(){
   }
   if (typeof document === 'undefined') return;
   const el = document.documentElement.style;
-  // [stated] **두 값을 갈라 둔다.** 하나로 쓰면 둘 중 하나가 반드시 깨진다:
-  //   `--vh`   지금 보이는 높이 — **상자 크기**에 쓴다.
-  //            얼려두면 키보드가 떴을 때 804짜리 상자가 506 창을 넘쳐
-  //            웹뷰가 화면을 통째로 축소해 맞춘다(실측: 891→506, .screen 804)
-  //   `--vhmax` 가장 컸던 높이 — **UI 한 칸 단위(`--u`)**에만 쓴다.
-  //            이걸 지금 높이로 두면 키보드가 뜰 때 글씨·버튼이 쪼그라든다
-  el.setProperty('--vh', Math.max(1, h) + 'px');
-  el.setProperty('--vhmax', Math.max(1, baseH) + 'px');
+  // [stated] **화면 축소 건은 손댄 것을 전부 되돌렸다** — 만질수록 더 꼬였다.
+  // 키보드로 창이 줄어도 **가장 컸던 높이**를 그대로 쓴다. 그래야 UI 크기가 안 변한다.
+  // (한때 `--vh`/`--vhmax` 로 갈라 봤지만 내용이 상자를 넘쳐 더 복잡해졌다)
+  el.setProperty('--vh', Math.max(1, baseH) + 'px');
 }
 
 /** 키보드를 뺀, 화면을 그릴 때 쓰는 높이 */

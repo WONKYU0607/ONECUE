@@ -446,10 +446,6 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-// [stated] **임시**: 코드 입력 때 UI 가 줄어드는 원인을 재는 화면 표시.
-// 원인을 잡으면 이 스위치와 `KeyboardProbe.jsx` 를 함께 지운다. **출시 전에 끈다**
-export const DEBUG_KEYBOARD = true;
-
 export const PROTO_VER = 69;   // 공 소유 방식·태클 기절·슛 차징
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다

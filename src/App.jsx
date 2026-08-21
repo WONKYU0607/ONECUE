@@ -17,8 +17,6 @@ import { onLangChange, t } from './i18n/index.js';
 import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
-import KeyboardProbe from './ui/KeyboardProbe.jsx';
-import { DEBUG_KEYBOARD } from './game/config.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -200,8 +198,6 @@ export default function App(){
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} onAgain={again} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
-      {/* [stated] 임시 — 키보드로 UI 가 줄어드는 원인을 재는 표시. 잡으면 지운다 */}
-      {DEBUG_KEYBOARD && <KeyboardProbe />}
       {askExit && <QuitAsk exit
                            onQuit={() => { setAskExit(false); exitApp(); }}
                            onStay={() => setAskExit(false)} />}

@@ -31,9 +31,6 @@ measureSafeArea();
 // **웹뷰가 자리를 잡는 데 시간이 걸린다.** 켜자마자 재면 상단바가 0 으로 읽혀
 // UI 크기가 잘못 굳는다 → 잠깐 뒤에 몇 번 더 재서 진짜 값을 잡는다
 for (const ms of [80, 250, 600, 1200]) setTimeout(measureSafeArea, ms);
-// [stated] **키보드가 창을 줄이지 못하게 한다.** 웹 쪽으로는 못 막아서 플러그인을 쓴다.
-// 플러그인이 없으면 조용히 지나간다
-import('./state/keyboard.js').then(m => m.initKeyboard()).catch(() => {});
 watchSafeArea(() => {});
 applyHomeUI();   // 홈 배치 수치를 CSS 변수로 내보낸다
 // **그려진 뒤에 다시 맞춘다** — 켤 때는 상단바가 아직 화면에 없어 맞추기가 그냥 지나간다
