@@ -115,6 +115,7 @@ export default {
   'ai.clear': 'Cleared',
   'ai.challenge': 'Play',
   'set.sound': 'Sound',
+  'set.music': 'Music',
   'set.vibrate': 'Vibration',
   'set.softFlash': 'Reduce flash',
   'set.stickLeft': 'Stick on the left',

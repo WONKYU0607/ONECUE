@@ -44,6 +44,9 @@ export function unlockAudio(){
 }
 
 const on = () => ready && ctx && getSettings().sound;
+// [stated] 사용자가 정한 음량 (0~100 → 0~1). 기본값은 설정에 있다
+const sfxVol = () => Math.max(0, Math.min(100, getSettings().sfxVol ?? 80)) / 100;
+const bgmVol = () => Math.max(0, Math.min(100, getSettings().bgmVol ?? 60)) / 100;
 
 // ── 소리 파일 ────────────────────────────────────────────────────────────
 // 코드로 만드는 소리와 달리 **파일은 미리 받아 풀어둬야** 첫 재생이 안 늦는다.
@@ -80,10 +83,10 @@ function shot(name, { vol = 1, rate = 1, t0 = 0 } = {}){
   src.buffer = buf[name];
   src.playbackRate.value = rate;
   const g = ctx.createGain();
-  g.gain.value = vol;
+  g.gain.value = vol * sfxVol();
   src.connect(g); g.connect(master);
   // 공간감은 효과음에도 살짝 (코드 소리와 결을 맞춘다)
-  const w = ctx.createGain(); w.gain.value = vol * 0.12;
+  const w = ctx.createGain(); w.gain.value = vol * sfxVol() * 0.12;
   g.connect(w); w.connect(wet);
   src.start(ctx.currentTime + t0);
 }
@@ -91,7 +94,7 @@ function shot(name, { vol = 1, rate = 1, t0 = 0 } = {}){
 // ── 배경음 ───────────────────────────────────────────────────────────────
 // **효과음과 따로 켜고 끈다**(설정의 `music`). 화면이 바뀔 때 부드럽게 갈아탄다
 let bgmNode = null, bgmGain = null, bgmName = '';
-const BGM_VOL = 0.34;
+const BGM_BASE = 0.55;   // 이 값에 사용자가 정한 음량을 곱한다
 
 export function playMusic(name){
   // [stated] **음소거를 누르면 배경음도 꺼진다** — `sound` 는 전체 스위치다
@@ -112,7 +115,7 @@ export function playMusic(name){
   src.loop = true;                             // 이음새는 파일에서 이미 맞춰뒀다
   const g = ctx.createGain();
   g.gain.value = 0;
-  g.gain.linearRampToValueAtTime(BGM_VOL, ctx.currentTime + 0.6);
+  g.gain.linearRampToValueAtTime(BGM_BASE * bgmVol(), ctx.currentTime + 0.6);
   src.connect(g); g.connect(master);
   src.start();
   bgmNode = src; bgmGain = g;
@@ -127,6 +130,15 @@ export function stopMusic(fade = 0.4){
     g.gain.setValueAtTime(g.gain.value, ctx.currentTime);
     g.gain.linearRampToValueAtTime(0, ctx.currentTime + fade);
     node.stop(ctx.currentTime + fade + 0.05);
+  } catch { /* 이미 멈췄으면 무시 */ }
+}
+
+/** [stated] 음량 바를 움직이면 **흐르고 있는 곡에 바로** 반영된다 */
+export function applyBgmVolume(){
+  if (!bgmGain || !ctx) return;
+  try {
+    bgmGain.gain.cancelScheduledValues(ctx.currentTime);
+    bgmGain.gain.setTargetAtTime(BGM_BASE * bgmVol(), ctx.currentTime, 0.05);
   } catch { /* 이미 멈췄으면 무시 */ }
 }
 
@@ -161,7 +173,7 @@ function hiss({ t0 = 0, dur = 0.15, vol = 0.2, type = 'bandpass', f0 = 1200, f1 
   if (f1 !== f0) filt.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
   const g = ctx.createGain();
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(vol, t + 0.004);
+  g.gain.linearRampToValueAtTime(vol * sfxVol(), t + 0.004);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   src.connect(filt); filt.connect(g); g.connect(master);
   if (space){ const sg = ctx.createGain(); sg.gain.value = space; g.connect(sg); sg.connect(wet); }
@@ -178,7 +190,7 @@ function body({ t0 = 0, dur = 0.2, vol = 0.25, f0 = 200, f1 = f0, type = 'sine',
   if (f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
   const g = ctx.createGain();
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(vol, t + attack);
+  g.gain.linearRampToValueAtTime(vol * sfxVol(), t + attack);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   osc.connect(g); g.connect(master);
   if (space){ const sg = ctx.createGain(); sg.gain.value = space; g.connect(sg); sg.connect(wet); }

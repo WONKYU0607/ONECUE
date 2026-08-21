@@ -5,6 +5,7 @@ import { getNick, avatarPos } from '../state/profile.js';
 import { scoreOf, ticketsLeft, nextTicketIn, fmtLeft } from '../state/tickets.js';
 import { fitBar } from '../state/homeLayout.js';
 import { getSettings, setSetting } from '../state/settings.js';
+import { playMusic, stopMusic, unlockAudio } from '../game/audio.js';
 import { t } from '../i18n/index.js';
 
 // 화면 맨 윗줄 한 줄.
@@ -69,7 +70,14 @@ export default function PlayerBar({ onHelp, onSettings, onFriends }){
             가장 흔한 실패가 "지금 켜진 건지 꺼진 건지 모르겠다"였다.
             켜짐은 음파를 그리고, 꺼짐은 사선 + 색을 죽여 상태를 두 겹으로 알린다 */}
         <button className={'pcell pico' + (sound ? '' : ' off')}
-                onClick={() => { setSetting('sound', !sound); tick(v => v + 1); }}
+                onClick={() => {
+                  const next = !sound;
+                  setSetting('sound', next);
+                  // [stated] **밖에 있는 음소거 토글이 배경음을 안 껐다** — 설정 창에만
+                  // 배경음 처리가 있었다. 여기서도 똑같이 처리한다
+                  if (next){ unlockAudio(); playMusic('lobby'); } else stopMusic();
+                  tick(v => v + 1);
+                }}
                 aria-label={sound ? t('home.muteOn') : t('home.muteOff')}
                 title={sound ? t('home.soundOn') : t('home.soundOff')}>
           <svg viewBox="0 0 24 24" aria-hidden="true">

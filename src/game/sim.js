@@ -1227,9 +1227,9 @@ export function step(s, inp){
             const v = s.p[s.ballOwner];
             if (v && (v.stun | 0) === 0) v.stun = SOC_STUN;
             s.ballOwner = -1; s.freeT = RELEASE_TICKS;
-            // [stated] **태클한 길로 공이 흘러나간다** — 미끄러진 방향으로 굴러간다
+            // [stated] **태클한 사람 쪽으로** 튕겨 나온다 (미끄러진 방향의 반대)
             const [tx, ty] = faceVec(a.tklF == null ? a.face : a.tklF);
-            s.ball.vx = tx * TACKLE_V; s.ball.vy = ty * TACKLE_V;
+            s.ball.vx = -tx * TACKLE_V; s.ball.vy = -ty * TACKLE_V;
             s.lastKicker = i;                     // 태클한 사람 몸은 잠깐 통과
           }
         }
@@ -1246,11 +1246,11 @@ export function step(s, inp){
           o.stun = SOC_STUN;
           if (s.ballOwner === j){
             s.ballOwner = -1; s.freeT = RELEASE_TICKS;
-            // [stated] **태클에 성공하면 공은 태클한 방향으로 튕겨 나간다.**
-            // 여기서 속도를 안 줘서 상대 발밑에 그대로 떨어졌다
-            // (공 근처를 지나가 뺏는 경로에는 있었는데 몸이 겹친 경로에는 빠져 있었다)
+            // [stated] **태클에 성공하면 공은 태클한 사람 쪽으로 튕겨 나온다.**
+            // 미끄러진 방향으로 보냈더니 **그 방향에 상대가 서 있어** 공이 상대에게 갔다 —
+            // 태클은 상대를 향해 들어가는 동작이므로 **반대로** 나와야 내가 잡을 수 있다
             const [tx2, ty2] = faceVec(a.tklF == null ? a.face : a.tklF);
-            s.ball.vx = tx2 * TACKLE_V; s.ball.vy = ty2 * TACKLE_V;
+            s.ball.vx = -tx2 * TACKLE_V; s.ball.vy = -ty2 * TACKLE_V;
             // **태클한 사람 몸은 잠깐 통과시킨다.** 공이 그 사람 몸 안에서 출발하므로
             // 그대로 두면 자기 몸에 부딪혀 힘이 죽는다(슛에 쓰던 것과 같은 처리)
             s.lastKicker = i;

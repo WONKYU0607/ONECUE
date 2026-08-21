@@ -115,6 +115,7 @@ export default {
   'ai.clear': '클리어',
   'ai.challenge': '도전',
   'set.sound': '효과음',
+  'set.music': '배경음악',
   'set.vibrate': '진동',
   'set.softFlash': '섬광 눈부심 줄이기',
   'set.stickLeft': '스틱을 왼쪽에',

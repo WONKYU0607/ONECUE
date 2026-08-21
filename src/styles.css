@@ -532,6 +532,17 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .kbprobe b{color:#ffd34d}
 .kbprobe .kb-at{color:#789;font-weight:400}
 
+/* [stated] 설정의 음량 바 — 켜고 끄는 줄 바로 아래 */
+.vol-row{display:flex;align-items:center;gap:10px;padding:0 14px 10px 14px}
+.vol-row.off{opacity:.35}
+.vol-row input[type=range]{flex:1 1 auto;height:4px;-webkit-appearance:none;appearance:none;
+  background:rgba(255,255,255,.18);border-radius:2px;outline:none}
+.vol-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+  width:16px;height:16px;border-radius:50%;background:#5a96c8;border:2px solid #cfe4ff;cursor:pointer}
+.vol-row input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
+  background:#5a96c8;border:2px solid #cfe4ff;cursor:pointer}
+.vol-row .vol-num{flex:0 0 30px;text-align:right;font:700 12px var(--gf);color:#8fd8ff}
+
 /* 매칭 소개(VS) 화면 — [stated] 배경을 **사선으로 반** 갈라 위아래에서 충돌시킨다.
    부딪힌 자리에 번개 두 개, 그 사이에 VS. 정보는 미리 붙어 있는 채로 부딪힌다 */
 .vs-wrap{position:absolute;inset:0;z-index:40;overflow:hidden;background:#060a12}

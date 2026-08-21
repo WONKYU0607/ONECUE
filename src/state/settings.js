@@ -2,8 +2,11 @@
 const KEY = 'duel.settings.v1';
 
 export const DEFAULTS = {
-  sound: true,       // 효과음
-  music: true,       // 배경음
+  sound: true,       // 효과음 켜기
+  music: true,       // 배경음 켜기
+  // [stated] **켜고 끄는 것만으로는 부족하다 — 음량도 조절한다.** 0~100
+  sfxVol: 80,        // 효과음 음량
+  bgmVol: 60,        // 배경음 음량 (배경은 조금 낮게 시작한다)
   vibrate: true,     // 진동 (피격 등)
   showGrid: false,   // 바닥 격자 (디버그)
   softFlash: false,  // 화면 효과 줄이기 (섬광탄 번쩍임을 옅은 안개로)

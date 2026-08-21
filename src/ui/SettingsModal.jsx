@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getSettings, setSetting } from '../state/settings.js';
-import { unlockAudio, sfx, playMusic, stopMusic } from '../game/audio.js';
+import { unlockAudio, sfx, playMusic, stopMusic, applyBgmVolume } from '../game/audio.js';
 import { VIEW, HAND } from '../game/config.js';
 import { t, LANGS, getLang, setLang } from '../i18n/index.js';
 
@@ -8,15 +8,27 @@ import { t, LANGS, getLang, setLang } from '../i18n/index.js';
 // 언어를 바꿔도 그대로 남는다
 // **`showGrid`는 뺐다.** 격자 좌표를 맞출 때 쓰던 개발용이라 사용자에게 보일 이유가 없다.
 // 코드는 남겨뒀다 — 새 아레나를 만들 때 다시 필요하다
-const ROWS = ['sound', 'vibrate', 'leftStick', 'softFlash'];
+// [stated] **효과음과 배경음을 나눈다.** 각자 켜고 끄고, 음량도 따로 조절한다
+const ROWS = ['sound', 'music', 'vibrate', 'leftStick', 'softFlash'];
+// 켜고 끄는 줄 바로 아래에 음량 바를 붙인다
+const VOL_OF = { sound: 'sfxVol', music: 'bgmVol' };
 const LABEL = {
-  sound: 'set.sound', vibrate: 'set.vibrate', leftStick: 'set.stickLeft',
+  sound: 'set.sound', music: 'set.music', vibrate: 'set.vibrate', leftStick: 'set.stickLeft',
   softFlash: 'set.softFlash'
 };
 
 export default function SettingsModal({ onClose }){
   const [s, setS] = useState(getSettings);
   const [lang, setL] = useState(getLang);
+
+  // 음량 바 — 움직이는 즉시 반영된다 (흐르고 있는 곡에도)
+  const setVol = (key, v) => {
+    setSetting(key, v);
+    setS(getSettings());
+    unlockAudio();
+    if (key === 'bgmVol') applyBgmVolume();
+    else sfx.tap?.();                  // 효과음은 소리로 크기를 확인시켜 준다
+  };
 
   const toggle = key => {
     const next = setSetting(key, !s[key]);
@@ -40,10 +52,23 @@ export default function SettingsModal({ onClose }){
           <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </header>
         {ROWS.map(k => (
-          <button key={k} className="toggle-row" onClick={() => toggle(k)}>
-            <span>{t(LABEL[k])}</span>
-            <span className={'switch' + (s[k] ? ' on' : '')}><i /></span>
-          </button>
+          <div key={k}>
+            <button className="toggle-row" onClick={() => toggle(k)}>
+              <span>{t(LABEL[k])}</span>
+              <span className={'switch' + (s[k] ? ' on' : '')}><i /></span>
+            </button>
+            {/* [stated] 켜고 끄는 것만이 아니라 **음량 바**로 조절한다.
+                꺼져 있으면 바를 흐리게 두고 못 만지게 한다 */}
+            {VOL_OF[k] && (
+              <div className={'vol-row' + (s[k] ? '' : ' off')}>
+                <input type="range" min="0" max="100" step="5"
+                       value={s[VOL_OF[k]] ?? (k === 'sound' ? 80 : 60)}
+                       disabled={!s[k]}
+                       onChange={e => setVol(VOL_OF[k], +e.target.value)} />
+                <span className="vol-num">{s[VOL_OF[k]] ?? (k === 'sound' ? 80 : 60)}</span>
+              </div>
+            )}
+          </div>
         ))}
 
         {/* 언어. 기기 언어를 자동으로 잡지만 직접 바꿀 수도 있어야 한다 */}

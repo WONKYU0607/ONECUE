@@ -17,7 +17,9 @@ import { FIELD, GOAL } from './ball.js';
 // 태클로 닿을 수 있는 거리 — 미끄러지며 들어가므로 슛 사거리보다 멀다
 const TACKLE_RANGE = 34 * FP;   // [stated] 봇이 태클을 안 해서 넓혔다
 // 이 안에 들어와야 슛을 쏜다 (골대까지 거리)
-const SHOOT_RANGE = 70 * FP;
+// [stated] "봇은 적당히 움직이고 적당히 슛하고 축구처럼만 하면 된다."
+// 골대 앞까지 못 가는 상황이 잦아 **멀리서도 차게** 넓혔다 — 완벽한 봇을 만들 이유가 없다
+const SHOOT_RANGE = 150 * FP;
 
 const LEVELS = [
   // **380ms 는 너무 느렸다** — 공이 작아진 뒤 90초 내내 0:0 이었다.
@@ -90,8 +92,10 @@ export function createSoccerAI(slot, level = 1){
         // 골대 폭 안에 들어왔고 골대를 보고 있으면 찬다. 멀면 더 달린다
         // **줄이 딱 맞을 때까지 기다리면 영영 안 찬다** — 잡은 채로 골대 앞을 서성이기만 했다.
         // 골대 폭 안이면 멀어도 차고, 아주 가까우면 각도가 어긋나도 찬다
-        const lined = b.x >= GOAL.lo - 14 * FP && b.x <= GOAL.hi + 14 * FP;
-        const veryClose = Math.abs(toGoal) < 34 * FP;
+        // **골대 폭 안에 정확히 들어와야 차게 하면 거의 안 찬다.**
+        // 멀리서는 넉넉히, 가까우면 각도가 어긋나도 찬다 — 봇은 이 정도면 충분하다
+        const lined = b.x >= GOAL.lo - 26 * FP && b.x <= GOAL.hi + 26 * FP;
+        const veryClose = Math.abs(toGoal) < 40 * FP;
         wantKick = facingGoal && (veryClose || (lined && Math.abs(toGoal) < SHOOT_RANGE));
       } else if (foeBall){
         // 상대가 들고 있다 → **한 명만 달려들고 나머지는 수비로 내려선다.**
@@ -128,13 +132,17 @@ export function createSoccerAI(slot, level = 1){
       // [stated] **공을 들고 모서리로 가면 껴서 안 움직였다.**
       // 벽에 딱 붙는 자리를 목표로 잡으면 계속 벽을 밀며 제자리걸음을 한다 →
       // **벽에서 한 뼘 떨어진 곳까지만** 목표로 삼는다
-      const M = 10 * FP;
+      // **공을 몰고 갈 때는 여백을 두지 않는다** — 골대 앞으로 다가가야 하는데
+      // 여백에 걸려 목표가 뒤로 밀리면 **영영 안 찬다**(실측: 단계 0·1 이 슛 0회)
+      const M = mineBall ? 0 : 10 * FP;
       goal.x = Math.max(FIELD.x0 + M, Math.min(FIELD.x1 - PWf - M, goal.x));
       goal.y = Math.max(GOAL.top + M, Math.min(GOAL.bot - PHf - M, goal.y));
-      // 내가 이미 모서리에 몰려 있으면 **가운데로 한 번 빠져나온다**
+      // 내가 이미 모서리에 몰려 있으면 **가운데로 한 번 빠져나온다**.
+      // **골대 근처는 빼야 한다** — 골대 앞도 "모서리"로 잡히면 슛하러 간 봇을
+      // 매번 가운데로 돌려보내 영영 안 찬다(실측: 단계 0·1 이 슛 0회)
       const cornerX = cx < FIELD.x0 + 14 * FP || cx > FIELD.x1 - 14 * FP;
-      const cornerY = cy < GOAL.top + 14 * FP || cy > GOAL.bot - 14 * FP;
-      if (mineBall && cornerX && cornerY){
+      const nearGoalMouth = cx > GOAL.lo - 20 * FP && cx < GOAL.hi + 20 * FP;
+      if (mineBall && cornerX && !nearGoalMouth){
         goal = { x: goalCx - half(PWf), y: half(GOAL.top + GOAL.bot) - half(PHf), slop: L.slop };
       }
     }
@@ -151,6 +159,24 @@ export function createSoccerAI(slot, level = 1){
     // **쿨다운 중에는 태클 입력을 안 낸다.** 계속 1로 내보내면 의미도 없고
     // 기록만 부풀려진다(90초에 800회가 찍혔다)
     const tkl = wantTackle && (me.tklCool | 0) === 0 && (me.tkl | 0) === 0 ? 1 : 0;
+    // [stated] **찰 때는 골대 쪽을 보게 만든다.** 슛은 보는 방향으로 나가는데,
+    // 판단이 느린 단계(0·1)는 `face` 가 낡아서 **63번 차고 한 골도 못 넣었다**.
+    // 조준을 따로 맞추려 애쓸 필요 없이, 차는 그 틱에 골대 쪽 입력을 넣으면 된다
+    // [stated] **찰지 말지는 매 틱 본다.** 계획은 340ms 마다 세우는데 공을 잡는 순간과
+    // 어긋나서, 63번 "차자"고 정해도 **실제로 잡은 채로 찬 건 한 번**뿐이었다.
+    // 지금 잡고 있고 골대 쪽이면 그냥 찬다 — 봇은 이 정도로 충분하다
+    const own = s.ballOwner == null ? -1 : s.ballOwner;
+    let kickNow = false;
+    if (own === slot){
+      const toG = foeGoalY - cy;
+      const lined = b.x >= GOAL.lo - 26 * FP && b.x <= GOAL.hi + 26 * FP;
+      if (lined && Math.abs(toG) < SHOOT_RANGE){
+        kickNow = true;
+        dx = 0;                                   // 찰 때는 골대 쪽을 본다
+        dy = toG < 0 ? -L.speed * FP : L.speed * FP;
+      }
+    }
+    if (kickNow) wantKick = true;
     // 슛은 **꽉 채워** 찬다 (골대 앞에서만 차므로 세게가 낫다)
     return { dx: dx | 0, dy: dy | 0, fire: wantKick ? 1 : 0, fch: 100, tkl };
   };

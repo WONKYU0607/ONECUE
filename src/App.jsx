@@ -71,7 +71,10 @@ export default function App(){
   useEffect(() => {
     // 진입창에서는 아직 소리가 안 열려 있고, 게임 화면은 게임이 알아서 튼다
     if (screen === 'splash') return;
-    if (screen === 'game'){ stopMusic(); return; }
+    // **게임 화면에서는 아무것도 하지 않는다.** 곡은 게임이 정한다(축구는 전용 곡, 나머지는 없음).
+    // 여기서 껐더니 **게임이 켠 곡을 부모 효과가 곧바로 꺼버렸다** —
+    // React 는 자식 효과가 먼저, 부모가 나중에 돈다
+    if (screen === 'game') return;
     playMusic('lobby');
   }, [screen]);
 
