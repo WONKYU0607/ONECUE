@@ -81,6 +81,29 @@ export function fitBar(){
   }
 }
 
+/**
+ * 상단바 맞추기를 **화면이 그려진 뒤에도** 계속 챙긴다.
+ *
+ * `apply()` 안의 `fitBar()` 는 앱이 켜질 때 한 번 불리는데, 그 시점에는
+ * **React 가 아직 안 그려서 `.pbar` 가 없다** — 그냥 돌아 나가고 끝났다.
+ * 그래서 좁은 화면에서 상단바가 자동으로 안 줄었다.
+ *
+ * 안전 영역이 뒤늦게 잡히거나 회전할 때도 다시 맞춰야 한다 —
+ * 크기 계산이 `safearea.js` 와 여기 **두 곳으로 나뉘어 있어** 한쪽만 바뀌면 어긋난다
+ */
+export function watchHomeBar(){
+  if (typeof window === 'undefined') return () => {};
+  const go = () => fitBar();
+  // 그려지는 데 시간이 걸린다 — 몇 번 나눠 맞춘다
+  for (const ms of [0, 120, 400, 900, 1600]) setTimeout(go, ms);
+  window.addEventListener('resize', go);
+  window.addEventListener('orientationchange', go);
+  return () => {
+    window.removeEventListener('resize', go);
+    window.removeEventListener('orientationchange', go);
+  };
+}
+
 // 확정한 값을 코드에 옮겨 적기 좋게
 export function dumpHomeUI(){
   return HOME_DEF.map(([k, nm]) => `${k}: ${cur[k]}   // ${nm}`).join('\n');

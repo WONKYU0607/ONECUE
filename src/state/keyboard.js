@@ -43,7 +43,15 @@ function unlift(){
 export async function initKeyboard(){
   if (typeof document === 'undefined') return;
   document.documentElement.style.setProperty('--kb-lift', '0px');
-  const Keyboard = globalThis.Capacitor?.Plugins?.Keyboard;
+  // **꾸러미를 직접 들여와야 한다.** 전역 `Capacitor.Plugins.Keyboard` 는
+  // 그 꾸러미를 한 번이라도 들여와야 생긴다 — 안 들여오면 `undefined` 라
+  // "없으면 지나간다"에 걸려 **아무 일도 안 한다**(설치해도 안 먹던 이유)
+  let Keyboard = null;
+  try {
+    ({ Keyboard } = await import('@capacitor/keyboard'));
+  } catch {
+    Keyboard = globalThis.Capacitor?.Plugins?.Keyboard || null;   // 꾸러미가 없는 빌드
+  }
   if (!Keyboard) return;                         // 웹에서는 창이 안 줄어드니 할 일이 없다
   try {
     // **핵심**: 키보드가 창을 줄이지 않고 덮기만 한다

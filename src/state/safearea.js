@@ -45,11 +45,23 @@ export function measureSafeArea(){
 // 안드로이드는 키보드가 뜨면 창 높이를 줄인다. 그 값을 그대로 쓰면 `--u`(한 칸 단위)가
 // 같이 줄어 **UI 전체가 쪼그라든다.** 그래서 **가로 폭이 같은 동안은 가장 큰 높이를 기억**하고
 // 그걸 쓴다. 회전하면 폭이 바뀌므로 그때 다시 잡는다
-let baseW = 0, baseH = 0;
+let baseW = 0, baseH = 0, settled = false;
 function setLayoutH(){
   const w = winW(), h = winH() - cur.top - cur.bottom;
-  if (w !== baseW){ baseW = w; baseH = h; }      // 회전 등 — 새로 잡는다
-  else if (h > baseH) baseH = h;                 // 커진 건 진짜 (키보드가 내려간 것)
+  // [stated] **상단바 크기가 작아졌다 커졌다 한다.**
+  // 앱이 켜지는 순간에는 웹뷰가 자리를 못 잡아 `env(safe-area-inset-*)` 이 **0 으로 읽힌다.**
+  // 그 값으로 `--vhmax` 를 굳히면 쓸 수 있는 높이보다 크게 잡혀(891 vs 843)
+  // **UI 가 5% 크게 고정되고**, 뒤늦게 진짜 값이 오면 화면이 튄다.
+  // → 위쪽 여백이 잡히기 전에는 **굳히지 않는다**
+  const ready = cur.top > 0 || cur.bottom > 0;
+  if (w !== baseW){ baseW = w; baseH = h; settled = ready; }   // 회전 등 — 새로 잡는다
+  else if (!settled){
+    // 아직 자리를 못 잡았다 — 재는 대로 따라가고, 잡히는 순간 그 값으로 시작한다
+    baseH = h;
+    settled = ready;
+  } else if (h > baseH){
+    baseH = h;                                   // 커진 건 진짜 (키보드가 내려간 것)
+  }
   if (typeof document === 'undefined') return;
   const el = document.documentElement.style;
   // [stated] **두 값을 갈라 둔다.** 하나로 쓰면 둘 중 하나가 반드시 깨진다:
@@ -75,6 +87,10 @@ export function watchSafeArea(onChange){
   const go = () => {
     const b = cur;
     const a = measureSafeArea();
+    // **크기 계산이 여기와 `homeLayout.js` 두 곳에 나뉘어 있다.**
+    // 여백이 바뀌면 상단바 맞추기도 다시 돌려야 한쪽만 어긋나지 않는다
+    if (a.top !== b.top || a.bottom !== b.bottom)
+      import('./homeLayout.js').then(m => m.fitBar()).catch(() => {});
     if (onChange && (a.top !== b.top || a.bottom !== b.bottom ||
                      a.left !== b.left || a.right !== b.right)) onChange(a);
   };

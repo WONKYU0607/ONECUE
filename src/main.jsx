@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import { startSync } from './cloud/sync.js';
-import { apply as applyHomeUI } from './state/homeLayout.js';
+import { apply as applyHomeUI, watchHomeBar } from './state/homeLayout.js';
 import { measureSafeArea, watchSafeArea } from './state/safearea.js';
 import './styles.css';
 
@@ -28,11 +28,16 @@ for (const [name, file] of [['--tiers', 'tiers.webp'], ['--ticket', 'ticket.webp
 // **화면을 그리기 전에 잰다.** 안드로이드 15부터 앱이 화면 끝까지 그려져서
 // 상태바·내비게이션바 자리에 UI 가 겹친다. 회전하면 값이 바뀌므로 계속 지켜본다
 measureSafeArea();
+// **웹뷰가 자리를 잡는 데 시간이 걸린다.** 켜자마자 재면 상단바가 0 으로 읽혀
+// UI 크기가 잘못 굳는다 → 잠깐 뒤에 몇 번 더 재서 진짜 값을 잡는다
+for (const ms of [80, 250, 600, 1200]) setTimeout(measureSafeArea, ms);
 // [stated] **키보드가 창을 줄이지 못하게 한다.** 웹 쪽으로는 못 막아서 플러그인을 쓴다.
 // 플러그인이 없으면 조용히 지나간다
 import('./state/keyboard.js').then(m => m.initKeyboard()).catch(() => {});
 watchSafeArea(() => {});
 applyHomeUI();   // 홈 배치 수치를 CSS 변수로 내보낸다
+// **그려진 뒤에 다시 맞춘다** — 켤 때는 상단바가 아직 화면에 없어 맞추기가 그냥 지나간다
+watchHomeBar();
 
 // [stated] **접속하자마자 서버를 깨운다.** 예전엔 PVP 를 누를 때 처음 두드려서
 // 거기서 1분을 기다렸다. 앱을 켠 순간 두드려 두면 사용자가 홈·프로필을 보는 동안

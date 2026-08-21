@@ -95,4 +95,27 @@ console.log('키보드가 창을 못 줄이게 한다');
   assert(/initKeyboard\(\)/.test(main), '  앱이 켜질 때 부른다');
 }
 
+// **크기 계산이 두 곳에 나뉘어 있다** — `safearea.js`(화면 높이·여백)와 `homeLayout.js`(상단바).
+// 한쪽만 바뀌면 어긋나므로 서로 이어져 있어야 한다
+console.log('크기 계산 두 곳이 서로 이어져 있다');
+{
+  const home = fs.readFileSync('src/state/homeLayout.js', 'utf8');
+  const main = fs.readFileSync('src/main.jsx', 'utf8');
+  // `apply()` 안의 `fitBar()` 는 앱이 켜질 때 불리는데 그때는 `.pbar` 가 아직 없다
+  assert(/export function watchHomeBar/.test(home), '  그려진 뒤에 다시 맞추는 길이 있다');
+  assert(/watchHomeBar\(\)/.test(main), '  앱이 그것을 부른다');
+  assert(/addEventListener\('resize'/.test(home), '  화면이 바뀌면 다시 맞춘다');
+  assert(/fitBar\(\)/.test(sa), '  여백이 바뀌어도 상단바를 다시 맞춘다');
+}
+
+console.log('상단바 크기가 잘못 굳지 않는다');
+{
+  // 켜자마자는 `env(safe-area-inset-*)` 이 0 으로 읽힌다 — 그 값으로 굳으면
+  // UI 가 쓸 수 있는 높이보다 크게 잡혀(891 vs 795) 뒤늦게 화면이 튄다
+  assert(/settled/.test(sa), '  자리가 잡혔는지 따로 본다');
+  assert(/cur\.top > 0 \|\| cur\.bottom > 0/.test(sa), '  여백이 잡혀야 굳은 것으로 본다');
+  const main = fs.readFileSync('src/main.jsx', 'utf8');
+  assert(/setTimeout\(measureSafeArea/.test(main), '  켠 뒤에도 몇 번 더 잰다');
+}
+
 console.log('safearea.test.js 통과');
