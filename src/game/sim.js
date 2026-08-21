@@ -155,6 +155,7 @@ export function normalizeState(st){
   if (typeof st.ballOwner !== 'number') st.ballOwner = -1;
   if (typeof st.freeT !== 'number') st.freeT = 0;
   if (typeof st.lastKicker !== 'number') st.lastKicker = -1;
+  if (typeof st.noGoal !== 'number') st.noGoal = 0;
   if (!Array.isArray(st.items)) st.items = [];
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
@@ -256,6 +257,7 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     ballOwner: -1,              // 공을 잡고 있는 슬롯 (-1 = 자유)
     freeT: 0,                   // 찬 직후 아무도 못 잡는 시간
     lastKicker: -1,             // 방금 찬 사람 (그 사람 몸만 잠깐 통과)
+    noGoal: 0,                  // 태클로 나간 공 — 잡히거나 차기 전까지 골이 안 된다
     p: players,
     bullets: [],
     covers: newCovers(),
@@ -1227,6 +1229,8 @@ export function step(s, inp){
             const v = s.p[s.ballOwner];
             if (v && (v.stun | 0) === 0) v.stun = SOC_STUN;
             s.ballOwner = -1; s.freeT = RELEASE_TICKS;
+            s.noGoal = 1;                          // 태클로 나간 공은 골이 안 된다
+            a.tkl = 0;                             // 걸렸으면 그 자리에서 멈춘다
             // [stated] **태클한 사람 쪽으로** 튕겨 나온다 (미끄러진 방향의 반대)
             const [tx, ty] = faceVec(a.tklF == null ? a.face : a.tklF);
             s.ball.vx = -tx * TACKLE_V; s.ball.vy = -ty * TACKLE_V;
@@ -1244,8 +1248,15 @@ export function step(s, inp){
           const near2 = adx * adx + ady * ady <= TACKLE_HIT * TACKLE_HIT;
           if (!near2 && !overlap(a.x, a.y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
           o.stun = SOC_STUN;
+          // [stated] **태클이 걸리면 거기서 멈춘다.** 계속 미끄러지면 상대를 지나쳐 버려
+          // 공을 내 쪽으로 보내도 **결과적으로 상대 뒤에 남는다**(실측: 상대를 30px 지나침).
+          // 실제 축구에서도 부딪히면 거기서 선다
+          a.tkl = 0;
           if (s.ballOwner === j){
             s.ballOwner = -1; s.freeT = RELEASE_TICKS;
+            // **태클로 나간 공은 골이 안 된다.** 세기를 올리니 골대 앞에서 태클만 해도
+            // 그대로 굴러 들어갔다 — 골은 **차야** 들어간다는 규칙과 어긋난다
+            s.noGoal = 1;
             // [stated] **태클에 성공하면 공은 태클한 사람 쪽으로 튕겨 나온다.**
             // 미끄러진 방향으로 보냈더니 **그 방향에 상대가 서 있어** 공이 상대에게 갔다 —
             // 태클은 상대를 향해 들어가는 동작이므로 **반대로** 나와야 내가 잡을 수 있다

@@ -52,7 +52,10 @@ export const BALL_STOP = Math.round(0.15 * FP);    // 이보다 느리면 세운
 // [stated] "현재 속도를 슛 속도로 하고 몰고 가는 건 반으로 줄여"
 export const KICK_V = Math.round(6 * FP);          // 슛 — 지금 속도 그대로 (굴러가는 거리 약 154px)
 // [stated] 태클로 공을 차면 **슛보다 약하게** 튕겨 나간다. 슛의 절반
-export const TACKLE_V = Math.round(1.6 * FP);   // [stated] 태클로 그대로 골이 들어가 절반으로
+// [stated] **태클로 뺏은 공이 넘어진 사람 앞에 그대로 떨어진다.**
+// 방향은 맞는데 **35px 밖에 안 굴러** 둘 사이에 남아 있었다 → 60px 쯤 굴러가게.
+// 예전에 3.0 이었을 때는 그대로 골대까지 굴러가 골이 됐으므로 그보다는 낮게 잡는다
+export const TACKLE_V = Math.round(2.6 * FP);
 export const TACKLE_TICKS = 26;                    // 미끄러지는 동안 (모션 길이)
 export const TACKLE_COOL = 48;                     // 연타 방지. 슛보다 길다
 // [stated] 태클하면 캐릭터가 **스윽 밀려난다**. 시작이 제일 빠르고 점점 느려진다
@@ -186,6 +189,7 @@ export function stepBall(s, kicks, chs){
         // 슛(1) 또는 태클로 건드림(2). 슛은 **차징 세기**를 쓴다
         const [fx, fy] = faceVec(p.face);
         const v = kicks[own] === 2 ? TACKLE_V : kickSpeed(chs ? chs[own] : 100);
+        s.noGoal = 0;                    // **차면 다시 골이 될 수 있다**
         b.vx = fx * v; b.vy = fy * v;
         if (kicks[own] !== 2) p.kickCool = KICK_COOL;
         s.kickFx = { x: f.x, y: f.y, f: p.face | 0, t: KICK_FX_TICKS };
@@ -220,6 +224,7 @@ export function stepBall(s, kicks, chs){
     }
     if (best >= 0){
       s.ballOwner = best;
+      s.noGoal = 0;                       // 누가 잡으면 다시 골이 될 수 있다
       const f = footOf(s.p[best]);
       b.x = f.x; b.y = f.y; b.vx = 0; b.vy = 0;
       return goalCheck(s, b);
@@ -265,11 +270,14 @@ export function stepBall(s, kicks, chs){
 
 /** 골 판정과 벽 반사. 잡고 있을 때도 골라인은 봐야 한다 */
 function goalCheck(s, b){
+  // **태클로 나간 공은 골이 안 된다** — 골은 차야 들어간다.
+  // 그 상태에서도 벽 반사는 해야 하므로 골 판정만 건너뛴다
+  const noGoal = (s.noGoal | 0) === 1;
   // 골 판정 — 골대 입구 안에서 골라인을 넘으면 골.
   //    **넘는 순간 속도를 줄여** 골대 안에서 잠깐 구르게 한다
   const inMouth = b.x >= GOAL.lo && b.x <= GOAL.hi;
-  if (inMouth && b.y <= GOAL.top){ damp(b); return { goal: 0 }; }   // 위 골대 = 아래 팀 득점
-  if (inMouth && b.y >= GOAL.bot){ damp(b); return { goal: 1 }; }
+  if (!noGoal && inMouth && b.y <= GOAL.top){ damp(b); return { goal: 0 }; }   // 위 골대 = 아래 팀 득점
+  if (!noGoal && inMouth && b.y >= GOAL.bot){ damp(b); return { goal: 1 }; }
 
   // 5) 좌우는 돌벽. 위아래는 **골대 입구 밖이면 골라인이 벽**이다 —
   //    골포스트·크로스바에 맞은 셈이라 거기서 튕긴다. 골대 뒤로 돌아 들어가지 않는다

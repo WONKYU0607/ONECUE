@@ -296,4 +296,26 @@ console.log('날아오는 공은 못 잡고 튕긴다');
   assert(CATCH_MAX > 0 && CATCH_MAX < KICK_V, '  잡을 수 있는 속도 한계가 슛보다 낮다');
 }
 
+// [stated] **태클로 뺏은 공이 넘어진 사람 앞에 그대로 떨어진다** —
+// 방향은 맞았는데 35px 밖에 안 굴러 둘 사이에 남았다. 세기를 올리되,
+// 그러면 골대 앞 태클이 그대로 골이 되므로 **태클로 나간 공은 골로 안 친다**
+console.log('태클로 나간 공은 골이 아니다');
+{
+  const s = world();
+  s.noGoal = 1;                                   // 태클로 나간 상태
+  s.p[0].x = FIELD.x0; s.p[0].y = GOAL.bot - PHf;
+  s.p[1].x = FIELD.x1 - PWf; s.p[1].y = GOAL.bot - PHf;
+  s.ball.x = mid.x; s.ball.y = GOAL.top + FP; s.ball.vy = -2 * FP;
+  assert(!stepBall(s, [0, 0]), '  골라인을 넘어도 골이 아니다');
+  // 누가 잡으면 다시 골이 될 수 있다
+  const t = world();
+  t.noGoal = 1;
+  t.ball.x = mid.x; t.ball.y = mid.y;
+  t.p[0].x = mid.x - (PWf >> 1); t.p[0].y = mid.y - (PHf >> 1) + 3 * FP;
+  t.p[1].x = FIELD.x0; t.p[1].y = GOAL.top;
+  stepBall(t, [0, 0]);
+  assert(t.ballOwner === 0, '  잡힌다');
+  assert((t.noGoal | 0) === 0, '  잡으면 다시 골이 될 수 있다');
+}
+
 console.log('ball.test.js 통과');
