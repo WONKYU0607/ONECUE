@@ -46,16 +46,26 @@ export async function initKeyboard(){
   // **꾸러미를 직접 들여와야 한다.** 전역 `Capacitor.Plugins.Keyboard` 는
   // 그 꾸러미를 한 번이라도 들여와야 생긴다 — 안 들여오면 `undefined` 라
   // "없으면 지나간다"에 걸려 **아무 일도 안 한다**(설치해도 안 먹던 이유)
+  // **결과를 화면에 남긴다.** `try/catch` 로 다 삼키면 "안 먹었다"만 알고
+  // **왜 안 먹었는지**는 영영 모른다 — 실제로 그래서 한 판을 날렸다
+  const note = v => { try { document.documentElement.dataset.kb = v; } catch { /* 무시 */ } };
   let Keyboard = null;
   try {
     ({ Keyboard } = await import('@capacitor/keyboard'));
-  } catch {
+    note(Keyboard ? '꾸러미ok' : '꾸러미빔');
+  } catch (e){
     Keyboard = globalThis.Capacitor?.Plugins?.Keyboard || null;   // 꾸러미가 없는 빌드
+    note(Keyboard ? '전역ok' : '못찾음:' + (e && e.message || '').slice(0, 24));
   }
   if (!Keyboard) return;                         // 웹에서는 창이 안 줄어드니 할 일이 없다
   try {
     // **핵심**: 키보드가 창을 줄이지 않고 덮기만 한다
     await Keyboard.setResizeMode({ mode: 'none' });
+    note('resize=none');
+  } catch (e){
+    note('실패:' + (e && e.message || '').slice(0, 30));
+  }
+  try {
     // 스크롤로 밀어 올리는 기본 동작도 끈다 — 우리가 직접 민다
     await Keyboard.setScroll?.({ isDisabled: true });
   } catch { /* 옛 버전이면 없는 기능일 수 있다 */ }

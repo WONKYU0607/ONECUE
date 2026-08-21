@@ -25,7 +25,14 @@ export default function KeyboardProbe(){
         vh: cs.getPropertyValue('--vh').trim(),
         u: cs.getPropertyValue('--u').trim(),
         sc: screen ? Math.round(screen.getBoundingClientRect().height) : -1,
-        at: new Date().toISOString().slice(14, 19)
+        at: new Date().toISOString().slice(14, 19),
+        kb: document.documentElement.dataset.kb || '(안 돌았음)',
+        // 상단바 크기가 오락가락하는지 보려고 — 실제 값과 잰 폭
+        rowH: cs.getPropertyValue('--h-rowH').trim(),
+        bar: (() => {
+          const b = document.querySelector('.pbar');
+          return b ? Math.round(b.scrollWidth) + '/' + Math.round(b.clientWidth) : '-';
+        })()
       });
     };
     read();
@@ -50,6 +57,8 @@ export default function KeyboardProbe(){
       <div>--vh <b>{v.vh || '-'}</b></div>
       <div>--u <b>{v.u || '-'}</b></div>
       <div>.screen <b>{v.sc}</b></div>
+      <div>플러그인 <b>{v.kb}</b></div>
+      <div>상단바 <b>{v.rowH}</b> ({v.bar})</div>
       <div className="kb-at">{v.at}</div>
     </div>
   );

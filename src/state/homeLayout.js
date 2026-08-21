@@ -65,18 +65,25 @@ export function apply(){
 // 실제로 그것 때문에 PC(줄이기가 발동하는 쪽)에서만 상단바가 무너졌다.
 // 상단바가 넘치면 글자·아이콘이 잘려서 "1,240"이 "1,0"으로 보인다.
 // 칸을 줄이는 대신 **글씨와 아이콘을 줄여** 넘치지 않게 맞춘다
+const FIT_KEYS = ['rowH', 'tierSz', 'tkW', 'tkH', 'valSz', 'padX', 'gapIco', 'boxGap'];
+
 export function fitBar(){
   const el = document.documentElement;
   const bar = document.querySelector('.pbar');
   if (!bar) return;
+  // **반드시 원래 크기로 되돌리고 나서 잰다.**
+  // 줄여 놓은 상태에서 재면 "안 넘친다"가 나와 원래 크기로 되돌리고,
+  // 그러면 다시 넘쳐서 또 줄인다 — **상단바 크기가 계속 오락가락했다**
+  for (const key of FIT_KEYS) el.style.setProperty('--h-' + key, String(cur[key]));
   const avail = bar.clientWidth;
   if (!avail) return;
+  void bar.scrollWidth;                       // 되돌린 값이 반영되게 한 번 읽는다
   let k = 1;
   for (let i = 0; i < 8; i++){
     const need = bar.scrollWidth;
     if (need <= avail || k <= 0.62) break;
     k = Math.max(0.62, k * Math.min(0.97, avail / need));
-    for (const key of ['rowH', 'tierSz', 'tkW', 'tkH', 'valSz', 'padX', 'gapIco', 'boxGap'])
+    for (const key of FIT_KEYS)
       el.style.setProperty('--h-' + key, String(Math.round(cur[key] * k)));
   }
 }
