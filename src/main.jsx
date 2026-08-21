@@ -28,6 +28,9 @@ for (const [name, file] of [['--tiers', 'tiers.webp'], ['--ticket', 'ticket.webp
 // **화면을 그리기 전에 잰다.** 안드로이드 15부터 앱이 화면 끝까지 그려져서
 // 상태바·내비게이션바 자리에 UI 가 겹친다. 회전하면 값이 바뀌므로 계속 지켜본다
 measureSafeArea();
+// [stated] **키보드가 창을 줄이지 못하게 한다.** 웹 쪽으로는 못 막아서 플러그인을 쓴다.
+// 플러그인이 없으면 조용히 지나간다
+import('./state/keyboard.js').then(m => m.initKeyboard()).catch(() => {});
 watchSafeArea(() => {});
 applyHomeUI();   // 홈 배치 수치를 CSS 변수로 내보낸다
 

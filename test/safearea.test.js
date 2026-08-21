@@ -81,4 +81,18 @@ console.log('게임 화면에 개발용 버튼이 없다');
   assert(back.length > 0, '  폰 뒤로가기 처리는 그대로 있다');
 }
 
+// [stated] 키보드가 화면을 줄이던 문제 — **웹으로는 못 막아 플러그인을 쓴다**
+console.log('키보드가 창을 못 줄이게 한다');
+{
+  const kb = fs.readFileSync('src/state/keyboard.js', 'utf8');
+  assert(/setResizeMode\(\{ mode: 'none' \}\)/.test(kb), '  창 크기를 안 줄이게 잠근다');
+  assert(/Capacitor\?\.Plugins\?\.Keyboard/.test(kb), '  플러그인이 없으면 그냥 지나간다');
+  assert(/keyboardWillShow/.test(kb) && /keyboardWillHide/.test(kb), '  뜨고 내릴 때를 듣는다');
+  // 창이 안 줄어드는 대신 **키보드가 입력창을 가릴 수 있다** — 그만큼 화면을 민다
+  assert(/--kb-lift/.test(kb), '  가리면 밀어 올린다');
+  assert(/--kb-lift/.test(css), '  화면이 그 값을 쓴다');
+  const main = fs.readFileSync('src/main.jsx', 'utf8');
+  assert(/initKeyboard\(\)/.test(main), '  앱이 켜질 때 부른다');
+}
+
 console.log('safearea.test.js 통과');
