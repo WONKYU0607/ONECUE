@@ -22,6 +22,9 @@ const LABEL = {
 };
 
 export default function Matching({ session, onCancel, onMatched }){
+  // **위에서 쓰므로 먼저 정의한다** (const 는 정의 전에 못 읽는다)
+  const goneRef = useRef(false);
+  const go = () => { if (goneRef.current) return; goneRef.current = true; onMatched(); };
   const [stage, setStage] = useState('waking');
   const [, setTries] = useState([0, 0]);   // 재시도 횟수는 이제 화면에 안 쓴다
   const [code, setCode] = useState('');
@@ -31,7 +34,6 @@ export default function Matching({ session, onCancel, onMatched }){
   // [stated] 매칭되면 **양쪽 정보를 보여주는 화면**을 잠깐 띄운 뒤 게임으로 넘어간다
   const [vs, setVs] = useState(null);
   const vsRef = useRef(null);
-  const goneRef = useRef(false);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -47,7 +49,14 @@ export default function Matching({ session, onCancel, onMatched }){
       soccer: !!session?.soccer,
       onVs: m => { if (alive.current){ vsRef.current = m; setVs(m); } },
       color: Number.isInteger(session?.color) ? session.color : -1,
-      onCode: c => { if (alive.current) setCode(c); },
+      // [stated] **방을 만들면 바로 로비로.** 코드를 받은 순간이 방이 만들어진 순간이다.
+      // 예전엔 "친구를 기다리는 중" 화면에 머물렀다 — 자리가 다 차야 넘어가게 돼 있어서
+      // 혼자 만든 방은 영영 안 넘어갔다
+      onCode: c => {
+        if (!alive.current) return;
+        setCode(c);
+        if (session?.mode === 'create') go();
+      },
       onLobby: l => { if (alive.current) setLobby(prev => ({ ...prev, ...l })); },
       onStage: (s, i, n) => {
         if (!alive.current) return;
@@ -70,6 +79,9 @@ export default function Matching({ session, onCancel, onMatched }){
         // **정보가 안 오면 기다리지 않는다** — 0.6초 안에 없으면 그냥 진행
         sfx.matched?.();      // 매칭 성사
         if (watching){ go(); return; }         // 관전은 VS 화면을 건너뛴다
+        // [stated] **방은 로비로 간다** — VS 화면은 빠른 매칭에서만.
+        // 방은 자리가 다 차기 전에도 들어가서 기다린다
+        if (session?.mode === 'create' || session?.mode === 'join'){ go(); return; }
         setStage('vs');
         setTimeout(() => { if (alive.current && !vsRef.current) go(); }, 600);
       })
@@ -80,7 +92,6 @@ export default function Matching({ session, onCancel, onMatched }){
     return () => { alive.current = false; clearInterval(iv); };
   }, [onMatched, session]);
 
-  const go = () => { if (goneRef.current) return; goneRef.current = true; onMatched(); };
   const cancel = () => { disconnect(); onCancel(); };
 
   if (stage === 'vs' && vs){

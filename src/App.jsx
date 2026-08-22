@@ -157,9 +157,11 @@ export default function App(){
   // [stated] **친구방이면 로비로**, 빠른 매칭이면 바로 게임으로
   const toRoomOrGame = useCallback(() => {
     setSession(sn => (sn && SELF.watching ? { ...sn, watching: true } : sn));
-    const r = getRoom();
-    setScreen(r && !SELF.watching ? 'room' : 'game');
-  }, []);
+    // **방을 만든 직후에는 방 상태가 아직 안 왔을 수 있다** — 어떻게 들어왔는지로 판단한다.
+    // 빠른 매칭(`queue`)만 바로 게임으로, 방(`create`·`join`)은 로비로
+    const byRoom = session?.mode === 'create' || session?.mode === 'join' || !!getRoom();
+    setScreen(byRoom && !SELF.watching ? 'room' : 'game');
+  }, [session]);
   const toGame    = useCallback(() => {
     setSession(sn => (sn && SELF.watching ? { ...sn, watching: true } : sn));
     setScreen('game');
