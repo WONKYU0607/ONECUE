@@ -26,8 +26,6 @@ export default function PvpMenu({ onBack, onStart }){
   // [stated] 축구는 **전용 티켓 하루 3장** — 일반 티켓과 별개 주머니라 따로 센다
   const outSoccer = () => socLeft() <= 0;
   const guardSoccer = fn => () => { if (!outSoccer()) fn(); };
-  // 칼전을 고른 뒤의 단계들 ('melee' 고른 직후 · 팀전 · 개인전)
-  const mkMelee = mk === 'melee' || mk === 'team' || mk === 'ffa';
   const back = () => {
     if (step === 'mode'){
       if (mk) return setMk(null);        // 펼친 것을 먼저 접는다
@@ -54,8 +52,6 @@ export default function PvpMenu({ onBack, onStart }){
       {[0, 1, 2, 3].map(c => cells[c] || <span key={c} className="mk-slot" />)}
     </div>
   );
-  // 한 칸에 세로로 쭈르륵 쌓는다 (옆으로 늘어놓지 않는다)
-  const stack = (col, items) => items.map(it => lvl(it.key, { [col]: it.node }));
 
   return (
     <div className="screen list">
@@ -110,8 +106,11 @@ export default function PvpMenu({ onBack, onStart }){
             </div>
             {/* 친구랑 하기는 아래에 작게 */}
             <div className="pick-row sub-row">
-              <button className={'menu-btn small' + (mk ? ' primary' : '')}
-                      onClick={() => { setCd(false); setMk(mk ? null : 'pick'); }}>
+              {/* [stated] **누르면 바로 방이 만들어지고 로비로 간다** —
+                  종목·인원은 어차피 로비 안에서 다 만질 수 있다.
+                  기본값은 총격전 1대1 */}
+              <button className="menu-btn small"
+                      onClick={() => onStart({ mode: 'create', n: 2, color: getColor() })}>
                 <span className="t">{t('pvp.create')}</span>
               </button>
               {/* [stated] 코드 입력도 **화면을 넘기지 말고** 이 밑에 칸과 버튼이 바로 나오게 */}
@@ -134,75 +133,6 @@ export default function PvpMenu({ onBack, onStart }){
                  </button>
             })}
 
-            {/* [stated] 방 만들기는 이 자리에서 펼치되, **각 단계가 자기 부모 버튼 밑**으로 온다.
-                칼전 밑에 팀전·개인전, 팀전 밑에 인원, 개인전 밑에 인원이 세로로 쌓인다 */}
-            {mk && (
-              <div className="pick-group mk-group">
-                {lvl('head', {
-                  0: <button key="gun" className={'menu-btn pick' + (mk === 'gun' ? ' primary' : '')}
-                             onClick={() => { setMelee(false); setMk('gun'); }}>
-                       <span className="t">{t('mode.gun')}</span>
-                     </button>,
-                  1: <button key="melee" className={'menu-btn pick' + (mkMelee ? ' primary' : '')}
-                             onClick={() => { setMelee(true); setMk('melee'); }}>
-                       <span className="t">{t('mode.melee')}</span>
-                     </button>,
-                  /* [stated] 방 만들기에서는 축구를 **칼전 옆에** */
-                  2: <button key="soc" className={'menu-btn pick' + (mk === 'soc' ? ' primary' : '')
-                                                  + (outSoccer() ? ' off' : '')}
-                             onClick={guardSoccer(() => { setMelee(false); setMk('soc'); })}>
-                       <span className="t">{t('mode.soccer')}</span>
-                     </button>
-                })}
-
-                {/* 축구 인원은 축구 밑(2번 칸)에. 1대1·2대2 뿐이다 */}
-                {/* [stated] **방 만들기는 티켓을 안 쓴다** — 친구방은 빠른 매칭과 달리 제한이 없다 */}
-                {mk === 'soc' && stack(2,
-                  [2, 4].map(k => ({
-                    key: 's' + k,
-                    node: <button key={k} className="menu-btn pick"
-                                  onClick={() => onStart({ mode: 'create', n: k,
-                                                           soccer: true, color: getColor() })}>
-                            <span className="t">{k / 2} vs {k / 2}</span>
-                          </button>
-                  })))}
-
-                {/* 칼전만 한 단계 더 — 칼전 밑에 팀전, 그 옆에 개인전.
-                    총격전은 진영이 위아래로 나뉘어 개인전이 성립하지 않는다 */}
-                {mkMelee && lvl('split', {
-                  1: <button key="team" className={'menu-btn pick' + (mk === 'team' ? ' primary' : '')}
-                             onClick={() => setMk('team')}>
-                       <span className="t">{t('mode.team')}</span>
-                     </button>,
-                  2: <button key="ffa" className={'menu-btn pick' + (mk === 'ffa' ? ' primary' : '')}
-                             onClick={() => setMk('ffa')}>
-                       <span className="t">{t('mode.ffa')}</span>
-                     </button>
-                })}
-
-                {/* 인원. 총격전이면 0번 칸(총격전 밑), 팀전이면 1번 칸(팀전 밑) */}
-                {(mk === 'gun' || mk === 'team') && stack(mk === 'gun' ? 0 : 1,
-                  [2, 4, 6].map(k => ({
-                    key: 'n' + k,
-                    node: <button key={k} className="menu-btn pick"
-                                  onClick={() => onStart({ mode: 'create', n: k,
-                                                           melee: mk === 'team', color: getColor() })}>
-                            <span className="t">{k / 2} vs {k / 2}</span>
-                          </button>
-                  })))}
-
-                {/* 개인전 인원은 개인전 밑(2번 칸)에 쭈르륵 */}
-                {mk === 'ffa' && stack(2,
-                  [3, 4, 5, 6].map(k => ({
-                    key: 'f' + k,
-                    node: <button key={k} className="menu-btn pick"
-                                  onClick={() => onStart({ mode: 'create', n: k, melee: true,
-                                                           ffa: true, color: getColor() })}>
-                            <span className="t">{t('pvp.players', { n: k })}</span>
-                          </button>
-                  })))}
-              </div>
-            )}
           </>
         )}
 

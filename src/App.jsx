@@ -249,7 +249,7 @@ export default function App(){
       {screen === 'room'     && <Room room={room || getRoom()} onLeave={goHome} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome}
                                           onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} />}
-      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={getRoom() ? backToRoom : null} onHome={goHome} />}
+      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={(session?.online && getRoom()) ? backToRoom : null} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       {askExit && <QuitAsk exit

@@ -63,10 +63,13 @@ console.log('티켓 — 친구방은 안 깎는다 (C안)');
     '  다시 시작할 때 낸 티켓 기록을 지우지 않는다');
   // 방 만들기 화면에서도 티켓 잠금이 없어야 한다
   const menu = fs.readFileSync('src/ui/screens/PvpMenu.jsx', 'utf8');
+  // [stated] **방 만들기를 누르면 바로 로비로** — 종목·인원은 로비에서 고른다.
+  // 그래서 이 화면의 `create` 는 **하나뿐**이다(예전엔 종목·인원마다 하나씩 있었다)
   const create = menu.match(/mode: 'create'[^}]*}/g) || [];
-  assert(create.length >= 2, '  방 만들기 버튼이 있다');
+  assert(create.length === 1, `  방 만들기 버튼은 하나 (${create.length})`);
   assert(!/guard\([^)]*\) => onStart\(\{ mode: 'create'/.test(menu),
     '  방 만들기에 티켓 잠금이 없다');
+  assert(!/\{mk && \(/.test(menu), '  펼쳐지던 종목·인원 메뉴는 없앴다');
 }
 
 // [stated] **관전** — 자리가 다 차면 보기만 하는 사람으로 들어온다. 인원 제한 없음
