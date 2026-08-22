@@ -59,7 +59,9 @@ export const TACKLE_V = Math.round(2.6 * FP);
 export const TACKLE_TICKS = 26;                    // 미끄러지는 동안 (모션 길이)
 export const TACKLE_COOL = 48;                     // 연타 방지. 슛보다 길다
 // [stated] 태클하면 캐릭터가 **스윽 밀려난다**. 시작이 제일 빠르고 점점 느려진다
-export const TACKLE_SLIDE = Math.round(2.2 * FP);  // 첫 틱 속도 — [stated] 너무 멀리 날아가 30px 쯤으로 줄임
+// 첫 틱 속도. [stated] **30 → 15px** — 멀리서도 태클이 닿아서 줄였다.
+// 미끄러지는 동안에도 판정을 하므로 **이 값이 실제 사거리를 정한다**
+export const TACKLE_SLIDE = Math.round(1.1 * FP);
 // [stated] 슛할 때 **음파 터지는 듯한 연출**을 0.3초. 찼는지 안 찼는지 안 보였다.
 // **시뮬 상태에 둔다** — 양쪽 화면에 같이 떠야 하므로(폭발 이펙트와 같은 방식)
 // [stated] 전체로 퍼지는 큰 음파가 아니라 **공 근처에만 생기는 미세한 파문** +
@@ -95,7 +97,8 @@ export const SOC_STUN = 48;   // [stated] 0.5초 → 0.8초
 // 태클이 스치기만 해도 뺏을 수 있게, 몸 겹침 말고 **거리로도** 본다
 // [stated] **태클이 너무 멀리서도 먹힌다** — 캐릭터가 9px 인데 중심 거리 14px 이면
 // 몸이 5px 떨어져 있어도 걸렸다. 몸이 거의 닿을 때만 걸리게 좁힌다
-export const TACKLE_HIT = Math.round(10 * FP);
+// [stated] **8px 까지만 걸리게.** 미끄러지며 더 붙으므로 실제로는 8px 근처가 한계가 된다
+export const TACKLE_HIT = Math.round(3 * FP);
 export const KICK_COOL = 18;                       // 연타 방지 (틱)
 export const GOAL_TO_WIN = 3;
 export const SOCCER_TICKS = 90 * 60;               // 90초

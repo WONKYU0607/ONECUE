@@ -383,7 +383,13 @@ export function createGame(canvas, opts = {}){
         try { opts.onCrash?.(e); } catch { /* 알림 자체가 실패해도 무시 */ }
       }
     }
-    // [stated] **방장이 다시 시작하면** 결과 화면을 닫고 새 판으로 돌아간다
+    // [stated] **카운트다운이 렉 먹은 것처럼 빠르게 지나갔다.**
+  // 접속은 VS 화면(3초) 전에 끝나는데 게임 화면은 그 뒤에 뜬다. 그 사이 서버는 계속 굴러서,
+  // 화면이 뜨는 순간 클라가 **3초치(180틱)를 한 프레임에 40틱씩 몰아서** 따라잡는다.
+  // → 시작할 때 **최신 스냅샷부터 다시 시작**하게 해서 따라잡을 게 없게 만든다
+  if (online) client.resync();
+
+  // [stated] **방장이 다시 시작하면** 결과 화면을 닫고 새 판으로 돌아간다
   client.onAgain = () => { lastPhase = -1; onAgain(); };
   client.onHost = h => onHost(h);
   client.onMode = m => onMode(m);

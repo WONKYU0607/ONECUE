@@ -117,7 +117,8 @@ console.log('태클하면 미끄러진다');
   step(s, [{ ...NOIN, tkl: 1 }, { ...NOIN }]);
   for (let i = 0; i < 40; i++) step(s, [{ ...NOIN }, { ...NOIN }]);
   const slid = (y0 - s.p[0].y) / FP;
-  assert(slid > 20, `  보는 방향으로 미끄러진다 (${slid.toFixed(1)}px)`);
+  // [stated] 멀리서도 태클이 닿아 **미끄러짐을 30 → 15px 로 줄였다**
+  assert(slid > 10 && slid < 22, `  보는 방향으로 15px 쯤 미끄러진다 (${slid.toFixed(1)}px)`);
   assert(s.p[0].tkl === 0, '  모션이 끝난다');
   assert(s.p[0].tklCool > 0, '  쿨다운이 남는다');
 }
