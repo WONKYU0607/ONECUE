@@ -10,7 +10,7 @@ export const DEFAULTS = {
   vibrate: true,     // 진동 (피격 등)
   showGrid: false,   // 바닥 격자 (디버그)
   softFlash: false,  // 화면 효과 줄이기 (섬광탄 번쩍임을 옅은 안개로)
-  seenHelp: false,   // 조작 안내를 본 적 있는지
+  tutoDone: false,   // [stated] 튜토리얼을 끝냈거나 건너뛰었는지 (처음 켤 때만 물어본다)
   leftStick: false   // 스틱을 왼쪽에 (왼손잡이)
 };
 

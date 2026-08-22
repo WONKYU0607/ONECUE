@@ -588,8 +588,9 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .seat.me{background:rgba(255,211,77,.15);color:#ffd34d}
 .room-modes{display:flex;gap:6px;width:100%}
 .room-modes .menu-btn{flex:1 1 0;min-width:0}
-.menu-btn.sm{padding:6px 4px}
-.menu-btn.sm .t{font-size:13px}
+/* [stated] 로비 버튼(이동·관전하기·종목·인원)은 **20% 작게** */
+.menu-btn.sm{padding:5px 3px;min-height:34px}
+.menu-btn.sm .t{font-size:11px}
 /* 관전 칸 — 팀과 종목 사이 */
 .room-watch{width:100%;padding:8px;border-radius:4px;
   background:rgba(12,22,36,.6);border:1px solid rgba(90,140,190,.3)}
@@ -607,13 +608,25 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .room-watch .menu-btn.primary .t,
 .room-watch .menu-btn.primary[disabled] .t{color:#ffd34d}
 /* [stated] 관전하기 버튼은 작게, 닉네임은 조금 크게 */
-.room-watch .menu-btn{min-height:34px;padding:4px 10px}
-.room-watch .menu-btn .t{font-size:12px}
+.room-watch .menu-btn{min-height:28px;padding:3px 8px}
+.room-watch .menu-btn .t{font-size:10px}
 .room-watch .seat{font-size:13px;height:24px}
 /* [stated] 인원이 안 차면 **시작 버튼 글씨만** 흐리게. (종목·인원 버튼은 제외 —
    고른 것이 `disabled` 라 여기에 걸려 노란 글씨가 도로 회색이 됐다) */
 .room > .menu > .menu-btn.primary[disabled]{opacity:1}
 .room > .menu > .menu-btn.primary[disabled] .t{color:#6b7a90;text-shadow:none}
+
+/* [stated] 튜토리얼 안내창 — 실제 판 위에 얹힌다. **조작을 가리면 안 되므로 위쪽에** */
+.tuto{position:fixed;left:0;right:0;top:calc(var(--sat) + 34px);z-index:30;
+  display:flex;justify-content:center;pointer-events:none}
+.tuto-box{pointer-events:auto;max-width:88%;padding:10px 14px;border-radius:5px;
+  background:rgba(8,14,24,.92);border:1px solid rgba(90,140,190,.5);
+  box-shadow:0 4px 18px rgba(0,0,0,.5)}
+.tuto-n{display:block;font:700 10px var(--gf);color:#8fd8ff;letter-spacing:1px;margin-bottom:3px}
+.tuto-msg{margin:0 0 8px;font:700 13px/1.45 var(--gf);color:#e8e8f0;letter-spacing:0}
+.tuto-btns{display:flex;gap:6px;justify-content:flex-end}
+.tuto-btns .menu-btn{min-height:30px;padding:4px 12px}
+.tuto-btns .menu-btn .t{font-size:12px}
 
 /* 매칭 소개(VS) 화면 — [stated] 배경을 **사선으로 반** 갈라 위아래에서 충돌시킨다.
    부딪힌 자리에 번개 두 개, 그 사이에 VS. 정보는 미리 붙어 있는 채로 부딪힌다 */

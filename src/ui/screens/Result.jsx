@@ -24,7 +24,7 @@ function name(r, sum){
   return same.length > 1 ? `${base}${idx}` : base;
 }
 
-export default function Result({ result, summary, score, session, host, onAgain, onMode, onRoom, onHome }){
+export default function Result({ result, summary, score, session, host, onAgain, onMode, onRoom, onNext, onHome }){
   // [stated] **기존 점수에서 1점씩 굴러 올라간다.** 걸리는 시간은 1초.
   // 소리도 같이 나는데, 300점이 오르면 300번을 낼 수 없으므로
   // **소리만 45ms 간격으로 솎아낸다** — 귀에는 '따르르륵' 으로 이어져 들린다
@@ -202,6 +202,12 @@ export default function Result({ result, summary, score, session, host, onAgain,
           <p className="res-wait">{t(session?.watching ? 'room.watching' : 'res.waitHost')}</p>
         )}
         </>)}
+        {/* [stated] **AI 모드에서 이겼으면 바로 다음 단계로** — 목록으로 돌아갔다 다시 고를 필요가 없다 */}
+        {onNext && (
+          <button className="menu-btn primary" onClick={onNext}>
+            <span className="t">{t('res.next')}</span>
+          </button>
+        )}
         <button className="menu-btn ghost" onClick={onHome}>
           <span className="t">{t('res.home')}</span>
         </button>

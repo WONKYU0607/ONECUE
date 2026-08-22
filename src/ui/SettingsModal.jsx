@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getSettings, setSetting } from '../state/settings.js';
+import { resetTuto } from '../state/tutorial.js';
 import { unlockAudio, sfx, playMusic, stopMusic, applyBgmVolume } from '../game/audio.js';
 import { VIEW, HAND } from '../game/config.js';
 import { t, LANGS, getLang, setLang } from '../i18n/index.js';
@@ -17,7 +18,7 @@ const LABEL = {
   softFlash: 'set.softFlash'
 };
 
-export default function SettingsModal({ onClose }){
+export default function SettingsModal({ onClose, onTuto }){
   const [s, setS] = useState(getSettings);
   const [lang, setL] = useState(getLang);
 
@@ -51,6 +52,10 @@ export default function SettingsModal({ onClose }){
           <span className="title">{t('home.settings')}</span>
           <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </header>
+        {/* [stated] **튜토리얼 다시 하기** — 처음 켤 때만 묻지만 여기서 언제든 다시 */}
+        <button className="menu-btn" onClick={() => { resetTuto(); onClose?.(); onTuto?.(); }}>
+          <span className="t">{t('tuto.again')}</span>
+        </button>
         {ROWS.map(k => (
           <div key={k}>
             <button className="toggle-row" onClick={() => toggle(k)}>

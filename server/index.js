@@ -502,11 +502,14 @@ class Room {
     if (reconnected) this.send({ t: 'peer', slot, state: 'back' });
     // **봇 자리는 소켓이 없다.** `x.ws` 만 보면 봇이 낀 방은 영원히 안 차서
     // 클라가 매칭 화면에서 멈춘다 ("상대를 전혀 못 찾는다")
-    else if (this.seats.every(x => x.ws || x.bot)){
+    // [stated] **방(코드가 있는 방)은 자리가 차도 자동으로 시작하지 않는다** —
+    // 방장이 로비에서 [시작 하기] 를 눌러야 한다. 빠른 매칭만 자동으로 시작한다
+    else if (!this.code && this.seats.every(x => x.ws || x.bot)){
       this.send({ t: 'go' });
       this.sendVs();                       // [stated] 매칭되면 서로의 정보를 보여준다
     }
-    else this.sendLobby(); this.sendRoom();
+    else this.sendLobby();
+    this.sendRoom();                       // 방 상태는 **어느 경우든** 보낸다
     return slot;
   }
 
@@ -947,7 +950,8 @@ wss.on('connection', (ws, req) => {
       try { ws.send(JSON.stringify({ t: 'p', id: m.id })); } catch { /* 무시 */ }
       return;
     }
-    if (m.t === 'team' && ws.room && ws.room.n > 2 && !ws.room.ffa){
+    // [stated] **로비에서는 1대1도 팀을 옮긴다.** 예전엔 `n > 2` 라 1대1 방에서 아무것도 안 먹었다
+    if (m.t === 'team' && ws.room){
       const room = ws.room, team = m.team === 1 ? 1 : 0;
       // [stated] **잘못 눌렀으면 되돌릴 수 있어야 한다.** 같은 팀을 다시 누르면 자리를 비운다
       if (ws.slot >= 0 && m.undo && room.server.s.phase === PH_READY){

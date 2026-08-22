@@ -4,11 +4,11 @@ import RankCards from '../RankCards.jsx';
 import InviteBanner from '../InviteBanner.jsx';
 import { t } from '../../i18n/index.js';
 
-export default function Home({ onPvp, onAi, onPractice, onSettings, onHelp, onRanks, onJoin, onFriends }){
+export default function Home({ onPvp, onAi, onPractice, onSettings, onRanks, onJoin, onFriends }){
   return (
     <div className="screen home">
 
-      <PlayerBar onHelp={onHelp} onSettings={onSettings} onFriends={onFriends} />
+      <PlayerBar onSettings={onSettings} onFriends={onFriends} />
 
       {/* [stated] 상단바 **바로 밑에** 순위표 두 칸 */}
       <RankCards onOpen={onRanks} />

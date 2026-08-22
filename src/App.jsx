@@ -11,7 +11,7 @@ import Matching from './ui/screens/Matching.jsx';
 import Result from './ui/screens/Result.jsx';
 import SettingsModal from './ui/SettingsModal.jsx';
 import Room from './ui/screens/Room.jsx';
-import HelpModal from './ui/HelpModal.jsx';
+import { tutoDone, markTutoDone } from './state/tutorial.js';
 import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings, setSetting } from './state/settings.js';
 import { onLangChange, t } from './i18n/index.js';
@@ -47,7 +47,6 @@ export default function App(){
   const [summary, setSummary] = useState(null);   // 결과 창에 띄울 한 판 요약
   const [score, setScore] = useState(null);       // 이번 판 점수 변화 (PVP만)
   const [showSettings, setShowSettings] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
   const [askQuit, setAskQuit] = useState(false);
   const [askExit, setAskExit] = useState(false);   // 홈에서 앱을 닫을까   // 게임 중 나가기 확인
   const [exitHint, setExitHint] = useState(false); // 홈에서 "한 번 더" 안내
@@ -60,7 +59,8 @@ export default function App(){
   }, []);
   // 처음 온 사람에게는 진입창이 끝난 뒤 조작 안내를 한 번 띄운다
   const goHomeFirst = useCallback(() => {
-    if (!getSettings().seenHelp){ setSetting('seenHelp', true); setShowHelp(true); }
+    // [stated] **앱을 처음 켰을 때만** 튜토리얼을 물어본다
+    if (!tutoDone()) setAskTuto(true);
   }, []);
 
   // [stated] **모든 버튼에 누르는 소리.** 화면마다 붙이면 빠뜨리는 곳이 생기므로
@@ -105,7 +105,6 @@ export default function App(){
       if (Date.now() - quitAt.current < 700) return true;
       if (askExit){ setAskExit(false); return true; }
       if (askQuit){ setAskQuit(false); return true; }
-      if (showHelp){ setShowHelp(false); return true; }
       if (showSettings){ setShowSettings(false); return true; }
       if (screen === 'game'){ setAskQuit(true); return true; }
       if (screen === 'matching'){ goHome(); return true; }
@@ -121,7 +120,7 @@ export default function App(){
       if (screen === 'home'){ setAskExit(true); return true; }
       return true;
     });
-  }, [screen, showHelp, showSettings, askQuit, askExit, goHome]);
+  }, [screen, showSettings, askQuit, askExit, goHome]);
   const startPvp  = useCallback(() => setScreen('pvp'), []);
   const beginPvp  = useCallback(opt => {
     disconnect();
@@ -142,6 +141,15 @@ export default function App(){
     setScreen('game');
   }, []);
   // [stated] **칼전 AI 도 단계별로.** 총격전과 같은 흐름 — 단계가 난이도를 정한다
+  // [stated] **튜토리얼** — 총격전만. 실제 판을 돌리며 단계별로 안내한다
+  const [askTuto, setAskTuto] = useState(false);
+  const startTuto = useCallback(() => {
+    disconnect();
+    setResult(null);
+    setAskTuto(false);
+    setSession({ kind: 'practice', n: 2, tuto: true });
+    setScreen('game');
+  }, []);
   const startMeleeAi = useCallback((n = 2, stage = 1) => {
     disconnect();
     setResult(null);
@@ -216,6 +224,12 @@ export default function App(){
   }, [session]);
   // [stated] 방장이 다시 시작하면 결과 화면을 닫는다 (방장이 아닌 사람 쪽)
   const onAgain   = useCallback(() => { setResult(null); setScreen('game'); }, []);
+  // [stated] **AI 모드에서 이겼으면 바로 다음 단계로.** 마지막 단계면 안 보여준다
+  const nextStage = useCallback(() => {
+    setResult(null);
+    setSession(sn => (sn ? { ...sn, stage: (sn.stage || 1) + 1 } : sn));
+    setScreen('game');
+  }, []);
   // [stated] **방장이 종목을 바꾸면** 세션을 갈아끼운다 — 인원수는 그대로라 자리는 안 흔들린다
   const onMode    = useCallback(m => {
     setResult(null);
@@ -237,7 +251,7 @@ export default function App(){
       }} />}
       {screen === 'login'    && <Login onDone={() => { goHome(); goHomeFirst(); }} />}
       {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
-                                     onSettings={() => setShowSettings(true)} onHelp={() => setShowHelp(true)}
+                                     onSettings={() => setShowSettings(true)}
                                      onRanks={k => { setRankKind(k); setScreen('ranks'); }}
                                      onJoin={beginPvp}
                                      onFriends={() => setScreen('friends')} />}
@@ -250,10 +264,27 @@ export default function App(){
       {/* [stated] **방(로비)** — 판이 끝나면 여기로 돌아온다 */}
       {screen === 'room'     && <Room room={room || getRoom()} onLeave={goHome} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome}
-                                          onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} />}
-      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={(session?.online && getRoom()) ? backToRoom : null} onHome={goHome} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+                                          onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} onTuto={goHome} />}
+      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={(session?.online && getRoom()) ? backToRoom : null}
+        onNext={(session?.kind === 'ai' && result === 'win' && (session.stage || 1) < 30) ? nextStage : null} onHome={goHome} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto} />}
+      {/* [stated] 처음 켰을 때 — 시작하기 / 건너뛰기 */}
+      {askTuto && (
+        <div className="modal-back">
+          <div className="modal ask">
+            <p className="ask-t">{t('tuto.ask')}</p>
+            <div className="ask-btns">
+              <button className="menu-btn primary" onClick={startTuto}>
+                <span className="t">{t('tuto.start')}</span>
+              </button>
+              <button className="menu-btn ghost"
+                      onClick={() => { markTutoDone(); setAskTuto(false); }}>
+                <span className="t">{t('tuto.skip')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {askExit && <QuitAsk exit
                            onQuit={() => { setAskExit(false); exitApp(); }}
                            onStay={() => setAskExit(false)} />}
