@@ -108,6 +108,7 @@ function openOnce(transport){
 // 접속해서 상대가 들어올 때까지 기다린다. onStage로 진행 상황을 알린다.
 // mode: 'queue'(랜덤) | 'create'(방 만들기) | 'join'(코드 입장)
 export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'queue', code = '', n = 2, melee = false, ffa = false, color = -1, soccer = false } = {}){
+  SELF.watching = false;    // 새 접속마다 초기화 — 지난 판의 관전 상태가 남으면 안 된다
   // 깨우기를 여러 번 두드린다. 한 번에 응답이 없어도 화면이 멈추지 않게 진행 상황을 알린다
   let health = null;
   for (let i = 0; i < 4 && !health; i++){
@@ -134,6 +135,7 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
     transport.onStatus = st => {
       if (st === 'closed' && !settled){ settled = true; reject(new Error(t('err.lost'))); }
     };
+        let watching = false;   // [stated] 관전으로 들어왔는지
     const done = () => {
       if (settled) return;
       settled = true;
@@ -141,7 +143,7 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
       // 자동 재접속은 '복귀'로 표시해야 서버가 원래 자리로 되돌려준다.
       // 반대로 사용자가 직접 새 매칭을 시작할 땐 이 표시가 없어야 새 방을 받는다
       transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer);
-      conn = { transport, slot, room };
+      conn = { transport, slot, room, watching };
       onStage?.('matched');
       resolve(conn);
     };
@@ -167,6 +169,16 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
         transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer);
         onStage?.('waiting');
         if (m.back && m.pid >= 0) done();    // 자리까지 돌려받은 재접속. 서버가 go를 다시 보내지 않는다
+      } else if (m.t === 'watch'){
+        // [stated] **자리가 다 차서 관전으로 들어왔다** — 조작 없이 보기만 한다
+        SELF.slot = -1; SELF.n = m.n | 0; SELF.melee = !!m.melee;
+        SELF.ffa = !!m.ffa; SELF.soccer = !!m.soccer;
+        SELF.watching = true;
+        transport.auto = true;
+        transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer);
+        onStage?.('watching');
+        watching = true;
+        done();                      // 관전도 접속 완료로 본다 — 화면이 게임으로 넘어간다
       } else if (m.t === 'lobby'){
         onLobby?.(m);                       // 팀별 인원 현황
         onStage?.('team');
@@ -195,6 +207,17 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
 
 // 사용자가 직접 나갈 때. 서버에 알려서 자리를 즉시 비운다
 // 2대2 방에서 팀을 고른다
+/** [stated] **판이 끝나면 방으로 돌아온다** — 방장이 같은 사람들로 새 판을 시작한다 */
+export function playAgain(){
+  if (conn) conn.transport.clientSend({ t: 'again' });
+}
+
+/** [stated] **방장이 종목을 바꾼다** — 인원수는 그대로 */
+export function setRoomMode({ melee, ffa, soccer, n }){
+  if (conn) conn.transport.clientSend({ t: 'mode', melee: !!melee, ffa: !!ffa, soccer: !!soccer,
+                                        n: Number.isInteger(n) ? n : undefined });
+}
+
 export function pickTeam(team, color){
   if (pending) pending.clientSend({ t: 'team', team, color });
 }

@@ -156,12 +156,13 @@ export default function PvpMenu({ onBack, onStart }){
                 })}
 
                 {/* 축구 인원은 축구 밑(2번 칸)에. 1대1·2대2 뿐이다 */}
+                {/* [stated] **방 만들기는 티켓을 안 쓴다** — 친구방은 빠른 매칭과 달리 제한이 없다 */}
                 {mk === 'soc' && stack(2,
                   [2, 4].map(k => ({
                     key: 's' + k,
-                    node: <button key={k} className={'menu-btn pick' + (outSoccer() ? ' off' : '')}
-                                  onClick={guardSoccer(() => onStart({ mode: 'create', n: k,
-                                                                       soccer: true, color: getColor() }))}>
+                    node: <button key={k} className="menu-btn pick"
+                                  onClick={() => onStart({ mode: 'create', n: k,
+                                                           soccer: true, color: getColor() })}>
                             <span className="t">{k / 2} vs {k / 2}</span>
                           </button>
                   })))}
@@ -169,12 +170,12 @@ export default function PvpMenu({ onBack, onStart }){
                 {/* 칼전만 한 단계 더 — 칼전 밑에 팀전, 그 옆에 개인전.
                     총격전은 진영이 위아래로 나뉘어 개인전이 성립하지 않는다 */}
                 {mkMelee && lvl('split', {
-                  1: <button key="team" className={'menu-btn pick' + (mk === 'team' ? ' primary' : '') + (out() ? ' off' : '')}
-                             onClick={guard(false, () => setMk('team'))}>
+                  1: <button key="team" className={'menu-btn pick' + (mk === 'team' ? ' primary' : '')}
+                             onClick={() => setMk('team')}>
                        <span className="t">{t('mode.team')}</span>
                      </button>,
-                  2: <button key="ffa" className={'menu-btn pick' + (mk === 'ffa' ? ' primary' : '') + (out(true) ? ' off' : '')}
-                             onClick={guard(true, () => setMk('ffa'))}>
+                  2: <button key="ffa" className={'menu-btn pick' + (mk === 'ffa' ? ' primary' : '')}
+                             onClick={() => setMk('ffa')}>
                        <span className="t">{t('mode.ffa')}</span>
                      </button>
                 })}
@@ -183,9 +184,9 @@ export default function PvpMenu({ onBack, onStart }){
                 {(mk === 'gun' || mk === 'team') && stack(mk === 'gun' ? 0 : 1,
                   [2, 4, 6].map(k => ({
                     key: 'n' + k,
-                    node: <button key={k} className={'menu-btn pick' + (out() ? ' off' : '')}
-                                  onClick={guard(false, () => onStart({ mode: 'create', n: k,
-                                                                        melee: mk === 'team', color: getColor() }))}>
+                    node: <button key={k} className="menu-btn pick"
+                                  onClick={() => onStart({ mode: 'create', n: k,
+                                                           melee: mk === 'team', color: getColor() })}>
                             <span className="t">{k / 2} vs {k / 2}</span>
                           </button>
                   })))}
@@ -194,9 +195,9 @@ export default function PvpMenu({ onBack, onStart }){
                 {mk === 'ffa' && stack(2,
                   [3, 4, 5, 6].map(k => ({
                     key: 'f' + k,
-                    node: <button key={k} className={'menu-btn pick' + (out(true) ? ' off' : '')}
-                                  onClick={guard(true, () => onStart({ mode: 'create', n: k, melee: true,
-                                                                       ffa: true, color: getColor() }))}>
+                    node: <button key={k} className="menu-btn pick"
+                                  onClick={() => onStart({ mode: 'create', n: k, melee: true,
+                                                           ffa: true, color: getColor() })}>
                             <span className="t">{t('pvp.players', { n: k })}</span>
                           </button>
                   })))}

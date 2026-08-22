@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createGame } from '../game/game.js';
-import { PH_READY, SHOW_NETINFO } from '../game/config.js';
+import { PH_READY, SHOW_NETINFO, SELF } from '../game/config.js';
 import { negText } from '../game/ui-state.js';
 import { getConnection, disconnect, getRoomInfo } from '../net/connection.js';
 import { getSettings } from '../state/settings.js';
@@ -11,7 +11,7 @@ import FitText from './FitText.jsx';
 // 게임 루프 상태는 ref에만 두고, React state는 "페이즈"처럼 드물게 바뀌는 것만 쓴다.
 // **화면 안 '‹' 와 하단 뒤로가기는 같은 동작이어야 한다.**
 // 예전엔 '‹' 가 확인 없이 바로 나가서, 나가기 창이 안 뜬다는 신고를 받았다
-export default function GameCanvas({ session, onExit, onBack, onFinish }){
+export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain, onMode }){
   const canvasRef = useRef(null);
   const gameRef = useRef(null);
   const [phase, setPhase] = useState(PH_READY);
@@ -103,7 +103,12 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
         if (u.peer === 'gone') setGraceLeft(Math.ceil((u.grace || 0) / 1000));
         if (u.peer === 'back' || u.peer === 'here') setGraceLeft(0);
       },
-      onFinish: (r, summary) => setTimeout(() => onFinish?.(r, summary), 1400),  // 결과 연출을 잠깐 보여준 뒤
+      // [stated] 방장이면 결과 화면에 '다시 하기' 가 뜬다
+      onFinish: (r, summary, host) => setTimeout(() => onFinish?.(r, summary, host), 1400),  // 결과 연출을 잠깐 보여준 뒤
+      // [stated] **방장이 다시 시작하면** 결과 화면을 닫고 새 판으로
+      onAgain: () => onAgain?.(),
+      // [stated] 방장이 종목을 바꾸면 세션을 갈아끼워 화면을 다시 차린다
+      onMode: m => onMode?.(m),
       softFlash: () => getSettings().softFlash   // 번쩍임이 부담되면 옅은 안개로
     });
     gameRef.current = game;
@@ -154,7 +159,10 @@ export default function GameCanvas({ session, onExit, onBack, onFinish }){
       {/* [stated] 신청·안내 상자를 **한 자리에 세로로 모은다.**
           예전엔 배너(`.link-note`)와 신청 줄(`.topbar`)이 각자 떠 있어서
           칼전에서는 배너가 준비 상자 위에 따로 놀았다. 하나로 묶어야 순서·크기가 맞는다 */}
-      {(((ready.prompt?.banner || []).length > 0) || placing ||
+      {/* [stated] **관전 중**임을 알려준다 — 왜 조작이 안 되는지 알 수 있게 */}
+      {SELF.watching && <div className="watch-tag ui-overlay">{t('room.watching')}</div>}
+      {/* [stated] **관전자에게는 조작·신청 UI 를 안 그린다** — 보기만 한다 */}
+      {!SELF.watching && (((ready.prompt?.banner || []).length > 0) || placing ||
         (ready.prompt?.offer || []).length > 0) && (
         <div className="gtop ui-overlay">
           {placing && (

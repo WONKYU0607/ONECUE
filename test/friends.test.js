@@ -160,7 +160,9 @@ console.log('키보드가 떠도 화면이 안 줄어든다');
   const css = fs.readFileSync('src/styles.css', 'utf8');
   assert(/setProperty\('--vh'/.test(sa), '  높이를 JS 가 px 로 넣는다');
   assert(/if \(w !== baseW\)/.test(sa), '  폭이 바뀔 때만 다시 잡는다 (회전)');
-  assert(/else if \(h > baseH\) baseH = h/.test(sa), '  커진 것만 반영한다 (키보드가 내려간 것)');
+  // [stated] 켤 때 여백이 0 으로 읽히면 잘못 굳는다 → `settled` 가 잡힌 뒤에만 최댓값을 지킨다
+  assert(/else if \(h > baseH\)\{/.test(sa), '  커진 것만 반영한다 (키보드가 내려간 것)');
+  assert(/settled/.test(sa), '  여백이 잡히기 전에는 굳히지 않는다');
   const scr = css.slice(css.indexOf('.screen{'), css.indexOf('}', css.indexOf('.screen{')));
   assert(/height:var\(--vh\)/.test(scr) && !/bottom:var\(--sab\)/.test(scr),
     '  .screen 은 bottom 이 아니라 height 로 잡는다 (bottom 은 키보드에 같이 줄어든다)');

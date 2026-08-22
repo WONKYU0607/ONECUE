@@ -449,6 +449,20 @@ export class Client {
         this.rtt = CLOCK.now() - t0;
         this.net.clientSend({ t:'rtt', pid:m.pid, rtt:this.rtt });
       }
+    } else if (m.t === 'host'){
+      // [stated] 방장인지 알려준다 — 결과 화면에서 '다시 하기' 를 그릴지 정한다
+      this.isHost = !!m.mine;
+      this.onHost?.(this.isHost);
+    } else if (m.t === 'watch'){
+      // [stated] **인원이 줄어 자리에서 밀려났다** — 그 자리에서 관전으로 바뀐다
+      SELF.watching = true; SELF.slot = -1;
+      this.onMode?.({ melee: !!m.melee, ffa: !!m.ffa, soccer: !!m.soccer, n: m.n | 0 });
+    } else if (m.t === 'mode'){
+      // [stated] 방장이 종목을 바꿨다 — 화면이 새 종목으로 다시 차려져야 한다
+      this.onMode?.({ melee: !!m.melee, ffa: !!m.ffa, soccer: !!m.soccer, n: m.n | 0 });
+    } else if (m.t === 'again'){
+      // [stated] **방장이 다시 시작했다** — 결과 화면을 닫고 새 판으로 돌아간다
+      this.onAgain?.();
     } else if (m.t === 's'){
       // 접속 시점엔 서버가 이미 여러 틱 진행돼 있어 프레임 1번부터 받을 수 없다.
       // 첫 스냅샷을 그대로 채택해서 그 지점부터 따라간다.

@@ -41,9 +41,14 @@ console.log('잘못된 코드 / 꽉 찬 방');
 const bad = conn('bad', 'join', '0000');
 await bad.ready; await sleep(300);
 assert(bad.msgs.some(m => m.t === 'joinfail' && m.reason === 'notfound'), '없는 코드는 거절');
+// [stated] **자리가 다 차면 거절이 아니라 관전으로 들어온다** — 인원 제한 없음
 const third = conn('third', 'join', roomMsg.code);
-await third.ready; await sleep(300);
-assert(third.msgs.some(m => m.t === 'joinfail' && m.reason === 'full'), '꽉 찬 방은 거절');
+await third.ready; await sleep(400);
+assert(!third.msgs.some(m => m.t === 'joinfail'), '꽉 찬 방도 안 튕긴다');
+const watch = third.msgs.find(m => m.t === 'watch');
+assert(watch, '관전으로 받아준다');
+assert(watch.code === roomMsg.code, '같은 방이다');
+assert(third.msgs.some(m => m.t === 's'), '관전자도 판 상태를 받는다');
 
 console.log('랜덤 매칭은 친구방과 섞이지 않는다');
 const r1 = conn('r1', 'queue');

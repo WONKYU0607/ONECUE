@@ -60,6 +60,30 @@ export function save(){ if (mod) mod.push(gather()); }
  *  기기를 바꿔 새로 깔면 익명 계정이 새로 생기고 점수 1000·티켓 5로 시작하는데,
  *  그 상태로 구글 계정에 붙으면 `save()` 가 그 값을 그대로 올려 버린다.
  *  그래서 **먼저 구름에서 읽어 기기에 덮고**, 그다음부터 올린다 */
+/**
+ * [stated] **익명으로 놀던 기록을 새 계정으로 옮긴다.**
+ * 이어붙이기(link)가 안 되는 경우(그 구글 계정이 이미 쓰이던 것)에만 쓴다.
+ * **점수가 높은 쪽을 남긴다** — 어느 쪽이 진짜 진도인지 알 수 없으므로 손해가 없는 쪽으로
+ */
+export async function mergeFrom(oldUid){
+  if (!oldUid) return false;
+  const m = await load();
+  const mine = await m.pull();                 // 새 계정 (지금 로그인한 쪽)
+  const theirs = await m.pullOf?.(oldUid);     // 옛 익명 계정
+  if (!theirs) return false;
+  const best = (a, b) => ((a | 0) >= (b | 0) ? a : b);
+  const merged = { ...theirs, ...mine };
+  for (const k of ['gun', 'melee', 'soccer']){
+    merged.score = merged.score || {};
+    merged.score[k] = best((mine && mine.score && mine.score[k]), (theirs.score && theirs.score[k]));
+  }
+  // 닉네임은 **옛 계정 것을 쓴다** — 그동안 쓰던 이름이다
+  if (theirs.nick) merged.nick = theirs.nick;
+  hydrate(merged); hydrateNick(merged);
+  save();
+  return true;
+}
+
 export async function resyncAccount(){
   const m = await load();
   setUid(await m.uid());

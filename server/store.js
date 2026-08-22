@@ -295,6 +295,7 @@ export async function friendList(me){
 // `src/state/tickets.js` 와 **같은 규칙**이어야 한다 (한쪽만 고치면 화면과 실제가 어긋난다):
 //   5장까지 · 10분에 1장 · 꽉 차 있으면 시계를 지금으로 당긴다 · 개인전은 하루 3판
 export const TICKET_MAX = 5;
+export const SOC_MAX = 3;      // [stated] 축구 전용 티켓 — 하루 3장, 일반 티켓과 별개 주머니
 export const REGEN_MS = 10 * 60 * 1000;
 export const FFA_MAX = 3;
 const dayKey = () => new Date().toISOString().slice(0, 10);
@@ -335,6 +336,31 @@ export async function readTickets(uid){
 /** 한 판 값을 깎는다. **트랜잭션이어야 한다** — 탭 두 개로 동시에 들어가면
  *  둘 다 "남아 있다"를 보고 한 장으로 두 판을 한다.
  *  개인전은 티켓과 하루 횟수를 **둘 다** 깎는다 */
+/**
+ * [stated] **축구는 전용 티켓(하루 3장)이라 일반 티켓을 건드리면 안 된다.**
+ * 서버에 축구 티켓 개념이 없어서 축구 판에도 일반 티켓을 깎았고,
+ * 클라가 축구 티켓을 따로 깎아 **둘 다 빠졌다**.
+ */
+export async function spendSoccer(uid){
+  if (!db || !uid) return { ok: false, off: true };
+  try {
+    return await db.runTransaction(async tx => {
+      const ref = db.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const v = d.exists ? d.data() : {};
+      const today = dayKey();
+      // 날짜가 바뀌면 하루치가 다시 찬다
+      const soc = (v.socDay === today) ? (v.soc | 0) : SOC_MAX;
+      if (soc <= 0) return { ok: false, why: 'noSoccer' };
+      tx.set(ref, { soc: soc - 1, socDay: today }, { merge: true });
+      return { ok: true, soc: soc - 1 };
+    });
+  } catch (e){
+    console.log('[store] 축구 티켓 차감 실패', e && e.code);
+    return { ok: false, why: 'err' };
+  }
+}
+
 export async function spendTicket(uid, ffa){
   if (!db || !uid) return { ok: false, off: true };
   try {

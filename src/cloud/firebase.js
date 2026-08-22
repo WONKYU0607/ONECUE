@@ -5,7 +5,8 @@
 import { initializeApp } from 'firebase/app';
 import {
   getAuth, onAuthStateChanged,
-  GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut
+  GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut,
+  linkWithCredential, linkWithPopup
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
@@ -81,18 +82,43 @@ async function nativeGoogleCredential(){
   return GoogleAuthProvider.credential(idToken, r.credential.accessToken);
 }
 
-/** 구글 로그인. 익명 계정이 없으니 **승격(link)·충돌 처리가 필요 없다.**
- *  돌려주는 값: `{ok:true}` 또는 `{ok:false, reason:'cancel'|'fail'}` */
+/**
+ * 구글 로그인.
+ *
+ * [stated] **익명으로 놀던 기록이 로그인하면 끊겼다.** `signInWithCredential` 은
+ * **새 uid 로 갈아타서** 옛 익명 문서가 남겨진 채 순위표에 따로 올라간다
+ * (같은 닉네임이 두 줄로 보였다).
+ *
+ * → **먼저 `linkWithCredential` 로 이어붙인다.** 그러면 **uid 가 그대로**라 기록이 통째로 따라온다.
+ * 그 구글 계정이 이미 쓰이던 것이면 이어붙일 수 없으므로(`credential-already-in-use`)
+ * 그때만 갈아타고, **옛 익명 기록을 새 계정으로 옮긴다**.
+ *
+ *  돌려주는 값: `{ok:true, merged?:true}` 또는 `{ok:false, reason:'cancel'|'fail'}` */
 export async function signInGoogle(){
   const native = await isNative();
+  const before = auth.currentUser;
+  const anonUid = before && before.isAnonymous ? before.uid : null;
   try {
+    const cred = native ? await nativeGoogleCredential() : null;
+    if (anonUid){
+      try {
+        if (native) await linkWithCredential(before, cred);
+        else await linkWithPopup(before, new GoogleAuthProvider());
+        uid = auth.currentUser ? auth.currentUser.uid : null;
+        return { ok: true };                    // uid 그대로 — 기록이 따라온다
+      } catch (e){
+        const c = (e && e.code) || '';
+        // 이미 쓰이던 구글 계정이면 이어붙일 수 없다 → 갈아타고 옛 기록을 옮긴다
+        if (c !== 'auth/credential-already-in-use' && c !== 'auth/email-already-in-use') throw e;
+      }
+    }
     if (native){
-      await signInWithCredential(auth, await nativeGoogleCredential());
+      await signInWithCredential(auth, cred || await nativeGoogleCredential());
     } else {
       await signInWithPopup(auth, new GoogleAuthProvider());
     }
     uid = auth.currentUser ? auth.currentUser.uid : null;
-    return { ok: true };
+    return { ok: true, mergeFrom: anonUid || null };
   } catch (e){
     const code = (e && e.code) || '';
     if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request')

@@ -1300,6 +1300,30 @@ export function step(s, inp){
 }
 
 /** 골 뒤 배치. [stated] 공은 가운데, **먹힌 쪽이 중앙선**(킥오프), 넣은 쪽은 자기 골대 앞 */
+/**
+ * [stated] **판이 끝나면 방으로 돌아온다** — 같은 사람들로 새 판을 차린다.
+ * 총격전 재대전에만 있던 코드를 함수로 뺐다. **서버도 이걸 쓴다**(방장이 다시 시작).
+ * 자리·색·끊김은 그대로 두고 판 내용만 새로 만든다
+ */
+export function resetForNextRound(s){
+  const t = s.tick, ms = s.maxStep, bv = s.bulletV, ct = s.coolT;
+  const n = newState(s.n, s.melee, s.ffa, s.soccer);
+  s.p = n.p; s.bullets = n.bullets; s.covers = n.covers;
+  s.items = n.items; s.ready = n.ready; s.fx = n.fx;
+  s.proj = n.proj; s.blind = n.blind; s.ammo = n.ammo; s.fire = n.fire;
+  // s.off 는 그대로 둔다 — 다시 해도 여전히 끊겨 있는 사람은 끊긴 것
+  s.fast = false; s.fastBy = 0;                            // 2배속은 그 판 한정
+  s.bare = false; s.bareBy = 0; s.fastT = 0; s.bareT = 0;  // 노템전도 그 판 한정
+  s.noBuff = false;
+  s.negOk = []; s.negNo = []; s.negNo2 = []; s.negDone = null; s.negLost = null;
+  s.maxStep = ms; s.bulletV = bv; s.coolT = ct;
+  s.tick = t;
+  s.phase = PH_READY; s.timer = 0; s.rdy = readyLimit(s.melee, s.soccer);
+  s.over = false; s.winner = 0; s.clock = 0;
+  if (s.soccer){ s.score = [0, 0]; s.ballOwner = -1; s.noGoal = 0; kickoff(s, -1); }
+  return s;
+}
+
 export function kickoff(s, scorer = -1){
   s.ball = ballHome();
   s.goalBy = -1;

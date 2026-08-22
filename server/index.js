@@ -3,13 +3,13 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { Server } from '../src/game/net.js';
-import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY, PH_OVER, PH_READY } from '../src/game/config.js';
+import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY, PH_OVER, PH_READY, readyLimit } from '../src/game/config.js';
 import { scoreDelta } from '../src/game/score.js';
 import { createAI } from '../src/game/ai.js';
 import { createSoccerAI } from '../src/game/soccer-ai.js';
 import { BOTS, pickBot } from './bots.js';
 import * as store from './store.js';
-import { forfeit, setOff } from '../src/game/sim.js';
+import { forfeit, setOff, resetForNextRound, newState } from '../src/game/sim.js';
 
 const PORT = process.env.PORT || 8080;
 const TICK_MS = 1000 / 60;
@@ -55,7 +55,11 @@ class Room {
     this.preScore = Array.from({ length: n }, () => ({ score: 1000, streak: 0 }));
     this.settled = false;        // 점수를 이미 썼는가 (한 판에 한 번만)
     this.emptyAt = 0;
+    // [stated] **방장** — 판이 끝나도 방이 유지되고, 방장이 다시 시작한다.
+    // 나가면 남아 있는 사람에게 자동으로 넘어간다
+    this.hostSid = null;
     this.waitingList = [];      // 아직 팀을 안 고른 사람들
+    this.watchers = new Set();  // [stated] 관전자 — 자리 없이 보기만 한다. 인원 제한 없음
     // 팀을 고르기 전에는 자리가 없어서 sid를 남길 데가 없다.
     // 그 상태로 끊기면 방장이 새 방·새 코드를 받아 나머지가 옛 방에 갇힌다.
     // 그래서 **방에 들어온 순간부터** sid를 여기 적어두고 유예 시간 동안 지킨다
@@ -76,6 +80,10 @@ class Room {
     for (const i of targets){
       const ws = this.seats[i].ws;
       if (ws && ws.readyState === 1) ws.send(raw);
+    }
+    // [stated] **관전자에게도 같이 보낸다.** 한 사람에게만 보내는 것(`pid`)은 빼고
+    if (pid === undefined) for (const w of this.watchers){
+      if (w.readyState === 1) w.send(raw); else this.watchers.delete(w);
     }
   }
   snapshotTo(slot){
@@ -290,6 +298,13 @@ class Room {
     return c;
   }
   // 팀 선택 중인 사람들에게 현재 인원 구성을 알린다
+  /** 방장이 누구인지 각자에게 알린다 (자기가 방장인지만 알면 된다) */
+  sendHost(){
+    this.ensureHost();
+    for (const st of this.seats) if (st.ws && st.ws.readyState === 1)
+      st.ws.send(JSON.stringify({ t: 'host', mine: st.sid === this.hostSid }));
+  }
+
   sendLobby(){
     // **팀을 고를 일이 없으면 보내지 않는다.** 보내면 클라가 팀 선택 화면을 띄우고
     // 거기서 멈춘다. 개인전뿐 아니라 **1대1도 팀이 없고**, 봇으로 채운 방도
@@ -312,6 +327,76 @@ class Room {
         myColor: this.server.s.color[st.ws.slot] }));
     }
   }
+  /** [stated] **방장이 나가면 남은 사람에게 넘긴다.** 자리 순서대로 첫 사람 */
+  ensureHost(){
+    if (this.hostSid && this.seats.some(x => x.sid === this.hostSid)) return;
+    const seat = this.seats.find(x => x.sid && x.ws);
+    this.hostSid = seat ? seat.sid : null;
+  }
+
+  /** [stated] **판이 끝나면 방으로 돌아온다.** 방장이 누르면 같은 사람들로 새 판을 시작한다 */
+  again(){
+    const st = this.server.s;
+    if (st.phase !== PH_OVER) return false;
+    resetForNextRound(st);
+    this.settled = false;                 // 다음 판 점수를 다시 쓸 수 있게
+    // **`charged` 를 비우면 안 된다** — 빠른 매칭에서 다시 하기로 무한히 돌 수 있다.
+    // 친구방은 애초에 안 깎으므로 그대로 두면 된다
+    this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+    this.send({ t: 'again' });
+    return true;
+  }
+
+  /**
+   * [stated] **방장이 종목을 바꾼다.** 인원수는 그대로라 자리·팀·색이 안 흔들린다.
+   * (인원수까지 바꾸려면 자리를 다시 짜야 해서 따로 손봐야 한다)
+   */
+  setMode({ melee, ffa, soccer, n }){
+    const st = this.server.s;
+    if (st.phase === PH_PLAY) return false;        // 전투 중에는 못 바꾼다
+    const n2 = Number.isInteger(n) && n >= 2 && n <= 6 ? n : this.n;
+    // 축구는 1대1·2대2 뿐이다
+    if (soccer && n2 > 4) return false;
+    // 총격전은 진영이 위아래로 나뉘어 개인전이 성립하지 않는다
+    if (ffa && !melee) return false;
+    if (!ffa && n2 % 2) return false;              // 팀전은 짝수여야 반으로 갈린다
+    // [stated] **인원을 줄이면 뒤에 앉은 사람부터 관전으로 보낸다.**
+    // 관전이 있으니 밀려난 사람이 갈 곳이 있다
+    if (n2 < this.n){
+      for (let i = n2; i < this.n; i++){
+        const seat = this.seats[i];
+        if (seat.ws && seat.ws.readyState === 1){
+          const w = seat.ws;
+          w.slot = -1; w.watching = true;
+          this.watchers.add(w);
+          w.send(JSON.stringify({ t: 'watch', code: this.code, n: n2,
+                                  melee: !!melee, ffa: !!ffa, soccer: !!soccer }));
+        }
+        seat.sid = null; seat.ws = null; seat.bot = false; seat.uid = ''; seat.goneAt = 0;
+      }
+    }
+    this.n = n2;
+    this.seats.length = n2;
+    for (let i = 0; i < n2; i++){
+      if (!this.seats[i]) this.seats[i] = { sid: null, ws: null, goneAt: 0, bot: false, uid: '' };
+    }
+    this.preScore = Array.from({ length: n2 }, (_, i) => this.preScore[i] || { score: 1000, streak: 0 });
+    this.melee = !!melee; this.ffa = !!ffa; this.soccer = !!soccer;
+    const keepNick = (st.nick || []).slice();
+    const keepColor = (st.color || []).slice();
+    const keepOff = (st.off || []).slice();
+    const fresh = newState(this.n, this.melee, this.ffa, this.soccer);
+    for (const k of Object.keys(fresh)) st[k] = fresh[k];
+    // **길이를 맞춘다** — 인원이 바뀌면 옛 배열이 남거나 모자란다
+    const fit = (arr, fill) => Array.from({ length: this.n }, (_, i) => (arr[i] === undefined ? fill : arr[i]));
+    st.nick = fit(keepNick, ''); st.color = fit(keepColor, 0); st.off = fit(keepOff, false);
+    st.rdy = readyLimit(this.melee, this.soccer);
+    this.settled = false;
+    this.send({ t: 'mode', melee: this.melee, ffa: this.ffa, soccer: this.soccer, n: this.n });
+    this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+    return true;
+  }
+
   dispose(){ if (this.code) codes.delete(this.code); }
 
   // 팀 선택 대기줄에 넣는다. 돌아온 사람이면 hello에 back을 실어 화면이 알아채게 한다
@@ -333,15 +418,20 @@ class Room {
 
     seat.sid = sid; seat.ws = ws; seat.goneAt = 0;
     seat.uid = ws.uid || seat.uid || '';
+    if (!this.hostSid) this.hostSid = sid;          // 먼저 들어온 사람이 방장
     // [stated] 티켓을 서버가 쥔다. **자리에 앉을 때 한 번만** 깎는다 —
     // 끊겼다 돌아오는 것(`reconnected`)이나 같은 방에 다시 앉는 것으로 또 깎으면 안 된다.
     // 실패해도 판은 그대로 진행한다(서버가 자거나 저장소가 꺼져 있을 수 있다) —
     // 여기서 막으면 **첫 사람이 아무것도 못 한다**
-    if (!reconnected && seat.uid && !this.charged.has(seat.uid)){
+    // [stated] **친구방(코드가 있는 방)은 티켓을 안 깎는다.** 빠른 매칭만 깎는다 —
+    // 티켓은 서버 부하 조절과 광고 노출이 목적인데, 지인끼리 하는 방은 사람이 적다
+    if (!this.code && !reconnected && seat.uid && !this.charged.has(seat.uid)){
       this.charged.add(seat.uid);
-      store.spendTicket(seat.uid, !!this.server.s.ffa)
-        .then(r => { if (r && !r.ok && r.why) console.log('[티켓]', seat.uid.slice(0, 6), r.why); })
-        .catch(() => {});
+      // [stated] **축구는 전용 티켓**이라 일반 티켓을 안 건드린다 — 둘 다 빠지던 문제
+      const spend = this.soccer ? store.spendSoccer(seat.uid)
+                                : store.spendTicket(seat.uid, !!this.server.s.ffa);
+      spend.then(r => { if (r && !r.ok && r.why) console.log('[티켓]', seat.uid.slice(0, 6), r.why); })
+           .catch(() => {});
     }
     // 슬롯별 닉네임을 상태에 실어 모두에게 전달한다
     if (!Array.isArray(this.server.s.nick)) this.server.s.nick = new Array(this.n).fill('');
@@ -452,6 +542,7 @@ class Room {
       const seat = this.seats[i];
       if (seat.bot) continue;                  // **봇은 소켓이 없다.** 나간 것으로 보면 안 된다
       if (seat.sid && !seat.ws && now - seat.goneAt > GRACE_MS){
+        if (seat.sid === this.hostSid) this.hostSid = null;   // 방장이 나갔다 → 아래에서 넘긴다
         seat.sid = null; seat.goneAt = 0;
         // 축구는 자리를 비우지 않고 AI 가 이어받는다
         if (this.soccer && this.server.s.phase !== PH_OVER) this.takeOver(i);
@@ -754,8 +845,18 @@ wss.on('connection', (ws, req) => {
   } else if (mode === 'join'){
     const room = codes.get(code);
     if (!room){ ws.send(JSON.stringify({ t: 'joinfail', reason: 'notfound' })); ws.close(); return; }
-    if (room.full){ ws.send(JSON.stringify({ t: 'joinfail', reason: 'full' })); ws.close(); return; }
     ws.room = room;
+    // [stated] **자리가 다 차면 관전으로 들어온다.** 인원 제한 없음, 조작 없이 보기만 한다
+    if (room.full){
+      room.watchers.add(ws);
+      ws.slot = -1; ws.watching = true;
+      ws.send(JSON.stringify({ t: 'watch', code: room.code, n: room.n,
+                               melee: room.melee, ffa: room.ffa, soccer: room.soccer }));
+      ws.send(JSON.stringify({ t: 's', tick: room.server.s.tick,
+                               st: JSON.parse(JSON.stringify(room.server.s)) }));
+      console.log(`관전 입장: ${code} (room ${room.id}, ${room.watchers.size}명)`);
+      return;
+    }
     if (room.n > 2 && !room.ffa){
       // 팀전(2대2·3대3)은 팀을 직접 고른다. 고를 때까지는 자리를 주지 않는다.
       // **개인전은 팀이 없으므로 바로 앉힌다** — 안 그러면 팀 로비에서 자리를 영영 못 받는다
@@ -839,7 +940,25 @@ wss.on('connection', (ws, req) => {
       }
       return;
     }
+    // [stated] **판이 끝나면 방으로 돌아온다.** 방장이 누르면 같은 사람들로 새 판
+    // [stated] **방장이 종목을 바꾼다** (인원수는 그대로)
+    if (m.t === 'mode' && ws.room){
+      const room = ws.room;
+      room.ensureHost();
+      if (ws.sid !== room.hostSid){ ws.send(JSON.stringify({ t: 'nothost' })); return; }
+      if (!room.setMode(m)) ws.send(JSON.stringify({ t: 'nomode' }));
+      return;
+    }
+    if (m.t === 'again' && ws.room){
+      const room = ws.room;
+      room.ensureHost();
+      if (ws.sid !== room.hostSid){ ws.send(JSON.stringify({ t: 'nothost' })); return; }
+      if (!room.again()) ws.send(JSON.stringify({ t: 'notover' }));
+      return;
+    }
     if (m.t === 'bye'){
+      // 관전자는 자리가 없으므로 목록에서만 뺀다
+      if (ws.room && ws.watching){ ws.room.watchers.delete(ws); ws.close(); return; }
       if (ws.room && ws.slot >= 0) ws.room.quit(ws.slot);
       else if (ws.room){ const i = ws.room.waitingList.indexOf(ws); if (i >= 0) ws.room.waitingList.splice(i, 1); ws.room.sendLobby(); }
       else { const i = waiting.indexOf(ws); if (i >= 0) waiting.splice(i, 1); }
@@ -853,6 +972,7 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
+    if (ws.room && ws.watching) ws.room.watchers.delete(ws);
     if (ws.uid){
       const n = (online.get(ws.uid) || 1) - 1;
       if (n > 0) online.set(ws.uid, n); else online.delete(ws.uid);
@@ -897,7 +1017,10 @@ setInterval(() => {
     }
     room.server.update(now);
     room.prime();           // 전투가 시작되면 점수를 한 번 읽어둔다
-    room.settle();          // 판이 끝났으면 점수를 쓴다 (한 번만)          // 판이 끝났으면 점수를 쓴다 (한 번만)
+    room.settle();          // 판이 끝났으면 점수를 쓴다 (한 번만)
+    // 판이 끝난 순간 **방장이 누구인지 알린다** — 결과 화면에서 다시 시작 버튼을 그린다
+    if (room.server.s.phase === PH_OVER && !room.toldHost){ room.toldHost = true; room.sendHost(); }
+    if (room.server.s.phase !== PH_OVER) room.toldHost = false;
   }
 }, TICK_MS);
 

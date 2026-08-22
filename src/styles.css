@@ -558,6 +558,19 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .link-note .votes{display:block;margin-top:2px;font:700 11px var(--gf);color:#8fd8ff;letter-spacing:0}
 .modal.ask .votes{display:block;margin-top:4px;font:700 12px var(--gf);color:#8fd8ff;letter-spacing:0}
 
+/* [stated] 방장이 아닌 사람은 결과 화면에서 기다린다 */
+.res-wait{margin:8px 0 0;font:700 13px var(--gf);color:#9fb0cc;text-align:center;letter-spacing:0}
+
+/* [stated] 결과 화면에서 방장이 종목을 바꾼다 */
+.res-modes{display:flex;gap:6px;margin:6px 0}
+.res-modes .menu-btn{flex:1 1 0;min-width:0}
+
+/* [stated] 관전 중 표시 */
+.watch-tag{position:fixed;left:50%;transform:translateX(-50%);
+  top:calc(var(--sat) + 8px);z-index:26;padding:3px 12px;border-radius:3px;
+  background:rgba(12,22,36,.8);border:1px solid rgba(90,140,190,.45);
+  font:900 12px var(--gf);color:#8fd8ff;letter-spacing:1px}
+
 /* 매칭 소개(VS) 화면 — [stated] 배경을 **사선으로 반** 갈라 위아래에서 충돌시킨다.
    부딪힌 자리에 번개 두 개, 그 사이에 VS. 정보는 미리 붙어 있는 채로 부딪힌다 */
 .vs-wrap{position:absolute;inset:0;z-index:40;overflow:hidden;background:#060a12}

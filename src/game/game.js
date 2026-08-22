@@ -32,6 +32,11 @@ export function createGame(canvas, opts = {}){
   const onPhase = opts.onPhase || (() => {});
   const onLink = opts.onLink || (() => {});   // 연결·상대 상태 알림
   const onFinish = opts.onFinish || (() => {});
+  // [stated] 방장이 다시 시작하면 결과 화면을 닫는다 / 방장이 바뀌면 알린다
+  const onAgain = opts.onAgain || (() => {});
+  const onHost = opts.onHost || (() => {});
+  // [stated] 방장이 종목을 바꾸면 화면을 새 종목으로 다시 차린다
+  const onMode = opts.onMode || (() => {});
   const session = opts.session || { kind: 'pvp' };
 
   // 온라인이면 서버가 원격이라 여기서 Server를 만들지 않는다
@@ -64,7 +69,9 @@ export function createGame(canvas, opts = {}){
   }
   const all = Array.from({ length: nLocal }, (_, i) => i);
   // 온라인이면 내 슬롯만, 로컬(AI·디버그)이면 전원 이 클라가 입력을 넣는다
-  const client = new Client(net, online ? [SELF.slot] : all);
+  // [stated] **관전자는 입력을 안 넣는다** — 자리가 없으므로 빈 목록
+  const watching = !!(online && SELF.watching);
+  const client = new Client(net, watching ? [] : (online ? [SELF.slot] : all));
   // AI는 슬롯마다 따로 만든다 (각자 상태를 들고 있다)
   const aiSlots = (!online && (session.kind === 'ai' || isMelee) && !(practice0 && isSoccer))
     ? all.filter(i => i !== SELF.slot) : [];
@@ -215,7 +222,8 @@ export function createGame(canvas, opts = {}){
   const ammoLeft = k => (client.pred.ammo?.[SELF.slot]?.[k] ?? 0);
 
   const input = attachInput(canvas, view, {
-    canPlaceNow: () => client.pred.phase === PH_READY,
+    // [stated] **관전자는 아무것도 못 놓고 못 움직인다** — 보기만 한다
+    canPlaceNow: () => !watching && client.pred.phase === PH_READY,
     leftCount,
     cellAt,
     pickAt,
@@ -375,7 +383,12 @@ export function createGame(canvas, opts = {}){
         try { opts.onCrash?.(e); } catch { /* 알림 자체가 실패해도 무시 */ }
       }
     }
-    raf = requestAnimationFrame(loop);
+    // [stated] **방장이 다시 시작하면** 결과 화면을 닫고 새 판으로 돌아간다
+  client.onAgain = () => { lastPhase = -1; onAgain(); };
+  client.onHost = h => onHost(h);
+  client.onMode = m => onMode(m);
+
+  raf = requestAnimationFrame(loop);
   }
 
   function frame(){
@@ -540,7 +553,9 @@ export function createGame(canvas, opts = {}){
       lastPhase = phase;
       onPhase(lastPhase);
       if (lastPhase === PH_OVER){
-        onFinish(resultFor(client.s, SELF.slot), matchSummary(client.s, SELF.slot));
+        // [stated] 방장이면 '다시 하기' 를 그린다
+        onFinish(resultFor(client.s, SELF.slot), matchSummary(client.s, SELF.slot),
+                 !!client.isHost);
       }
     }
   }

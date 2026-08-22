@@ -17,6 +17,7 @@ import { onLangChange, t } from './i18n/index.js';
 import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
+import { playAgain, setRoomMode } from './net/connection.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -34,6 +35,7 @@ export default function App(){
   const [rankKind, setRankKind] = useState('gun');  // 순위표에서 먼저 볼 종목
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
+  const [isHost, setIsHost] = useState(false);   // [stated] 방장이면 결과 화면에 '다시 하기'
   const [summary, setSummary] = useState(null);   // 결과 창에 띄울 한 판 요약
   const [score, setScore] = useState(null);       // 이번 판 점수 변화 (PVP만)
   const [showSettings, setShowSettings] = useState(false);
@@ -76,7 +78,11 @@ export default function App(){
     playMusic('lobby');
   }, [screen]);
 
-  const goHome    = useCallback(() => { disconnect(); setSession(null); setResult(null); setScreen('home'); }, []);
+  const goHome    = useCallback(() => {
+    disconnect();
+    SELF.watching = false;          // **반드시 끈다** — 안 끄면 다음 판에서 조작이 막힌다
+    setSession(null); setResult(null); setScreen('home');
+  }, []);
 
   // **`goHome` 아래에 두어야 한다.** const 는 정의 전에 읽을 수 없어(TDZ),
   // 위에 두면 화면이 뜨자마자 ReferenceError 로 앱이 통째로 죽는다
@@ -132,8 +138,12 @@ export default function App(){
     setSession({ kind: 'ai', stage, n });
     setScreen('game');
   }, []);
-  const toGame    = useCallback(() => setScreen('game'), []);
-  const onFinish  = useCallback((r, summary) => {
+  // [stated] **관전으로 들어왔으면 세션에 표시한다** — 결과 화면이 조작 버튼을 안 그린다
+  const toGame    = useCallback(() => {
+    setSession(sn => (sn && SELF.watching ? { ...sn, watching: true } : sn));
+    setScreen('game');
+  }, []);
+  const onFinish  = useCallback((r, summary, host) => {
     // **PVP만 점수를 매긴다.** AI·연습은 연습이므로 기록하지 않는다
     let sc = null;
     if (session?.kind === 'pvp' && summary?.state && summary.state.soccer){
@@ -163,14 +173,30 @@ export default function App(){
     // AI 모드에서 이기면 다음 단계가 열린다
     // 모드별로 따로 기록한다 (1대1을 깼다고 3대3까지 열리면 안 된다)
     if (session?.kind === 'ai') recordResult(session.stage, r, modeKey(session.n || 2, !!session.melee));
-    setResult(r); setScreen('result');
+    setResult(r); setIsHost(!!host); setScreen('result');
   }, [session]);
   const again     = useCallback(() => {
     setResult(null);
-    // 친구방은 코드가 이미 닫혀 있으므로 다시 할 땐 PVP 메뉴에서 고르게 한다
-    if (session?.kind === 'pvp'){ disconnect(); setScreen('pvp'); }
-    else setScreen('game');
+    // [stated] **판이 끝나면 방으로 돌아온다** — 끊고 나가지 않는다.
+    // 온라인이면 서버에 알려 같은 사람들로 새 판을 차린다(방장만 가능)
+    if (session?.online || session?.kind === 'queue' || session?.kind === 'pvp'){
+      playAgain();
+      setScreen('game');
+      return;
+    }
+    setScreen('game');
   }, [session]);
+  // [stated] 방장이 다시 시작하면 결과 화면을 닫는다 (방장이 아닌 사람 쪽)
+  const onAgain   = useCallback(() => { setResult(null); setScreen('game'); }, []);
+  // [stated] **방장이 종목을 바꾸면** 세션을 갈아끼운다 — 인원수는 그대로라 자리는 안 흔들린다
+  const onMode    = useCallback(m => {
+    setResult(null);
+    setSession(sn => (sn ? { ...sn, melee: !!m.melee, ffa: !!m.ffa, soccer: !!m.soccer,
+                            n: m.n || sn.n,
+                            // 인원이 줄어 자리에서 밀려났으면 관전으로 바뀐다
+                            watching: SELF.watching || sn.watching } : sn));
+    setScreen('game');
+  }, []);
 
   return (
     <>
@@ -194,8 +220,8 @@ export default function App(){
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toGame} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome}
-                                          onBack={() => setAskQuit(true)} onFinish={onFinish} />}
-      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} onAgain={again} onHome={goHome} />}
+                                          onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} />}
+      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       {askExit && <QuitAsk exit

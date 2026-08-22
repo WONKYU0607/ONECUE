@@ -94,6 +94,8 @@ export default {
   'res.lose': 'Defeat',
   'res.draw': 'Draw',
   'res.again': 'Play again',
+  'res.waitHost': 'Waiting for the host to start again…',
+  'room.watching': 'Spectating',
   'res.home': 'Back to menu',
   'res.hp': 'HP',
   'res.dmg': 'Damage',

@@ -55,14 +55,21 @@ export default function Matching({ session, onCancel, onMatched }){
         if (i) setTries([i, n]);
       }
     })
-      .then(() => {
+      .then(c => {
         if (!alive.current) return;
-        // **상대를 만난 뒤에 티켓을 뺀다.** 매칭에 실패하거나 도중에 나가면 안 빠진다.
-        // [stated] 축구는 **전용 티켓**이라 일반 티켓을 안 건드린다
-        if (session?.soccer) useSoccer(); else spendFor(!!session?.ffa);
+        // [stated] **관전은 티켓을 안 쓴다** — 자리가 없으니 판에 낀 게 아니다.
+        // 친구방도 안 쓴다(C안) — 빠른 매칭만 깎는다
+        const watching = !!(c && c.watching);
+        if (watching) SELF.watching = true;
+        if (!watching && session?.mode === 'queue'){
+          // **상대를 만난 뒤에 티켓을 뺀다.** 매칭에 실패하거나 도중에 나가면 안 빠진다.
+          // 축구는 **전용 티켓**이라 일반 티켓을 안 건드린다
+          if (session?.soccer) useSoccer(); else spendFor(!!session?.ffa);
+        }
         // VS 화면이 뜰 수 있게 여기서 바로 넘어가지 않는다.
         // **정보가 안 오면 기다리지 않는다** — 0.6초 안에 없으면 그냥 진행
         sfx.matched?.();      // 매칭 성사
+        if (watching){ go(); return; }         // 관전은 VS 화면을 건너뛴다
         setStage('vs');
         setTimeout(() => { if (alive.current && !vsRef.current) go(); }, 600);
       })

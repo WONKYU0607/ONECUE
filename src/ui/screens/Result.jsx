@@ -24,7 +24,7 @@ function name(r, sum){
   return same.length > 1 ? `${base}${idx}` : base;
 }
 
-export default function Result({ result, summary, score, session, onAgain, onHome }){
+export default function Result({ result, summary, score, session, host, onAgain, onMode, onHome }){
   // [stated] **기존 점수에서 1점씩 굴러 올라간다.** 걸리는 시간은 1초.
   // 소리도 같이 나는데, 300점이 오르면 300번을 낼 수 없으므로
   // **소리만 45ms 간격으로 솎아낸다** — 귀에는 '따르르륵' 으로 이어져 들린다
@@ -145,9 +145,55 @@ export default function Result({ result, summary, score, session, onAgain, onHom
           </div>
         )}
 
-        <button className="menu-btn primary" onClick={onAgain}>
-          <span className="t">{t('res.again')}</span>
-        </button>
+        {/* [stated] **판이 끝나면 방으로 돌아온다** — 온라인에서는 방장만 다시 시작한다.
+            나머지는 기다린다(방장이 누르면 저절로 넘어간다) */}
+        {/* 관전자는 자리가 없으므로 다시 하기도 없다 */}
+        {(!session?.online || (host && !session?.watching)) && (
+          <button className="menu-btn primary" onClick={onAgain}>
+            <span className="t">{t('res.again')}</span>
+          </button>
+        )}
+        {/* [stated] **방장은 종목도 바꿀 수 있다** — 인원수는 그대로라 자리가 안 흔들린다.
+            축구는 1대1·2대2 뿐, 개인전은 칼전만 */}
+        {session?.online && host && !session?.watching && (
+          <div className="res-modes">
+            {[['gun', { melee: false, ffa: false, soccer: false }, 'mode.gun'],
+              ['melee', { melee: true, ffa: false, soccer: false }, 'mode.melee'],
+              ['soccer', { melee: false, ffa: false, soccer: true }, 'mode.soccer']]
+              .filter(([k]) => !(k === 'soccer' && (session.n || 2) > 4))
+              .map(([k, m, label]) => {
+                const now = k === 'soccer' ? !!session.soccer
+                          : k === 'melee' ? (!!session.melee && !session.soccer)
+                          : (!session.melee && !session.soccer);
+                return (
+                  <button key={k} className={'menu-btn pick' + (now ? ' primary' : '')}
+                          disabled={now} onClick={() => onMode?.(m)}>
+                    <span className="t">{t(label)}</span>
+                  </button>
+                );
+              })}
+          </div>
+        )}
+        {/* [stated] **인원 바꾸기** — 줄이면 뒤에 앉은 사람부터 관전으로 간다.
+            축구는 1대1·2대2 뿐, 개인전은 3~6명 */}
+        {session?.online && host && !session?.watching && (
+          <div className="res-modes">
+            {(session.soccer ? [2, 4] : session.ffa ? [3, 4, 5, 6] : [2, 4, 6]).map(k => {
+              const now = (session.n || 2) === k;
+              return (
+                <button key={k} className={'menu-btn pick' + (now ? ' primary' : '')}
+                        disabled={now}
+                        onClick={() => onMode?.({ melee: !!session.melee, ffa: !!session.ffa,
+                                                  soccer: !!session.soccer, n: k })}>
+                  <span className="t">{session.ffa ? t('pvp.players', { n: k }) : `${k / 2} vs ${k / 2}`}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {session?.online && (!host || session?.watching) && (
+          <p className="res-wait">{t(session?.watching ? 'room.watching' : 'res.waitHost')}</p>
+        )}
         <button className="menu-btn ghost" onClick={onHome}>
           <span className="t">{t('res.home')}</span>
         </button>

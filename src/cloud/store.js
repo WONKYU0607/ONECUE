@@ -27,6 +27,20 @@ export async function pull(){
   }
 }
 
+/**
+ * [stated] **다른 uid 의 기록을 읽는다** — 익명으로 놀던 기록을 새 계정으로 옮길 때만 쓴다.
+ * 규칙에서 남의 문서는 못 읽으므로 **실패하면 조용히 없는 것으로** 본다
+ */
+export async function pullOf(otherUid){
+  if (!otherUid) return null;
+  try {
+    const snap = await getDoc(ref(otherUid));
+    return snap.exists() ? snap.data() : null;
+  } catch {
+    return null;                 // 규칙에 막히면 옮길 수 없다
+  }
+}
+
 /** 바뀐 내용을 올린다. **몰아서 한 번에** 보낸다 —
  *  판이 끝날 때마다 즉시 쓰면 읽기·쓰기 할당량이 금방 닳는다 */
 export function push(data, delay = 1500){

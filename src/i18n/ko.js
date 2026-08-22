@@ -94,6 +94,8 @@ export default {
   'res.lose': '패배',
   'res.draw': '무승부',
   'res.again': '다시 하기',
+  'res.waitHost': '방장이 다시 시작하기를 기다리는 중…',
+  'room.watching': '관전 중',
   'res.home': '첫 화면으로',
   'res.hp': '체력',
   'res.dmg': '피해',
