@@ -144,7 +144,7 @@ export function newItems(){ return []; }
 export function normalizeState(st){
   // **soccer 를 빠뜨리면 축구 방인데 화면이 총격전으로 뜬다.**
   // 스냅샷을 받은 클라가 여기서 아레나를 정하는데, 그때 축구 여부가 안 넘어갔다
-  setArena(st && st.n, st && st.melee, st && st.ffa, st && st.soccer);
+  setArena(st && st.n, st && st.melee, st && st.ffa, st && st.soccer, st && st.vsAll);
   if (!st) return st;
   st.soccer = !!st.soccer;
   if (st.soccer && !st.ball) st.ball = ballHome();
@@ -156,6 +156,8 @@ export function normalizeState(st){
   if (typeof st.freeT !== 'number') st.freeT = 0;
   if (typeof st.lastKicker !== 'number') st.lastKicker = -1;
   if (typeof st.noGoal !== 'number') st.noGoal = 0;
+  if (typeof st.hold !== 'boolean') st.hold = false;
+  if (typeof st.vsAll !== 'boolean') st.vsAll = false;
   if (!Array.isArray(st.items)) st.items = [];
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
@@ -164,7 +166,7 @@ export function normalizeState(st){
   // **인원수를 박아 넣으면 안 된다.** [0,1,2,3] 고정이라 3대3·개인전 6인에서
   // 슬롯 4·5 의 색이 undefined 로 남았다
   if (!Array.isArray(st.color)) st.color = Array.from({ length: (st.p ? st.p.length : (st.n || 2)) }, (_, i) => i);
-  if (typeof st.solo !== 'boolean') st.solo = false;
+  if (typeof st.vsAll !== 'boolean') st.vsAll = false;
   if (typeof st.fast !== 'boolean') st.fast = false;
   if (typeof st.fastBy !== 'number') st.fastBy = 0;
   st.bare = !!st.bare;
@@ -219,7 +221,7 @@ export function newCovers(){
   return [];
 }
 export function newState(n = 2, melee = false, ffa = false, soccer = false){
-  setArena(n, melee, ffa, soccer);
+  setArena(n, melee, ffa, soccer, false);
   const players = [];
   for (let i = 0; i < n; i++){
     const team = teamOf(i, n);
@@ -258,6 +260,8 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     freeT: 0,                   // 찬 직후 아무도 못 잡는 시간
     lastKicker: -1,             // 방금 찬 사람 (그 사람 몸만 잠깐 통과)
     noGoal: 0,                  // 태클로 나간 공 — 잡히거나 차기 전까지 골이 안 된다
+    vsAll: false,               // [stated] 2대1 — 나 혼자(0번) 대 나머지 (AI 모드 조건)
+    hold: false,                // 전원이 게임 화면에 들어올 때까지 준비 시간을 세지 않는다
     p: players,
     bullets: [],
     covers: newCovers(),
@@ -338,7 +342,7 @@ export function itemRect(it){
 // 해당 슬롯이 이 칸에 이 아이템을 놓을 수 있는가
 // 이 슬롯이 놓아야 할 아이템을 전부 놓았는가 (설치 완료 조건)
 export function allPlaced(s, slot){
-  setArena(s.n, s.melee, s.ffa, s.soccer);
+  setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   const team = teamOf(slot, s.n);
   // 엄폐물은 **칸 수마다** 따로 센다 (1칸 2개 · 2칸 1개)
   for (const c of coverSizes())
@@ -352,7 +356,7 @@ export function allPlaced(s, slot){
 }
 // 내가 놓은 아이템 찾기 (옮기려고 집을 때)
 export function myItemAt(s, slot, c, r){
-  setArena(s.n, s.melee, s.ffa, s.soccer);
+  setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   const team = teamOf(slot, s.n);
   return (s.items || []).find(it => {
     const w = ITEM_DEF[it.k].cells;
@@ -362,7 +366,7 @@ export function myItemAt(s, slot, c, r){
 
 // from을 주면 그 자리의 내 아이템은 없는 셈 치고 검사한다 (자리 옮기기)
 export function canPlace(s, slot, k, c, r, from){
-  setArena(s.n, s.melee, s.ffa, s.soccer);
+  setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   const team = teamOf(slot, s.n);
   const def = ITEM_DEF[k];
   if (!def) return false;
@@ -417,7 +421,7 @@ export function canPlace(s, slot, k, c, r, from){
 // 칸 (c,r)을 중심으로 rad칸 범위를 터뜨린다. 드럼통·수류탄이 함께 쓴다
 // 정중앙 칸에 서 있는가 (직격 판정)
 export function atCenter(s, i, c, r){
-  setArena(s.n, s.melee, s.ffa, s.soccer);
+  setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   const x0 = Math.round(cellX(c) * FP), x1 = Math.round(cellX(c + 1) * FP);
   const y0 = Math.round(cellY(r) * FP), y1 = Math.round(cellY(r + 1) * FP);
   const p = s.p[i];
@@ -445,7 +449,7 @@ export function addDealt(s, by, amount){
   s.dealt[by] += Math.max(0, amount);
 }
 export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
-  setArena(s.n, s.melee, s.ffa, s.soccer);
+  setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   const x0 = Math.round(cellX(c - rad) * FP);
   const x1 = Math.round(cellX(c + rad + 1) * FP);
   const y0 = Math.round(cellY(r - rad) * FP);
@@ -517,13 +521,13 @@ export function throwRow(slot, charge, n = 2, melee = false){
 // 연결 끊김 표시. 1대1은 나간 사람이 지고, 2대2는 그대로 두고 계속 굴린다
 // (한 명 끊겼다고 나머지 셋의 판을 망치는 게 더 이상하다는 판단)
 export function setOff(s, slot, v){
-  setArena(s.n, s.melee, s.ffa, s.soccer);
+  setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   if (!Array.isArray(s.off)) s.off = Array(s.n).fill(false);
   s.off[slot] = !!v;
 }
 // 자리를 완전히 뜬 경우 (직접 나감 / 유예 시간 초과)
 export function forfeit(s, slot){
-  setArena(s.n, s.melee, s.ffa, s.soccer);
+  setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   setOff(s, slot, true);
   if (s.phase === PH_OVER || s.solo) return;
   // **나간 사람은 죽은 것으로 본다.** 예전엔 3인 이상이면 아무 처리도 안 해서
@@ -547,7 +551,7 @@ export function forfeit(s, slot){
   }
 }
 export function canThrow(s, slot, k){
-  setArena(s.n, s.melee, s.ffa, s.soccer);
+  setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   if (s.phase !== PH_PLAY) return false;
   if (s.bare) return false;                            // 노템전은 투척물이 없다
   if (!s.p[slot] || s.p[slot].hp <= 0) return false;   // 죽으면 관전. 던지기도 안 된다
@@ -559,7 +563,7 @@ export function canThrow(s, slot, k){
 // 이 위치에 서면 엄폐물과 겹치는가. 드럼통은 함정이라 막지 않는다
 // (막으면 안 보이는 상태에서 길이 막혀 위치가 드러난다)
 export function blocked(s, x, y, self = -1){
-  setArena(s.n, s.melee, s.ffa, s.soccer);
+  setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   // **이미 그 안에 서 있으면 막지 않는다.** 안 그러면 아이템 안에 갇혀 영영 못 나온다
   // (드럼통은 상대가 서 있는 자리에도 놓일 수 있다)
   const me = self >= 0 && s.p ? s.p[self] : null;
@@ -589,7 +593,7 @@ export function blocked(s, x, y, self = -1){
 }
 
 export function step(s, inp){
-  setArena(s.n, s.melee, s.ffa, s.soccer);
+  setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   s.tick++;
 
   // 대기/종료 화면: START 입력(fire)으로만 카운트다운 시작
@@ -703,7 +707,10 @@ export function step(s, inp){
     // 안 누를 때 영원히 안 시작된다. 2배속·노템전 신청 중에는 멈춘다(답을 기다려야 하므로)
     // 2배속·노템전 신청에 답을 기다리는 동안은 멈춘다 (답할 시간을 뺏으면 안 된다)
     const asking = s.fastT > 0 || s.bareT > 0;
-    if (!s.solo && !asking && s.rdy > 0) s.rdy--;
+    // [stated] **10 에서 시작해야 하는데 7 부터 보였다.**
+    // 서버는 방이 차는 순간부터 세는데, 사용자는 **VS 화면 3초를 본 뒤에** 들어온다.
+    // → 전원이 게임 화면에 들어올 때까지(`s.hold`) 세지 않는다
+    if (!s.solo && !asking && !s.hold && s.rdy > 0) s.rdy--;
     const timeUp = !s.solo && s.rdy === 0;
     if (allReady || timeUp){
       // 시간이 다 되면 안 누른 사람도 준비된 것으로 본다
@@ -1366,7 +1373,7 @@ export function kickoff(s, scorer = -1){
 }
 
 export function checksum(s){
-  setArena(s.n, s.melee, s.ffa, s.soccer);
+  setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   let h = s.tick + s.maxStep + s.bulletV + s.coolT + s.phase * 7 + s.timer + s.clock;
   h = (h*31 + (s.rdy | 0)) | 0;
   h = (h*31 + (s.seed | 0) + (s.noBuff ? 7 : 0)) | 0;

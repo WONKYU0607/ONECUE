@@ -24,7 +24,7 @@ function name(r, sum){
   return same.length > 1 ? `${base}${idx}` : base;
 }
 
-export default function Result({ result, summary, score, session, host, onAgain, onMode, onHome }){
+export default function Result({ result, summary, score, session, host, onAgain, onMode, onRoom, onHome }){
   // [stated] **기존 점수에서 1점씩 굴러 올라간다.** 걸리는 시간은 1초.
   // 소리도 같이 나는데, 300점이 오르면 300번을 낼 수 없으므로
   // **소리만 45ms 간격으로 솎아낸다** — 귀에는 '따르르륵' 으로 이어져 들린다
@@ -153,6 +153,13 @@ export default function Result({ result, summary, score, session, host, onAgain,
             <span className="t">{t('res.again')}</span>
           </button>
         )}
+        {/* [stated] **판이 끝나면 방으로 돌아온다** — 종목·인원은 로비에서 고른다 */}
+        {onRoom && (
+          <button className="menu-btn primary" onClick={onRoom}>
+            <span className="t">{t('res.toRoom')}</span>
+          </button>
+        )}
+        {!onRoom && (<>
         {/* [stated] **방장은 종목도 바꿀 수 있다** — 인원수는 그대로라 자리가 안 흔들린다.
             축구는 1대1·2대2 뿐, 개인전은 칼전만 */}
         {session?.online && host && !session?.watching && (
@@ -194,6 +201,7 @@ export default function Result({ result, summary, score, session, host, onAgain,
         {session?.online && (!host || session?.watching) && (
           <p className="res-wait">{t(session?.watching ? 'room.watching' : 'res.waitHost')}</p>
         )}
+        </>)}
         <button className="menu-btn ghost" onClick={onHome}>
           <span className="t">{t('res.home')}</span>
         </button>

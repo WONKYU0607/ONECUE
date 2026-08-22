@@ -264,7 +264,11 @@ export const TEAM_OF = [0, 1, 2, 3, 4, 5];     // 플레이어 슬롯 -> 컬러 
 // **개인전(ffa)이면 각자가 자기 팀이다.** 팀 판정이 45곳에 흩어져 있어서
 // 함수 하나만 바꾸는 게 안전하다. ARENA를 이미 모든 시뮬 진입점에서 세팅하므로
 // 그 값을 읽는다(setArena(n, melee, ffa))
-export const teamOf = (slot, n = 2) => (ARENA.ffa ? slot : (slot < n / 2 ? 0 : 1));
+// [stated] **2대1** — AI 모드 후반 조건. 나 혼자(0번) 대 나머지 전원.
+// `ARENA.solo` 가 켜졌을 때만 이렇게 나눈다. 평소 규칙(`slot < n/2`)은 그대로다 —
+// 3인일 때 그 규칙은 0·1번을 한 팀으로 묶어서 원하는 편 가르기가 안 된다
+export const teamOf = (slot, n = 2) =>
+  (ARENA.ffa ? slot : (ARENA.solo ? (slot === 0 ? 0 : 1) : (slot < n / 2 ? 0 : 1)));
 // 이 판에 존재하는 팀 수
 export const teamCount = (n = 2) => (ARENA.ffa ? n : 2);
 // 팀별 세로 범위: 팀0=아래, 팀1=위
@@ -377,11 +381,13 @@ export const cellUsable = (c, r) => {
   return !!b && c >= b[0] && c <= b[1];
 };
 
-export function setArena(n, melee = false, ffa = false, soccer = false){
+export function setArena(n, melee = false, ffa = false, soccer = false, solo = false){
   const a = soccer ? A4 : (melee ? A3 : (n > 2 ? A2 : A1));
   // 개인전 여부가 바뀌면 팀 판정이 통째로 달라지므로 아레나가 같아도 갱신해야 한다
   // **인원수도 봐야 한다.** 2대2와 3대3은 같은 아레나지만 시작 열 수가 다르다
-  if (ARENA.bg === a.bg && ARENA.cols === a.cols && !!ARENA.ffa === !!ffa && ARENA.n === n) return ARENA;
+  // **2대1 여부도** — 팀 나누기가 통째로 달라진다
+  if (ARENA.bg === a.bg && ARENA.cols === a.cols && !!ARENA.ffa === !!ffa
+      && ARENA.n === n && !!ARENA.solo === !!solo) return ARENA;
   // 그냥 assign하면 **앞 아레나에만 있던 키가 남는다**(melee, straight, wt, wb...).
   // 칼전을 한 판 하고 총격전으로 돌아오면 ARENA.melee가 true로 남아
   // 캐릭터가 칼전 스프라이트로 그려졌다. 매번 비우고 채운다
@@ -389,6 +395,7 @@ export function setArena(n, melee = false, ffa = false, soccer = false){
   Object.assign(ARENA, a);
   ARENA.ffa = !!ffa;
   ARENA.n = n;
+  ARENA.solo = !!solo;      // [stated] 2대1 — 나 혼자(0번) 대 나머지
   GRID_COLS = a.cols; GRID_ROWS = a.rows; GRID_MIDROW = a.mid;
   GRID_X0 = a.x0; GRID_CW = a.cw; GRID_Y0 = a.y0; GRID_CH = a.ch;
   PWf = Math.round(a.pw * FP); PHf = Math.round(a.ph * FP);

@@ -10,6 +10,7 @@ import Friends from './ui/screens/Friends.jsx';
 import Matching from './ui/screens/Matching.jsx';
 import Result from './ui/screens/Result.jsx';
 import SettingsModal from './ui/SettingsModal.jsx';
+import Room from './ui/screens/Room.jsx';
 import HelpModal from './ui/HelpModal.jsx';
 import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings, setSetting } from './state/settings.js';
@@ -17,7 +18,7 @@ import { onLangChange, t } from './i18n/index.js';
 import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
-import { playAgain, setRoomMode } from './net/connection.js';
+import { playAgain, setRoomMode, getRoom, onRoom, onGo } from './net/connection.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -36,6 +37,13 @@ export default function App(){
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
   const [isHost, setIsHost] = useState(false);   // [stated] 방장이면 결과 화면에 '다시 하기'
+  // [stated] **방(로비)** — 소켓으로 흘러오는 방 상태를 그대로 담는다
+  const [room, setRoom] = useState(null);
+  useEffect(() => {
+    onRoom(r => setRoom(r));
+    onGo(() => setScreen('game'));
+    return () => { onRoom(null); onGo(null); };
+  }, []);
   const [summary, setSummary] = useState(null);   // 결과 창에 띄울 한 판 요약
   const [score, setScore] = useState(null);       // 이번 판 점수 변화 (PVP만)
   const [showSettings, setShowSettings] = useState(false);
@@ -133,12 +141,25 @@ export default function App(){
     setSession({ kind: 'melee', n, ffa });
     setScreen('game');
   }, []);
+  // [stated] **칼전 AI 도 단계별로.** 총격전과 같은 흐름 — 단계가 난이도를 정한다
+  const startMeleeAi = useCallback((n = 2, stage = 1) => {
+    disconnect();
+    setResult(null);
+    setSession({ kind: 'ai', melee: true, stage, n });
+    setScreen('game');
+  }, []);
   const startAi   = useCallback((stage, n = 2) => {
     SELF.slot = 0;                       // AI전은 항상 내가 아래쪽
     setSession({ kind: 'ai', stage, n });
     setScreen('game');
   }, []);
   // [stated] **관전으로 들어왔으면 세션에 표시한다** — 결과 화면이 조작 버튼을 안 그린다
+  // [stated] **친구방이면 로비로**, 빠른 매칭이면 바로 게임으로
+  const toRoomOrGame = useCallback(() => {
+    setSession(sn => (sn && SELF.watching ? { ...sn, watching: true } : sn));
+    const r = getRoom();
+    setScreen(r && !SELF.watching ? 'room' : 'game');
+  }, []);
   const toGame    = useCallback(() => {
     setSession(sn => (sn && SELF.watching ? { ...sn, watching: true } : sn));
     setScreen('game');
@@ -175,6 +196,11 @@ export default function App(){
     if (session?.kind === 'ai') recordResult(session.stage, r, modeKey(session.n || 2, !!session.melee));
     setResult(r); setIsHost(!!host); setScreen('result');
   }, [session]);
+  // [stated] **판이 끝나면 방으로 돌아온다** — 친구방이면 로비 화면으로
+  const backToRoom = useCallback(() => {
+    setResult(null);
+    if (getRoom()) setScreen('room'); else goHome();
+  }, [goHome]);
   const again     = useCallback(() => {
     setResult(null);
     // [stated] **판이 끝나면 방으로 돌아온다** — 끊고 나가지 않는다.
@@ -215,13 +241,15 @@ export default function App(){
                                      onFriends={() => setScreen('friends')} />}
       {screen === 'ranks'    && <RankBoard kind={rankKind} onBack={goHome} />}
       {screen === 'friends'  && <Friends onBack={goHome} />}
-      {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} onMelee={startMelee} />}
+      {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} onMelee={startMeleeAi} />}
       {screen === 'practice' && <PracticeMenu onBack={goHome} onStart={startPractice} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
-      {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toGame} />}
+      {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toRoomOrGame} />}
+      {/* [stated] **방(로비)** — 판이 끝나면 여기로 돌아온다 */}
+      {screen === 'room'     && <Room room={room || getRoom()} onLeave={goHome} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome}
                                           onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} />}
-      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onHome={goHome} />}
+      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={getRoom() ? backToRoom : null} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       {askExit && <QuitAsk exit

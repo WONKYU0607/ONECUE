@@ -1,6 +1,6 @@
 import {
   FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH, setArena,
-  stepCap, bulletFP, coolTicks, clampi, BUFF, BUFF_DEF, FAST_MUL, assignColors,
+  stepCap, bulletFP, coolTicks, clampi, BUFF, BUFF_DEF, FAST_MUL, assignColors, MAXHP
 } from './config.js';
 import { Loopback, Server, Client } from './net.js';
 import { createRenderer } from './render.js';
@@ -47,7 +47,13 @@ export function createGame(canvas, opts = {}){
   const net = online || new Loopback();
   // 로컬 AI전은 2인/4인을 고를 수 있다. 4인이면 나 말고 셋이 AI
   // 3대3(6인)과 개인전(3~6인)이 생겼다. 4만 허용하던 탓에 3대3이 1대1로 돌아갔다
-  const nLocal = (!online && [3, 4, 5, 6].includes(session.n)) ? session.n : 2;
+  // [stated] **2대1** — AI 모드 후반 조건. 나 혼자(0번) 대 AI 둘
+  const aiCond = (session.kind === 'ai' && session.stage)
+    ? (AI_STAGES[Math.max(0, Math.min(AI_STAGES.length - 1, session.stage - 1))].cond || {})
+    : {};
+  const vsAll = !!aiCond.twoVsOne;
+  const nLocal = vsAll ? 3
+    : ((!online && [3, 4, 5, 6].includes(session.n)) ? session.n : 2);
   // 칼전 여부: 로컬은 session, 온라인은 서버가 hello로 알려준 값
   const isMelee = session.kind === 'melee' || (online ? !!SELF.melee : !!session.melee);
   // 축구는 온라인이면 서버가 hello 로 알려주고, 로컬이면 세션에 실려 온다
@@ -57,6 +63,8 @@ export function createGame(canvas, opts = {}){
   const isFfa = online ? !!SELF.ffa : !!session.ffa;
   if (!online){ SELF.slot = 0; SELF.n = nLocal; }
   const server = online ? null : new Server(net, nLocal, isMelee, isFfa, isSoccer);
+  // **팀 나누기가 통째로 달라지므로** 시뮬 상태에 넣고 아레나에도 알린다
+  if (server && vsAll){ server.s.vsAll = true; setArena(nLocal, isMelee, isFfa, isSoccer, true); }
   // AI 모드: 단계가 오를수록 상대가 조금씩 빨라진다.
   // 자동 발사 게임이라 회피와 공격이 서로 배타적이어서, 판단만으로는 난이도가 안 갈렸다
   if (server && session.kind === 'ai' && session.stage){
@@ -66,6 +74,15 @@ export function createGame(canvas, opts = {}){
         server.s.spdMul[i] = st.mul || 1;
         server.s.coolMul[i] = st.cool || 1;
       }
+    // [stated] **11단계부터 조건이 붙는다.** 값만으로는 사람을 못 이긴다
+    const c = aiCond;
+    // **AI 체력만 올린다** — 내 체력은 안 깎는다
+    if (c.foeHp) for (let i = 0; i < nLocal; i++)
+      if (i !== SELF.slot) server.s.p[i].hp = Math.round(MAXHP * c.foeHp);
+    // 아이템(엄폐물·투척물)을 아예 못 쓴다. 노템전과 같은 장치를 쓴다
+    if (c.noItems){ server.s.bare = true; server.s.items = []; }
+    // 엄폐물만 없앤다 — 투척물은 그대로
+    if (c.noCover) server.s.covers = [];
   }
   const all = Array.from({ length: nLocal }, (_, i) => i);
   // 온라인이면 내 슬롯만, 로컬(AI·디버그)이면 전원 이 클라가 입력을 넣는다
@@ -383,12 +400,6 @@ export function createGame(canvas, opts = {}){
         try { opts.onCrash?.(e); } catch { /* 알림 자체가 실패해도 무시 */ }
       }
     }
-    // [stated] **카운트다운이 렉 먹은 것처럼 빠르게 지나갔다.**
-  // 접속은 VS 화면(3초) 전에 끝나는데 게임 화면은 그 뒤에 뜬다. 그 사이 서버는 계속 굴러서,
-  // 화면이 뜨는 순간 클라가 **3초치(180틱)를 한 프레임에 40틱씩 몰아서** 따라잡는다.
-  // → 시작할 때 **최신 스냅샷부터 다시 시작**하게 해서 따라잡을 게 없게 만든다
-  if (online) client.resync();
-
   // [stated] **방장이 다시 시작하면** 결과 화면을 닫고 새 판으로 돌아간다
   client.onAgain = () => { lastPhase = -1; onAgain(); };
   client.onHost = h => onHost(h);

@@ -73,6 +73,9 @@ class Room {
     // 클라마다 다르면 서로 다른 칸에 버프가 보인다.
     // Server 를 만든 **뒤에** 넣어야 한다 (앞에 두면 this.server 가 아직 없다)
     this.server.s.seed = (Math.random() * 0x7fffffff) | 0;
+    // [stated] **전원이 게임 화면에 들어올 때까지 준비 시간을 세지 않는다.**
+    // 방이 차는 순간부터 세면 VS 화면(3초)만큼 이미 지나 있어 10 이 아니라 7 부터 보인다
+    this.server.s.hold = true;
   }
   send(msg, pid){
     const raw = JSON.stringify(msg);
@@ -298,6 +301,44 @@ class Room {
     return c;
   }
   // 팀 선택 중인 사람들에게 현재 인원 구성을 알린다
+  /**
+   * 앉아 있는 사람이 **전부 게임 화면에 들어왔는지** 본다.
+   * 다 들어왔으면 준비 시간을 세기 시작한다
+   */
+  checkHold(){
+    const st = this.server.s;
+    const waiting = this.seats.some(x => x.ws && x.ws.readyState === 1 && !x.ws.seen);
+    const hold = waiting && st.phase === PH_READY;
+    if (st.hold !== hold){
+      st.hold = hold;
+      this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+    }
+  }
+
+  /**
+   * [stated] **로비 화면에 쓸 방 상태**를 각자에게 보낸다.
+   * 자리·명단·관전자·방장·종목·인원을 한 덩어리로 — 화면이 이 값만 보고 그린다
+   */
+  sendRoom(){
+    this.ensureHost();
+    const st = this.server.s;
+    const names = [[], []];
+    this.seats.forEach((x, i) => {
+      if (!x.sid) return;
+      names[i < this.n / 2 ? 0 : 1].push({ slot: i, nick: ((st.nick || [])[i] || '').trim() });
+    });
+    const watchList = [];
+    for (const w of this.watchers) if (w.readyState === 1)
+      watchList.push({ slot: -1, nick: (w.nick || '').trim() });
+    const base = { t: 'roomst', code: this.code, n: this.n,
+                   melee: this.melee, ffa: this.ffa, soccer: this.soccer,
+                   names, watchList };
+    for (const st2 of this.seats) if (st2.ws && st2.ws.readyState === 1)
+      st2.ws.send(JSON.stringify({ ...base, host: st2.sid === this.hostSid, mySlot: st2.ws.slot }));
+    for (const w of this.watchers) if (w.readyState === 1)
+      w.send(JSON.stringify({ ...base, host: false, mySlot: -1 }));
+  }
+
   /** 방장이 누구인지 각자에게 알린다 (자기가 방장인지만 알면 된다) */
   sendHost(){
     this.ensureHost();
@@ -339,6 +380,9 @@ class Room {
     const st = this.server.s;
     if (st.phase !== PH_OVER) return false;
     resetForNextRound(st);
+    // 다시 시작할 때도 **전원이 화면에 들어올 때까지** 준비 시간을 세지 않는다
+    for (const x of this.seats) if (x.ws) x.ws.seen = false;
+    st.hold = true;
     this.settled = false;                 // 다음 판 점수를 다시 쓸 수 있게
     // **`charged` 를 비우면 안 된다** — 빠른 매칭에서 다시 하기로 무한히 돌 수 있다.
     // 친구방은 애초에 안 깎으므로 그대로 두면 된다
@@ -393,6 +437,7 @@ class Room {
     st.rdy = readyLimit(this.melee, this.soccer);
     this.settled = false;
     this.send({ t: 'mode', melee: this.melee, ffa: this.ffa, soccer: this.soccer, n: this.n });
+    this.sendRoom();
     this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
     return true;
   }
@@ -404,7 +449,7 @@ class Room {
     this.pending.set(sid, 0);
     this.waitingList.push(ws);
     ws.send(JSON.stringify({ t: 'hello', pid: -1, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, soccer: this.soccer, back, ver: PROTO_VER }));
-    this.sendLobby();
+    this.sendLobby(); this.sendRoom();
   }
   join(ws, sid, team, wantColor, nick){
     const back = this.seatOf(sid);
@@ -461,7 +506,7 @@ class Room {
       this.send({ t: 'go' });
       this.sendVs();                       // [stated] 매칭되면 서로의 정보를 보여준다
     }
-    else this.sendLobby();
+    else this.sendLobby(); this.sendRoom();
     return slot;
   }
 
@@ -915,7 +960,7 @@ wss.on('connection', (ws, req) => {
         ws.slot = -1;
         if (!room.waitingList.includes(ws)) room.waitingList.push(ws);
         room.send({ t: 'peer', slot, state: 'left' });
-        room.sendLobby();
+        room.sendLobby(); room.sendRoom();
         console.log(`팀 취소: room ${room.id} slot ${slot}`);
         return;
       }
@@ -949,6 +994,20 @@ wss.on('connection', (ws, req) => {
       if (!room.setMode(m)) ws.send(JSON.stringify({ t: 'nomode' }));
       return;
     }
+    // [stated] **방장이 판을 시작한다** — 자리가 다 차야 한다
+    if (m.t === 'start' && ws.room){
+      const room = ws.room;
+      room.ensureHost();
+      if (ws.sid !== room.hostSid) return;
+      if (!room.full) return;
+      const st = room.server.s;
+      if (st.phase !== PH_READY) return;
+      for (const x of room.seats) if (x.ws) x.ws.seen = false;
+      st.hold = true;                     // 전원이 화면에 들어오면 그때부터 센다
+      room.send({ t: 'go' });             // 모두 게임 화면으로
+      room.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+      return;
+    }
     if (m.t === 'again' && ws.room){
       const room = ws.room;
       room.ensureHost();
@@ -960,7 +1019,7 @@ wss.on('connection', (ws, req) => {
       // 관전자는 자리가 없으므로 목록에서만 뺀다
       if (ws.room && ws.watching){ ws.room.watchers.delete(ws); ws.close(); return; }
       if (ws.room && ws.slot >= 0) ws.room.quit(ws.slot);
-      else if (ws.room){ const i = ws.room.waitingList.indexOf(ws); if (i >= 0) ws.room.waitingList.splice(i, 1); ws.room.sendLobby(); }
+      else if (ws.room){ const i = ws.room.waitingList.indexOf(ws); if (i >= 0) ws.room.waitingList.splice(i, 1); ws.room.sendLobby(); ws.room.sendRoom(); }
       else { const i = waiting.indexOf(ws); if (i >= 0) waiting.splice(i, 1); }
       ws.close();
       return;
@@ -968,6 +1027,11 @@ wss.on('connection', (ws, req) => {
     if (!ws.room || ws.slot === undefined || ws.slot < 0) return;   // 자리가 없으면 입력은 버린다
     // pid는 절대 클라이언트 말을 믿지 않는다 (남의 캐릭터를 조작할 수 있으므로)
     m.pid = ws.slot;
+    // [stated] **전원이 게임 화면에 들어올 때까지 준비 시간을 세지 않는다.**
+    // 입력이 오기 시작했다 = 그 사람이 게임 화면에 있다는 뜻이다.
+    // 서버는 방이 차는 순간부터 셌는데 사용자는 VS 화면 3초 뒤에 들어와,
+    // 10 이 아니라 7 부터 보였다
+    if (m.t === 'in' && !ws.seen){ ws.seen = true; ws.room.checkHold(); }
     ws.room.server.onMsg(m);
   });
 
@@ -986,7 +1050,7 @@ wss.on('connection', (ws, req) => {
       // 팀 고르는 중에 끊긴 것. 자리는 없지만 sid는 유예 시간 동안 지켜서
       // 다시 붙으면 같은 방으로 돌아오게 한다 (방장이면 방이 통째로 흩어진다)
       if (ws.room.pending.has(ws.sid)) ws.room.pending.set(ws.sid, Date.now());
-      ws.room.sendLobby();
+      ws.room.sendLobby(); ws.room.sendRoom();
       return;
     }
     const room = ws.room;

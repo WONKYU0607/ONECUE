@@ -457,6 +457,13 @@ export class Client {
       // [stated] **인원이 줄어 자리에서 밀려났다** — 그 자리에서 관전으로 바뀐다
       SELF.watching = true; SELF.slot = -1;
       this.onMode?.({ melee: !!m.melee, ffa: !!m.ffa, soccer: !!m.soccer, n: m.n | 0 });
+    } else if (m.t === 'roomst'){
+      // [stated] **로비 화면이 쓰는 방 상태** — 자리·명단·관전자·방장
+      this.room = m;
+      this.onRoom?.(m);
+    } else if (m.t === 'go'){
+      // 방장이 시작을 눌렀다 → 모두 게임 화면으로
+      this.onGo?.();
     } else if (m.t === 'mode'){
       // [stated] 방장이 종목을 바꿨다 — 화면이 새 종목으로 다시 차려져야 한다
       this.onMode?.({ melee: !!m.melee, ffa: !!m.ffa, soccer: !!m.soccer, n: m.n | 0 });

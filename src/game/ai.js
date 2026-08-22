@@ -2,7 +2,7 @@ import {
   FP, WALL_L, WALL_R, wallIdx, PH_PLAY, THROW,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CW, GRID_CH, GRID_X0, GRID_Y0,
   ATK_TICKS, ATK_HIT, FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX, PHf, PWf, MAXHP, BUFF, PORTAL_N,
-  ITEM, ITEM_DEF, isCover, coverBudget, itemQuota, PH_READY, coverUsed, coverCells} from './config.js';
+  ITEM, ITEM_DEF, isCover, coverBudget, itemQuota, PH_READY, coverUsed, coverCells, THROW_DEF } from './config.js';
 import { canPlace } from './sim.js';
 
 // 노릴 상대. 2대2에서는 살아 있는 적 중 가로로 가장 가까운 쪽을 본다.
@@ -35,30 +35,112 @@ function foeOf(s, me){
 //  mGuard : 상대 모션을 읽고 방패를 드는 정도
 //  mBait  : 접근하는 척하다 빠지는 정도
 //  mPort  : 차원문을 쓰는 정도 (불리하면 도망, 유리하면 추격)
+// [stated] **AI 모드 30단계.** 뒤로 갈수록 반드시 어려워진다(스물한 개 값을 전부 확인).
+//
+//   판단 900ms → 120ms   ·  속도 0.35 → 1.50  ·  조준 0.10 → 0.88
+//   20단계에서 **사람과 같은 속도**, 24단계부터 **사람 반응보다 빠름**
+//
+// 값만으로는 한계가 있어(반응 120ms 는 이미 사람보다 빠르다) **11단계부터 조건을 섞는다**:
+//   noItems   아이템 없음        noCover  엄폐물 없음
+//   foeHp     AI 체력 배수       twoVsOne 적이 둘
+// [stated] **내 체력은 안 깎는다**(AI 체력을 올린다). 제한 시간은 모든 단계 그대로.
+// [stated] 체력은 **30단계 1.3배가 천장** — 2배는 너무 빡세다
+//
+// `thrBonus` — [stated] 투척 개수. 1~10 사람과 같고, 11~20 하나씩, 21~30 둘씩 더.
+// **화염병은 늘 1개**(한 판에 한 번 쓰는 무기라 늘리면 성격이 달라진다)
 export const AI_STAGES = [
-  //                        방어                              공격
-  //          react horizon danger speed  aim  push slop | thrGap aimErr chargeErr combo
-  { nameKey: 'ai.s1',   react: 900, horizon: 18,  danger: 9,  speed: 0.35, aim: 0.1, push: 0.1, slop: 14.0,
-    thrGap: 9000, aimErr: 2.4, chargeErr: 0.35, combo: 0.0, lead: 0.0 , timing: 0.0 , mul: 0.8 , engage: 0.04 , cool: 1.25 , mOrbit: 0.050, mSpace: 0.000, mGuard: 0.020, mBait: 0.000, mPort: 0.0 },
-  { nameKey: 'ai.s2',   react: 807, horizon: 23,  danger: 10, speed: 0.417, aim: 0.153, push: 0.133, slop: 12.0,
-    thrGap: 8333, aimErr: 2.133, chargeErr: 0.303, combo: 0.0, lead: 0.0 , timing: 0.04 , mul: 0.833 , engage: 0.06 , cool: 1.217 , mOrbit: 0.072, mSpace: 0.013, mGuard: 0.120, mBait: 0.017, mPort: 0.078 },
-  { nameKey: 'ai.s3',   react: 713, horizon: 29,  danger: 10, speed: 0.483, aim: 0.213, push: 0.167, slop: 10.333,
-    thrGap: 7667, aimErr: 1.867, chargeErr: 0.26, combo: 0.0, lead: 0.0 , timing: 0.087 , mul: 0.867 , engage: 0.08 , cool: 1.183 , mOrbit: 0.094, mSpace: 0.027, mGuard: 0.220, mBait: 0.033, mPort: 0.156 },
-  { nameKey: 'ai.s4',   react: 620, horizon: 36,  danger: 11, speed: 0.55, aim: 0.28, push: 0.2, slop: 9.0,
-    thrGap: 7000, aimErr: 1.6, chargeErr: 0.22, combo: 0.0, lead: 0.0 , timing: 0.14 , mul: 0.9 , engage: 0.1 , cool: 1.15 , mOrbit: 0.117, mSpace: 0.040, mGuard: 0.320, mBait: 0.050, mPort: 0.233 },
-  { nameKey: 'ai.s5', react: 540, horizon: 44,  danger: 12, speed: 0.61, aim: 0.347, push: 0.253, slop: 7.667,
-    thrGap: 6333, aimErr: 1.333, chargeErr: 0.187, combo: 0.133, lead: 0.0 , timing: 0.207 , mul: 0.94 , engage: 0.12 , cool: 1.117 , mOrbit: 0.139, mSpace: 0.053, mGuard: 0.420, mBait: 0.067, mPort: 0.311 },
-  { nameKey: 'ai.s6',   react: 467, horizon: 53,  danger: 12, speed: 0.667, aim: 0.413, push: 0.303, slop: 6.333,
-    thrGap: 5667, aimErr: 1.1, chargeErr: 0.157, combo: 0.25, lead: 0.0 , timing: 0.28 , mul: 0.973 , engage: 0.14 , cool: 1.083 , mOrbit: 0.161, mSpace: 0.067, mGuard: 0.520, mBait: 0.083, mPort: 0.389 },
-  { nameKey: 'ai.s7', react: 400, horizon: 62,  danger: 13, speed: 0.72, aim: 0.48, push: 0.35, slop: 5.0,
-    thrGap: 5000, aimErr: 0.9, chargeErr: 0.13, combo: 0.35, lead: 0.0 , timing: 0.36 , mul: 1.0 , engage: 0.16 , cool: 1.05 , mOrbit: 0.183, mSpace: 0.080, mGuard: 0.620, mBait: 0.100, mPort: 0.467 },
-  { nameKey: 'ai.s8',   react: 340, horizon: 73, danger: 14, speed: 0.773, aim: 0.547, push: 0.397, slop: 4.333,
-    thrGap: 4467, aimErr: 0.767, chargeErr: 0.11, combo: 0.45, lead: 0.0 , timing: 0.453 , mul: 1.027 , engage: 0.173 , cool: 1.017 , mOrbit: 0.206, mSpace: 0.093, mGuard: 0.720, mBait: 0.117, mPort: 0.544 },
-  { nameKey: 'ai.s9', react: 287, horizon: 84, danger: 14, speed: 0.823, aim: 0.613, push: 0.447, slop: 3.667,
-    thrGap: 3933, aimErr: 0.633, chargeErr: 0.09, combo: 0.55, lead: 0.0 , timing: 0.547 , mul: 1.053 , engage: 0.187 , cool: 0.98 , mOrbit: 0.228, mSpace: 0.107, mGuard: 0.820, mBait: 0.133, mPort: 0.622 },
-  { nameKey: 'ai.s10',   react: 240,  horizon: 95, danger: 15, speed: 0.87, aim: 0.68, push: 0.5, slop: 3.0,
-    thrGap: 3400, aimErr: 0.5, chargeErr: 0.07, combo: 0.65, lead: 0.0 , timing: 0.64 , mul: 1.08 , engage: 0.2 , cool: 0.94 , mOrbit: 0.250, mSpace: 0.120, mGuard: 0.920, mBait: 0.150, mPort: 0.7 },
+  { nameKey: 'ai.s1', react: 900, horizon: 18, danger: 9, speed: 0.35, aim: 0.1, push: 0.1, slop: 14,
+    thrGap: 9000, aimErr: 2.4, chargeErr: 0.35, combo: 0, lead: 0, timing: 0, mul: 0.8, engage: 0.04, cool: 1.25,
+    mOrbit: 0.05, mSpace: 0, mGuard: 0.02, mBait: 0, mPort: 0, thrBonus: 0 },
+  { nameKey: 'ai.s2', react: 838, horizon: 22, danger: 9, speed: 0.362, aim: 0.119, push: 0.118, slop: 13.291,
+    thrGap: 8672, aimErr: 2.246, chargeErr: 0.328, combo: 0.008, lead: 0.004, timing: 0.016, mul: 0.812, engage: 0.048, cool: 1.237,
+    mOrbit: 0.06, mSpace: 0.006, mGuard: 0.044, mBait: 0.008, mPort: 0.029, thrBonus: 0 },
+  { nameKey: 'ai.s3', react: 795, horizon: 26, danger: 10, speed: 0.381, aim: 0.141, push: 0.136, slop: 12.723,
+    thrGap: 8387, aimErr: 2.132, chargeErr: 0.311, combo: 0.02, lead: 0.011, timing: 0.036, mul: 0.823, engage: 0.055, cool: 1.223,
+    mOrbit: 0.07, mSpace: 0.012, mGuard: 0.071, mBait: 0.015, mPort: 0.059, thrBonus: 0 },
+  { nameKey: 'ai.s4', react: 758, horizon: 30, danger: 10, speed: 0.404, aim: 0.164, push: 0.154, slop: 12.197,
+    thrGap: 8117, aimErr: 2.029, chargeErr: 0.296, combo: 0.035, lead: 0.02, timing: 0.059, mul: 0.835, engage: 0.063, cool: 1.21,
+    mOrbit: 0.08, mSpace: 0.019, mGuard: 0.099, mBait: 0.023, mPort: 0.088, thrBonus: 0 },
+  { nameKey: 'ai.s5', react: 723, horizon: 33, danger: 10, speed: 0.429, aim: 0.188, push: 0.172, slop: 11.698,
+    thrGap: 7857, aimErr: 1.933, chargeErr: 0.282, combo: 0.053, lead: 0.031, timing: 0.084, mul: 0.847, engage: 0.07, cool: 1.196,
+    mOrbit: 0.09, mSpace: 0.025, mGuard: 0.129, mBait: 0.03, mPort: 0.117, thrBonus: 0 },
+  { nameKey: 'ai.s6', react: 691, horizon: 37, danger: 10, speed: 0.457, aim: 0.213, push: 0.19, slop: 11.217,
+    thrGap: 7602, aimErr: 1.841, chargeErr: 0.269, combo: 0.073, lead: 0.043, timing: 0.109, mul: 0.859, engage: 0.078, cool: 1.183,
+    mOrbit: 0.1, mSpace: 0.031, mGuard: 0.159, mBait: 0.038, mPort: 0.147, thrBonus: 0 },
+  { nameKey: 'ai.s7', react: 661, horizon: 41, danger: 11, speed: 0.487, aim: 0.238, push: 0.208, slop: 10.751,
+    thrGap: 7353, aimErr: 1.754, chargeErr: 0.256, combo: 0.094, lead: 0.056, timing: 0.136, mul: 0.87, engage: 0.086, cool: 1.169,
+    mOrbit: 0.11, mSpace: 0.037, mGuard: 0.19, mBait: 0.046, mPort: 0.176, thrBonus: 0 },
+  { nameKey: 'ai.s8', react: 631, horizon: 45, danger: 11, speed: 0.519, aim: 0.263, push: 0.226, slop: 10.296,
+    thrGap: 7108, aimErr: 1.669, chargeErr: 0.244, combo: 0.116, lead: 0.071, timing: 0.163, mul: 0.882, engage: 0.093, cool: 1.156,
+    mOrbit: 0.12, mSpace: 0.043, mGuard: 0.221, mBait: 0.053, mPort: 0.205, thrBonus: 0 },
+  { nameKey: 'ai.s9', react: 603, horizon: 49, danger: 11, speed: 0.552, aim: 0.289, push: 0.243, slop: 9.85,
+    thrGap: 6866, aimErr: 1.586, chargeErr: 0.232, combo: 0.14, lead: 0.087, timing: 0.192, mul: 0.894, engage: 0.101, cool: 1.142,
+    mOrbit: 0.13, mSpace: 0.05, mGuard: 0.253, mBait: 0.061, mPort: 0.234, thrBonus: 0 },
+  { nameKey: 'ai.s10', react: 576, horizon: 53, danger: 11, speed: 0.587, aim: 0.315, push: 0.261, slop: 9.413,
+    thrGap: 6628, aimErr: 1.506, chargeErr: 0.221, combo: 0.165, lead: 0.104, timing: 0.221, mul: 0.906, engage: 0.108, cool: 1.129,
+    mOrbit: 0.14, mSpace: 0.056, mGuard: 0.285, mBait: 0.068, mPort: 0.264, thrBonus: 0 },
+  { nameKey: 'ai.s11', react: 549, horizon: 57, danger: 12, speed: 0.623, aim: 0.342, push: 0.279, slop: 8.984,
+    thrGap: 6392, aimErr: 1.427, chargeErr: 0.209, combo: 0.191, lead: 0.121, timing: 0.251, mul: 0.917, engage: 0.116, cool: 1.116,
+    mOrbit: 0.15, mSpace: 0.062, mGuard: 0.318, mBait: 0.076, mPort: 0.293, thrBonus: 1, cond: {"noItems":1} },
+  { nameKey: 'ai.s12', react: 523, horizon: 60, danger: 12, speed: 0.661, aim: 0.369, push: 0.297, slop: 8.56,
+    thrGap: 6158, aimErr: 1.35, chargeErr: 0.198, combo: 0.219, lead: 0.14, timing: 0.281, mul: 0.929, engage: 0.123, cool: 1.102,
+    mOrbit: 0.16, mSpace: 0.068, mGuard: 0.35, mBait: 0.083, mPort: 0.322, thrBonus: 1 },
+  { nameKey: 'ai.s13', react: 498, horizon: 64, danger: 12, speed: 0.699, aim: 0.395, push: 0.315, slop: 8.143,
+    thrGap: 5927, aimErr: 1.274, chargeErr: 0.187, combo: 0.247, lead: 0.16, timing: 0.312, mul: 0.941, engage: 0.131, cool: 1.089,
+    mOrbit: 0.17, mSpace: 0.074, mGuard: 0.384, mBait: 0.091, mPort: 0.352, thrBonus: 1, cond: {"foeHp":1.05} },
+  { nameKey: 'ai.s14', react: 473, horizon: 68, danger: 13, speed: 0.739, aim: 0.423, push: 0.333, slop: 7.73,
+    thrGap: 5697, aimErr: 1.2, chargeErr: 0.176, combo: 0.276, lead: 0.18, timing: 0.344, mul: 0.952, engage: 0.139, cool: 1.075,
+    mOrbit: 0.18, mSpace: 0.081, mGuard: 0.417, mBait: 0.099, mPort: 0.381, thrBonus: 1 },
+  { nameKey: 'ai.s15', react: 448, horizon: 72, danger: 13, speed: 0.78, aim: 0.45, push: 0.351, slop: 7.323,
+    thrGap: 5469, aimErr: 1.127, chargeErr: 0.166, combo: 0.307, lead: 0.201, timing: 0.376, mul: 0.964, engage: 0.146, cool: 1.062,
+    mOrbit: 0.19, mSpace: 0.087, mGuard: 0.451, mBait: 0.106, mPort: 0.41, thrBonus: 1, cond: {"noCover":1} },
+  { nameKey: 'ai.s16', react: 424, horizon: 76, danger: 13, speed: 0.822, aim: 0.478, push: 0.369, slop: 6.92,
+    thrGap: 5243, aimErr: 1.054, chargeErr: 0.155, combo: 0.338, lead: 0.223, timing: 0.408, mul: 0.976, engage: 0.154, cool: 1.048,
+    mOrbit: 0.2, mSpace: 0.093, mGuard: 0.485, mBait: 0.114, mPort: 0.44, thrBonus: 1 },
+  { nameKey: 'ai.s17', react: 401, horizon: 80, danger: 13, speed: 0.865, aim: 0.505, push: 0.387, slop: 6.52,
+    thrGap: 5018, aimErr: 0.983, chargeErr: 0.145, combo: 0.37, lead: 0.246, timing: 0.441, mul: 0.988, engage: 0.161, cool: 1.035,
+    mOrbit: 0.21, mSpace: 0.099, mGuard: 0.519, mBait: 0.121, mPort: 0.469, thrBonus: 1, cond: {"foeHp":1.1} },
+  { nameKey: 'ai.s18', react: 377, horizon: 84, danger: 14, speed: 0.909, aim: 0.533, push: 0.405, slop: 6.125,
+    thrGap: 4795, aimErr: 0.913, chargeErr: 0.135, combo: 0.402, lead: 0.269, timing: 0.474, mul: 0.999, engage: 0.169, cool: 1.021,
+    mOrbit: 0.22, mSpace: 0.106, mGuard: 0.553, mBait: 0.129, mPort: 0.498, thrBonus: 1 },
+  { nameKey: 'ai.s19', react: 355, horizon: 88, danger: 14, speed: 0.954, aim: 0.562, push: 0.423, slop: 5.733,
+    thrGap: 4573, aimErr: 0.843, chargeErr: 0.125, combo: 0.436, lead: 0.293, timing: 0.508, mul: 1.011, engage: 0.177, cool: 1.008,
+    mOrbit: 0.23, mSpace: 0.112, mGuard: 0.588, mBait: 0.137, mPort: 0.528, thrBonus: 1, cond: {"foeHp":1.12,"noItems":1} },
+  { nameKey: 'ai.s20', react: 332, horizon: 91, danger: 14, speed: 1, aim: 0.59, push: 0.441, slop: 5.344,
+    thrGap: 4352, aimErr: 0.774, chargeErr: 0.115, combo: 0.47, lead: 0.318, timing: 0.542, mul: 1.023, engage: 0.184, cool: 0.994,
+    mOrbit: 0.24, mSpace: 0.118, mGuard: 0.623, mBait: 0.144, mPort: 0.557, thrBonus: 1 },
+  { nameKey: 'ai.s21', react: 310, horizon: 95, danger: 15, speed: 1.046, aim: 0.618, push: 0.459, slop: 4.958,
+    thrGap: 4133, aimErr: 0.706, chargeErr: 0.105, combo: 0.505, lead: 0.344, timing: 0.576, mul: 1.034, engage: 0.192, cool: 0.981,
+    mOrbit: 0.25, mSpace: 0.124, mGuard: 0.658, mBait: 0.152, mPort: 0.586, thrBonus: 2, cond: {"twoVsOne":1} },
+  { nameKey: 'ai.s22', react: 288, horizon: 99, danger: 15, speed: 1.094, aim: 0.647, push: 0.477, slop: 4.575,
+    thrGap: 3914, aimErr: 0.639, chargeErr: 0.095, combo: 0.541, lead: 0.37, timing: 0.611, mul: 1.046, engage: 0.199, cool: 0.968,
+    mOrbit: 0.26, mSpace: 0.13, mGuard: 0.693, mBait: 0.159, mPort: 0.616, thrBonus: 2 },
+  { nameKey: 'ai.s23', react: 266, horizon: 103, danger: 15, speed: 1.142, aim: 0.676, push: 0.494, slop: 4.195,
+    thrGap: 3697, aimErr: 0.572, chargeErr: 0.085, combo: 0.577, lead: 0.396, timing: 0.646, mul: 1.058, engage: 0.207, cool: 0.954,
+    mOrbit: 0.27, mSpace: 0.137, mGuard: 0.728, mBait: 0.167, mPort: 0.645, thrBonus: 2, cond: {"noCover":1,"noItems":1,"foeHp":1.15} },
+  { nameKey: 'ai.s24', react: 244, horizon: 107, danger: 15, speed: 1.191, aim: 0.704, push: 0.512, slop: 3.818,
+    thrGap: 3480, aimErr: 0.506, chargeErr: 0.076, combo: 0.614, lead: 0.424, timing: 0.681, mul: 1.07, engage: 0.214, cool: 0.941,
+    mOrbit: 0.28, mSpace: 0.143, mGuard: 0.764, mBait: 0.174, mPort: 0.674, thrBonus: 2 },
+  { nameKey: 'ai.s25', react: 223, horizon: 111, danger: 16, speed: 1.241, aim: 0.733, push: 0.53, slop: 3.442,
+    thrGap: 3265, aimErr: 0.44, chargeErr: 0.066, combo: 0.652, lead: 0.452, timing: 0.717, mul: 1.081, engage: 0.222, cool: 0.927,
+    mOrbit: 0.29, mSpace: 0.149, mGuard: 0.8, mBait: 0.182, mPort: 0.703, thrBonus: 2, cond: {"twoVsOne":1,"foeHp":1.18} },
+  { nameKey: 'ai.s26', react: 202, horizon: 115, danger: 16, speed: 1.291, aim: 0.763, push: 0.548, slop: 3.07,
+    thrGap: 3050, aimErr: 0.375, chargeErr: 0.057, combo: 0.691, lead: 0.48, timing: 0.753, mul: 1.093, engage: 0.23, cool: 0.914,
+    mOrbit: 0.3, mSpace: 0.155, mGuard: 0.835, mBait: 0.19, mPort: 0.733, thrBonus: 2 },
+  { nameKey: 'ai.s27', react: 181, horizon: 118, danger: 16, speed: 1.342, aim: 0.792, push: 0.566, slop: 2.699,
+    thrGap: 2837, aimErr: 0.311, chargeErr: 0.048, combo: 0.729, lead: 0.509, timing: 0.789, mul: 1.105, engage: 0.237, cool: 0.9,
+    mOrbit: 0.31, mSpace: 0.161, mGuard: 0.871, mBait: 0.197, mPort: 0.762, thrBonus: 2, cond: {"foeHp":1.22,"noItems":1} },
+  { nameKey: 'ai.s28', react: 161, horizon: 122, danger: 16, speed: 1.394, aim: 0.821, push: 0.584, slop: 2.331,
+    thrGap: 2624, aimErr: 0.247, chargeErr: 0.038, combo: 0.769, lead: 0.539, timing: 0.826, mul: 1.117, engage: 0.245, cool: 0.887,
+    mOrbit: 0.32, mSpace: 0.168, mGuard: 0.907, mBait: 0.205, mPort: 0.791, thrBonus: 2 },
+  { nameKey: 'ai.s29', react: 140, horizon: 126, danger: 17, speed: 1.447, aim: 0.85, push: 0.602, slop: 1.964,
+    thrGap: 2411, aimErr: 0.183, chargeErr: 0.029, combo: 0.809, lead: 0.569, timing: 0.863, mul: 1.128, engage: 0.252, cool: 0.873,
+    mOrbit: 0.33, mSpace: 0.174, mGuard: 0.944, mBait: 0.212, mPort: 0.821, thrBonus: 2, cond: {"twoVsOne":1,"noCover":1,"foeHp":1.26} },
+  { nameKey: 'ai.s30', react: 120, horizon: 130, danger: 17, speed: 1.5, aim: 0.88, push: 0.62, slop: 1.6,
+    thrGap: 2200, aimErr: 0.12, chargeErr: 0.02, combo: 0.85, lead: 0.6, timing: 0.9, mul: 1.14, engage: 0.26, cool: 0.86,
+    mOrbit: 0.34, mSpace: 0.18, mGuard: 0.98, mBait: 0.22, mPort: 0.85, thrBonus: 2, cond: {"twoVsOne":1,"foeHp":1.3,"noItems":1} },
 ];
+
 
 const HALF = 7 * FP;        // 캐릭터 가로 절반
 const MID  = 8 * FP;        // 세로 중앙 오프셋
@@ -115,6 +197,10 @@ export function createAI(stage = 1){
   let wander = 0, wanderT = 0;
   let nextThrow = 2500 + Math.random() * 2500;   // 처음 던지기까지
   let aimKind = -1, aimErrC = 0, aimErrR = 0, aimSince = 0;   // 이번 투척의 목표와 오차
+  // [stated] **투척 개수.** 1~10 사람과 같고, 11~20 하나씩, 21~30 둘씩 더.
+  // **화염병은 늘 1개** — 한 판에 한 번 쓰는 무기라 늘리면 성격이 달라진다
+  const bonus = p.thrBonus | 0;
+  const thrLeft = THROW_DEF.map((d, k) => d.count + (k === THROW.MOLO ? 0 : bonus));
   let lastFoe = null, foeVx = 0;                 // 상대 이동 속도 추정
   let blindUntil = 0;                            // 섬광이 걸린 동안은 수류탄을 잇는다
 
@@ -365,15 +451,26 @@ export function createAI(stage = 1){
       }
       lastFoe = foe.x;
 
-      if (nextThrow <= 0){
+      // [stated] **AI 도 투척 개수를 지킨다.** 예전엔 시간만 지나면 무한히 던져서,
+      // 30단계면 한 판에 스물일곱 개를 던졌다 — 사람은 일곱 개뿐이라 불공평했다.
+      // 남은 게 없으면 아예 안 던진다
+      const leftOf = k => (thrLeft[k] | 0);
+      const anyLeft = THROW_DEF.some((_, k) => leftOf(k) > 0);
+      if (nextThrow <= 0 && anyLeft){
         if (aimKind < 0){
           // 섬광에 걸린 동안이면 수류탄을 잇는다 (눈이 먼 사이엔 피하기 어렵다)
           const chase = now < blindUntil && Math.random() < p.combo;
           // 화염병은 한 개뿐이라 가끔만. 나머지는 예전대로
           const roll = Math.random();
-          aimKind = chase ? THROW.NADE
-                          : roll < 0.15 ? THROW.MOLO
-                          : (roll < 0.55 + p.combo * 0.25 ? THROW.FLASH : THROW.NADE);
+          let want = chase ? THROW.NADE
+                           : roll < 0.15 ? THROW.MOLO
+                           : (roll < 0.55 + p.combo * 0.25 ? THROW.FLASH : THROW.NADE);
+          // 고른 것이 다 떨어졌으면 남아 있는 것으로 바꾼다
+          if (leftOf(want) <= 0){
+            const alt = [THROW.NADE, THROW.FLASH, THROW.MOLO].find(k => leftOf(k) > 0);
+            want = alt === undefined ? -1 : alt;
+          }
+          aimKind = want;
           aimErrC = (Math.random() * 2 - 1) * p.aimErr;         // 이번 투척의 조준 오차
           aimErrR = (Math.random() * 2 - 1) * p.chargeErr;
           aimSince = now;
@@ -399,6 +496,7 @@ export function createAI(stage = 1){
           const ch = (foeRowIdx - near) / (far - near) + aimErrR;
           thr = { k: aimKind, ch: Math.round(Math.max(0, Math.min(1, ch)) * 100) };
           if (aimKind === THROW.FLASH) blindUntil = now + 2600;
+          thrLeft[aimKind] = Math.max(0, leftOf(aimKind) - 1);   // 하나 썼다
           aimKind = -1;
           nextThrow = p.thrGap * (0.75 + Math.random() * 0.5);
         }

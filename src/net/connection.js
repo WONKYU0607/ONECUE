@@ -169,6 +169,9 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
         transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer);
         onStage?.('waiting');
         if (m.back && m.pid >= 0) done();    // 자리까지 돌려받은 재접속. 서버가 go를 다시 보내지 않는다
+      } else if (m.t === 'roomst'){
+        roomState = m;
+        try { roomWatch?.(m); } catch { /* 무시 */ }
       } else if (m.t === 'watch'){
         // [stated] **자리가 다 차서 관전으로 들어왔다** — 조작 없이 보기만 한다
         SELF.slot = -1; SELF.n = m.n | 0; SELF.melee = !!m.melee;
@@ -199,6 +202,8 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
         // [stated] 매칭 뒤 **양쪽 정보**. 구름을 읽어야 해서 `go` 보다 늦게 올 수 있다
         onVs?.(m);
       } else if (m.t === 'go'){
+        // 방장이 시작을 눌렀을 때도 이걸 받는다 — 로비 화면이 게임으로 넘어간다
+        try { goWatch?.(); } catch { /* 무시 */ }
         done();
       }
     };
@@ -210,6 +215,21 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
 /** [stated] **판이 끝나면 방으로 돌아온다** — 방장이 같은 사람들로 새 판을 시작한다 */
 export function playAgain(){
   if (conn) conn.transport.clientSend({ t: 'again' });
+}
+
+// [stated] **로비 화면이 쓰는 방 상태.** 소켓으로 흘러오는 것을 여기 담아 두고,
+// 화면은 `getRoom()` 으로 읽는다. 바뀌면 `onRoom` 으로 알린다
+let roomState = null;
+let roomWatch = null;
+export const getRoom = () => roomState;
+export function onRoom(fn){ roomWatch = fn; }
+let goWatch = null;
+/** 방장이 시작을 누르면 모두 이걸 받는다 */
+export function onGo(fn){ goWatch = fn; }
+
+/** [stated] **방장이 판을 시작한다** */
+export function startRoom(){
+  if (conn) conn.transport.clientSend({ t: 'start' });
 }
 
 /** [stated] **방장이 종목을 바꾼다** — 인원수는 그대로 */
