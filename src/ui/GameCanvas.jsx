@@ -162,7 +162,8 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
           칼전에서는 배너가 준비 상자 위에 따로 놀았다. 하나로 묶어야 순서·크기가 맞는다 */}
       {/* [stated] **튜토리얼** — 실제 판 위에 얹혀 단계별로 안내한다 */}
       {session?.tuto && (
-        <Tutorial getState={() => ({ st: gameRef.current?.client?.pred, prompt: ready.prompt })}
+        <Tutorial getState={() => ({ st: gameRef.current?.client?.pred, prompt: ready.prompt, ready })}
+                  spotRect={w => gameRef.current?.spotRect?.(w) || null}
                   onQuit={() => onTuto?.()} />
       )}
       {/* [stated] **관전 중**임을 알려준다 — 왜 조작이 안 되는지 알 수 있게 */}

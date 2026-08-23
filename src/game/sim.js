@@ -158,6 +158,7 @@ export function normalizeState(st){
   if (typeof st.noGoal !== 'number') st.noGoal = 0;
   if (typeof st.hold !== 'boolean') st.hold = false;
   if (typeof st.vsAll !== 'boolean') st.vsAll = false;
+  if (typeof st.tuto !== 'boolean') st.tuto = false;
   if (!Array.isArray(st.items)) st.items = [];
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
@@ -167,6 +168,7 @@ export function normalizeState(st){
   // 슬롯 4·5 의 색이 undefined 로 남았다
   if (!Array.isArray(st.color)) st.color = Array.from({ length: (st.p ? st.p.length : (st.n || 2)) }, (_, i) => i);
   if (typeof st.vsAll !== 'boolean') st.vsAll = false;
+  if (typeof st.tuto !== 'boolean') st.tuto = false;
   if (typeof st.fast !== 'boolean') st.fast = false;
   if (typeof st.fastBy !== 'number') st.fastBy = 0;
   st.bare = !!st.bare;
@@ -262,6 +264,7 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     noGoal: 0,                  // 태클로 나간 공 — 잡히거나 차기 전까지 골이 안 된다
     vsAll: false,               // [stated] 2대1 — 나 혼자(0번) 대 나머지 (AI 모드 조건)
     hold: false,                // 전원이 게임 화면에 들어올 때까지 준비 시간을 세지 않는다
+    tuto: false,                // [stated] 튜토리얼 — 체력이 안 닳고 시간도 안 간다
     p: players,
     bullets: [],
     covers: newCovers(),
@@ -466,7 +469,9 @@ export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
     if (!overlap(p.x, p.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
     if (p.invul > 0) continue;
     p.invul = INVUL_T; p.flash = FLASH_T; p.hitBy = by;
-    if (!DEBUG_INF_HP){
+    // [stated] **튜토리얼은 체력이 안 닳는다** — 배우다 죽으면 안 된다.
+    // 맞은 표시(반짝임)는 그대로 둬서 맞았다는 건 알 수 있게
+    if (!DEBUG_INF_HP && !s.tuto){
       const d = (centerDmg && atCenter(s, i, c, r)) ? centerDmg : dmg;
       const was = p.hp;
       addDealt(s, by, Math.min(d, Math.max(0, was)));
@@ -950,7 +955,7 @@ export function step(s, inp){
               continue;
             }
             addDealt(s, i, Math.min(MELEE_DAMAGE, Math.max(0, hp0[v])));   // 깎기 전 체력 기준
-            if (!DEBUG_INF_HP) t.hp -= MELEE_DAMAGE;
+            if (!DEBUG_INF_HP && !s.tuto) t.hp -= MELEE_DAMAGE;
             t.flash = FLASH_T; t.hitBy = i;
           }
         }
@@ -974,7 +979,8 @@ export function step(s, inp){
         if (!overlap(t.x, t.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
         const was = t.hp;
         addDealt(s, fr.by, Math.min(FIRE_DAMAGE, Math.max(0, t.hp)));
-        t.hp -= FIRE_DAMAGE; t.flash = FLASH_T; t.hitBy = -1;
+        if (!s.tuto) t.hp -= FIRE_DAMAGE;
+        t.flash = FLASH_T; t.hitBy = -1;
       }
       // [stated] 불길도 상대 바리케이트를 태운다
       hurtBarricades(s, x0, y0, x1, y1, fireTeam, BARR_FIRE_DMG);
@@ -1061,7 +1067,7 @@ export function step(s, inp){
 
           if (!DEBUG_INF_HP){
             addDealt(s, b.o, Math.min(BULLET_DAMAGE, Math.max(0, t.hp)));   // 깎기 전 체력 기준
-            t.hp -= BULLET_DAMAGE;
+            if (!s.tuto) t.hp -= BULLET_DAMAGE;   // [stated] 튜토리얼은 체력이 안 닳는다
           }
         }
         break;
@@ -1296,7 +1302,13 @@ export function step(s, inp){
   }
 
   // 제한 시간. 다 되면 체력이 많은 쪽 승, 같으면 무승부
-  if (!s.soccer && !s.solo && !s.over && s.phase === PH_PLAY && s.clock > 0 && --s.clock === 0){
+  // [stated] **튜토리얼은 투척물이 계속 채워진다** — 마음껏 던져 보게 한다
+  if (s.tuto && s.ammo) for (let i = 0; i < s.n; i++){
+    const a = s.ammo[i];
+    if (a) for (let k = 0; k < a.length; k++) a[k] = THROW_DEF[k] ? THROW_DEF[k].count : a[k];
+  }
+  // [stated] **튜토리얼은 시간이 안 간다** — 투척물을 다 던지기 전에 판이 끝나면 안 된다
+  if (!s.soccer && !s.solo && !s.tuto && !s.over && s.phase === PH_PLAY && s.clock > 0 && --s.clock === 0){
     s.over = true; s.phase = PH_OVER;
     // 시간이 다 되면 팀 체력 합이 많은 쪽 승
     const sum = [0, 0];

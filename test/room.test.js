@@ -34,8 +34,15 @@ await guest.ready; await sleep(300);
 const hg = guest.msgs.find(m => m.t === 'hello');
 assert(hg && hg.pid === 1 && hg.room === host.msgs.find(m => m.t === 'hello').room,
        `초대받은 쪽은 같은 방 슬롯 1 (room ${hg?.room})`);
-assert(host.msgs.some(m => m.t === 'go') && guest.msgs.some(m => m.t === 'go'),
-       '둘 다 모이면 go');
+// [stated] **방은 자리가 차도 자동으로 시작하지 않는다** — 방장이 로비에서 [시작 하기] 를 눌러야 한다.
+// (빠른 매칭만 자동으로 시작한다)
+assert(!host.msgs.some(m => m.t === 'go'), '방은 자동으로 시작하지 않는다');
+assert(host.msgs.some(m => m.t === 'roomst'), '대신 방 상태가 온다');
+const rs = host.msgs.filter(m => m.t === 'roomst').pop();
+assert(rs.host === true, '방을 만든 사람이 방장이다');
+assert(rs.mySlot === 0, '내 자리를 알려준다');
+const rg = guest.msgs.filter(m => m.t === 'roomst').pop();
+assert(rg && rg.host === false, '나중에 온 사람은 방장이 아니다');
 
 console.log('잘못된 코드 / 꽉 찬 방');
 const bad = conn('bad', 'join', '0000');

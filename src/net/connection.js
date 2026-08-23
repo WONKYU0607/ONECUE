@@ -147,7 +147,16 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
       onStage?.('matched');
       resolve(conn);
     };
+    // [stated] **방 상태는 늘 받아야 한다.**
+    // `Client` 가 만들어지면 `toClient` 를 통째로 가져가서, 한 번 게임에 들어갔다 나오면
+    // 방 화면 버튼이 전부 죽었다(방장·자리 정보가 안 와서) → **먼저 여기서 가로챈다**
+    const always = m => {
+      if (m.t === 'roomst'){ roomState = m; try { roomWatch?.(m); } catch { /* 무시 */ } }
+      if (m.t === 'go'){ try { goWatch?.(); } catch { /* 무시 */ } }
+    };
+    transport.always = always;
     transport.toClient = m => {
+      always(m);
       if (m.t === 'hello'){
         // 서버가 옛 코드면 아이템·준비 같은 새 기능이 통째로 동작하지 않는다.
         // 조용히 멈추는 대신 원인을 알려준다
@@ -169,9 +178,6 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
         transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer);
         onStage?.('waiting');
         if (m.back && m.pid >= 0) done();    // 자리까지 돌려받은 재접속. 서버가 go를 다시 보내지 않는다
-      } else if (m.t === 'roomst'){
-        roomState = m;
-        try { roomWatch?.(m); } catch { /* 무시 */ }
       } else if (m.t === 'watch'){
         // [stated] **자리가 다 차서 관전으로 들어왔다** — 조작 없이 보기만 한다
         SELF.slot = -1; SELF.n = m.n | 0; SELF.melee = !!m.melee;
@@ -202,8 +208,6 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
         // [stated] 매칭 뒤 **양쪽 정보**. 구름을 읽어야 해서 `go` 보다 늦게 올 수 있다
         onVs?.(m);
       } else if (m.t === 'go'){
-        // 방장이 시작을 눌렀을 때도 이걸 받는다 — 로비 화면이 게임으로 넘어간다
-        try { goWatch?.(); } catch { /* 무시 */ }
         done();
       }
     };

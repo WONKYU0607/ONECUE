@@ -14,9 +14,9 @@ import { usableW, usableH } from '../state/safearea.js';
 import {
   FAST, BARE, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, teamOf, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
   ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed, coverCells, coverSizes,
-  GRID_X0, GRID_Y0, H, cellOwner, cellX, cellY
+  GRID_X0, GRID_Y0, GRID_MIDROW, H, cellOwner, cellX, cellY
 } from './config.js';
-import { padRect, paletteSlots, uiBoxRect } from './layout.js';
+import { paletteSlots, uiBoxRect, stickGeom, throwSlots } from './layout.js';
 import { uiPrompt, resultFor, matchSummary } from './ui-state.js';
 import { CHARGE_MAX_MS, PH_PLAY, THROW } from './config.js';
 import { t } from '../i18n/index.js';
@@ -65,6 +65,8 @@ export function createGame(canvas, opts = {}){
   const server = online ? null : new Server(net, nLocal, isMelee, isFfa, isSoccer);
   // **팀 나누기가 통째로 달라지므로** 시뮬 상태에 넣고 아레나에도 알린다
   if (server && vsAll){ server.s.vsAll = true; setArena(nLocal, isMelee, isFfa, isSoccer, true); }
+  // [stated] **튜토리얼** — 체력이 안 닳고 시간도 안 간다. 상대는 기본공격만 한다
+  if (server && session.tuto) server.s.tuto = true;
   // AI 모드: 단계가 오를수록 상대가 조금씩 빨라진다.
   // 자동 발사 게임이라 회피와 공격이 서로 배타적이어서, 판단만으로는 난이도가 안 갈렸다
   if (server && session.kind === 'ai' && session.stage){
@@ -594,6 +596,68 @@ export function createGame(canvas, opts = {}){
         width: b.w * k,
         height: Math.max(18, b.h * k)
       };
+    },
+    /**
+     * [stated] **튜토리얼이 짚을 자리.** 배치 칸·스틱은 캔버스에 그려져 DOM 이 없다 —
+     * 화면 좌표로 돌려줘야 테두리를 그릴 수 있다
+     */
+    spotRect(which){
+      const r = canvas.getBoundingClientRect();
+      const k = view.scale;
+      // **`right`·`bottom` 까지 채운다** — 받는 쪽이 `getBoundingClientRect()` 처럼 쓴다.
+      // 빠뜨렸더니 화면 밖 자르기 계산이 깨져 강조가 4px 로 찌그러졌다
+      const toScreen = b => {
+        const left = r.left + b.x * k, top = r.top + b.y * k;
+        const width = b.w * k, height = b.h * k;
+        return { left, top, width, height, right: left + width, bottom: top + height };
+      };
+      // `palette` 는 칸 전체, `palette:<번호>` 는 그 칸 하나만.
+      // [stated] 드럼통 단계에서 칸 전체를 강조하면 **어느 걸 끌어야 하는지 모른다**
+      if (which === 'palette' || String(which).startsWith('palette:')){
+        const sl = paletteSlots(view.uiH);
+        if (!sl || !sl.length) return null;
+        // `palette:<아이템 번호>` — **화면 순서가 아니라 아이템 번호**로 찾는다.
+        // 판마다 있는 종류가 달라(1대1 셋 / 2대2 일곱) 순서로 잡으면 엉뚱한 칸을 짚는다
+        const want = String(which).startsWith('palette:') ? (+String(which).split(':')[1] | 0) : -1;
+        if (want >= 0){
+          const at = itemKinds().indexOf(want);
+          const c = sl[at >= 0 ? at : 0];
+          return toScreen({ x: c.x, y: c.y, w: c.w, h: c.h });
+        }
+        const a = sl[0], z = sl[sl.length - 1];
+        return toScreen({ x: a.x, y: a.y, w: (z.x + z.w) - a.x, h: a.h });
+      }
+      // **우리 진영** — 배치 단계에서 여기까지 끌어다 놓는 것을 보여 준다
+      if (which === 'mine'){
+        const rows = GRID_ROWS, mid = GRID_MIDROW;
+        const top = SELF.slot === 0 ? mid + 1 : 0;
+        const cnt = SELF.slot === 0 ? rows - mid - 1 : mid;
+        return toScreen({ x: GRID_X0, y: GRID_Y0 + GRID_CH * top,
+                          w: GRID_CW * GRID_COLS, h: GRID_CH * cnt });
+      }
+      // **상대 진영** — 드럼통을 여기까지 끌어다 놓는 것을 보여 준다
+      if (which === 'foe'){
+        const rows = GRID_ROWS, mid = GRID_MIDROW;
+        const top = SELF.slot === 0 ? 0 : mid + 1;
+        const cnt = SELF.slot === 0 ? mid : rows - mid - 1;
+        return toScreen({ x: GRID_X0, y: GRID_Y0 + GRID_CH * top,
+                          w: GRID_CW * GRID_COLS, h: GRID_CH * cnt });
+      }
+      // **스틱 원만 짚는다.** `padRect` 은 조작판 전체라 화면 밖까지 걸쳐 찌그러졌다
+      // **투척물 칸 하나** — `thr:<번호>`. 수류탄·섬광탄·화염병을 따로 짚는다
+      if (String(which).startsWith('thr:')){
+        const sl = throwSlots(view.uiH);
+        if (!sl || !sl.length) return null;
+        const i = +String(which).split(':')[1] | 0;
+        const c = sl[Math.min(i, sl.length - 1)];
+        return toScreen({ x: c.x, y: c.y, w: c.w, h: c.h });
+      }
+      if (which === 'stick'){
+        const g = stickGeom(view.uiH);
+        if (!g) return null;
+        return toScreen({ x: g.cx - g.r, y: g.cy - g.r, w: g.r * 2, h: g.r * 2 });
+      }
+      return null;
     },
     // 2배속 대결 (PVP 전용)
     // 전투 전 화면에 무엇을 띄울지는 순수 함수 하나가 정한다 (테스트가 지킨다)

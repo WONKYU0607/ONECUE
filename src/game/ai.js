@@ -455,7 +455,9 @@ export function createAI(stage = 1){
       // 30단계면 한 판에 스물일곱 개를 던졌다 — 사람은 일곱 개뿐이라 불공평했다.
       // 남은 게 없으면 아예 안 던진다
       const leftOf = k => (thrLeft[k] | 0);
-      const anyLeft = THROW_DEF.some((_, k) => leftOf(k) > 0);
+      // [stated] **튜토리얼에서는 상대가 안 던진다** — 기본공격만 한다.
+      // 배우는 중에 수류탄이 날아오면 뭘 배우는지 알 수 없다
+      const anyLeft = !s.tuto && THROW_DEF.some((_, k) => leftOf(k) > 0);
       if (nextThrow <= 0 && anyLeft){
         if (aimKind < 0){
           // 섬광에 걸린 동안이면 수류탄을 잇는다 (눈이 먼 사이엔 피하기 어렵다)

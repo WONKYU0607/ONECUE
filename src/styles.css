@@ -543,6 +543,10 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .kbprobe b{color:#ffd34d}
 .kbprobe .kb-at{color:#789;font-weight:400}
 
+/* [stated] 설정의 '튜토리얼 다시 하기' — 다른 줄과 어울리게 작게 */
+.tuto-again{min-height:32px;padding:4px 10px;margin-bottom:4px}
+.tuto-again .t{font-size:12px}
+
 /* [stated] 설정의 음량 바 — 켜고 끄는 줄 바로 아래 */
 .vol-row{display:flex;align-items:center;gap:10px;padding:0 14px 10px 14px}
 .vol-row.off{opacity:.35}
@@ -616,17 +620,42 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .room > .menu > .menu-btn.primary[disabled]{opacity:1}
 .room > .menu > .menu-btn.primary[disabled] .t{color:#6b7a90;text-shadow:none}
 
-/* [stated] 튜토리얼 안내창 — 실제 판 위에 얹힌다. **조작을 가리면 안 되므로 위쪽에** */
-.tuto{position:fixed;left:0;right:0;top:calc(var(--sat) + 34px);z-index:30;
-  display:flex;justify-content:center;pointer-events:none}
-.tuto-box{pointer-events:auto;max-width:88%;padding:10px 14px;border-radius:5px;
-  background:rgba(8,14,24,.92);border:1px solid rgba(90,140,190,.5);
-  box-shadow:0 4px 18px rgba(0,0,0,.5)}
-.tuto-n{display:block;font:700 10px var(--gf);color:#8fd8ff;letter-spacing:1px;margin-bottom:3px}
-.tuto-msg{margin:0 0 8px;font:700 13px/1.45 var(--gf);color:#e8e8f0;letter-spacing:0}
-.tuto-btns{display:flex;gap:6px;justify-content:flex-end}
-.tuto-btns .menu-btn{min-height:30px;padding:4px 12px}
-.tuto-btns .menu-btn .t{font-size:12px}
+/* [stated] 튜토리얼 안내 — **아레나를 절대 가리지 않는다.**
+   위에 두었더니 상대가 안 보였다 → 조작 패드 위, 아레나 아래 한 줄로 */
+/* [stated] 안내문은 **설명 대상 바로 위**. 자리는 화면에서 계산해 넣는다 */
+.tuto{position:fixed;z-index:31;pointer-events:none}
+.tuto-box{pointer-events:auto;display:flex;align-items:center;gap:9px;
+  padding:9px 13px;border-radius:5px;
+  background:rgba(8,14,24,.95);border:1px solid rgba(255,211,77,.5);
+  box-shadow:0 4px 18px rgba(0,0,0,.6)}
+.tuto-n{flex:0 0 auto;font:900 12px var(--gf);color:#0b1220;background:#ffd34d;
+  border-radius:3px;padding:2px 7px;letter-spacing:0}
+.tuto-msg{flex:1 1 auto;min-width:0;margin:0;font:700 14px/1.4 var(--gf);color:#e8e8f0;
+  letter-spacing:0;white-space:pre-line;word-break:keep-all}
+
+/* [stated] 나가기는 **좌상단 하나** */
+.tuto-quit{position:fixed;z-index:32;left:8px;top:calc(var(--sat) + 8px);
+  padding:5px 12px;border-radius:4px;cursor:pointer;
+  background:rgba(8,14,24,.9);border:1px solid rgba(90,140,190,.55);
+  font:700 12px var(--gf);color:#cfe4ff;letter-spacing:0}
+/* 마지막 단계의 종료 버튼 — 좌상단, 다른 버튼과 같은 금속 틀로 */
+.tuto-end{position:fixed;z-index:32;left:8px;top:calc(var(--sat) + 8px);
+  min-height:40px;padding:5px 16px}
+.tuto-end .t{font-size:13px}
+
+/* 끌어다 놓을 길과 손가락 */
+.tuto-path{position:fixed;inset:0;z-index:30;pointer-events:none;width:100%;height:100%}
+/* 손 모양. **짚는 곳이 검지 끝**이라 그 점이 좌표에 오게 맞춘다 */
+.tuto-hand{position:fixed;z-index:32;width:38px;height:48px;
+  margin:-8px 0 0 -11px;pointer-events:none;
+  filter:drop-shadow(0 2px 5px rgba(0,0,0,.6));transition:transform .12s}
+.tuto-hand.down{transform:scale(.88)}
+/* **눌러야 할 곳을 짚어 준다** — 말로만 하면 어디를 눌러야 하는지 모른다 */
+.tuto-hi{position:fixed;z-index:29;border:2px solid #ffd34d;border-radius:5px;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.42);pointer-events:none;
+  animation:tutoPulse 1.1s ease-in-out infinite}
+@keyframes tutoPulse{0%,100%{box-shadow:0 0 0 9999px rgba(0,0,0,.42),0 0 0 0 rgba(255,211,77,.55)}
+  50%{box-shadow:0 0 0 9999px rgba(0,0,0,.42),0 0 0 7px rgba(255,211,77,0)}}
 
 /* 매칭 소개(VS) 화면 — [stated] 배경을 **사선으로 반** 갈라 위아래에서 충돌시킨다.
    부딪힌 자리에 번개 두 개, 그 사이에 VS. 정보는 미리 붙어 있는 채로 부딪힌다 */

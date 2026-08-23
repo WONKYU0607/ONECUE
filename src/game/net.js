@@ -424,7 +424,8 @@ export class Client {
     this.stats = { f:0, q:0, snap:0, hello:0, peer:0, other:0, sentIn:0, sendCalls:0, blocked:0 };
     this.awaitSnap = true;             // 스냅샷을 받아야 시작(또는 재개)할 수 있는 상태
     this.ckHist = new Map();
-    net.toClient = m => this.onMsg(m);
+    // **방 상태는 `Client` 가 가로채도 계속 흘러가야 한다** — 안 그러면 방 화면이 죽는다
+    net.toClient = m => { net.always?.(m); this.onMsg(m); };
   }
   onMsg(m){
     const st = this.stats;

@@ -49,6 +49,9 @@ export default function App(){
   const [showSettings, setShowSettings] = useState(false);
   const [askQuit, setAskQuit] = useState(false);
   const [askExit, setAskExit] = useState(false);   // 홈에서 앱을 닫을까   // 게임 중 나가기 확인
+  // **뒤로가기 효과가 의존성 목록에서 먼저 읽는다** — 아래에 두면 정의 전에 읽혀 화면이 터진다
+  const [askTuto, setAskTuto] = useState(false);   // 튜토리얼을 시작하시겠습니까?
+  const [askRoom, setAskRoom] = useState(false);   // [stated] 방을 나가시겠습니까?
   const [exitHint, setExitHint] = useState(false); // 홈에서 "한 번 더" 안내
 
 
@@ -105,9 +108,12 @@ export default function App(){
       if (Date.now() - quitAt.current < 700) return true;
       if (askExit){ setAskExit(false); return true; }
       if (askQuit){ setAskQuit(false); return true; }
+      if (askRoom){ setAskRoom(false); return true; }
       if (showSettings){ setShowSettings(false); return true; }
       if (screen === 'game'){ setAskQuit(true); return true; }
       if (screen === 'matching'){ goHome(); return true; }
+      // [stated] **방에서 뒤로가기** — 바로 나가지 않고 물어본다
+      if (screen === 'room'){ setAskRoom(true); return true; }
       // **화면 안에 단계가 있으면 거기부터 돌아간다** (PVP 색 고르기 → 모드 고르기 → 홈).
       // 이걸 안 물어보면 어느 단계에 있든 통째로 홈으로 나가버린다
       if (tryInnerBack()) return true;
@@ -120,7 +126,7 @@ export default function App(){
       if (screen === 'home'){ setAskExit(true); return true; }
       return true;
     });
-  }, [screen, showSettings, askQuit, askExit, goHome]);
+  }, [screen, showSettings, askQuit, askExit, askRoom, goHome]);
   const startPvp  = useCallback(() => setScreen('pvp'), []);
   const beginPvp  = useCallback(opt => {
     disconnect();
@@ -142,12 +148,13 @@ export default function App(){
   }, []);
   // [stated] **칼전 AI 도 단계별로.** 총격전과 같은 흐름 — 단계가 난이도를 정한다
   // [stated] **튜토리얼** — 총격전만. 실제 판을 돌리며 단계별로 안내한다
-  const [askTuto, setAskTuto] = useState(false);
   const startTuto = useCallback(() => {
     disconnect();
     setResult(null);
     setAskTuto(false);
-    setSession({ kind: 'practice', n: 2, tuto: true });
+    // [stated] **연습 모드로 열면 안 된다** — 준비 단계가 건너뛰어져 배치·신청을 못 해본다.
+    // 진짜 1대1 판(AI 1단계)을 열고 안내만 얹는다
+    setSession({ kind: 'ai', stage: 1, n: 2, tuto: true });
     setScreen('game');
   }, []);
   const startMeleeAi = useCallback((n = 2, stage = 1) => {
@@ -262,7 +269,7 @@ export default function App(){
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toRoomOrGame} />}
       {/* [stated] **방(로비)** — 판이 끝나면 여기로 돌아온다 */}
-      {screen === 'room'     && <Room room={room || getRoom()} onLeave={goHome} />}
+      {screen === 'room'     && <Room room={room || getRoom()} onLeave={() => setAskRoom(true)} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome}
                                           onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} onTuto={goHome} />}
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={(session?.online && getRoom()) ? backToRoom : null}
@@ -280,6 +287,23 @@ export default function App(){
               <button className="menu-btn ghost"
                       onClick={() => { markTutoDone(); setAskTuto(false); }}>
                 <span className="t">{t('tuto.skip')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* [stated] 방에서 뒤로가기 — 취소 / 나가기 */}
+      {askRoom && (
+        <div className="modal-back">
+          <div className="modal ask">
+            <p className="ask-t">{t('room.leaveAsk')}</p>
+            <div className="ask-btns">
+              <button className="menu-btn ghost" onClick={() => setAskRoom(false)}>
+                <span className="t">{t('quit.no')}</span>
+              </button>
+              <button className="menu-btn primary"
+                      onClick={() => { setAskRoom(false); goHome(); }}>
+                <span className="t">{t('quit.yes')}</span>
               </button>
             </div>
           </div>
