@@ -152,7 +152,9 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
     // 방 화면 버튼이 전부 죽었다(방장·자리 정보가 안 와서) → **먼저 여기서 가로챈다**
     const always = m => {
       if (m.t === 'roomst'){ roomState = m; try { roomWatch?.(m); } catch { /* 무시 */ } }
-      if (m.t === 'go'){ try { goWatch?.(); } catch { /* 무시 */ } }
+      // [stated] **빠른 매칭에서 VS 화면이 안 떴다** — 이 알림이 매칭 순간에도 발동해
+      // 화면을 바로 게임으로 넘겨버렸다. **접속이 끝난 뒤**(= 로비에 있을 때)만 쓴다
+      if (m.t === 'go' && settled){ try { goWatch?.(); } catch { /* 무시 */ } }
     };
     transport.always = always;
     transport.toClient = m => {
@@ -217,9 +219,13 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
 // 사용자가 직접 나갈 때. 서버에 알려서 자리를 즉시 비운다
 // 2대2 방에서 팀을 고른다
 /** [stated] **판이 끝나면 방으로 돌아온다** — 방장이 같은 사람들로 새 판을 시작한다 */
-export function playAgain(){
-  if (conn) conn.transport.clientSend({ t: 'again' });
-}
+// [stated] **로비 버튼이 아무 일도 안 했다.** 보내는 통로가 `conn` 과 `pending` 둘로
+// 갈려 있는데, 방 만들기는 코드를 받자마자 로비로 가서 그때 `conn` 이 아직 없다.
+// **살아 있는 쪽으로 보낸다**
+const line = () => (conn ? conn.transport : pending);
+const tell = msg => { const t = line(); if (t) t.clientSend(msg); };
+
+export function playAgain(){ tell({ t: 'again' }); }
 
 // [stated] **로비 화면이 쓰는 방 상태.** 소켓으로 흘러오는 것을 여기 담아 두고,
 // 화면은 `getRoom()` 으로 읽는다. 바뀌면 `onRoom` 으로 알린다
@@ -233,22 +239,22 @@ export function onGo(fn){ goWatch = fn; }
 
 /** [stated] **방장이 판을 시작한다** */
 export function startRoom(){
-  if (conn) conn.transport.clientSend({ t: 'start' });
+  tell({ t: 'start' });
 }
 
 /** [stated] **방장이 종목을 바꾼다** — 인원수는 그대로 */
 export function setRoomMode({ melee, ffa, soccer, n }){
-  if (conn) conn.transport.clientSend({ t: 'mode', melee: !!melee, ffa: !!ffa, soccer: !!soccer,
-                                        n: Number.isInteger(n) ? n : undefined });
+  tell({ t: 'mode', melee: !!melee, ffa: !!ffa, soccer: !!soccer,
+         n: Number.isInteger(n) ? n : undefined });
 }
 
 export function pickTeam(team, color){
-  if (pending) pending.clientSend({ t: 'team', team, color });
+  tell({ t: 'team', team, color });
 }
 
 /** [stated] 팀을 잘못 골랐을 때 되돌린다 — 자리를 비우고 다시 고를 수 있게 */
 export function unpickTeam(){
-  if (pending) pending.clientSend({ t: 'team', undo: 1 });
+  tell({ t: 'team', undo: 1 });
 }
 
 export function disconnect(){

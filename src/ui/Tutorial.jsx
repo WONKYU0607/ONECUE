@@ -46,6 +46,7 @@ export default function Tutorial({ getState, spotRect, onQuit }){
   // **`getState` 는 매 렌더마다 새 함수다.** 의존성에 넣으면 효과가 계속 지워졌다 다시 걸려
   // **120ms 가 차기 전에 초기화돼 한 번도 안 돌았다** — 그래서 단계가 영영 안 넘어갔다.
   // 최신 것을 상자에 담아 두고 효과는 **한 번만** 건다
+  const holdRef = useRef(false);      // 다음 단계로 넘어가기 전 기다리는 중인가
   const getRef = useRef(getState);
   getRef.current = getState;
   const stepRef = useRef(step);
@@ -56,7 +57,17 @@ export default function Tutorial({ getState, spotRect, onQuit }){
       if (!s) return;
       const v = watch.current.tick(s.st, s.prompt, s.ready);
       const cur = TUTO_STEPS[stepRef.current];
-      if (cur && cur.done(v)) setStep(n => Math.min(TUTO_STEPS.length - 1, n + 1));
+      if (!cur || !cur.done(v)) return;
+      // [stated] **던진 뒤 3초는 기다린다** — 날아가서 터지는 것을 다 보고 넘어가야 한다.
+      // 바로 넘기면 다음 단계가 판을 멈춰서 투척물이 공중에서 끊긴다
+      if (holdRef.current) return;              // 이미 기다리는 중
+      const wait = cur.after || 0;
+      if (!wait){ setStep(n => Math.min(TUTO_STEPS.length - 1, n + 1)); return; }
+      holdRef.current = true;
+      setTimeout(() => {
+        holdRef.current = false;
+        setStep(n => Math.min(TUTO_STEPS.length - 1, n + 1));
+      }, wait);
     }, 120);
     return () => clearInterval(id);
   }, []);

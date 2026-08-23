@@ -189,7 +189,6 @@ export default {
   'ai.s28': 'Stage 28',
   'ai.s29': 'Stage 29',
   'ai.s30': 'Stage 30',
-  'ai.record': '{w}W {l}L {d}D',
   'ready.waitN': 'Ready {a}/{b}',
   'ready.meOnly': 'Ready {a}/{b}',
   'match.needN': '({n} players needed)',

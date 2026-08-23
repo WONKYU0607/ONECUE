@@ -200,6 +200,16 @@ console.log('투척 설명 중에는 멈춘다');
   assert(/\}, \[step\]\);/.test(ui), '  단계 번호로 다시 건다');
 }
 
+// [stated] **던진 뒤 3초는 기다린다** — 날아가서 터지는 것을 다 보고 넘어가야 한다
+console.log('던진 뒤 3초 기다린다');
+{
+  for (const k of ['nade', 'flash', 'molo'])
+    assert(TUTO_STEPS.find(x => x.key === k).after === 3000, `  ${k} 는 3초 뒤 다음`);
+  const ui = fs.readFileSync('src/ui/Tutorial.jsx', 'utf8');
+  assert(/holdRef\.current/.test(ui), '  기다리는 중에는 또 안 넘어간다');
+  assert(/cur\.after \|\| 0/.test(ui), '  단계마다 정한 시간을 쓴다');
+}
+
 console.log('화면 규칙');
 {
   const ui = fs.readFileSync('src/ui/Tutorial.jsx', 'utf8');

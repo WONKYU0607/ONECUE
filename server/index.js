@@ -680,7 +680,10 @@ const http = createServer((req, res) => {
   if (req.url && req.url.startsWith('/rank')){
     const q = new URL(req.url, 'http://x').searchParams;
     const uid = q.get('uid') || '';
-    const kind = q.get('kind') === 'melee' ? 'melee' : 'gun';
+    // [stated] **축구를 물어도 총격전 등수가 왔다** — 여기서 `soccer` 를 안 받아
+    // 전부 `gun` 으로 떨어졌다
+    const k0 = q.get('kind');
+    const kind = k0 === 'melee' ? 'melee' : (k0 === 'soccer' ? 'soccer' : 'gun');
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     if (!uid){ res.end(JSON.stringify({ ok: false, why: 'uid 없음' })); return; }
     store.myRank(uid, kind)
@@ -966,6 +969,28 @@ wss.on('connection', (ws, req) => {
         room.send({ t: 'peer', slot, state: 'left' });
         room.sendLobby(); room.sendRoom();
         console.log(`팀 취소: room ${room.id} slot ${slot}`);
+        return;
+      }
+      // [stated] **이미 앉아 있어도 다른 팀으로 옮길 수 있어야 한다.**
+      // 예전엔 자리가 없을 때만 앉혀서, 로비에서 [이동] 을 눌러도 아무 일도 안 났다
+      if (ws.slot >= 0 && room.server.s.phase === PH_READY){
+        const cur = teamOf(ws.slot, room.n);
+        if (cur === team) return;                    // 같은 팀이면 할 일 없음
+        const dst = room.freeSeatIn(team);
+        if (dst < 0){ ws.send(JSON.stringify({ t: 'teamfull', team })); return; }
+        const from = room.seats[ws.slot], to = room.seats[dst];
+        const st0 = room.server.s;
+        to.sid = from.sid; to.ws = ws; to.uid = from.uid; to.bot = false; to.goneAt = 0;
+        from.sid = null; from.ws = null; from.uid = ''; from.bot = false; from.goneAt = 0;
+        // 닉네임·색도 같이 옮긴다 (자리마다 붙어 있다)
+        if (Array.isArray(st0.nick)){ st0.nick[dst] = st0.nick[ws.slot] || ''; st0.nick[ws.slot] = ''; }
+        if (Array.isArray(st0.color)){ st0.color[dst] = st0.color[ws.slot] | 0; }
+        ws.slot = dst;
+        ws.send(JSON.stringify({ t: 'hello', pid: dst, room: room.id, n: room.n,
+          melee: room.melee, ffa: room.ffa, soccer: room.soccer, back: true, ver: PROTO_VER }));
+        room.send({ t: 's', tick: st0.tick, st: JSON.parse(JSON.stringify(st0)) });
+        room.sendLobby(); room.sendRoom();
+        console.log(`팀 이동: room ${room.id} ${cur} → ${team} (slot ${dst})`);
         return;
       }
       if (ws.slot === undefined || ws.slot < 0){

@@ -189,7 +189,6 @@ export default {
   'ai.s28': '28단계',
   'ai.s29': '29단계',
   'ai.s30': '30단계',
-  'ai.record': '{w}승 {l}패 {d}무',
   'ready.waitN': '준비 {a}/{b}',
   'ready.meOnly': '준비 {a}/{b}',
   'match.needN': '({n}명 필요)',

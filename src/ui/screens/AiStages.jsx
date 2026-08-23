@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AI_STAGES } from '../../game/ai.js';
-import { isUnlocked, isCleared, getProgress, modeKey } from '../../state/progress.js';
+import { isUnlocked, isCleared, modeKey } from '../../state/progress.js';
 import { t } from '../../i18n/index.js';
 import { setInnerBack } from '../../state/back.js';
 
@@ -17,7 +17,6 @@ export default function AiStages({ onBack, onStart, onMelee }){
   useEffect(() => () => setInnerBack(null), []);
   // 모드마다 진행도가 따로다. n(인원수)과 총격/칼전으로 갈린다
   const key = modeKey(n, mode === 'melee');
-  const p = getProgress(key);
 
   if (mode === null) return (
     <div className="screen list">
@@ -45,7 +44,6 @@ export default function AiStages({ onBack, onStart, onMelee }){
         <span className="spacer" />
       </header>
 
-      <p className="hint record">{t('ai.record', { w: p.wins, l: p.losses, d: p.draws })}</p>
 
       <div className="stages">
         {AI_STAGES.map((s, i) => {
