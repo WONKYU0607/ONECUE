@@ -152,6 +152,9 @@ export default function App(){
     disconnect();
     setResult(null);
     setAskTuto(false);
+    // [stated] **한 번 물어봤으면 다시 안 묻는다.** 시작하기를 눌러도 표시를 남긴다 —
+    // 안 남기면 튜토리얼을 하다 앱을 껐을 때 다음에 또 물어본다
+    markTutoDone();
     // [stated] **연습 모드로 열면 안 된다** — 준비 단계가 건너뛰어져 배치·신청을 못 해본다.
     // 진짜 1대1 판(AI 1단계)을 열고 안내만 얹는다
     setSession({ kind: 'ai', stage: 1, n: 2, tuto: true });

@@ -162,7 +162,9 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
           칼전에서는 배너가 준비 상자 위에 따로 놀았다. 하나로 묶어야 순서·크기가 맞는다 */}
       {/* [stated] **튜토리얼** — 실제 판 위에 얹혀 단계별로 안내한다 */}
       {session?.tuto && (
-        <Tutorial getState={() => ({ st: gameRef.current?.client?.pred, prompt: ready.prompt, ready })}
+        <Tutorial getState={() => ({ st: gameRef.current?.client?.pred, prompt: ready.prompt, ready,
+                                   // **멈춤 표시는 서버 상태에 넣어야 한다** — `pred` 는 매 프레임 새로 만들어진다
+                                   sim: gameRef.current?.server?.s })}
                   spotRect={w => gameRef.current?.spotRect?.(w) || null}
                   onQuit={() => onTuto?.()} />
       )}

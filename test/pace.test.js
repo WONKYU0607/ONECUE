@@ -1,3 +1,4 @@
+import fs from 'fs';
 // 입력 페이싱. 프레임률이 60이 아니어도 이동량이 사라지면 안 된다.
 //
 // 예전 버그: 프레임마다 모은 이동량을 **통째로 한 틱에** 실었다.
@@ -156,6 +157,22 @@ console.log('내 캐릭터와 상대 캐릭터가 둘 다 매끄럽다 (진짜 �
   SELF.slot = keep.slot; SELF.n = keep.n;
 }
 
+// [stated] **화면을 잠시 나갔다 오면 그동안 밀린 판이 배속으로 재생됐다.**
+// 끊겼다 들어온 것이니 **지난 것을 보여주지 말고 지금 상황부터** 보여준다
+console.log('많이 밀리면 따라잡지 않고 건너뛴다');
+{
+  const net = fs.readFileSync('src/game/net.js', 'utf8');
+  assert(/const CATCHUP_SKIP = 60;/.test(net), '  한계가 1초(60틱)');
+  assert(/if \(target - p\.tick > CATCHUP_SKIP\)\{[\s\S]{0,120}target = p\.tick;/.test(net),
+    '  넘으면 그 자리에서 시작한다');
+  // **지난 위치 기록을 버려야** 순간이동처럼 튀지 않는다
+  assert(/this\.hist = \[\]; this\.mhist = \[\];/.test(net), '  지난 위치 기록을 버린다');
+  // 평소 지연(수십 ms)으로는 절대 안 걸린다
+  const ticks = sec => Math.round(sec * 60);
+  assert(ticks(0.3) <= 60, '  0.3초 밀림은 평소대로 따라잡는다');
+  assert(ticks(5) > 60, '  5초 밀림은 건너뛴다');
+}
+
 console.log('pace.test.js 통과');
 
 console.log('시작하자마자 렉이 걸리지 않는다');
@@ -186,6 +203,33 @@ console.log('시작하자마자 렉이 걸리지 않는다');
   // 시작 렉은 ① 만으로 해결한다
   const send = net.slice(net.indexOf('sendInputs(now){'), net.indexOf('sendInputs(now){') + 1200);
   assert(!/this\.nextInputTick -=/.test(send), '입력 틱을 뒤로 당기지 않는다');
+}
+
+// **오프라인 판(연습·AI·튜토리얼)도 같은 증상이 난다** — 폰은 앱이 잠들면 시계가 멈췄다가
+// 깨어날 때 확 뛴다. 밀린 시간을 없던 것으로 해야 배속 재생이 안 보인다
+console.log('앱이 잠들었다 깨도 배속이 없다');
+{
+  const { Loopback, Server, setClock } = await import('../src/game/net.js');
+  const { PH_PLAY } = await import('../src/game/config.js');
+  const run = awaySec => {
+    let now = 0;
+    setClock({ now: () => now, delay: fn => setTimeout(fn, 0) });
+    const srv = new Server(new Loopback(), 2, false, false, false);
+    srv.s.phase = PH_PLAY; srv.s.clock = 3600;
+    for (let i = 0; i < 120; i++){ now += 16.7; srv.update(now); }
+    now += awaySec * 1000;                 // **앱이 잠든다** (프레임 없이 시계만 흐른다)
+    const rolled = [];
+    for (let f = 0; f < 5; f++){ const t0 = srv.s.tick; now += 16.7; srv.update(now); rolled.push(srv.s.tick - t0); }
+    return rolled;
+  };
+  const short = run(0.3);
+  assert(short.some(v => v > 1), `  짧은 지연은 평소대로 따라잡는다 (${short})`);
+  for (const sec of [5, 30]){
+    const r = run(sec);
+    assert(r.every(v => v <= 1), `  ${sec}초 잠들어도 몰아서 굴리지 않는다 (${r})`);
+  }
+  const net = fs.readFileSync('src/game/net.js', 'utf8');
+  assert(/this\.start = now - this\.s\.tick \* TICK_MS;/.test(net), '  밀린 시간을 없던 것으로 한다');
 }
 
 console.log('pace.test.js 통과');

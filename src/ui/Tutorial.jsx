@@ -63,6 +63,36 @@ export default function Tutorial({ getState, spotRect, onQuit }){
 
   const cur = TUTO_STEPS[step];
 
+  // [stated] **투척 설명 중에는 판을 멈추고 화면을 어둡게 한다.**
+  // 던지는 순간 시뮬이 스스로 풀고(`tutoPause = 0`), 화면도 같이 밝아진다
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    // **`pred` 가 아니라 `sim`(서버 상태)에 넣는다** — `pred` 는 매 프레임 새로 만들어져 지워진다
+    const sim = getRef.current && getRef.current()?.sim;
+    if (!sim) return;
+    if (!(cur && cur.pause)){ sim.tutoPause = 0; setPaused(false); return; }
+    // **바로 걸면 안 된다** — 앞 단계에서 던진 입력이 아직 그 틱에 남아 있어
+    // 멈춤이 걸리자마자 풀린다. 그 입력이 지나간 뒤에 건다
+    const id = setTimeout(() => {
+      const s2 = getRef.current && getRef.current()?.sim;
+      if (!s2) return;
+      s2.tutoPause = 1;
+      setPaused(true);
+    }, 350);
+    return () => clearTimeout(id);
+    // **`step` 으로 걸어야 한다** — `cur` 은 같은 표에서 꺼낸 객체라
+    // 단계가 바뀌어도 React 가 "안 바뀌었다"로 봐서 효과가 안 돌았다
+  }, [step]);
+  useEffect(() => {
+    if (!paused) return;
+    // 시뮬이 풀렸는지 지켜본다 (던지면 풀린다)
+    const id = setInterval(() => {
+      const sim = getRef.current && getRef.current()?.sim;
+      if (sim && !sim.tutoPause) setPaused(false);
+    }, 80);
+    return () => clearInterval(id);
+  }, [paused]);
+
   // 강조할 자리와 손가락이 훑을 길
   useEffect(() => {
     const spot = cur && cur.spot;
@@ -127,6 +157,8 @@ export default function Tutorial({ getState, spotRect, onQuit }){
 
   return (
     <>
+      {/* 설명 중에는 판을 어둡게 — 던지면 풀린다 */}
+      {paused && <div className="tuto-dim" aria-hidden="true" />}
       {hi && <div className="tuto-hi" style={hi} />}
       {/* 끌어다 놓을 길 — 점선과 손가락 */}
       {path && (

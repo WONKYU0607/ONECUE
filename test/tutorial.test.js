@@ -4,7 +4,7 @@
 //   아이템 주인은 `o` 가 아니라 `by`, 그리고 `vx`·`vy` 는 상태에 아예 없다
 import fs from 'fs';
 import { newState, step, NOIN } from '../src/game/sim.js';
-import { PH_READY, PH_PLAY, FP } from '../src/game/config.js';
+import { PH_READY, PH_PLAY, FP, MAXHP } from '../src/game/config.js';
 import { TUTO_STEPS, makeWatch } from '../src/state/tutorial.js';
 import { assert } from './harness.js';
 process.chdir(new URL('..', import.meta.url).pathname);
@@ -110,9 +110,20 @@ console.log('튜토리얼 판은 안 끝난다');
   assert(normal.hp1 < normal.hp0, '  평소 판은 체력이 닳는다');
   assert(normal.clock < 3600, '  평소 판은 시간이 간다');
   const tuto = run(true);
-  assert(tuto.hp1 === tuto.hp0, '  튜토리얼은 체력이 안 닳는다');
+  // [stated] **내 체력만** 안 닳는다 — 상대는 닳아야 내가 던진 게 먹히는 걸 본다
+  assert(tuto.hp1 === tuto.hp0, '  튜토리얼은 **내** 체력이 안 닳는다');
   assert(tuto.clock === 3600, '  튜토리얼은 시간이 안 간다');
   assert(!tuto.over, '  튜토리얼 판은 안 끝난다');
+  // 상대 체력은 닳고, 죽으면 되살아나 판이 안 끝난다
+  {
+    const s = newState(2, false, false, false);
+    s.tuto = true; s.phase = PH_PLAY; s.clock = 3600;
+    s.p[0].x = s.p[1].x;
+    const foe0 = s.p[1].hp;
+    for (let i = 0; i < 600; i++) step(s, IN());
+    assert(s.p[1].hp !== foe0 || s.p[1].hp === MAXHP, '  상대 체력은 닳는다');
+    assert(!s.over, '  상대가 죽어도 판이 안 끝난다');
+  }
   // 상대가 투척물을 안 쓴다
   const ai = fs.readFileSync('src/game/ai.js', 'utf8');
   assert(/!s\.tuto && THROW_DEF\.some/.test(ai), '  상대는 튜토리얼에서 안 던진다');
@@ -160,6 +171,33 @@ console.log('튜토리얼에서만 여는 것들');
   assert(/\(online \|\| st\.tuto\)/.test(ui), '  신청 버튼이 튜토리얼에도 뜬다');
   const sim = fs.readFileSync('src/game/sim.js', 'utf8');
   assert(/!s\.tuto && \(s\.fastBy > 0/.test(sim), '  신청이 걸려도 카운트다운이 간다');
+}
+
+// [stated] **투척 설명 중에는 판이 멈추고 화면이 어두워진다.** 던지면 둘 다 풀려
+// 날아가 터지는 것을 볼 수 있다
+console.log('투척 설명 중에는 멈춘다');
+{
+  const s = newState(2, false, false, false);
+  s.tuto = true; s.phase = PH_PLAY; s.clock = 3600; s.tutoPause = 1;
+  const t0 = s.tick, x0 = s.p[0].x;
+  for (let i = 0; i < 60; i++) step(s, IN());
+  assert(s.p[0].x === x0, '  얼어 있는 동안 캐릭터가 안 움직인다');
+  assert(s.tutoPause === 1, '  아무것도 안 하면 멈춘 채로');
+  assert(s.tick > t0, '  **틱은 돈다** — 안 돌리면 던지기 요청이 영영 못 들어온다');
+  // 던지면 풀린다
+  const inp = IN(); inp[0].thr = { k: 0, ch: 60 };
+  step(s, inp);
+  assert(s.tutoPause === 0, '  던지면 풀린다');
+  const x1 = s.p[0].x;
+  for (let i = 0; i < 30; i++){ const q = IN(); q[0].dx = 300; step(s, q); }
+  assert(s.p[0].x !== x1, '  풀린 뒤에는 다시 움직인다');
+  // 세 투척 단계에 전부 표시가 있다
+  for (const k of ['nade', 'flash', 'molo'])
+    assert(TUTO_STEPS.find(x => x.key === k).pause === 1, `  ${k} 단계는 멈춘다`);
+  const ui = fs.readFileSync('src/ui/Tutorial.jsx', 'utf8');
+  // **앞 단계의 던지기 입력이 남아 있어** 바로 걸면 곧바로 풀린다
+  assert(/setTimeout\(\(\) => \{[\s\S]{0,200}tutoPause = 1/.test(ui), '  앞 입력이 지나간 뒤에 건다');
+  assert(/\}, \[step\]\);/.test(ui), '  단계 번호로 다시 건다');
 }
 
 console.log('화면 규칙');

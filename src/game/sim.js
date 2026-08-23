@@ -159,6 +159,7 @@ export function normalizeState(st){
   if (typeof st.hold !== 'boolean') st.hold = false;
   if (typeof st.vsAll !== 'boolean') st.vsAll = false;
   if (typeof st.tuto !== 'boolean') st.tuto = false;
+  if (typeof st.tutoPause !== 'number') st.tutoPause = 0;
   if (!Array.isArray(st.items)) st.items = [];
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
@@ -169,6 +170,7 @@ export function normalizeState(st){
   if (!Array.isArray(st.color)) st.color = Array.from({ length: (st.p ? st.p.length : (st.n || 2)) }, (_, i) => i);
   if (typeof st.vsAll !== 'boolean') st.vsAll = false;
   if (typeof st.tuto !== 'boolean') st.tuto = false;
+  if (typeof st.tutoPause !== 'number') st.tutoPause = 0;
   if (typeof st.fast !== 'boolean') st.fast = false;
   if (typeof st.fastBy !== 'number') st.fastBy = 0;
   st.bare = !!st.bare;
@@ -264,7 +266,8 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     noGoal: 0,                  // 태클로 나간 공 — 잡히거나 차기 전까지 골이 안 된다
     vsAll: false,               // [stated] 2대1 — 나 혼자(0번) 대 나머지 (AI 모드 조건)
     hold: false,                // 전원이 게임 화면에 들어올 때까지 준비 시간을 세지 않는다
-    tuto: false,                // [stated] 튜토리얼 — 체력이 안 닳고 시간도 안 간다
+    tuto: false,                // [stated] 튜토리얼 — 내 체력이 안 닳고 시간도 안 간다
+    tutoPause: 0,               // 투척 설명 중 — 던지면 풀린다
     p: players,
     bullets: [],
     covers: newCovers(),
@@ -469,9 +472,9 @@ export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
     if (!overlap(p.x, p.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
     if (p.invul > 0) continue;
     p.invul = INVUL_T; p.flash = FLASH_T; p.hitBy = by;
-    // [stated] **튜토리얼은 체력이 안 닳는다** — 배우다 죽으면 안 된다.
-    // 맞은 표시(반짝임)는 그대로 둬서 맞았다는 건 알 수 있게
-    if (!DEBUG_INF_HP && !s.tuto){
+    // [stated] **튜토리얼은 내 체력만 안 닳는다.** 배우다 죽으면 안 되지만,
+    // 상대는 닳아야 내가 던진 게 먹히는 걸 볼 수 있다 (0번이 사용자)
+    if (!DEBUG_INF_HP && !(s.tuto && i === 0)){
       const d = (centerDmg && atCenter(s, i, c, r)) ? centerDmg : dmg;
       const was = p.hp;
       addDealt(s, by, Math.min(d, Math.max(0, was)));
@@ -479,7 +482,8 @@ export function blast(s, c, r, rad, dmg, centerDmg, by = -1){
       // 승패는 아래 팀 전멸 판정에서 정한다. 여기서 정하면 2대2에서 한 명만 죽어도 끝난다.
       // **연습 모드는 승패가 없다** — 죽으면 끝내지 말고 체력을 되돌려 계속 연습하게 한다
       // (예전엔 여기서 끝내버려서 수류탄으로 허수아비를 잡으면 결과 창이 떴다)
-      if (p.hp <= 0 && s.solo) p.hp = MAXHP;
+      // [stated] **튜토리얼도 판이 안 끝난다** — 상대가 죽으면 체력을 되돌려 계속 배우게 한다
+      if (p.hp <= 0 && (s.solo || s.tuto)) p.hp = MAXHP;
     }
   }
   // [stated] 바리케이트는 **상대** 폭발에 체력이 닳는다 (벽은 안 닳는다)
@@ -599,6 +603,11 @@ export function blocked(s, x, y, self = -1){
 
 export function step(s, inp){
   setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
+  // [stated] **투척 설명 중에는 판이 멈춘다** — 던지는 순간 풀려서 날아가 터지는 것을 볼 수 있다.
+  // **`return` 으로 통째로 멈추면 안 된다** — 던지기 요청이 다음 틱 입력에 실려 오는데
+  // 그 틱이 영영 안 와서 교착이 된다. 그래서 **틱은 돌리되 아래에서 움직임만 얼린다**
+  if (s.tutoPause && (inp || []).some(q => q && q.thr)) s.tutoPause = 0;
+  const frozen = !!s.tutoPause;
   s.tick++;
 
   // 대기/종료 화면: START 입력(fire)으로만 카운트다운 시작
@@ -840,6 +849,9 @@ export function step(s, inp){
     return;
   }
 
+  // 얼어 있으면 여기서 끝 — 던지기 요청만 위에서 받고 판은 그대로 둔다
+  if (frozen) return;
+
   // 던지기 요청 (누르는 시간이 사거리)
   for (let i = 0; i < s.n; i++){
     const q = inp[i] || NOIN;
@@ -957,7 +969,7 @@ export function step(s, inp){
               continue;
             }
             addDealt(s, i, Math.min(MELEE_DAMAGE, Math.max(0, hp0[v])));   // 깎기 전 체력 기준
-            if (!DEBUG_INF_HP && !s.tuto) t.hp -= MELEE_DAMAGE;
+            if (!DEBUG_INF_HP && !(s.tuto && v === 0)) t.hp -= MELEE_DAMAGE;
             t.flash = FLASH_T; t.hitBy = i;
           }
         }
@@ -981,7 +993,7 @@ export function step(s, inp){
         if (!overlap(t.x, t.y, PWf, PHf, x0, y0, x1 - x0, y1 - y0)) continue;
         const was = t.hp;
         addDealt(s, fr.by, Math.min(FIRE_DAMAGE, Math.max(0, t.hp)));
-        if (!s.tuto) t.hp -= FIRE_DAMAGE;
+        if (!(s.tuto && v === 0)) t.hp -= FIRE_DAMAGE;
         t.flash = FLASH_T; t.hitBy = -1;
       }
       // [stated] 불길도 상대 바리케이트를 태운다
@@ -1069,7 +1081,7 @@ export function step(s, inp){
 
           if (!DEBUG_INF_HP){
             addDealt(s, b.o, Math.min(BULLET_DAMAGE, Math.max(0, t.hp)));   // 깎기 전 체력 기준
-            if (!s.tuto) t.hp -= BULLET_DAMAGE;   // [stated] 튜토리얼은 체력이 안 닳는다
+            if (!(s.tuto && i === 0)) t.hp -= BULLET_DAMAGE;   // 튜토리얼은 **내 체력만** 안 닳는다
           }
         }
         break;
@@ -1084,7 +1096,8 @@ export function step(s, inp){
     const alive = Array(tc).fill(0);
     for (let i = 0; i < s.n; i++) if (s.p[i].hp > 0) alive[teamOf(i, s.n)]++;
     const left = alive.filter(v => v > 0);
-    if (left.length <= 1){
+    // [stated] **튜토리얼은 판이 안 끝난다** — 상대가 죽어도 되살아나 계속 배운다
+    if (left.length <= 1 && !s.tuto){
       s.over = true; s.phase = PH_OVER;
       s.winner = left.length === 0 ? 0 : alive.findIndex(v => v > 0) + 1;
     }

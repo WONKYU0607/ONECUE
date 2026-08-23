@@ -50,13 +50,16 @@ export const TUTO_STEPS = [
     // **움직이기 + 기본공격은 자동**이라는 설명. 움직여 보면 넘어간다
     done: v => v.moved && v.phase === PH_PLAY },
   // [stated] **투척물을 하나씩 다 설명한다** — 던지면 어떻게 되고, 맞으면 어떻게 되는지.
-  // 실제 수치를 그대로 쓴다(짐작해서 쓰면 틀린다)
-  { key: 'nade',  msg: 'tuto.nade',  spot: 'thr:0',
+  // 실제 수치를 그대로 쓴다(짐작해서 쓰면 틀린다).
+  //
+  // `pause: 1` — [stated] **설명 중에는 판이 멈추고 화면이 어두워진다.**
+  // 던지는 순간 둘 다 풀려서 **날아가 터지는 것을 볼 수 있다**
+  { key: 'nade',  msg: 'tuto.nade',  spot: 'thr:0', pause: 1,
     // 수류탄을 던지면 넘어간다
     done: v => v.thrown[0] > 0 },
-  { key: 'flash', msg: 'tuto.flash', spot: 'thr:1',
+  { key: 'flash', msg: 'tuto.flash', spot: 'thr:1', pause: 1,
     done: v => v.thrown[1] > 0 },
-  { key: 'molo',  msg: 'tuto.molo',  spot: 'thr:2',
+  { key: 'molo',  msg: 'tuto.molo',  spot: 'thr:2', pause: 1,
     done: v => v.thrown[2] > 0 },
   { key: 'free', msg: 'tuto.free', spot: null,
     // [stated] **마음껏 해보는 단계.** 움직이고 던지고 — 투척물도 무제한.

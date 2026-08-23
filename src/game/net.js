@@ -294,7 +294,15 @@ export class Server {
       this.lastDrop = this.s.tick;
       this.recalcDelay();
     }
-    const want = Math.floor((now - this.start) / TICK_MS);
+    let want = Math.floor((now - this.start) / TICK_MS);
+    // [stated] **앱을 잠시 나갔다 오면 그동안 밀린 판이 배속으로 재생됐다.**
+    // 폰은 앱이 잠들면 시계가 멈췄다가 깨어날 때 확 뛴다 → `want` 가 수백 틱 앞서고
+    // 한 프레임에 8틱씩 몰아 굴리는 게 눈에 보인다.
+    // **밀린 시간을 없던 것으로 한다** — 지난 것을 재생하지 않고 지금부터 이어 간다
+    if (want - this.s.tick > CATCHUP_SKIP){
+      this.start = now - this.s.tick * TICK_MS;
+      want = this.s.tick;
+    }
     let guard = 0;
     while (this.s.tick < want && guard++ < 8){
       const t = this.s.tick + 1;
@@ -385,6 +393,10 @@ const tickRate = (err, soft) => 1 + Math.max(-0.12, Math.min(0.12, err / Math.ma
 export const RENDER_BUF = 2;   // 상대를 확정 기록보다 이만큼 뒤에서 그린다 (renderTick과 같은 값)
 
 // ================= CLIENT =================
+// [stated] 이 틱 수보다 많이 밀렸으면 **따라잡지 말고 건너뛴다** (약 1초).
+// 평소 지연(수십 ms)으로는 절대 안 걸리고, 화면을 나갔다 온 경우에만 걸린다
+const CATCHUP_SKIP = 60;
+
 export class Client {
   constructor(net, controlled){
     this.net = net;
@@ -520,6 +532,16 @@ export class Client {
     // 다시 보내게 되어 서버와 어긋난다 — 5초 전투에 데싱크가 29번 났다.
     // 시작 렉은 매칭 중에 미리 RTT 를 재는 것으로 해결한다(startPing)
     let guard = 0;
+    // [stated] **화면을 잠시 나갔다 오면 그동안 밀린 판이 배속으로 재생됐다.**
+    // 진짜 병목은 여기다 — 입력 틱이 **한 프레임에 8씩만** 나아가서
+    // 20초(1200틱) 밀리면 150프레임(2.5초) 동안 빨리 감기가 보인다.
+    // 많이 밀렸으면 **지금 서버 자리로 건너뛴다** (지난 것을 보여주지 않는다)
+    if (target - this.nextInputTick > CATCHUP_SKIP){
+      this.nextInputTick = target;
+      this.sent.length = 0;              // 못 보낸 옛 입력은 버린다
+      this.hist = []; this.mhist = [];   // 지난 위치 기록도 (안 버리면 순간이동처럼 튄다)
+      this.rx = null; this.ry = null; this.rb = null;
+    }
     while (this.nextInputTick <= target && guard++ < 8){
       const t = this.nextInputTick++;
       this.tickAt = now;
@@ -592,7 +614,7 @@ export class Client {
       this.seedRender(this.pred);      // 렌더 위치는 미리 채워둔다 (draw가 먼저 돌 수 있다)
       return;
     }
-    const target = this.nextInputTick - 1;
+    let target = this.nextInputTick - 1;
     const p = cloneState(this.s);
     const inputsFor = t => {
       const n = p.n || 2;
@@ -606,6 +628,16 @@ export class Client {
       for (const e of this.sent) if (e.tick === t) inp[e.pid] = { dx:e.dx, dy:e.dy, fire:e.fire, sh:e.sh, ready:e.ready, go:e.go, place:e.place, thr:e.thr, fastReq:e.fastReq, fastAns:e.fastAns, bareReq:e.bareReq, bareAns:e.bareAns };
       return inp;
     };
+    // [stated] **화면을 잠시 나갔다 오면 그동안 밀린 판이 배속으로 재생됐다.**
+    // 끊겼다 들어온 것이니 **지난 것을 보여주지 말고 지금 상황부터** 보여준다.
+    // 서버가 보낸 마지막 상태로 건너뛰고, 남은 몇 틱만 굴려 따라잡는다
+    // `p` 는 이미 **서버가 확정한 상태**에서 복제한 것이다. 밀린 만큼 굴리는 게 배속의 정체다
+    // → 많이 밀렸으면 **굴리지 않고 그 자리에서 시작**한다. 지난 위치 기록도 버린다
+    if (target - p.tick > CATCHUP_SKIP){
+      target = p.tick;
+      this.hist = []; this.mhist = [];
+      this.rx = null; this.ry = null; this.rb = null;
+    }
     let guard = 0;
     while (p.tick < target && guard++ < 40){
       step(p, inputsFor(p.tick + 1));

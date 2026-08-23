@@ -65,7 +65,11 @@ try {
   const slots = [host2, b, c, d].map(t => t.last('hello')?.pid);
   assert(slots.every(v => v >= 0), '네 명 다 자리를 받는다 (' + slots.join(',') + ')');
   assert(new Set(slots).size === 4, '슬롯이 겹치지 않는다');
-  assert(d.last('go'), '네 자리가 다 차면 go');
+  // [stated] **방은 자리가 차도 자동 시작하지 않는다** — 방장이 로비에서 [시작 하기] 를 눌러야 한다
+assert(!d.last('go'), '방은 자동으로 시작하지 않는다');
+host2.send({ t: 'start' });
+await sleep(400);
+assert(d.last('go'), '방장이 시작하면 전원 go');
 
   console.log('게임 중에 끊겼다 돌아온다');
   const slotC = c.last('hello').pid;
