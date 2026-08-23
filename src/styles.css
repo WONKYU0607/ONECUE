@@ -620,6 +620,11 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .room > .menu > .menu-btn.primary[disabled]{opacity:1}
 .room > .menu > .menu-btn.primary[disabled] .t{color:#6b7a90;text-shadow:none}
 
+/* [stated] 창 안의 버튼 둘은 **한 줄로** (시작하기 / 건너뛰기) */
+.ask-btns{display:flex;gap:8px;margin-top:10px}
+.ask-btns .menu-btn{flex:1 1 0;min-width:0;min-height:44px}
+.ask-btns .menu-btn .t{font-size:14px}
+
 /* [stated] 튜토리얼 안내 — **아레나를 절대 가리지 않는다.**
    위에 두었더니 상대가 안 보였다 → 조작 패드 위, 아레나 아래 한 줄로 */
 /* [stated] 안내문은 **설명 대상 바로 위**. 자리는 화면에서 계산해 넣는다 */

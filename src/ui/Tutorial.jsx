@@ -43,17 +43,23 @@ export default function Tutorial({ getState, spotRect, onQuit }){
   const watch = useRef(null);
   if (!watch.current) watch.current = makeWatch();
 
-  // 조건이 채워지면 다음 단계로. **누르는 버튼은 없다**
+  // **`getState` 는 매 렌더마다 새 함수다.** 의존성에 넣으면 효과가 계속 지워졌다 다시 걸려
+  // **120ms 가 차기 전에 초기화돼 한 번도 안 돌았다** — 그래서 단계가 영영 안 넘어갔다.
+  // 최신 것을 상자에 담아 두고 효과는 **한 번만** 건다
+  const getRef = useRef(getState);
+  getRef.current = getState;
+  const stepRef = useRef(step);
+  stepRef.current = step;
   useEffect(() => {
     const id = setInterval(() => {
-      const s = getState?.();
+      const s = getRef.current && getRef.current();
       if (!s) return;
       const v = watch.current.tick(s.st, s.prompt, s.ready);
-      const cur = TUTO_STEPS[step];
+      const cur = TUTO_STEPS[stepRef.current];
       if (cur && cur.done(v)) setStep(n => Math.min(TUTO_STEPS.length - 1, n + 1));
     }, 120);
     return () => clearInterval(id);
-  }, [step, getState]);
+  }, []);
 
   const cur = TUTO_STEPS[step];
 

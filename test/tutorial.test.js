@@ -126,6 +126,10 @@ console.log('마지막 단계는 자유 연습');
   assert(last.done() === false, '  저절로 안 넘어간다 (직접 끝낸다)');
   const ui = fs.readFileSync('src/ui/Tutorial.jsx', 'utf8');
   assert(/tuto\.end/.test(ui), '  종료 버튼이 있다');
+  // **`getState` 를 의존성에 넣으면 효과가 계속 다시 걸려 한 번도 안 돈다** —
+  // 매 렌더마다 새 함수라서. 상자에 담아 두고 효과는 한 번만 건다
+  assert(/getRef\.current = getState/.test(ui), '  getState 를 상자에 담는다');
+  assert(/\}, \[\]\);/.test(ui), '  단계 확인 효과는 한 번만 건다');
   // [stated] **마지막에는 안내 상자를 안 그린다** — 조작을 가린다
   assert(/cur\.key !== 'free' && \(\s*<div className="tuto/.test(ui.replace(/\s+/g, ' ').replace(/ /g, ' ')) ||
          /cur\.key !== 'free'/.test(ui), '  마지막 단계엔 안내 상자가 없다');
@@ -144,6 +148,18 @@ console.log('마지막 단계는 자유 연습');
     step(n, inp);
   }
   assert(n.ammo[0][0] < 3, '  평소 판은 줄어든다');
+}
+
+// **실제 조작으로 열 단계를 끝까지 돌려 확인했다.** 화면만 봐서는 못 잡는 것 셋이 나왔다:
+//   ① `getState` 가 매 렌더마다 새 함수라 확인 효과가 계속 초기화돼 **한 번도 안 돌았다**
+//   ② 신청 버튼이 `online` 일 때만 떠서 **3단계가 영영 안 넘어갔다**
+//   ③ 신청을 눌러두면 답할 상대가 없어 **카운트다운이 10초 멈췄다**
+console.log('튜토리얼에서만 여는 것들');
+{
+  const ui = fs.readFileSync('src/game/ui-state.js', 'utf8');
+  assert(/\(online \|\| st\.tuto\)/.test(ui), '  신청 버튼이 튜토리얼에도 뜬다');
+  const sim = fs.readFileSync('src/game/sim.js', 'utf8');
+  assert(/!s\.tuto && \(s\.fastBy > 0/.test(sim), '  신청이 걸려도 카운트다운이 간다');
 }
 
 console.log('화면 규칙');

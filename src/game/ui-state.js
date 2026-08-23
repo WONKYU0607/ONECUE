@@ -128,7 +128,9 @@ export function uiPrompt(st, slot, online){
   const offer = [];
   // [stated] 축구는 미니게임이라 2배속·노템전 신청이 없다.
   // **버튼만 없애면 고친 클라가 신청할 수 있어** 여기서 통째로 막는다
-  if (online && !pending && st.phase !== PH_COUNT && !st.soccer){
+  // [stated] **튜토리얼에서도 보여준다** — 이 버튼을 설명하는 단계가 있는데
+  // `online` 일 때만 떠서 그 단계가 영영 안 넘어갔다. 오프라인이라도 튜토리얼이면 띄운다
+  if ((online || st.tuto) && !pending && st.phase !== PH_COUNT && !st.soccer){
     // [stated] 칼전에는 2배속을 안 쓴다 — 버프(이속 1.5 · 공속 1.5)만으로 충분히 빠르다.
     // 둘이 곱해지면 이동 3배·칼 주기 3배가 되어 과했다
     // [stated] **거절당한 종류는 버튼을 없앤다** — 계속 남아 있어 몇 번이고 신청하게 됐다

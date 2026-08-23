@@ -828,7 +828,9 @@ export function step(s, inp){
   if (s.phase === PH_COUNT){
     // 답을 기다리는 동안엔 카운트를 멈춘다. 안 그러면 3초 안에 못 누른다.
     // 제한 시간(5초)이 있어 영영 멈추지는 않는다
-    if (s.fastBy > 0 || s.bareBy > 0) return;
+    // [stated] **튜토리얼은 답할 상대가 없다** — 신청을 눌러 두면 10초가 다 갈 때까지
+    // 카운트다운이 멈춰 사용자가 영문도 모르고 기다리게 된다. 튜토리얼에서는 그냥 진행한다
+    if (!s.tuto && (s.fastBy > 0 || s.bareBy > 0)) return;
     if (--s.timer <= 0){
       s.phase = PH_PLAY; s.timer = 0;
       // [stated] 축구는 90초. **여기서 안 넣으면 시계가 0으로 시작해** 점수판이 0으로 굳는다
