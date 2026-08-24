@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { TEAMS } from '../../game/config.js';
 import { t } from '../../i18n/index.js';
 import { sfx } from '../../game/audio.js';
+import { leftFor, socLeft } from '../../state/tickets.js';
 
 // [stated] 점수가 굴러가는 시간
 const ROLL_MS = 1000;
@@ -25,6 +26,9 @@ function name(r, sum){
 }
 
 export default function Result({ result, summary, score, session, host, onAgain, onMode, onRoom, onNext, onHome }){
+  // 빠른 매칭이면 티켓이 남아야 다시 찾을 수 있다. 그 밖(방·AI·연습)은 늘 가능
+  const canAgain = session?.mode !== 'queue'
+    || (session?.soccer ? socLeft() > 0 : leftFor(!!session?.ffa) > 0);
   // [stated] **기존 점수에서 1점씩 굴러 올라간다.** 걸리는 시간은 1초.
   // 소리도 같이 나는데, 300점이 오르면 300번을 낼 수 없으므로
   // **소리만 45ms 간격으로 솎아낸다** — 귀에는 '따르르륵' 으로 이어져 들린다
@@ -153,9 +157,11 @@ export default function Result({ result, summary, score, session, host, onAgain,
         {/* [stated] **판이 끝나면 방으로 돌아온다** — 온라인에서는 방장만 다시 시작한다.
             나머지는 기다린다(방장이 누르면 저절로 넘어간다) */}
         {/* 관전자는 자리가 없으므로 다시 하기도 없다 */}
+        {/* [stated] **빠른 매칭의 '다시 하기' 는 새 상대를 찾는다** — 티켓이 없으면 못 찾으니 막는다 */}
         {(!session?.online || (host && !session?.watching)) && (
-          <button className="menu-btn primary" onClick={onAgain}>
-            <span className="t">{t('res.again')}</span>
+          <button className="menu-btn primary" disabled={!canAgain}
+                  onClick={onAgain}>
+            <span className="t">{t(canAgain ? 'res.again' : 'res.noTicket')}</span>
           </button>
         )}
         {/* [stated] **판이 끝나면 방으로 돌아온다** — 종목·인원은 로비에서 고른다 */}

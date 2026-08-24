@@ -140,4 +140,17 @@ console.log('두 길이 따로 있다');
     '  시작할 때 길이 갈린다');
 }
 
+// [stated] **빠른 매칭의 '다시 하기' 는 새 상대를 찾는다.**
+// 예전엔 같은 사람과 또 붙어서 이미 이긴 판이 다시 열리고 점수가 또 올라갔다
+console.log('다시 하기가 갈래마다 다르다');
+{
+  const app = fs.readFileSync('src/App.jsx', 'utf8');
+  assert(/session\?\.mode === 'queue'[\s\S]{0,200}setScreen\('matching'\)/.test(app),
+    '  빠른 매칭은 처음부터 다시 찾는다');
+  assert(/'create' \|\| session\?\.mode === 'join'[\s\S]{0,120}playAgain\(\)/.test(app),
+    '  방에서만 같은 사람들로 새 판');
+  const res = fs.readFileSync('src/ui/screens/Result.jsx', 'utf8');
+  assert(/canAgain/.test(res), '  티켓이 없으면 다시 하기를 막는다');
+}
+
 console.log('roomflow.test.js 통과');

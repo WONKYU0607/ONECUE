@@ -94,6 +94,7 @@ export default {
   'res.lose': '패배',
   'res.draw': '무승부',
   'res.again': '다시 하기',
+  'res.noTicket': '티켓 없음',
   'res.next': '다음 단계',
   'tuto.ask': '튜토리얼을 시작하시겠습니까?',
   'tuto.start': '시작하기',

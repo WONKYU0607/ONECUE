@@ -94,6 +94,7 @@ export default {
   'res.lose': 'Defeat',
   'res.draw': 'Draw',
   'res.again': 'Play again',
+  'res.noTicket': 'No tickets',
   'res.next': 'Next stage',
   'tuto.ask': 'Start the tutorial?',
   'tuto.start': 'Start',

@@ -227,14 +227,21 @@ export default function App(){
   }, [goHome, session]);
   const again     = useCallback(() => {
     setResult(null);
-    // [stated] **판이 끝나면 방으로 돌아온다** — 끊고 나가지 않는다.
-    // 온라인이면 서버에 알려 같은 사람들로 새 판을 차린다(방장만 가능)
-    if (session?.online || session?.kind === 'queue' || session?.kind === 'pvp'){
+    // [stated] **빠른 매칭의 '다시 하기' 는 새 상대를 찾는 것이다.**
+    // 예전엔 같은 사람과 또 붙어서, 이미 이긴 판이 다시 열리고 점수가 또 올라갔다.
+    // 방(친구방)에서만 같은 사람들로 새 판을 차린다
+    if (session?.mode === 'queue'){
+      disconnect();
+      setScreen('matching');                 // 처음부터 다시 찾는다
+      return;
+    }
+    // 방: 서버에 알려 같은 사람들로 새 판 (방장만 가능)
+    if (session?.mode === 'create' || session?.mode === 'join'){
       playAgain();
       setScreen('game');
       return;
     }
-    setScreen('game');
+    setScreen('game');                        // AI·연습은 그냥 다시
   }, [session]);
   // [stated] 방장이 다시 시작하면 결과 화면을 닫는다 (방장이 아닌 사람 쪽)
   const onAgain   = useCallback(() => { setResult(null); setScreen('game'); }, []);

@@ -170,7 +170,7 @@ export default function Tutorial({ getState, spotRect, onQuit }){
     <>
       {/* 설명 중에는 판을 어둡게 — 던지면 풀린다 */}
       {paused && <div className="tuto-dim" aria-hidden="true" />}
-      {hi && <div className="tuto-hi" style={hi} />}
+      {hi && <div className={'tuto-hi' + (paused ? ' dark' : '')} style={hi} />}
       {/* 끌어다 놓을 길 — 점선과 손가락 */}
       {path && (
         <svg className="tuto-path" aria-hidden="true">
