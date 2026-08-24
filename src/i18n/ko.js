@@ -62,6 +62,7 @@ export default {
   'match.others': '다른 사람 기다리는 중…',
   'match.found': '상대를 찾았다',
   'match.failed': '연결할 수 없다',
+  'match.sec': '{s}초',
   'match.roomCode': '방 코드',
   'match.pickTeam': '팀을 고르세요',
   'match.teamA': 'A 팀',

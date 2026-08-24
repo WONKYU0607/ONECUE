@@ -77,7 +77,12 @@ export default function Result({ result, summary, score, session, host, onAgain,
         {score && (
           <div className="resbox scorebox">
             <div className="sc-main">
-              <span className="sc-kind">{score.kind === 'melee' ? t('mode.melee') : t('mode.gun')}</span>
+              {/* [stated] **축구를 이겼는데 '총격전 +900' 으로 떴다** — 여기서 `soccer` 를
+                  안 봐서 축구가 총격전으로 찍혔다. 점수 계산(골x100x연승)은 맞았고 이름만 틀렸다 */}
+              <span className="sc-kind">
+                {score.kind === 'melee' ? t('mode.melee')
+                  : (score.kind === 'soccer' ? t('mode.soccer') : t('mode.gun'))}
+              </span>
               <b className={'sc-delta ' + (score.delta > 0 ? 'up' : score.delta < 0 ? 'down' : '')}>
                 {score.delta > 0 ? '+' : ''}{score.delta}
               </b>

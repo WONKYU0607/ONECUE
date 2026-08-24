@@ -957,6 +957,25 @@ wss.on('connection', (ws, req) => {
     if (m.t === 'team' && ws.room){
       const room = ws.room, team = m.team === 1 ? 1 : 0;
       // [stated] **잘못 눌렀으면 되돌릴 수 있어야 한다.** 같은 팀을 다시 누르면 자리를 비운다
+      // [stated] **관전하기** — 자리를 비우고 관전자 목록에 들어간다
+      if (m.watch && room.server.s.phase === PH_READY){
+        if (ws.slot >= 0){
+          const slot = ws.slot, seat = room.seats[slot];
+          room.pending.delete(seat.sid);
+          seat.sid = null; seat.ws = null; seat.bot = false; seat.uid = ''; seat.goneAt = 0;
+          ws.slot = -1;
+          room.send({ t: 'peer', slot, state: 'left' });
+        }
+        const i = room.waitingList.indexOf(ws);
+        if (i >= 0) room.waitingList.splice(i, 1);
+        ws.watching = true;
+        room.watchers.add(ws);
+        ws.send(JSON.stringify({ t: 'watch', code: room.code, n: room.n,
+                                 melee: room.melee, ffa: room.ffa, soccer: room.soccer }));
+        room.sendLobby(); room.sendRoom();
+        console.log(`관전으로: room ${room.id}`);
+        return;
+      }
       if (ws.slot >= 0 && m.undo && room.server.s.phase === PH_READY){
         // **`quit()` 을 쓰면 안 된다** — 축구에서는 나간 자리를 AI 가 이어받는다.
         // 아직 시작도 안 한 팀 고르기 단계에서는 자리만 비우면 된다

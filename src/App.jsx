@@ -7,7 +7,8 @@ import PvpMenu from './ui/screens/PvpMenu.jsx';
 import RankBoard from './ui/screens/RankBoard.jsx';
 import Login from './ui/screens/Login.jsx';
 import Friends from './ui/screens/Friends.jsx';
-import Matching from './ui/screens/Matching.jsx';
+import QuickMatch from './ui/screens/QuickMatch.jsx';
+import RoomEnter from './ui/screens/RoomEnter.jsx';
 import Result from './ui/screens/Result.jsx';
 import SettingsModal from './ui/SettingsModal.jsx';
 import Room from './ui/screens/Room.jsx';
@@ -111,7 +112,7 @@ export default function App(){
       if (askRoom){ setAskRoom(false); return true; }
       if (showSettings){ setShowSettings(false); return true; }
       if (screen === 'game'){ setAskQuit(true); return true; }
-      if (screen === 'matching'){ goHome(); return true; }
+      if (screen === 'matching' || screen === 'entering'){ goHome(); return true; }
       // [stated] **방에서 뒤로가기** — 바로 나가지 않고 물어본다
       if (screen === 'room'){ setAskRoom(true); return true; }
       // **화면 안에 단계가 있으면 거기부터 돌아간다** (PVP 색 고르기 → 모드 고르기 → 홈).
@@ -133,7 +134,10 @@ export default function App(){
     // kind는 게임 종류(pvp/ai), mode는 접속 방식(queue/create/join).
     // 예전엔 둘 다 mode라 펼치기에서 덮어써져 온라인인지 판정이 깨졌다
     setSession({ kind: 'pvp', ...opt });      // opt: {mode:'queue'|'create'|'join', code, n, melee}
-    setScreen('matching');
+    // **여기서 길이 갈린다** — 빠른 매칭은 매칭 화면, 방은 접속 화면.
+    // 둘은 서로 아무것도 공유하지 않는다
+    if (opt?.mode === 'create' || opt?.mode === 'join') setScreen('entering');
+    else setScreen('matching');
   }, []);
   const startPractice = useCallback(opt => {
     SELF.slot = 0;
@@ -173,13 +177,11 @@ export default function App(){
   }, []);
   // [stated] **관전으로 들어왔으면 세션에 표시한다** — 결과 화면이 조작 버튼을 안 그린다
   // [stated] **친구방이면 로비로**, 빠른 매칭이면 바로 게임으로
-  const toRoomOrGame = useCallback(() => {
+  // [stated] **방에 들어갔다 → 로비로.** 빠른 매칭과 길이 아예 갈려 있어 조건이 필요 없다
+  const toRoom = useCallback(() => {
     setSession(sn => (sn && SELF.watching ? { ...sn, watching: true } : sn));
-    // **방을 만든 직후에는 방 상태가 아직 안 왔을 수 있다** — 어떻게 들어왔는지로 판단한다.
-    // 빠른 매칭(`queue`)만 바로 게임으로, 방(`create`·`join`)은 로비로
-    const byRoom = session?.mode === 'create' || session?.mode === 'join' || !!getRoom();
-    setScreen(byRoom && !SELF.watching ? 'room' : 'game');
-  }, [session]);
+    setScreen(SELF.watching ? 'game' : 'room');
+  }, []);
   const toGame    = useCallback(() => {
     setSession(sn => (sn && SELF.watching ? { ...sn, watching: true } : sn));
     setScreen('game');
@@ -219,8 +221,10 @@ export default function App(){
   // [stated] **판이 끝나면 방으로 돌아온다** — 친구방이면 로비 화면으로
   const backToRoom = useCallback(() => {
     setResult(null);
-    if (getRoom()) setScreen('room'); else goHome();
-  }, [goHome]);
+    // **방으로 들어온 경우에만** 방으로 돌아간다 (빠른 매칭은 방이 없다)
+    if (session?.mode === 'create' || session?.mode === 'join') setScreen('room');
+    else goHome();
+  }, [goHome, session]);
   const again     = useCallback(() => {
     setResult(null);
     // [stated] **판이 끝나면 방으로 돌아온다** — 끊고 나가지 않는다.
@@ -270,12 +274,14 @@ export default function App(){
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} onMelee={startMeleeAi} />}
       {screen === 'practice' && <PracticeMenu onBack={goHome} onStart={startPractice} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
-      {screen === 'matching' && <Matching session={session} onCancel={goHome} onMatched={toRoomOrGame} />}
+      {/* [stated] **빠른 매칭과 방은 길이 다르다.** 한 화면에서 갈래를 나누다 계속 샜다 */}
+      {screen === 'matching' && <QuickMatch session={session} onCancel={goHome} onMatched={toGame} />}
+      {screen === 'entering' && <RoomEnter session={session} onCancel={goHome} onEntered={toRoom} />}
       {/* [stated] **방(로비)** — 판이 끝나면 여기로 돌아온다 */}
       {screen === 'room'     && <Room room={room || getRoom()} onLeave={() => setAskRoom(true)} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome}
                                           onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} onTuto={goHome} />}
-      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={(session?.online && getRoom()) ? backToRoom : null}
+      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={(session?.mode === 'create' || session?.mode === 'join') ? backToRoom : null}
         onNext={(session?.kind === 'ai' && result === 'win' && (session.stage || 1) < 30) ? nextStage : null} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto} />}
       {/* [stated] 처음 켰을 때 — 시작하기 / 건너뛰기 */}

@@ -184,6 +184,11 @@ console.log('투척 설명 중에는 멈춘다');
   assert(s.p[0].x === x0, '  얼어 있는 동안 캐릭터가 안 움직인다');
   assert(s.tutoPause === 1, '  아무것도 안 하면 멈춘 채로');
   assert(s.tick > t0, '  **틱은 돈다** — 안 돌리면 던지기 요청이 영영 못 들어온다');
+  // 함정 둘을 다 밟아 봤다 — 검사가 이동 뒤면 캐릭터가 움직이고, 틱을 안 올리면 교착이다
+  const sim = fs.readFileSync('src/game/sim.js', 'utf8');
+  const iTick = sim.indexOf('s.tick++;');
+  const iFrozen = sim.indexOf('const frozen = !!s.tutoPause;');
+  assert(iTick > 0 && iFrozen > iTick, '  틱을 먼저 올리고 나서 얼음을 본다');
   // 던지면 풀린다
   const inp = IN(); inp[0].thr = { k: 0, ch: 60 };
   step(s, inp);

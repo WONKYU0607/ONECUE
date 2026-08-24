@@ -159,12 +159,15 @@ export async function writeResults(rows){
  *  규칙을 건너뛰는 서버(Admin SDK)가 대신 세어 준다 */
 export async function myRank(uid, kind = 'gun'){
   if (!db) return null;
-  const field = 'score.' + (kind === 'melee' ? 'melee' : 'gun');
+  // [stated] **축구 등수를 물어도 다른 종목 등수가 왔다** — 여기서 `soccer` 를 안 받아
+  // 전부 총격전 칸을 보고 셌다
+  const k = kind === 'melee' ? 'melee' : (kind === 'soccer' ? 'soccer' : 'gun');
+  const field = 'score.' + k;
   try {
     const me = await db.doc('players/' + uid).get();
     if (!me.exists) return null;
     const v = me.data();
-    const score = (v.score && v.score[kind === 'melee' ? 'melee' : 'gun']) | 0;
+    const score = (v.score && v.score[k]) | 0;
     // 나보다 **높은** 사람만 센다. 동점자끼리는 같은 등수가 된다
     const [above, total] = await Promise.all([
       db.collection('players').where(field, '>', score).count().get(),

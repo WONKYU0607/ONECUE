@@ -16,7 +16,9 @@ import { setInnerBack } from '../../state/back.js';
 import { t } from '../../i18n/index.js';
 
 export default function RankBoard({ kind: kind0 = 'gun', onBack }){
-  const [kind, setKind] = useState(kind0 === 'melee' ? 'melee' : 'gun');
+  // [stated] **축구로 들어와도 총격전 탭이 열렸다** — 여기서 `soccer` 를 안 받았다
+  const [kind, setKind] = useState(
+    kind0 === 'melee' ? 'melee' : (kind0 === 'soccer' ? 'soccer' : 'gun'));
   const [data, setData] = useState(() => cachedRank(kind));
   const [busy, setBusy] = useState(!cachedRank(kind));
 

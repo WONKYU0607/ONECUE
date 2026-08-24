@@ -117,4 +117,27 @@ console.log('인원 바꾸기 규칙');
   assert(/st\.phase === PH_PLAY\) return false/.test(fn), '  전투 중에는 못 바꾼다');
 }
 
+// [stated] **빠른 매칭과 방은 길이 완전히 갈려 있다.**
+// 예전엔 한 화면에서 `mode` 로 갈래를 나눴는데, 로비 조건을 건드릴 때마다 빠른 매칭이 같이 샜다 —
+// VS 화면이 사라지고, 빠른 매칭이 방으로 넘어가고, 로비 버튼이 안 먹었다
+console.log('두 길이 따로 있다');
+{
+  const q = fs.readFileSync('src/ui/screens/QuickMatch.jsx', 'utf8');
+  const r = fs.readFileSync('src/ui/screens/RoomEnter.jsx', 'utf8');
+  // 빠른 매칭은 **오직 queue** — 방 갈래가 아예 없다
+  assert(/mode: 'queue'/.test(q), '  빠른 매칭은 queue 로 붙는다');
+  assert(!/'create'|'join'/.test(q), '  빠른 매칭에 방 갈래가 없다');
+  assert(/VsIntro/.test(q), '  빠른 매칭은 VS 화면을 띄운다');
+  // 방은 **VS 도 티켓도 없다**
+  assert(!/VsIntro/.test(r), '  방은 VS 화면이 없다');
+  assert(!/spendFor|useSoccer/.test(r), '  방은 티켓을 안 쓴다');
+  assert(/onCode/.test(r), '  방은 코드를 받는 순간 로비로');
+  // 옛 화면은 지웠다
+  assert(!fs.existsSync('src/ui/screens/Matching.jsx'), '  갈래를 나누던 옛 화면은 없앴다');
+  const app = fs.readFileSync('src/App.jsx', 'utf8');
+  assert(/screen === 'entering'/.test(app), '  방 접속 화면이 따로 있다');
+  assert(/setScreen\('entering'\)/.test(app) && /setScreen\('matching'\)/.test(app),
+    '  시작할 때 길이 갈린다');
+}
+
 console.log('roomflow.test.js 통과');

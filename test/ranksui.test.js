@@ -3,6 +3,7 @@
 // 그냥 import 하면 죽는다 → **빌드된 번들과 소스를 함께** 확인한다.
 // (화면 동작·눌러 들어가기는 실제 크롬으로 따로 확인했다)
 import fs from 'fs';
+import { soccerDelta } from '../src/state/tickets.js';
 import { assert } from './harness.js';
 process.chdir(new URL('..', import.meta.url).pathname);
 
@@ -58,6 +59,23 @@ console.log('내 자리는 목록보다 위');
   // 30위 밖이면 목록에 없어서, 아래에 두면 끝까지 내려야 자기 등수를 본다
   const me = board.indexOf('rb-me'), list = board.indexOf('rb-list');
   assert(me > 0 && list > 0 && me < list, '  rb-me 가 rb-list 보다 먼저 나온다');
+}
+
+
+// [stated] **축구를 이겼는데 "총격전 +900" 으로 떴다.**
+// 계산(골x100x연승)은 맞았고 **이름표만** 틀렸다 — `soccer` 를 안 보는 곳이 네 군데였다
+console.log('축구를 축구라고 부르는가');
+{
+  const res = fs.readFileSync('src/ui/screens/Result.jsx', 'utf8');
+  assert(/score\.kind === 'soccer'/.test(res), '  결과 화면이 축구를 안다');
+  const board = fs.readFileSync('src/ui/screens/RankBoard.jsx', 'utf8');
+  assert(/kind0 === 'soccer'/.test(board), '  순위표 첫 탭이 축구를 안다');
+  const store = fs.readFileSync('server/store.js', 'utf8');
+  assert(/kind === 'soccer' \? 'soccer'/.test(store), '  myRank 가 축구를 안다');
+  const idx = fs.readFileSync('server/index.js', 'utf8');
+  assert(/k0 === 'soccer' \? 'soccer'/.test(idx), '  /rank 주소가 축구를 받는다');
+  // 화면에 뜬 숫자와 계산이 맞는지 (3골 · 연승 3배 = 900)
+  assert(soccerDelta('win', 3, 2) === 900, '  3골 연승2 승리는 900점');
 }
 
 console.log('ranksui.test.js 통과');

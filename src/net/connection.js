@@ -253,6 +253,9 @@ export function pickTeam(team, color){
 }
 
 /** [stated] 팀을 잘못 골랐을 때 되돌린다 — 자리를 비우고 다시 고를 수 있게 */
+/** [stated] **관전하기** — 자리를 비우고 보기만 한다 */
+export function watchRoom(){ tell({ t: 'team', watch: 1 }); }
+
 export function unpickTeam(){
   tell({ t: 'team', undo: 1 });
 }

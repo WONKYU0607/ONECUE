@@ -604,11 +604,33 @@ export function blocked(s, x, y, self = -1){
 export function step(s, inp){
   setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   // [stated] **투척 설명 중에는 판이 멈춘다** — 던지는 순간 풀려서 날아가 터지는 것을 볼 수 있다.
-  // **`return` 으로 통째로 멈추면 안 된다** — 던지기 요청이 다음 틱 입력에 실려 오는데
-  // 그 틱이 영영 안 와서 교착이 된다. 그래서 **틱은 돌리되 아래에서 움직임만 얼린다**
+  //
+  // 함정 둘을 다 밟아 봤다:
+  //  ① 이동 처리 **뒤에** 검사를 두면 캐릭터가 그대로 움직인다(실측 2초에 23913 → 35584)
+  //  ② **틱을 안 올리고** 나가면 던지기 요청이 다음 틱 입력에 실려 오는데 그 틱이 영영 안 와
+  //     교착이 된다 — 얼어붙은 채 아무것도 못 한다
+  // → **틱은 반드시 올리고**, 이동보다 **먼저** 검사한다
+  s.tick++;
   if (s.tutoPause && (inp || []).some(q => q && q.thr)) s.tutoPause = 0;
   const frozen = !!s.tutoPause;
-  s.tick++;
+  if (frozen){
+    for (let i = 0; i < s.n; i++){
+      const q = (inp && inp[i]) || NOIN;
+      if (!q.thr) continue;
+      const k = q.thr.k | 0;
+      if (!canThrow(s, i, k)) continue;
+      s.ammo[i][k]--;
+      s.proj.push({
+        k, by: i,
+        c: throwCol(s.p[i]),
+        r0: teamOf(i, s.n) === 0 ? ROW_MAX[0] : ROW_MIN[1],
+        r1: throwRow(i, q.thr.ch / 100, s.n, s.melee),
+        t: FLY_TICKS, fuse: 0
+      });
+      s.tutoPause = 0;                      // 던졌다 → 다시 흐른다
+    }
+    if (s.tutoPause) return;
+  }
 
   // 대기/종료 화면: START 입력(fire)으로만 카운트다운 시작
   // 2배속 대결: 한쪽이 신청하고 상대가 수락해야 켜진다.
@@ -848,9 +870,6 @@ export function step(s, inp){
     }
     return;
   }
-
-  // 얼어 있으면 여기서 끝 — 던지기 요청만 위에서 받고 판은 그대로 둔다
-  if (frozen) return;
 
   // 던지기 요청 (누르는 시간이 사거리)
   for (let i = 0; i < s.n; i++){

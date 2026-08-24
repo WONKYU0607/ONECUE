@@ -62,6 +62,7 @@ export default {
   'match.others': 'Waiting for others…',
   'match.found': 'Opponent found',
   'match.failed': 'Could not connect',
+  'match.sec': '{s}s',
   'match.roomCode': 'Room code',
   'match.pickTeam': 'Pick a team',
   'match.teamA': 'Team A',

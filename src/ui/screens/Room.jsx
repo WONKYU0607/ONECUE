@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import { t } from '../../i18n/index.js';
 import { getColor } from '../../state/profile.js';
-import { pickTeam, unpickTeam, setRoomMode, startRoom } from '../../net/connection.js';
+import { pickTeam, unpickTeam, setRoomMode, startRoom, watchRoom } from '../../net/connection.js';
 
 /** 종목 고르기 — 인원수에 따라 못 고르는 것이 있다 */
 const MODES = [
@@ -88,7 +88,7 @@ export default function Room({ room, onLeave }){
           </div>
           <button className={'menu-btn pick sm' + (mineTeam < 0 ? ' primary' : '')}
                   disabled={mineTeam < 0}
-                  onClick={() => unpickTeam()}>
+                  onClick={() => watchRoom()}>
             <span className="t">{mineTeam < 0 ? t('room.watchingNow') : t('room.goWatch')}</span>
           </button>
         </div>
