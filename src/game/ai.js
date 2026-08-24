@@ -2,7 +2,7 @@ import {
   FP, WALL_L, WALL_R, wallIdx, PH_PLAY, THROW,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CW, GRID_CH, GRID_X0, GRID_Y0,
   ATK_TICKS, ATK_HIT, FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX, PHf, PWf, MAXHP, BUFF, PORTAL_N,
-  ITEM, ITEM_DEF, isCover, coverBudget, itemQuota, PH_READY, coverUsed, coverCells, THROW_DEF } from './config.js';
+  ITEM, ITEM_DEF, isCover, coverBudget, itemQuota, PH_READY, coverUsed, coverCells, THROW_DEF, setArena } from './config.js';
 import { canPlace } from './sim.js';
 
 // 노릴 상대. 2대2에서는 살아 있는 적 중 가로로 가장 가까운 쪽을 본다.
@@ -284,6 +284,10 @@ export function createAI(stage = 1){
     stage: p,
     // s: 현재 상태, me: AI 슬롯, dt: 초, now: ms
     think(s, me, dt, now){
+      // [stated] **봇이 같은 팀끼리 싸웠다.** `teamOf` 는 전역 아레나(`ARENA.ffa`)를 보는데,
+      // 여기서 아레나를 안 맞추면 **앞 판의 개인전 표시가 남아** 모두를 적으로 본다.
+      // 시뮬과 똑같이 먼저 맞춘다
+      setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
       // ── 배치 단계: 아이템을 놓는다 ──────────────────────────
       // **없으면 빈손으로 싸운다.** 봇이 벽·드럼통을 하나도 안 놓고 있었다
       if (s.phase === PH_READY && !s.melee && !s.bare){

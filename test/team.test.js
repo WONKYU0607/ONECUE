@@ -1,7 +1,8 @@
+import fs from 'fs';
 import { newState, step, canPlace, allPlaced, blocked, itemRect } from '../src/game/sim.js';
 import {
   FP, MAXHP, ITEM, ITEM_DEF, PH_PLAY, PH_OVER, CD_TICKS, BULLET_DAMAGE,
-  ROUND_TICKS, ROUND_TICKS_4, GRID_ROWS, GRID_MIDROW, teamOf, cellOwner
+  ROUND_TICKS, ROUND_TICKS_4, GRID_ROWS, GRID_MIDROW, teamOf, cellOwner, setArena
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 
@@ -112,7 +113,6 @@ console.log('죽으면 관전');
   for (let i = 0; i < 120; i++){ s.p[3].hp = MAXHP; s.p[0].hp = MAXHP; s.p[1].hp = MAXHP; step(s, IN(4)); }
   assert(s.bullets.filter(b => b.o === 2).length === before, '죽은 사람은 총을 안 쏜다');
 }
-console.log('team.test.js 통과');
 
 console.log('쓰러지면 사라진다');
 {
@@ -138,4 +138,23 @@ console.log('쓰러지면 사라진다');
   for (let i = 0; i < 40; i++) step(s, IN(4));
   assert(s.p[3].hp < hp3, '총알이 시신을 통과해 뒤에 있는 적을 맞힌다');
 }
+console.log('team.test.js 통과');
+
+// [stated] **3대3 인데 봇이 같은 팀끼리 휘두르고, VS 화면도 개인전처럼 나왔다.**
+// `teamOf` 는 전역 아레나(`ARENA.ffa`)를 보는데, 앞 판이 개인전이면 그 표시가 남는다
+console.log('앞 판의 개인전 표시가 안 새는가');
+{
+  const ai = fs.readFileSync('src/game/ai.js', 'utf8');
+  assert(/think\(s, me, dt, now\)\{[\s\S]{0,400}setArena\(s\.n, s\.melee, s\.ffa/.test(ai),
+    '  AI 가 판단 전에 아레나를 맞춘다');
+  const vs = fs.readFileSync('src/ui/VsIntro.jsx', 'utf8');
+  assert(!/teamOf\(/.test(vs), '  VS 화면은 전역 teamOf 를 안 쓴다');
+  assert(/const teamAt = slot =>/.test(vs), '  서버가 준 값으로 직접 나눈다');
+  // 실제로 갈리는지
+  setArena(6, true, true, false, false);          // 개인전으로 더럽혀 놓고
+  setArena(6, true, false, false, false);         // 3대3
+  assert([0,1,2,3,4,5].map(i => teamOf(i, 6)).join(',') === '0,0,0,1,1,1',
+    '  3대3 은 세 명씩 갈린다');
+}
+
 console.log('team.test.js 통과');

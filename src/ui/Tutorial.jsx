@@ -79,15 +79,18 @@ export default function Tutorial({ getState, spotRect, onQuit }){
   const [paused, setPaused] = useState(false);
   useEffect(() => {
     // **`pred` 가 아니라 `sim`(서버 상태)에 넣는다** — `pred` 는 매 프레임 새로 만들어져 지워진다
-    const sim = getRef.current && getRef.current()?.sim;
+    const g = getRef.current && getRef.current();
+    const sim = g && g.sim;
     if (!sim) return;
-    if (!(cur && cur.pause)){ sim.tutoPause = 0; setPaused(false); return; }
+    const also = v => { sim.tutoPause = v; if (g.pred) g.pred.tutoPause = v; };
+    if (!(cur && cur.pause)){ also(0); setPaused(false); return; }
     // **바로 걸면 안 된다** — 앞 단계에서 던진 입력이 아직 그 틱에 남아 있어
     // 멈춤이 걸리자마자 풀린다. 그 입력이 지나간 뒤에 건다
     const id = setTimeout(() => {
-      const s2 = getRef.current && getRef.current()?.sim;
-      if (!s2) return;
-      s2.tutoPause = 1;
+      const g2 = getRef.current && getRef.current();
+      if (!g2 || !g2.sim) return;
+      g2.sim.tutoPause = 1;
+      if (g2.pred) g2.pred.tutoPause = 1;    // 예측도 같이 얼린다
       setPaused(true);
     }, 350);
     return () => clearTimeout(id);

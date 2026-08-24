@@ -164,7 +164,10 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
       {session?.tuto && (
         <Tutorial getState={() => ({ st: gameRef.current?.client?.pred, prompt: ready.prompt, ready,
                                    // **멈춤 표시는 서버 상태에 넣어야 한다** — `pred` 는 매 프레임 새로 만들어진다
-                                   sim: gameRef.current?.server?.s })}
+                                   sim: gameRef.current?.server?.s,
+                                   // **클라 예측에도 같이 걸어야 한다** — 서버에만 걸면
+                                   // 예측은 움직였다가 되돌려져 캐릭터가 제자리로 튄다
+                                   pred: gameRef.current?.client?.s })}
                   spotRect={w => gameRef.current?.spotRect?.(w) || null}
                   onQuit={() => onTuto?.()} />
       )}

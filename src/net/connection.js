@@ -151,7 +151,14 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
     // `Client` 가 만들어지면 `toClient` 를 통째로 가져가서, 한 번 게임에 들어갔다 나오면
     // 방 화면 버튼이 전부 죽었다(방장·자리 정보가 안 와서) → **먼저 여기서 가로챈다**
     const always = m => {
-      if (m.t === 'roomst'){ roomState = m; try { roomWatch?.(m); } catch { /* 무시 */ } }
+      if (m.t === 'roomst'){
+        roomState = m;
+        // [stated] **자리를 여러 번 옮기면 버튼이 전부 죽었다** — 옮긴 자리를 클라가 몰라
+        // 방장 판정·조작이 어긋났다. 방 상태가 알려주는 **내 자리로 늘 맞춘다**
+        if (Number.isInteger(m.mySlot) && m.mySlot >= 0) SELF.slot = m.mySlot;
+        SELF.watching = m.mySlot === -1;
+        try { roomWatch?.(m); } catch { /* 무시 */ }
+      }
       // [stated] **빠른 매칭에서 VS 화면이 안 떴다** — 이 알림이 매칭 순간에도 발동해
       // 화면을 바로 게임으로 넘겨버렸다. **접속이 끝난 뒤**(= 로비에 있을 때)만 쓴다
       if (m.t === 'go' && settled){ try { goWatch?.(); } catch { /* 무시 */ } }
@@ -249,6 +256,8 @@ export function setRoomMode({ melee, ffa, soccer, n }){
 }
 
 export function pickTeam(team, color){
+  // [stated] **관전에서 팀으로 돌아올 때** 화면 쪽 표시도 같이 푼다
+  SELF.watching = false;
   tell({ t: 'team', team, color });
 }
 

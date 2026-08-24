@@ -256,7 +256,7 @@ class Room {
     }
     if (!rows.length) return;
     store.writeResults(rows)
-      .then(ok => { if (ok) store.buildRanks(kind).catch(() => {}); })
+      .then(ok => { if (ok) store.queueRanks(kind); })
       .catch(() => {});
   }
 
@@ -957,6 +957,26 @@ wss.on('connection', (ws, req) => {
     if (m.t === 'team' && ws.room){
       const room = ws.room, team = m.team === 1 ? 1 : 0;
       // [stated] **잘못 눌렀으면 되돌릴 수 있어야 한다.** 같은 팀을 다시 누르면 자리를 비운다
+      // [stated] **관전에서 팀으로 돌아올 수 있어야 한다** — 예전엔 나오는 길이 없어 묶였다
+      if (!m.watch && ws.watching && room.server.s.phase === PH_READY){
+        const team = m.team === 1 ? 1 : 0;
+        const dst = room.freeSeatIn(team);
+        if (dst < 0){ ws.send(JSON.stringify({ t: 'teamfull', team })); return; }
+        room.watchers.delete(ws);
+        ws.watching = false;
+        const seat = room.seats[dst];
+        seat.sid = ws.sid; seat.ws = ws; seat.uid = ws.uid || ''; seat.bot = false; seat.goneAt = 0;
+        ws.slot = dst;
+        const st0 = room.server.s;
+        if (Array.isArray(st0.nick)) st0.nick[dst] = ws.nick || '';
+        if (Array.isArray(st0.color) && Number.isInteger(m.color) && m.color >= 0) st0.color[dst] = m.color;
+        ws.send(JSON.stringify({ t: 'hello', pid: dst, room: room.id, n: room.n,
+          melee: room.melee, ffa: room.ffa, soccer: room.soccer, back: true, ver: PROTO_VER }));
+        room.send({ t: 's', tick: st0.tick, st: JSON.parse(JSON.stringify(st0)) });
+        room.ensureHost(); room.sendLobby(); room.sendRoom();
+        console.log(`관전 → 팀 ${team} (slot ${dst})`);
+        return;
+      }
       // [stated] **관전하기** — 자리를 비우고 관전자 목록에 들어간다
       if (m.watch && room.server.s.phase === PH_READY){
         if (ws.slot >= 0){
@@ -992,6 +1012,12 @@ wss.on('connection', (ws, req) => {
       }
       // [stated] **이미 앉아 있어도 다른 팀으로 옮길 수 있어야 한다.**
       // 예전엔 자리가 없을 때만 앉혀서, 로비에서 [이동] 을 눌러도 아무 일도 안 났다
+      // [stated] **관전에서 팀으로 못 돌아왔다** — 자리에 앉아도 관전자 목록에 남아 있었다.
+      // 팀을 고르는 순간 관전을 푼다
+      if (ws.watching){
+        room.watchers.delete(ws);
+        ws.watching = false;
+      }
       if (ws.slot >= 0 && room.server.s.phase === PH_READY){
         const cur = teamOf(ws.slot, room.n);
         if (cur === team) return;                    // 같은 팀이면 할 일 없음

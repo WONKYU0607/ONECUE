@@ -30,7 +30,9 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
     let live = true;
     const hit = cachedRank(kind);
     setData(hit); setBusy(!hit);
-    loadRank(kind)
+    // [stated] **목록이 뒤처져 내 점수가 위 칸과 달랐다.** 캐시가 있으면 먼저 보여주되
+    // 항상 새로 받아 덮는다 (판을 여러 번 하면 1분 캐시로는 못 따라간다)
+    loadRank(kind, true)
       .then(v => { if (live){ setData(v); setBusy(false); } })
       .catch(() => { if (live) setBusy(false); });
     return () => { live = false; };
@@ -127,7 +129,12 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
               <span className="rb-no">{row.rank}</span>
               {kind !== 'soccer' && <TierIcon score={row.score | 0} />}
               <span className="rb-nick">{row.nick || '-'}</span>
-              <span className="rb-score">{(row.score | 0).toLocaleString()}</span>
+              {/* [stated] **내 점수가 위 칸과 목록에서 달랐다** — 목록은 판이 끝날 때 다시 만들고
+                  클라가 1분 캐시라 여러 판을 하면 뒤처진다. **내 줄만은 지금 값**을 쓴다 */}
+              <span className="rb-score">
+                {(((row.nick && row.nick === myNick && data && data.my && data.my.score)
+                   || row.score) | 0).toLocaleString()}
+              </span>
             </div>
           ))}
         </div>

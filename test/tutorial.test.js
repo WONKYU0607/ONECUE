@@ -212,6 +212,8 @@ console.log('던진 뒤 3초 기다린다');
     assert(TUTO_STEPS.find(x => x.key === k).after === 3000, `  ${k} 는 3초 뒤 다음`);
   const ui = fs.readFileSync('src/ui/Tutorial.jsx', 'utf8');
   assert(/holdRef\.current/.test(ui), '  기다리는 중에는 또 안 넘어간다');
+  // [stated] **얼렸는데 캐릭터가 제자리로 튀었다** — 서버에만 걸어서 예측이 움직였다 되돌려졌다
+  assert(/g2\.pred\.tutoPause = 1/.test(ui), '  클라 예측도 같이 얼린다');
   assert(/cur\.after \|\| 0/.test(ui), '  단계마다 정한 시간을 쓴다');
 }
 

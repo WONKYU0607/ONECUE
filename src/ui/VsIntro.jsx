@@ -6,7 +6,7 @@
 // **정보가 없어도 화면은 뜬다** — 구름을 읽어야 해서 늦거나 못 올 수 있고,
 // 봇은 계정이 없어 점수·전적이 아예 없다. 없는 칸은 `-` 로 둔다.
 import { useEffect, useRef } from 'react';
-import { teamOf, TEAMS } from '../game/config.js';
+import { TEAMS } from '../game/config.js';
 import { getColor } from '../state/profile.js';
 import { t } from '../i18n/index.js';
 import { sfx } from '../game/audio.js';
@@ -59,13 +59,17 @@ export default function VsIntro({ vs, mySlot, onDone }){
   const rows = (vs && vs.rows) || [];
   const n = rows.length || 2;
   const kind = (vs && vs.kind) || 'gun';
-  const myTeam = teamOf(mySlot, n);
-  // [stated] **개인전은 나 혼자 위, 나머지 전원 아래.** 팀전은 팀끼리 나눈다
+  // [stated] **3대3 인데 개인전처럼 여섯 명이 흩어져 나왔다.**
+  // `teamOf` 는 전역 아레나(`ARENA.ffa`)를 보는데, 앞 판이 개인전이면 그 표시가 남는다.
+  // **서버가 준 값으로 직접 나눈다** — 전역 상태에 기대지 않는다
   const ffa = !!(vs && vs.ffa);
+  const half = n / 2;
+  const teamAt = slot => (ffa ? slot : (slot < half ? 0 : 1));
+  const myTeam = teamAt(mySlot);
   const ours = ffa ? rows.filter(r => r.slot === mySlot)
-                   : rows.filter(r => teamOf(r.slot, n) === myTeam);
+                   : rows.filter(r => teamAt(r.slot) === myTeam);
   const theirs = ffa ? rows.filter(r => r.slot !== mySlot)
-                     : rows.filter(r => teamOf(r.slot, n) !== myTeam);
+                     : rows.filter(r => teamAt(r.slot) !== myTeam);
   // [stated] **점수가 높은 쪽이 위로 간다.** 내가 아래라는 규칙보다 이게 먼저다.
   // 점수가 없으면(봇·정보 못 받음) 낮은 것으로 본다
   const sum = list => list.reduce((a, r) => a + (r.score == null ? -1 : (r.score | 0)), 0);
@@ -82,11 +86,13 @@ export default function VsIntro({ vs, mySlot, onDone }){
     // 두 줄은 **절반 폭에 들어가게** 더 줄인다 (0.66 은 오른쪽이 잘렸다)
     // **자리는 그대로 두고 배율만 낮춰** 사선에 안 걸리는 값을 실제로 재서 찾았다
     // (2대2 0.7 / 3대3 0.6 / 4명 이상 0.6 에서 잘림이 사라진다)
-    zoom: cnt >= 4 ? 0.6 : cnt === 3 ? 0.6 : cnt === 2 ? 0.7 : 1,
+    // [stated] **개인전 6인에서 오른쪽 줄이 겹치고 잘렸다** — 다섯 명이 두 줄로 들어가면
+    //  0.6 으로는 절반 폭을 넘는다. 5명 이상은 더 줄인다
+    zoom: cnt >= 5 ? 0.46 : cnt === 4 ? 0.6 : cnt === 3 ? 0.6 : cnt === 2 ? 0.7 : 1,
     // 위 조각은 위에서, 아래 조각은 아래에서 붙으므로 **여백을 키워야** 가운데로 온다
     // (줄였더니 오히려 바깥으로 밀렸다)
     // **사선 쪽 줄이 잘렸다** — 조각은 사선까지밖에 안 보이므로 여백을 더 줘 안쪽으로 민다
-    pad: cnt >= 4 ? 4 : cnt === 3 ? 14 : cnt === 2 ? 20 : 28
+    pad: cnt >= 5 ? 2 : cnt === 4 ? 4 : cnt === 3 ? 14 : cnt === 2 ? 20 : 28
   });
   const upSz = sizeOf(upper.length || 1);
   const loSz = sizeOf(lower.length || 1);

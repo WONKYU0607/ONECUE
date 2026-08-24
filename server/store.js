@@ -495,6 +495,18 @@ export async function publicOf(uids){
   }
 }
 
+// [stated] **사용자가 늘어도 버티게** — 판이 끝날 때마다 상위 30명을 다시 읽으면
+// 분당 판이 100개일 때 읽기 3,000회가 된다. 목록은 그렇게 자주 안 바뀌므로
+// **종목별로 모아 두었다가 15초에 한 번만** 만든다 (그 사이 판이 몇이든 한 번)
+const rankWait = new Map();          // kind → 예약된 타이머
+export function queueRanks(kind = 'gun'){
+  if (rankWait.has(kind)) return;    // 이미 예약돼 있으면 그대로 둔다
+  rankWait.set(kind, setTimeout(() => {
+    rankWait.delete(kind);
+    buildRanks(kind).catch(() => {});
+  }, 15000));
+}
+
 /** 순위표를 한 덩어리로 저장한다. [stated] 상위 **30명**.
  *  **문서 하나에 모아둔다** — 볼 때마다 30명을 각각 읽으면 읽기 할당량이 금방 닳는다.
  *  한 덩어리면 몇 명을 담든 조회 1회라, 인원을 늘려도 비용은 그대로다 */
