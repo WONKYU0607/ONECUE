@@ -103,6 +103,8 @@ export default {
   'set.vsReset': 'Reset',
   'set.vsSave': 'Save',
   'set.vsResetAll': 'Reset all',
+  'set.vsCopy': 'Copy values',
+  'set.vsCopied': 'Copied',
   'set.vsHelp': 'Pick a mode, drag the boxes, then save.',
   'set.vsFake': 'Player{n}',
   'set.vsGo': 'Enter',

@@ -103,6 +103,8 @@ export default {
   'set.vsReset': '되돌리기',
   'set.vsSave': '저장',
   'set.vsResetAll': '전부 되돌리기',
+  'set.vsCopy': '값 복사하기',
+  'set.vsCopied': '복사됨',
   'set.vsHelp': '모드를 고르고 네모를 끌어 자리를 맞춘 뒤 저장을 누르세요.',
   'set.vsFake': '플레이어{n}',
   'set.vsGo': '들어가기',

@@ -695,6 +695,11 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
    (잘림을 잡겠다고 자리를 옮겼다가 "위치 바꾸라고 했나"는 지적을 받았다) */
 /* [stated] **가운데(사선) 쪽으로 붙인다** — 위 조각은 아래쪽에 붙이고,
    아래 조각은 위쪽에 붙인다. 사선은 왼쪽 72% / 오른쪽 28% 를 잇는다 */
+/* 복사가 막히면 값을 글로 띄운다 — 길게 눌러 복사할 수 있게 */
+.vs-dump{user-select:text;-webkit-user-select:text;word-break:break-all;
+  padding:8px;border-radius:4px;background:rgba(12,22,36,.7);
+  border:1px solid rgba(90,140,190,.4);font:600 11px var(--gf);color:#cfe4ff}
+
 /* [stated] **자리를 직접 옮겨 값을 보는 편집 모드** (`window.__vsEdit = true`) */
 .vs-pad.vs-edit{outline:2px dashed #ffd34d;outline-offset:-2px;cursor:move;touch-action:none}
 .vs-edit-hud{position:fixed;left:0;right:0;bottom:0;z-index:60;

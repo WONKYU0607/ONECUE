@@ -13,7 +13,8 @@ import { t } from '../../i18n/index.js';
 const CASES = [
   ['gun', 2, false], ['gun', 4, false], ['gun', 6, false],
   ['melee', 2, false], ['melee', 4, false], ['melee', 6, false],
-  ['melee', 6, true],
+  // [stated] **개인전은 3·4·5·6인** 네 가지다 (칼전만 있다)
+  ['melee', 3, true], ['melee', 4, true], ['melee', 5, true], ['melee', 6, true],
   ['soccer', 2, false], ['soccer', 4, false]
 ];
 
@@ -31,6 +32,8 @@ const fakeVs = (kind, n, ffa) => ({
 export default function VsLayout({ onBack }){
   const [pick, setPick] = useState(null);      // [kind, n, ffa]
   const [, bump] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [show, setShow] = useState('');
   setInnerBack(() => { if (!pick) return false; setPick(null); return true; });
 
   if (pick){
@@ -70,6 +73,18 @@ export default function VsLayout({ onBack }){
             </button>
           );
         })}
+        {/* [stated] **폰에서 값을 옮겨 적기 번거롭다** — 통째로 복사해 붙여넣게 한다 */}
+        <button className="menu-btn sm" onClick={() => {
+          const txt = JSON.stringify(saved);
+          const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1500); };
+          if (navigator.clipboard && navigator.clipboard.writeText){
+            navigator.clipboard.writeText(txt).then(done).catch(() => setShow(txt));
+          } else setShow(txt);
+        }}>
+          <span className="t">{t(copied ? 'set.vsCopied' : 'set.vsCopy')}</span>
+        </button>
+        {/* 복사가 막히면 글로 띄워서 길게 눌러 복사하게 한다 */}
+        {show && <p className="hint vs-dump" onClick={() => setShow('')}>{show}</p>}
         <button className="menu-btn sm ghost" onClick={() => { resetVsOffsets(); bump(v => v + 1); }}>
           <span className="t">{t('set.vsResetAll')}</span>
         </button>
