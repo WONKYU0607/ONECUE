@@ -5,8 +5,7 @@
 //
 // **정보가 없어도 화면은 뜬다** — 구름을 읽어야 해서 늦거나 못 올 수 있고,
 // 봇은 계정이 없어 점수·전적이 아예 없다. 없는 칸은 `-` 로 둔다.
-import { useEffect, useRef, useState } from 'react';
-import { TEAMS } from '../game/config.js';
+import { useEffect, useRef } from 'react';
 import { getColor } from '../state/profile.js';
 import { t } from '../i18n/index.js';
 import { getVsOffset } from '../state/vslayout.js';
@@ -21,7 +20,7 @@ const SHOW_MS = 3000;
 //   melee   3872x1188, 칸 484x198 (8열 6행). 색 = 행, 자세 = 열(대기 = 2)
 //   gun     1008x48,  칸 42x48 (24열 1행). **색과 앞/뒤가 열에 같이 들어 있다** — 색*2
 const SHEET = {
-  soccer: { src: 'assets/soccer-chars.webp', cw: 80,  ch: 52,  cols: 13, rows: 6, col: c => 0,     row: c => c },
+  soccer: { src: 'assets/soccer-chars.webp', cw: 80,  ch: 52,  cols: 13, rows: 6, col: () => 0,   row: c => c },
   melee:  { src: 'assets/melee.webp',        cw: 484, ch: 198, cols: 8,  rows: 6, col: () => 0,    row: c => c },
   gun:    { src: 'assets/characters.png',    cw: 42,  ch: 48,  cols: 24, rows: 1, col: c => c * 2, row: () => 0 }
 };
@@ -43,7 +42,7 @@ function Portrait({ kind, color, zoom = 1 }){
   );
 }
 
-export default function VsIntro({ vs, mySlot, onDone, edit: editOpt }){
+export default function VsIntro({ vs, mySlot, onDone }){
   // [stated] **막대는 없애고 3초 뒤에 그냥 들어간다.**
   // `onDone` 을 의존성에 두면 부모가 다시 그릴 때마다 시작 시각이 초기화된다 —
   // 그래서 막대가 줄다 다시 차오르고 게임이 안 시작됐다. 참조로 붙잡아 한 번만 건다
@@ -51,13 +50,12 @@ export default function VsIntro({ vs, mySlot, onDone, edit: editOpt }){
   doneRef.current = onDone;
   // [stated] **자리를 옮기려면 화면이 안 넘어가야 한다** — VS 는 3초 뒤 저절로 넘어간다.
   // 편집 모드에서는 넘기지 않고, 아래 [들어가기] 를 눌러야 판으로 간다
-  const editing = !!editOpt;
   useEffect(() => {
-    const id = editing ? null : setTimeout(() => doneRef.current?.(), SHOW_MS);
+    const id = setTimeout(() => doneRef.current?.(), SHOW_MS);
     // 연출과 소리를 맞춘다 — 0.6초에 부딪히고, 1.0초에 번개가 다 뻗는다
     // [stated] 번개 소리는 **뺐다** (별로였다). 충돌 소리만 남긴다
     const t1 = setTimeout(() => sfx.vsClash?.(), 560);
-    return () => { if (id) clearTimeout(id); clearTimeout(t1); };
+    return () => { clearTimeout(id); clearTimeout(t1); };
   }, []);
 
   const rows = (vs && vs.rows) || [];
@@ -125,66 +123,24 @@ export default function VsIntro({ vs, mySlot, onDone, edit: editOpt }){
     );
   };
 
-  // [stated] **자리를 직접 옮겨 값을 보기 위한 편집 모드.**
-  // `window.__vsEdit = true` 로 켜면 위·아래 무리에 네모가 생기고 끌어서 옮길 수 있다.
-  // 화면 아래에 지금 값이 뜨므로 그대로 알려주면 코드에 박으면 된다
-  const edit = editing;
-  const [off, setOff] = useState(() => (editOpt && editOpt.start)
-    || getVsOffset(vs && vs.kind, (vs && vs.rows && vs.rows.length) || 2, !!(vs && vs.ffa)));
-  const drag = useRef(null);
-  const onDown = which => e => {
-    if (!edit) return;
-    const t = e.touches ? e.touches[0] : e;
-    drag.current = { which, x: t.clientX, y: t.clientY, base: { ...off } };
-  };
-  useEffect(() => {
-    if (!edit) return;
-    const move = e => {
-      if (!drag.current) return;
-      const t = e.touches ? e.touches[0] : e;
-      const dx = Math.round(t.clientX - drag.current.x);
-      const dy = Math.round(t.clientY - drag.current.y);
-      const b = drag.current.base;
-      setOff(drag.current.which === 'top'
-        ? { ...b, tx: b.tx + dx, ty: b.ty + dy }
-        : { ...b, bx: b.bx + dx, by: b.by + dy });
-      e.preventDefault();
-    };
-    const up = () => { drag.current = null; };
-    window.addEventListener('pointermove', move, { passive: false });
-    window.addEventListener('pointerup', up);
-    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-  }, [edit, off]);
-
-  // 편집 중이 아니어도 **저장된 값이 있으면 그대로 적용**한다
-  const use = edit ? off : getVsOffset(kind, n, ffa);
-  const moved = use.tx || use.ty || use.bx || use.by;
-  const topShift = (edit || moved) ? `translate(${use.tx}px, ${use.ty}px)` : undefined;
-  const botShift = (edit || moved) ? `translate(${use.bx}px, ${use.by}px)` : undefined;
+  // [stated] **모드마다 자리를 따로 맞춰 두었다** (사용자가 직접 맞춘 값)
+  const use = getVsOffset(kind, n, ffa);
+  const topShift = `translate(${use.tx}px, ${use.ty}px)`;
+  const botShift = `translate(${use.bx}px, ${use.by}px)`;
 
   return (
-    <div className={'vs-wrap' + (edit ? ' editing' : '')}>
+    <div className="vs-wrap">
       {/* 위아래 반쪽이 사선으로 잘려 부딪힌다. 정보는 이미 붙어 있다 */}
       <div className="vs-half top">
-        <div className={'vs-pad' + (upSz.two ? ' two' : '') + (edit ? ' vs-edit' : '')}
-             onPointerDown={onDown('top')}
+        <div className={'vs-pad' + (upSz.two ? ' two' : '')}
              style={{ paddingTop: (upSz.pad*0.28) + '%',
-                      ...(topShift ? { transform: topShift } : {}) }}>{upper.map(line(upSz.zoom))}</div>
+                      transform: topShift }}>{upper.map(line(upSz.zoom))}</div>
       </div>
       <div className="vs-half bot">
-        <div className={'vs-pad' + (loSz.two ? ' two' : '') + (edit ? ' vs-edit' : '')}
-             onPointerDown={onDown('bot')}
+        <div className={'vs-pad' + (loSz.two ? ' two' : '')}
              style={{ paddingBottom: (loSz.pad*0.28) + '%',
-                      ...(botShift ? { transform: botShift } : {}) }}>{lower.map(line(loSz.zoom))}</div>
+                      transform: botShift }}>{lower.map(line(loSz.zoom))}</div>
       </div>
-      {edit && (
-        <div className="vs-edit-hud">
-          위 {off.tx}, {off.ty} · 아래 {off.bx}, {off.by}
-          <button onClick={() => setOff({ tx:0, ty:0, bx:0, by:0 })}>{t('set.vsReset')}</button>
-          <button onClick={() => editOpt.onSave?.(editOpt.key, off)}>{t('set.vsSave')}</button>
-          <button onClick={() => editOpt.onQuit?.()}>{t('common.back')}</button>
-        </div>
-      )}
 
       {/* 부딪힌 자리 — 번개 두 개 사이에 VS */}
       <div className="vs-seam">

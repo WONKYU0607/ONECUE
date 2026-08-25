@@ -22,7 +22,10 @@ const FW = 14 * RS, FH = 16 * RS;
 // 칼전 시트 규격 (melee.json)
 // 화면(CSS)과 같은 게임 글꼴. canvas는 CSS 변수를 못 읽어 여기에 한 번 더 적는다
 const GF = '"Arial Black","Helvetica Neue",Impact,"Apple SD Gothic Neo","Malgun Gothic",sans-serif';
-const MELEE_FW = 484, MELEE_FH = 198, MELEE_BODY_H = 190;
+// [stated] **칼전 시트를 절반으로 줄였다** — 3872x1188 은 메모리에 17.5MB 로 풀려
+// 판이 시작될 때 이걸 올리느라 초반이 걸렸다. 화면엔 36px 로 그리는데 원본이 182px 이라
+// 절반(1936x594, 4.4MB)으로도 여전히 줄여 그린다 — 보이는 건 그대로다
+const MELEE_FW = 242, MELEE_FH = 99, MELEE_BODY_H = 95;
 // 시트 열: 앞대기 앞공격 뒤대기 뒤공격 좌대기 좌공격 우대기 우공격
 // 화면이 뒤집힌 팀은 위·아래가 바뀌므로 그때만 앞뒤를 맞바꾼다
 // 축구 시트: 6행(색) x 8열. 자세 순서 0앞서 1뒤서 2좌서 3우서 4앞뛰 5뒤뛰 6좌뛰 7우뛰

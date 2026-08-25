@@ -99,7 +99,8 @@ console.log('우리 팀은 뒷모습, 상대 팀은 앞모습');
       s.phase = PH_PLAY;
       const fc = drawOnce(s, slot);
       // 캐릭터 그리기: 총격전은 원본 14x16, 칼전은 310x184
-      const SW = m.melee ? 484 : 14 * 3, SH = m.melee ? 198 : 16 * 3;
+      // [stated] **칼전 시트를 절반으로 줄였다** (초반 렉 — 메모리 17.5MB → 4.4MB)
+      const SW = m.melee ? 242 : 14 * 3, SH = m.melee ? 99 : 16 * 3;
       const chars = fc.calls.filter(c => c.name === 'drawImage' && c.args[2] === SW && c.args[3] === SH);
       assert(chars.length === m.n, `${m.name} 슬롯${slot} — 캐릭터 ${m.n}명을 그린다 (${chars.length})`);
       // 뒷모습 프레임: 총격전은 idx가 홀수, 칼전은 열 2·3
@@ -237,6 +238,40 @@ console.log('맞은 표시가 비싸지 않게');
   // 칼전·축구 둘 다 쓴다 (총격전은 흰색 그림이 시트에 따로 있다)
   assert(/whiteOf\(melee\)/.test(src), '  칼전에 쓴다');
   assert(/whiteOf\(soccerImg\)/.test(src), '  축구에도 쓴다');
+}
+
+
+// [stated] **판이 시작되고 몇 초가 유독 끊긴다** — 칼전 시트가 3872x1188 이라
+// 메모리에 17.5MB 로 풀린다. 판이 시작될 때 이걸 올리느라 걸렸다.
+// 화면엔 36px 로 그리는데 원본이 182px 이라 절반으로 줄여도 여전히 줄여 그린다
+console.log('칼전 시트가 너무 크지 않은가');
+{
+  const src = fs.readFileSync('src/game/render.js', 'utf8');
+  const m = src.match(/const MELEE_FW = (\d+), MELEE_FH = (\d+), MELEE_BODY_H = (\d+);/);
+  assert(m, '  칸 크기가 정의돼 있다');
+  const [, fw, fh] = m.map(Number);
+  assert(fw === 242 && fh === 99, `  칸 242x99 (${fw}x${fh})`);
+  // 시트 전체 크기 = 칸 x 열/행
+  const px = (fw * 8) * (fh * 6);
+  assert(px * 4 / 1024 / 1024 < 6, `  메모리 6MB 미만 (${(px*4/1024/1024).toFixed(1)}MB)`);
+  // 화면에 그리는 크기보다는 커야 선명하다
+  assert(fh > 36 * 2, '  화면 크기(36px)의 두 배 이상 — 줄여 그리므로 선명하다');
+}
+
+
+// [stated] **판이 시작되는 순간 그림을 올리느라 초반이 걸린다.**
+// VS 화면 3초(또는 모드를 고른 뒤)는 놀고 있으므로 그때 미리 준비한다 — 모든 모드에 적용
+console.log('그림을 미리 준비한다');
+{
+  const a = fs.readFileSync('src/game/assets.js', 'utf8');
+  assert(/export function warmUp\(keys\)/.test(a), '  미리 준비하는 함수가 있다');
+  assert(/img\.decode\(\)/.test(a), '  decode 로 압축까지 풀어 둔다');
+  assert(/export function keysFor/.test(a), '  판마다 필요한 그림 목록이 있다');
+  // 모든 모드가 목록을 얻는다
+  const q = fs.readFileSync('src/ui/screens/QuickMatch.jsx', 'utf8');
+  assert(/warmUp\(keysFor/.test(q), '  빠른 매칭(VS 화면)에서 미리 준비');
+  const app = fs.readFileSync('src/App.jsx', 'utf8');
+  assert((app.match(/warm\(\{/g) || []).length >= 4, '  방·연습·칼전·AI 도 미리 준비');
 }
 
 console.log('render.test.js 통과');

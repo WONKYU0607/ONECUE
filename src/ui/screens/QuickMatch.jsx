@@ -9,6 +9,7 @@ import { connectAndWait, disconnect, serverUrl } from '../../net/connection.js';
 import { spendFor, useSoccer } from '../../state/tickets.js';
 import VsIntro from '../VsIntro.jsx';
 import { sfx } from '../../game/audio.js';
+import { warmUp, keysFor } from '../../game/assets.js';
 import { SELF } from '../../game/config.js';
 import { t } from '../../i18n/index.js';
 
@@ -55,6 +56,9 @@ export default function QuickMatch({ session, onCancel, onMatched }){
         // 축구는 **전용 티켓**이라 일반 티켓을 안 건드린다
         if (session?.soccer) useSoccer(); else spendFor(!!session?.ffa);
         sfx.matched?.();
+        // [stated] **VS 화면 3초 동안 그림을 미리 준비한다** — 판이 시작될 때 올리면
+        // 그 순간이 걸린다. 여기서 미리 해두면 시작이 매끄럽다
+        warmUp(keysFor({ melee: SELF.melee, soccer: SELF.soccer, n: SELF.n }));
         // **VS 화면을 보여주고 넘어간다.** 정보가 안 오면 기다리지 않는다(0.6초)
         setStage('vs');
         setTimeout(() => { if (alive.current && !vsRef.current) go(); }, 600);

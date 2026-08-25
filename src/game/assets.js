@@ -61,3 +61,29 @@ export function getImage(key){
 }
 
 export const isReady = img => !!img && img.complete && img.naturalWidth > 0;
+
+// [stated] **판이 시작되는 순간 그림을 올리느라 초반이 걸린다.**
+// VS 화면 3초 동안은 아무 일도 안 하므로, 그때 미리 준비해 둔다.
+// `decode()` 는 압축을 풀어 그릴 준비까지 끝낸다 — 이걸 미리 해두면 판이 시작될 때 공짜다
+const warmed = new Set();
+export function warmUp(keys){
+  for (const k of keys){
+    if (warmed.has(k)) continue;      // **한 번만** — 모드를 고를 때와 VS 화면에서 두 번 불렸다
+    const img = getImage(k);
+    if (!img) continue;
+    warmed.add(k);
+    try {
+      if (img.decode) img.decode().catch(() => warmed.delete(k));   // 아직 못 받았으면 다음에 다시
+    } catch { /* 지원 안 하면 넘어간다 */ }
+  }
+}
+
+/** 이 판에 필요한 그림 이름들 */
+export function keysFor({ melee, soccer, n = 2 } = {}){
+  const arena = soccer ? 'arena4' : (melee ? 'arena3' : (n > 2 ? 'arena2' : 'arena'));
+  const who = soccer ? 'soccer' : (melee ? 'melee' : 'characters');
+  return soccer
+    ? [arena, who, 'ball', 'kickfx']
+    : [arena, who, 'items', 'explosion', 'fire', 'flash', 'flashfx',
+       'grenade', 'molotov', 'portal'];
+}
