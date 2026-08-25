@@ -553,6 +553,10 @@ export function createGame(canvas, opts = {}){
     reactTo(client.pred, dt);
     client.updateRender(a, dt);
     view.draw(client.pred, dbg, a, client, stick, input.drag, leftCount, okCell, {
+      // [stated] **YOU WIN 이 떴다가 사라지고 판이 계속됐다.**
+      // 화면은 예측 상태로 그리는데, 예측이 먼저 "죽었다"고 판단하면 배너가 뜬다.
+      // 서버가 아니라고 하면 되돌려져 사라진다 → **승패 배너는 확정본으로만**
+      overPhase: client.s.phase,
       ammo: ammoLeft, charge: input.charge, softFlash: opts.softFlash?.() || false, juice,
       // 공도 캐릭터처럼 **부드럽게 따라가는 위치**로 그린다 (안 그러면 순간이동한다)
       ball: client.ballRender ? client.ballRender(dt) : null,

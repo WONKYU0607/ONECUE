@@ -214,7 +214,6 @@ export function normalizeState(st){
   if (!Array.isArray(st.portals)) st.portals = [];
   if (!Array.isArray(st.onPort) || st.onPort.length !== (st.n || 2))
     st.onPort = Array.from({ length: st.n || 2 }, () => -1);
-  if (typeof st.noBuff !== 'boolean') st.noBuff = false;
   return st;
 }
 
@@ -313,7 +312,6 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     seed: 0,                                     // 결정론적 난수 씨앗 (서버가 정한다)
     portals: [],                                 // 차원문 [{c,r}] — 칼전만
     onPort: Array.from({ length: n }, () => -1), // 지금 밟고 있는 차원문 (-1이면 없음)
-    noBuff: false,                               // 노버프전인가
 
     phase: PH_READY, timer: 0, clock: 0,
     rdy: readyLimit(melee, soccer),   // 준비 단계 남은 틱. 0이 되면 자동으로 시작한다
@@ -654,7 +652,9 @@ export function step(s, inp){
         s.negLost = { slot: i, t: NEG_SHOW };
       if (q.fastReq && !s.fast && !s.melee && !s.soccer && !pending){ s.fastBy = i + 1; s.fastT = NEG_TICKS; s.negOk = []; }
       // [stated] 칼전에도 신청 가능. 칼전은 없앨 아이템이 없으므로 **버프를 끈다**
-      if (q.bareReq && !s.bare && !s.soccer && !pending){ s.bareBy = i + 1; s.bareT = NEG_TICKS; s.negOk = []; }
+      // [stated] **칼전에는 노템전이 없다** — 버튼만 없애면 고친 클라가 신청할 수 있어
+      // 시뮬에서도 막는다 (축구와 같은 방식)
+      if (q.bareReq && !s.bare && !s.soccer && !s.melee && !pending){ s.bareBy = i + 1; s.bareT = NEG_TICKS; s.negOk = []; }
 
       const by = s.fastBy || s.bareBy;
       if (!q.fastAns && !q.bareAns) continue;
@@ -690,7 +690,7 @@ export function step(s, inp){
         s.negDone = { kind: s.fastBy ? 'fast' : 'bare', by: (s.fastBy || s.bareBy) - 1, t: NEG_SHOW };
         if (s.fastBy) s.fast = true;
         // 칼전은 없앨 아이템이 없으므로 **버프를 끈다** (= 노버프전)
-        else { s.bare = true; s.items = []; if (s.melee) s.noBuff = true; }
+        else { s.bare = true; s.items = []; }
         s.fastBy = 0; s.bareBy = 0; s.fastT = 0; s.bareT = 0; s.negOk = []; s.negNo2 = [];
       }
     }
@@ -1181,7 +1181,8 @@ export function step(s, inp){
   // ── 칼전 버프 ────────────────────────────────────────────
   // [stated] 칸에 무작위로 뜨고 밟으면 얻는다. 개인전에도 넣는다.
   // **결정론적 난수**를 쓴다 — 서버와 클라가 같은 자리에 띄워야 한다
-  if (s.melee && !s.noBuff && !s.solo && s.phase === PH_PLAY){
+  // [stated] **칼전 노버프전은 없앴다** — 신청 자체를 막았으므로 버프는 늘 나온다
+  if (s.melee && !s.solo && s.phase === PH_PLAY){
     // 뜨기
     if (s.buffs.length < BUFF_MAX && s.tick > 0 && s.tick % BUFF_EVERY === 0){
       const kind = rnd(s, 1) % BUFF_KINDS;
@@ -1371,7 +1372,6 @@ export function resetForNextRound(s){
   // s.off 는 그대로 둔다 — 다시 해도 여전히 끊겨 있는 사람은 끊긴 것
   s.fast = false; s.fastBy = 0;                            // 2배속은 그 판 한정
   s.bare = false; s.bareBy = 0; s.fastT = 0; s.bareT = 0;  // 노템전도 그 판 한정
-  s.noBuff = false;
   s.negOk = []; s.negNo = []; s.negNo2 = []; s.negDone = null; s.negLost = null;
   s.maxStep = ms; s.bulletV = bv; s.coolT = ct;
   s.tick = t;
@@ -1426,7 +1426,7 @@ export function checksum(s){
   setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   let h = s.tick + s.maxStep + s.bulletV + s.coolT + s.phase * 7 + s.timer + s.clock;
   h = (h*31 + (s.rdy | 0)) | 0;
-  h = (h*31 + (s.seed | 0) + (s.noBuff ? 7 : 0)) | 0;
+  h = (h*31 + (s.seed | 0)) | 0;
   for (const b of s.buffs) h = (h*31 + b.k*5 + b.c*11 + b.r*17) | 0;
   for (const g of s.portals) h = (h*31 + g.c*13 + g.r*19) | 0;
   for (const v of s.onPort) h = (h*31 + v) | 0;

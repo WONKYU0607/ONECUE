@@ -88,11 +88,14 @@ export default function VsIntro({ vs, mySlot, onDone }){
     // (2대2 0.7 / 3대3 0.6 / 4명 이상 0.6 에서 잘림이 사라진다)
     // [stated] **개인전 6인에서 오른쪽 줄이 겹치고 잘렸다** — 다섯 명이 두 줄로 들어가면
     //  0.6 으로는 절반 폭을 넘는다. 5명 이상은 더 줄인다
-    zoom: cnt >= 5 ? 0.46 : cnt === 4 ? 0.6 : cnt === 3 ? 0.6 : cnt === 2 ? 0.7 : 1,
+    // [stated] **너무 아래에 있다** — 사선 쪽(가운데)으로 모으고 크기도 키운다
+    zoom: cnt >= 5 ? 0.5 : cnt === 4 ? 0.66 : cnt === 3 ? 0.72 : cnt === 2 ? 0.78 : 1,
     // 위 조각은 위에서, 아래 조각은 아래에서 붙으므로 **여백을 키워야** 가운데로 온다
     // (줄였더니 오히려 바깥으로 밀렸다)
     // **사선 쪽 줄이 잘렸다** — 조각은 사선까지밖에 안 보이므로 여백을 더 줘 안쪽으로 민다
-    pad: cnt >= 5 ? 2 : cnt === 4 ? 4 : cnt === 3 ? 14 : cnt === 2 ? 20 : 28
+    // 여백을 줄이면 사선 쪽(가운데)으로 붙는다
+    // 사선에서 얼마나 떨어질지 (작을수록 가운데에 가깝다)
+    pad: cnt >= 5 ? 30 : cnt === 4 ? 32 : cnt === 3 ? 34 : cnt === 2 ? 40 : 46
   });
   const upSz = sizeOf(upper.length || 1);
   const loSz = sizeOf(lower.length || 1);
@@ -123,11 +126,11 @@ export default function VsIntro({ vs, mySlot, onDone }){
       {/* 위아래 반쪽이 사선으로 잘려 부딪힌다. 정보는 이미 붙어 있다 */}
       <div className="vs-half top">
         <div className={'vs-pad' + (upSz.two ? ' two' : '')}
-             style={{ paddingTop: upSz.pad + '%' }}>{upper.map(line(upSz.zoom))}</div>
+             style={{ paddingTop: (upSz.pad*0.28) + '%' }}>{upper.map(line(upSz.zoom))}</div>
       </div>
       <div className="vs-half bot">
         <div className={'vs-pad' + (loSz.two ? ' two' : '')}
-             style={{ paddingBottom: loSz.pad + '%' }}>{lower.map(line(loSz.zoom))}</div>
+             style={{ paddingBottom: (loSz.pad*0.28) + '%' }}>{lower.map(line(loSz.zoom))}</div>
       </div>
 
       {/* 부딪힌 자리 — 번개 두 개 사이에 VS */}

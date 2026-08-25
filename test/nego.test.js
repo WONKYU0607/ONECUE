@@ -95,20 +95,17 @@ console.log('칼전 2배속 — 카운트다운 중에 신청한다');
   w.run(20);
   assert(w.srv.s.fastBy === 0, '2배속 신청은 무시된다');
 
+  // [stated] **칼전에는 노템전이 없다** — 시뮬에서도 막는다
+  // (버튼만 없애면 고친 클라가 신청할 수 있다)
   w.cs[0].requestBare(0);
   w.run(20);
-  assert(w.srv.s.bareBy === 1, '준비 단계에서 노버프전 신청이 들어간다');
-  assert(w.cs[1].pred.bareBy === 1, '**상대 클라까지 전달된다**');
+  assert(w.srv.s.bareBy === 0, '칼전은 노템전 신청이 안 들어간다');
+  assert(w.cs[1].pred.bareBy === 0, '상대 클라에도 안 뜬다');
 
-  // 답을 기다리는 동안 카운트가 멈춰야 한다 (안 그러면 3.8초 안에 못 누른다)
+  // 신청이 없으니 준비 단계는 그대로 흐른다
   w.run(150);
-  assert(w.srv.s.phase === PH_READY, '준비 단계라 시간 압박이 없다');
-
-  SELF.slot = 1;
-  w.cs[1].answerBare(1, true);
-  w.run(20);
-  assert(w.srv.s.bare === true, '수락하면 켜진다');
-  assert(w.srv.s.noBuff === true, '칼전이면 버프가 꺼진다');
+  assert(w.srv.s.phase === PH_READY, '준비 단계 그대로');
+  assert(w.srv.s.bare === false, '노템전이 안 켜진다');
   for (let i = 0; i < 2; i++){ SELF.slot = i; w.cs[i].setGo(i); }
   w.run(300);
   assert(w.srv.s.phase === PH_PLAY, '준비완료하면 전투 시작');
@@ -168,19 +165,17 @@ console.log('칼전은 답이 없어도 제한 시간 뒤 시작한다');
 
 console.log('칼전도 노템전을 신청할 수 있다 — 버프를 끄는 뜻이다');
 {
-  // [stated] 칼전엔 없앨 아이템이 없으므로 노템전 = **노버프전**.
-  // 예전엔 `!s.melee` 조건이 있어 신청 자체가 무시됐다
+  // [stated] **칼전에는 노템전(노버프전)을 없앴다.** 버튼도 없고 시뮬도 안 받는다
   const w = world(true);
   w.run(60);
   SELF.slot = 0; SELF.n = 2;
   w.cs[0].requestBare(0);
   w.run(20);
-  assert(w.srv.s.bareBy === 1, `칼전에서도 신청이 간다 (bareBy ${w.srv.s.bareBy})`);
-  // 상대가 수락하면 버프가 꺼진다
+  assert(w.srv.s.bareBy === 0, `칼전은 신청이 안 간다 (bareBy ${w.srv.s.bareBy})`);
+  // 수락 신호를 억지로 보내도 안 켜진다
   w.cs[1].answerBare(1, true);
   w.run(20);
-  assert(w.srv.s.bare === true, '수락하면 켜진다');
-  assert(w.srv.s.noBuff === true, '칼전이면 버프가 꺼진다');
+  assert(w.srv.s.bare === false, '억지로 수락해도 안 켜진다');
 }
 
 console.log('칼전은 준비완료를 누르면 바로 시작한다');

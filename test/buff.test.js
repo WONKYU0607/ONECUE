@@ -66,13 +66,6 @@ console.log('총격전·연습에는 안 뜬다');
   assert(p.buffs.length === 0, '연습엔 없다');
 }
 
-console.log('노버프전이면 안 뜬다');
-{
-  const s = play(2, false); s.noBuff = true;
-  for (let t = 0; t < 1800; t++) step(s, IN(2));
-  assert(s.buffs.length === 0, '하나도 안 뜬다');
-}
-
 console.log('밟으면 얻는다');
 {
   for (const k of [BUFF.SPD, BUFF.ATK, BUFF.INVUL]){
@@ -134,7 +127,7 @@ console.log('상태 전송·체크섬');
   assert(checksum(back) === checksum(s), '복제해도 같다');
   // 옛 서버가 보낸 버프 없는 상태를 받아도 안 죽는다
   const old = cloneState(s);
-  delete old.buffs; delete old.bf; delete old.seed; delete old.noBuff;
+  delete old.buffs; delete old.bf; delete old.seed;
   const fixed = normalizeState(old);
   assert(Array.isArray(fixed.buffs) && Array.isArray(fixed.bf), '없으면 채운다');
   assert(fixed.bf.length === 4, '인원수만큼');

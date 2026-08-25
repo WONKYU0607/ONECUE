@@ -214,7 +214,8 @@ console.log('uistate.test.js 통과');
 console.log('수락되면 가운데 알림이 뜬다');
 {
   // [stated] "상대방이 2배속 신청을 수락하셨습니다" 같은 문구를 화면 가운데에
-  for (const [melee, nm] of [[false, '총격'], [true, '칼전']]){
+  // [stated] **칼전에는 노템전이 없다** — 총격전만 확인한다
+  for (const [melee, nm] of [[false, '총격']]){
     const s = newState(2, melee);
     let q = IN(2); q[0].bareReq = 1; step(s, q);
     q = IN(2); q[1].bareAns = 1; step(s, q);

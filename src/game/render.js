@@ -736,7 +736,11 @@ export function createRenderer(canvas){
         const y = sy + (my - sy) * k - Math.sin(Math.PI * k) * 34;
         const img = throwImg[pr.k];
         if (isReady(img)){
-          const w = img.naturalWidth / RS * 0.7, h = img.naturalHeight / RS * 0.7;
+          // [stated] **총격전 팀전 맵에서 투척물이 너무 크다** — 맵이 더 넓은데
+          // 그림 크기는 그대로라 상대적으로 커 보인다. 팀전(3인 이상)에서 **40% 줄인다**
+          const teamMap = !ARENA.melee && !ARENA.soccer && (s.n || 2) > 2;
+          const z = 0.7 * (teamMap ? 0.6 : 1);
+          const w = img.naturalWidth / RS * z, h = img.naturalHeight / RS * z;
           ctx.drawImage(img, Math.round((x - w/2)*RS), Math.round((y - h/2)*RS),
                         Math.round(w*RS), Math.round(h*RS));
         } else px(x - 2, y - 2, 4, 4, '#e8e8f0');
@@ -1097,7 +1101,8 @@ export function createRenderer(canvas){
       ctx.fillText(label, W/2*RS, (H * 0.30 + (big ? 6 : 16)) * RS);
       ctx.font = '700 ' + (8*RS) + 'px ' + GF;
     }
-    if (s.phase === PH_OVER){
+    // **승패 배너만은 확정본을 본다** — 예측으로 띄우면 떴다가 사라진다
+    if ((extra.overPhase !== undefined ? extra.overPhase : s.phase) === PH_OVER){
       px(0, H/2-26, W, 26, 'rgba(0,0,0,0.75)');
       ctx.font = '900 ' + (12*RS) + 'px ' + GF;
       // 결과 판단은 한 곳에서만 (예전에 화면과 결과창이 서로 다른 답을 냈다)

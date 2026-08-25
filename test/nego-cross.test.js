@@ -61,14 +61,14 @@ console.log('칼전 — 2배속은 아예 안 걸린다');
   // 버튼도 안 나와야 한다
   const p = uiPrompt(room(true), 0, true);
   assert(!p.offer.includes('fast'), `  버튼에도 없다 (${p.offer.join(',')})`);
-  assert(p.offer.includes('bare'), '  노버프전 버튼은 있다');
+  assert(!p.offer.includes('bare'), '  노버프전 버튼이 없다');
 }
 
-console.log('칼전 — 노버프전은 버프를 끈다');
+// [stated] **칼전 노버프전은 없앴다** — 버튼도 없고 시뮬도 안 받는다
+console.log('칼전 — 노버프전이 아예 없다');
 {
   const s = negotiate(room(true), 0, 'bare');
-  assert(s.bare === true, '  노버프전이 켜진다');
-  assert(s.noBuff === true, '  버프가 꺼진다');
+  assert(s.bare === false, '  신청해도 안 켜진다');
 }
 
 console.log('거절하면 아무것도 안 걸린다');

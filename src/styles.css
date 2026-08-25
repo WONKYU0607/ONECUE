@@ -693,14 +693,26 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .vs-half.bot{align-items:flex-end;justify-content:flex-start}
 /* [stated] **자리는 예전 그대로 두고, 잘리는 것만 크기를 줄인다.**
    (잘림을 잡겠다고 자리를 옮겼다가 "위치 바꾸라고 했나"는 지적을 받았다) */
-.vs-half.top .vs-pad{width:92%;padding:14% 0 0 16px}
+/* [stated] **가운데(사선) 쪽으로 붙인다** — 위 조각은 아래쪽에 붙이고,
+   아래 조각은 위쪽에 붙인다. 사선은 왼쪽 72% / 오른쪽 28% 를 잇는다 */
+/* [stated] **캐릭터를 번개(사선) 쪽으로 모은다.**
+   사선은 왼쪽 위에서 오른쪽 아래로 내려온다 → 위 조각은 **오른쪽**이, 아래 조각은 **왼쪽**이 사선에 가깝다 */
+.vs-half.top .vs-pad{width:92%;padding:0 0 0 16px;transform:translateY(30px)}
 /* [stated] 4~5명은 **옆 여백을 써서 두 줄**로 (한 줄로 세우면 너무 작아진다) */
 .vs-pad.two{display:flex;flex-wrap:wrap;align-content:flex-start}
 .vs-pad.two .vs-row{width:50%;box-sizing:border-box;padding-right:8px}
 /* 사선이 오른쪽으로 갈수록 올라간다 → **오른쪽 열만 조금 내려** 번개를 피한다 */
 .vs-half.bot .vs-pad.two .vs-row:nth-child(2n){margin-top:2.2em}
 .vs-half.top .vs-pad.two .vs-row:nth-child(2n){margin-bottom:2.2em}
-.vs-half.bot .vs-pad{width:92%;padding:0 0 14% 16px}
+/* [stated] **아래 진영은 위와 대칭으로 오른쪽 끝에** — 사선이 왼쪽으로 내려가므로
+   아래 조각은 오른쪽이 넓다. 거기에 붙여야 잘리지 않고 위아래가 대칭으로 보인다 */
+/* 아래 조각은 **위쪽이 사선에 잘려** 보이지 않는다. 오른쪽 끝에서 사선은 28% 높이라
+   그 바로 아래(약 32%)부터 시작해야 가운데 쪽으로 붙어 보인다 */
+/* 아래 조각은 **아래쪽에서 밀어 올린다** — 위 조각이 위 끝에서 21px 인 것과 대칭이 되게.
+   `margin-top:auto` 로 바닥에 붙인 뒤 아래 여백만큼 띄운다 */
+.vs-half.bot .vs-pad{width:92%;padding:0 16px 0 0;margin-left:auto;margin-top:auto;transform:translateY(-30px)}
+.vs-half.bot .vs-row{justify-content:flex-end}
+.vs-half.bot .vs-pad.two .vs-row{padding-right:0;padding-left:8px}
 /* 아래 조각도 **왼쪽부터** 읽는 순서를 지킨다 — 뒤집었더니 트로피가 숫자 뒤로 갔다 */
 .vs-half.bot .vs-info{align-items:flex-start}
 
