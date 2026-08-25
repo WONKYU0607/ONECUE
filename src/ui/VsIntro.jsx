@@ -163,7 +163,7 @@ export default function VsIntro({ vs, mySlot, onDone, edit: editOpt }){
   const botShift = (edit || moved) ? `translate(${use.bx}px, ${use.by}px)` : undefined;
 
   return (
-    <div className="vs-wrap">
+    <div className={'vs-wrap' + (edit ? ' editing' : '')}>
       {/* 위아래 반쪽이 사선으로 잘려 부딪힌다. 정보는 이미 붙어 있다 */}
       <div className="vs-half top">
         <div className={'vs-pad' + (upSz.two ? ' two' : '') + (edit ? ' vs-edit' : '')}

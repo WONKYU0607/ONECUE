@@ -695,6 +695,9 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
    (잘림을 잡겠다고 자리를 옮겼다가 "위치 바꾸라고 했나"는 지적을 받았다) */
 /* [stated] **가운데(사선) 쪽으로 붙인다** — 위 조각은 아래쪽에 붙이고,
    아래 조각은 위쪽에 붙인다. 사선은 왼쪽 72% / 오른쪽 28% 를 잇는다 */
+.vs-list{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-bottom:calc(var(--sab) + 16px)}
+
 /* 복사가 막히면 값을 글로 띄운다 — 길게 눌러 복사할 수 있게 */
 .vs-dump{user-select:text;-webkit-user-select:text;word-break:break-all;
   padding:8px;border-radius:4px;background:rgba(12,22,36,.7);
@@ -702,6 +705,14 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 
 /* [stated] **자리를 직접 옮겨 값을 보는 편집 모드** (`window.__vsEdit = true`) */
 .vs-pad.vs-edit{outline:2px dashed #ffd34d;outline-offset:-2px;cursor:move;touch-action:none;z-index:31}
+/* [stated] **밑으로 끌리지 않았다** — 사선(`clip-path`)이 잘라내서 밖으로 나가면 안 보인다.
+   편집 중에는 자르기를 풀어 어디로든 옮길 수 있게 한다 */
+.vs-wrap.editing .vs-half.top,
+.vs-wrap.editing .vs-half.bot{clip-path:none;background:transparent}
+.vs-wrap.editing .vs-half.bot{pointer-events:none}
+.vs-wrap.editing .vs-half.bot .vs-pad{pointer-events:auto}
+.vs-wrap.editing .vs-half.top{pointer-events:none}
+.vs-wrap.editing .vs-half.top .vs-pad{pointer-events:auto}
 /* [stated] **네모를 아래로 끌면 저장 버튼을 덮었다.**
    → 편집칸은 **화면 맨 위**에 두고, 네모(`z-index:31`)보다 위에 그린다 */
 .vs-edit-hud{position:fixed;left:0;right:0;top:0;z-index:80;

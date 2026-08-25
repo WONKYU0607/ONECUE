@@ -57,7 +57,8 @@ export default function VsLayout({ onBack }){
         <span className="title">{t('set.vsEdit')}</span>
         <span className="spacer" />
       </header>
-      <div className="menu wide-menu">
+      {/* [stated] **아래쪽 항목까지 안 내려갔다** — 열두 모드라 한 화면을 넘친다. 스크롤되게 한다 */}
+      <div className="menu wide-menu vs-list">
         <p className="hint">{t('set.vsHelp')}</p>
         {CASES.map(([kind, n, ffa]) => {
           const key = vsKeyOf(kind, n, ffa);
