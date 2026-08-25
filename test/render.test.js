@@ -1,3 +1,4 @@
+import fs from 'fs';
 // 화면 그리기 연기 테스트.
 //
 // 오늘까지 검은 화면이 세 번 났고 전부 그리는 코드였다(팔레트 빈 배열 / 슬롯 2·3 없음 /
@@ -220,6 +221,22 @@ for (const m of modes){
   } catch (e) { err = e; }
   assert(!err, `${m.name} 240틱 동안 매번 그려진다 (${err && err.message})`);
   assert(worst === 0, `${m.name} 240틱 동안 좌표 정상`);
+}
+
+
+// [stated] **칼전 초반이 유독 끊긴다** — 맞을 때 `ctx.filter` 로 하얗게 만들었는데
+// 이건 브라우저가 매번 이미지를 다시 처리해서 아주 비싸다.
+// 여섯이 붙어 싸우는 칼전은 타격이 몰려 44fps 까지 떨어졌다 (실측 최악 100ms)
+console.log('맞은 표시가 비싸지 않게');
+{
+  const src = fs.readFileSync('src/game/render.js', 'utf8');
+  assert(!/ctx\.filter = 'grayscale/.test(src), '  비싼 filter 를 안 쓴다');
+  assert(/function whiteOf\(img\)/.test(src), '  하얀 판을 미리 만들어 둔다');
+  assert(/whiteCache\.set\(img, c\)/.test(src), '  한 번만 만들고 다시 쓴다');
+  assert(/source-atop/.test(src), '  그림이 있는 자리만 하얗게');
+  // 칼전·축구 둘 다 쓴다 (총격전은 흰색 그림이 시트에 따로 있다)
+  assert(/whiteOf\(melee\)/.test(src), '  칼전에 쓴다');
+  assert(/whiteOf\(soccerImg\)/.test(src), '  축구에도 쓴다');
 }
 
 console.log('render.test.js 통과');

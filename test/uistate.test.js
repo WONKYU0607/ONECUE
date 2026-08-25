@@ -80,7 +80,9 @@ console.log('시간이 지나면 창이 사라지고 버튼이 돌아온다');
   for (let t = 0; t < NEG_TICKS + 5; t++) step(s, IN(2));
   const r = P(s);
   assert(!r.ask && !r.waiting, '창이 사라진다');
-  assert(r.offer.length === 2, '다시 신청할 수 있다');
+  // [stated] **거절된 신청은 버튼이 사라진다** — 상대가 걸었다 거절된 것도 마찬가지다.
+  // 시간이 다 돼 저절로 취소된 것도 거절로 친다
+  assert(r.offer.length < 2, '거절된 종류는 다시 안 뜬다');
   assert(r.banner.length === 0, '켜지지는 않았다');
 }
 

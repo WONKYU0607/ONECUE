@@ -134,7 +134,11 @@ export function uiPrompt(st, slot, online){
     // [stated] 칼전에는 2배속을 안 쓴다 — 버프(이속 1.5 · 공속 1.5)만으로 충분히 빠르다.
     // 둘이 곱해지면 이동 3배·칼 주기 3배가 되어 과했다
     // [stated] **거절당한 종류는 버튼을 없앤다** — 계속 남아 있어 몇 번이고 신청하게 됐다
-    const denied = (Array.isArray(st.negNo) && st.negNo[slot]) || [];
+    // [stated] **거절된 신청은 버튼이 사라져야 한다** — 상대가 걸었다 거절된 것도 마찬가지다.
+    // 예전엔 신청한 사람 자리에만 기록해서, 거절당한 뒤에도 남의 화면엔 버튼이 남았다
+    const denied = Array.isArray(st.negNo)
+      ? st.negNo.reduce((a, v) => (Array.isArray(v) ? a.concat(v) : a), [])
+      : [];
     if (!st.fast && !st.melee && !denied.includes('fast')) offer.push('fast');
     // [stated] 칼전에도 신청할 수 있다 — 없앨 아이템이 없으므로 **버프를 끈다**.
     // 시뮬은 열어놨는데 이 목록에 `!st.melee` 가 남아 버튼이 안 떴다

@@ -18,7 +18,7 @@ const LABEL = {
   softFlash: 'set.softFlash'
 };
 
-export default function SettingsModal({ onClose, onTuto }){
+export default function SettingsModal({ onClose, onTuto, onVsLayout }){
   const [s, setS] = useState(getSettings);
   const [lang, setL] = useState(getLang);
 
@@ -53,6 +53,11 @@ export default function SettingsModal({ onClose, onTuto }){
           <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </header>
         {/* [stated] **튜토리얼 다시 하기** — 처음 켤 때만 묻지만 여기서 언제든 다시 */}
+        {/* [stated] **VS 화면 자리를 직접 옮겨 보는 모드.** 켜고 VS 화면에서 끌면
+            아래에 값이 뜬다. 그 값을 알려주면 코드에 박는다 */}
+        <button className="menu-btn sm tuto-again" onClick={() => onVsLayout?.()}>
+          <span className="t">{t('set.vsEdit')}</span>
+        </button>
         <button className="menu-btn sm tuto-again" onClick={() => { resetTuto(); onClose?.(); onTuto?.(); }}>
           <span className="t">{t('tuto.again')}</span>
         </button>

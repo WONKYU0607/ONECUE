@@ -80,6 +80,26 @@ export function createRenderer(canvas){
   const roll = makeRoller();                // 공 굴림 각도 (그리기 전용)
   const bgOf = () => getImage(ARENA.bg);   // 아레나에 따라 배경이 달라진다
   const boom = getImage('explosion');
+
+  // [stated] **칼전 초반이 유독 끊긴다.** 맞을 때 `ctx.filter` 로 하얗게 만들었는데
+  // 이건 매우 비싸다 — 여섯이 붙어 싸우는 칼전은 초반에 타격이 몰려 프레임이 무너졌다.
+  // → **하얀 판을 한 번만 미리 만들어 두고** 그때는 그걸 그린다 (매 프레임 비용 0)
+  const whiteCache = new Map();
+  function whiteOf(img){
+    // 검사 환경에는 `document` 가 없다 — 그때는 원본을 그대로 쓴다
+    if (!isReady(img) || typeof document === 'undefined') return null;
+    let c = whiteCache.get(img);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    g.globalCompositeOperation = 'source-atop';   // 그림이 있는 자리만 하얗게
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, c.width, c.height);
+    whiteCache.set(img, c);
+    return c;
+  }
   const flashfx = getImage('flashfx');
   const throwImg = THROW_DEF.map(d => getImage(d.key));
   const fireImg = getImage('fire');
@@ -163,21 +183,20 @@ export function createRenderer(canvas){
       // 그래서 자세마다 **긴 쪽 길이를 48 로 맞추는** 배율을 따로 곱한다
       const sc = ARENA.ph / SOC_BODY * 1.35 * (SOC_SCALE[fc] || 1);
       const dw = SOC_FW * sc, dh = SOC_FH * sc;
-      if (hit) ctx.filter = 'grayscale(1) brightness(3.4)';
+      const socSrc = (hit && whiteOf(soccerImg)) || soccerImg;
       const dx0 = Math.round((xw + ARENA.pw / 2 - dw / 2) * RS);
       const dy0 = Math.round((yw + ARENA.ph - dh) * RS);
       if (mirror){
         ctx.save();
         ctx.translate(dx0 + Math.round(dw * RS), dy0);
         ctx.scale(-1, 1);
-        ctx.drawImage(soccerImg, fc * SOC_FW, col * SOC_FH, SOC_FW, SOC_FH,
+        ctx.drawImage(socSrc, fc * SOC_FW, col * SOC_FH, SOC_FW, SOC_FH,
           0, 0, Math.round(dw * RS), Math.round(dh * RS));
         ctx.restore();
       } else {
-        ctx.drawImage(soccerImg, fc * SOC_FW, col * SOC_FH, SOC_FW, SOC_FH,
+        ctx.drawImage(socSrc, fc * SOC_FW, col * SOC_FH, SOC_FW, SOC_FH,
           dx0, dy0, Math.round(dw * RS), Math.round(dh * RS));
       }
-      ctx.filter = 'none';
       if (off) ctx.globalAlpha = 1;
       return;
     }
@@ -192,12 +211,11 @@ export function createRenderer(canvas){
       const dw = MELEE_FW * sc, dh = MELEE_FH * sc;
       // 총격전은 흰색 프레임이 따로 있는데 칼전 시트엔 없다.
       // 밝기만 올리면 색이 남아 '몸 색이 바뀐 것'처럼 보이므로 완전히 하얗게 만든다
-      if (hit) ctx.filter = 'grayscale(1) brightness(3.4)';
       // 시트는 몸통 가로 중심 기준이라, 캐릭터 상자 가운데에 맞춰 그린다
-      ctx.drawImage(melee, fc * MELEE_FW, col * MELEE_FH, MELEE_FW, MELEE_FH,
+      const meleeSrc = (hit && whiteOf(melee)) || melee;
+      ctx.drawImage(meleeSrc, fc * MELEE_FW, col * MELEE_FH, MELEE_FW, MELEE_FH,
         Math.round((xw + ARENA.pw / 2 - dw / 2) * RS), Math.round((yw + ARENA.ph - dh) * RS),
         Math.round(dw * RS), Math.round(dh * RS));
-      ctx.filter = 'none';
       // 방패를 든 동안: 바라보는 쪽에 빛나는 호를 그린다 (시트에 방패 프레임이 없다)
       if (p.shield > 0){
         const cx = xw + ARENA.pw / 2, cy = yw + ARENA.ph / 2;

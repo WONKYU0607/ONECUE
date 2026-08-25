@@ -157,11 +157,11 @@ export default function Result({ result, summary, score, session, host, onAgain,
         {/* [stated] **판이 끝나면 방으로 돌아온다** — 온라인에서는 방장만 다시 시작한다.
             나머지는 기다린다(방장이 누르면 저절로 넘어간다) */}
         {/* 관전자는 자리가 없으므로 다시 하기도 없다 */}
-        {/* [stated] **빠른 매칭의 '다시 하기' 는 새 상대를 찾는다** — 티켓이 없으면 못 찾으니 막는다 */}
-        {(!session?.online || (host && !session?.watching)) && (
-          <button className="menu-btn primary" disabled={!canAgain}
-                  onClick={onAgain}>
-            <span className="t">{t(canAgain ? 'res.again' : 'res.noTicket')}</span>
+        {/* [stated] **티켓이 없으면 버튼을 아예 안 그린다** — '티켓 없음' 을 띄워봐야
+            누를 수도 없는 자리만 차지한다 */}
+        {(!session?.online || (host && !session?.watching)) && canAgain && (
+          <button className="menu-btn primary" onClick={onAgain}>
+            <span className="t">{t('res.again')}</span>
           </button>
         )}
         {/* [stated] **판이 끝나면 방으로 돌아온다** — 종목·인원은 로비에서 고른다 */}
