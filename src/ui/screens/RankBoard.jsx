@@ -39,6 +39,9 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
   }, [kind]);
 
   const me = fmtRank(data && data.my);
+  // 서버가 준 내 점수가 있으면 그것이 옳다 (기기 값은 못 따라올 수 있다)
+  const svScore = data && data.my && Number.isInteger(data.my.score) ? data.my.score : null;
+  const myScore = svScore === null ? scoreOf(kind) : svScore;
   const myNick = getNick();
 
   // 친구 순위표: 친구 목록 + 나를 점수순으로 세운다
@@ -110,13 +113,15 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
         {!onlyFriends && <div className="rb-me">
           <span className="rb-no">{(data && data.my && data.my.rank) || '-'}</span>
           {/* [stated] 축구는 **티어를 안 나눈다** — 점수만 센다 */}
-          {kind !== 'soccer' && <TierIcon score={scoreOf(kind)} />}
+          {kind !== 'soccer' && <TierIcon score={myScore} />}
           <span className="rb-nick">{myNick}</span>
-          <span className="rb-tier">{tierName(tierOf(scoreOf(kind)))}</span>
+          <span className="rb-tier">{tierName(tierOf(myScore))}</span>
           <span className="rb-rank">
             {busy ? t('rank.loading') : (me ? t('rank.mine', { r: me.rank, n: me.total }) : t('rank.none'))}
           </span>
-          <span className="rb-score">{scoreOf(kind).toLocaleString()}</span>
+          {/* [stated] **위 칸과 목록의 점수가 달랐다** — 위 칸은 기기에 쌓인 값,
+              목록은 서버가 만든 값이라 따로 자랐다. **서버 값이 있으면 그것을 쓴다** */}
+          <span className="rb-score">{myScore.toLocaleString()}</span>
         </div>}
 
         <div className="rb-list">
@@ -132,8 +137,7 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
               {/* [stated] **내 점수가 위 칸과 목록에서 달랐다** — 목록은 판이 끝날 때 다시 만들고
                   클라가 1분 캐시라 여러 판을 하면 뒤처진다. **내 줄만은 지금 값**을 쓴다 */}
               <span className="rb-score">
-                {(((row.nick && row.nick === myNick && data && data.my && data.my.score)
-                   || row.score) | 0).toLocaleString()}
+                {((row.nick && row.nick === myNick ? myScore : (row.score | 0))).toLocaleString()}
               </span>
             </div>
           ))}

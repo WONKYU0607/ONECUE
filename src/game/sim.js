@@ -125,9 +125,8 @@ import {
   teamYMin,
   topSpan,
   botSpan,
-  wallIdx
-,
-  NEG_SHOW, BARR_BLAST_DMG, BARR_FIRE_DMG,
+  wallIdx,
+  NEG_SHOW, BARR_BLAST_DMG, BARR_FIRE_DMG, MELEE_SPD
 } from './config.js';
 import {
   stepBall, stepBallInGoal, ballHome, KICKOFF, GOAL, FIELD,
@@ -746,7 +745,9 @@ export function step(s, inp){
     // [stated] **10 에서 시작해야 하는데 7 부터 보였다.**
     // 서버는 방이 차는 순간부터 세는데, 사용자는 **VS 화면 3초를 본 뒤에** 들어온다.
     // → 전원이 게임 화면에 들어올 때까지(`s.hold`) 세지 않는다
-    if (!s.solo && !asking && !s.hold && s.rdy > 0) s.rdy--;
+    // [stated] **튜토리얼은 준비 시간이 안 간다** — 배치·신청을 배우기도 전에
+    // 카운트다운이 끝나 판이 시작돼 단계가 통째로 넘어갔다. 직접 준비완료를 눌러야 시작한다
+    if (!s.solo && !s.tuto && !asking && !s.hold && s.rdy > 0) s.rdy--;
     const timeUp = !s.solo && s.rdy === 0;
     if (allReady || timeUp){
       // 시간이 다 되면 안 누른 사람도 준비된 것으로 본다
@@ -782,7 +783,10 @@ export function step(s, inp){
       let dx = q.dx | 0, dy = q.dy | 0;
       // 버프를 먹으면 그만큼 더 빨라진다
       const bSpd = (s.bf && s.bf[i] && s.bf[i][BUFF.SPD] > 0) ? BUFF_DEF[BUFF.SPD].mul : 1;
-      const cap = s.maxStep * (s.fast ? FAST_MUL : 1) * ((s.spdMul && s.spdMul[i]) || 1) * bSpd,
+      // [stated] **칼전이 너무 빠르다** — 총격전은 좌우로만 다니는데 칼전은 사방으로
+      // 같은 속도로 움직여서 체감이 훨씬 크다. 칼전만 **80%** 로 낮춘다
+      const cap = s.maxStep * (s.melee ? MELEE_SPD : 1)
+                            * (s.fast ? FAST_MUL : 1) * ((s.spdMul && s.spdMul[i]) || 1) * bSpd,
             len2 = dx*dx + dy*dy;
       if (len2 > cap*cap){                     // 대각선이 빨라지지 않도록 벡터 길이로 제한
         const k = cap / Math.sqrt(len2);

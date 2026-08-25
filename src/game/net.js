@@ -162,8 +162,18 @@ export class WsTransport {
       try { this.ws.send(JSON.stringify({ t: 'p', id, pre: 1 })); } catch { /* 무시 */ }
       if (this.pings.size > 8) this.pings.clear();
     };
+    // [stated] **판이 시작되고 몇 초가 유난히 끊긴다** — 0.7초에 한 번만 재서
+    // 3초에 겨우 네 번이다. 그동안 지연 값이 널뛰고, 바뀔 때마다 화면이 뚝 끊긴다.
+    // → **처음 스무 번은 0.15초 간격**으로 몰아서 재고(3초), 그 뒤 평소 간격으로
     beat();
-    this.pingTimer = setInterval(beat, 700);
+    let fast = 20;
+    const tickOnce = () => {
+      beat();
+      if (--fast > 0) return;
+      clearInterval(this.pingTimer);
+      this.pingTimer = setInterval(beat, 700);
+    };
+    this.pingTimer = setInterval(tickOnce, 150);
   }
   stopPing(){ if (this.pingTimer){ clearInterval(this.pingTimer); this.pingTimer = null; } }
   connect(){
@@ -282,7 +292,12 @@ export class Server {
   }
   recalcDelay(){
     const worst = Math.max(...this.rtt.map(v => v || 0));     // 가장 느린 사람 기준 = 전원 동일 지연
-    this.delay = clampi(Math.ceil((worst/2 + JITTER_MS) / TICK_MS) + this.extra, MIN_DELAY, MAX_DELAY);
+    const want = clampi(Math.ceil((worst/2 + JITTER_MS) / TICK_MS) + this.extra, MIN_DELAY, MAX_DELAY);
+    // [stated] **지연이 확 바뀌는 순간 화면이 뚝 끊긴다.** 핑이 60 → 200 으로 튀면
+    // 3 → 8 틱으로 한 번에 뛰었다. **올릴 때는 한 번에, 내릴 때는 한 틱씩** —
+    // 늦게 올리면 그 사이 입력이 밀려 더 끊기고, 급히 내리면 또 튄다
+    if (this.delay === undefined || want > this.delay) this.delay = want;
+    else if (want < this.delay) this.delay -= 1;
   }
   update(now){
     // [stated] 회선이 멀쩡해지면 **빨리** 떨군다. 예전엔 2초에 1씩이라

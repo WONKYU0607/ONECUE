@@ -243,7 +243,8 @@ export function createRenderer(canvas){
   // 준비 단계 남은 시간. **아레나 한가운데에 크게.** 패널 안 작은 숫자는
   // 체력바·버튼과 겹쳐 안 보인다는 지적을 받았다
   function drawReadyTimer(s){
-    if (s.phase !== PH_READY || s.solo || !(s.rdy > 0)) return;
+    // [stated] **튜토리얼은 준비 시간이 안 간다** — 안 줄어드는 숫자를 띄우면 이상하다
+    if (s.phase !== PH_READY || s.solo || s.tuto || !(s.rdy > 0)) return;
     const left = Math.ceil(s.rdy / 60);
     const cx = W / 2 * RS, cy = H * 0.42 * RS;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';

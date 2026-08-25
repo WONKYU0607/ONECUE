@@ -232,4 +232,21 @@ console.log('앱이 잠들었다 깨도 배속이 없다');
   assert(/this\.start = now - this\.s\.tick \* TICK_MS;/.test(net), '  밀린 시간을 없던 것으로 한다');
 }
 
+// [stated] **판이 시작되고 몇 초가 유난히 끊긴다** — 어느 모드나 그렇다.
+// 원인 둘: ① 핑을 0.7초에 한 번만 재서 3초에 네 번뿐 ② 지연이 한 번에 확 뛴다
+console.log('시작 직후가 안 끊기게');
+{
+  const net = fs.readFileSync('src/game/net.js', 'utf8');
+  // 처음에는 몰아서 잰다
+  assert(/setInterval\(tickOnce, 150\)/.test(net), '  초반에는 0.15초 간격으로 잰다');
+  assert(/let fast = 20;/.test(net), '  스무 번(약 3초) 몰아서 잰 뒤 평소로');
+  // 지연은 올릴 땐 바로, 내릴 땐 한 칸씩
+  assert(/else if \(want < this\.delay\) this\.delay -= 1;/.test(net), '  내릴 때는 한 틱씩');
+  // 실제로 그렇게 움직이는지
+  let d = 3;
+  const seq = [3, 8, 8, 5, 3, 3, 3, 3].map(w => { if (w > d) d = w; else if (w < d) d -= 1; return d; });
+  assert(seq[1] === 8, '  올릴 때는 한 번에 (밀린 입력이 더 끊기게 만든다)');
+  assert(seq[3] === 7 && seq[7] === 3, '  내릴 때는 천천히 (급히 내리면 또 튄다)');
+}
+
 console.log('pace.test.js 통과');

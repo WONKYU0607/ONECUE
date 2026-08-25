@@ -4,7 +4,7 @@ import {
   FP, MAXHP, PH_PLAY, ARENA, setArena, teamOf, cellUsable, rowCols, topSpan, botSpan,
   GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH, GRID_X0, GRID_Y0, PWf, PHf,
   YMIN_S, YMAX_S, WALL_L, WALL_R, wallIdx,
-  MELEE_DAMAGE, ATK_TICKS, MELEE_COOL, stepCap
+  MELEE_DAMAGE, ATK_TICKS, MELEE_COOL, stepCap, MELEE_SPD
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 
@@ -431,7 +431,6 @@ console.log('개인전 — 각자 한 팀, 마지막 한 명이 승리');
   assert(t.ffa === false && teamOf(0, 4) === teamOf(1, 4), '팀전은 둘씩 같은 팀');
 }
 
-console.log('melee.test.js 통과');
 
 console.log('같은 틱에 서로 베면 둘 다 들어간다 (무승부)');
 {
@@ -464,3 +463,30 @@ console.log('같은 틱에 서로 베면 둘 다 들어간다 (무승부)');
   const two = mk(MELEE_DAMAGE * 3, half);
   assert(two.winner === 1, `반대도 마찬가지 (winner ${two.winner})`);
 }
+
+// [stated] **칼전이 너무 빠르다** — 총격전은 좌우로만 다니는데 칼전은 사방으로 움직여
+// 같은 값이어도 체감이 훨씬 크다. **80%** 로 낮췄다
+console.log('칼전은 총격전보다 느리다');
+{
+  const walk = melee => {
+    setArena(2, melee, false, false, false);
+    const s = newState(2, melee, false, false);
+    s.phase = PH_PLAY; s.clock = 3600;
+    s.p[0].x = Math.round(GRID_X0 * FP + 20 * FP);
+    const x0 = s.p[0].x;
+    for (let i = 0; i < 30; i++) step(s, [{ ...NOIN, dx: s.maxStep }, { ...NOIN }]);
+    return (s.p[0].x - x0) / FP;
+  };
+  const gun = walk(false), mel = walk(true);
+  assert(Math.abs(mel / gun - MELEE_SPD) < 0.02, `  칼전이 총격전의 ${MELEE_SPD} 배 (${(mel/gun).toFixed(2)})`);
+  // **봇도 같이 느려져야** 공평하다
+  setArena(2, true, false, false, false);
+  const s = newState(2, true, false, false);
+  s.phase = PH_PLAY; s.clock = 3600;
+  s.p[0].x = s.p[1].x = Math.round(GRID_X0 * FP + 20 * FP);
+  const a0 = s.p[0].x, b0 = s.p[1].x;
+  for (let i = 0; i < 30; i++) step(s, [{ ...NOIN, dx: s.maxStep }, { ...NOIN, dx: s.maxStep }]);
+  assert(Math.abs((s.p[0].x - a0) - (s.p[1].x - b0)) < 2, '  사람과 봇이 같은 속도');
+}
+
+console.log('melee.test.js 통과');

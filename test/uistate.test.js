@@ -27,9 +27,10 @@ console.log('칼전 카운트다운 — 여기서 안 뜨는 게 예전 버그�
   const r = P(s);
   assert(r.pre === true, '**카운트다운도 전투 전 단계다**');
   assert(!r.offer.includes('fast'), '칼전엔 2배속 버튼이 없다 (버프로 충분히 빠르다)');
-  // [stated] 칼전에도 신청할 수 있다 — 없앨 아이템이 없으므로 **버프를 끈다**.
-  // 예전엔 이 목록에 melee 조건이 남아 시뮬은 받는데 버튼이 안 떴다
-  assert(r.offer.includes('bare'), '칼전에도 노버프전 신청 버튼이 뜬다');
+  // [stated] **칼전에는 노템전을 없앤다** — 칼전은 원래 아이템이 없어
+  // 버프를 끄는 것뿐이라 신청할 이유가 약했다
+  assert(!r.offer.includes('bare'), '칼전엔 노템전 버튼이 없다');
+  assert(r.offer.length === 0, '칼전은 신청 버튼이 아예 없다');
 }
 
 console.log('상대가 신청하면 나에게 창이 뜬다');
@@ -241,10 +242,10 @@ console.log('카운트다운이 시작되면 신청 버튼이 사라진다');
   assert(uiPrompt(s, 0, true).offer.length > 0, '  준비 단계에는 버튼이 있다');
   s.phase = PH_COUNT;
   assert(uiPrompt(s, 0, true).offer.length === 0, '  카운트다운에는 없다');
-  // 칼전도 마찬가지. 다만 **준비 단계에는 남아 있어야** 한다 — 거기가 유일한 기회다
+  // [stated] **칼전에는 신청이 아예 없다** — 2배속도 노템전도 안 쓴다
   const m = newState(4, true, false);
   m.phase = PH_READY;
-  assert(uiPrompt(m, 0, true).offer.includes('bare'), '  칼전은 준비 단계에 버튼이 있다');
+  assert(uiPrompt(m, 0, true).offer.length === 0, '  칼전은 준비 단계에도 버튼이 없다');
   m.phase = PH_COUNT;
   assert(uiPrompt(m, 0, true).offer.length === 0, '  칼전도 카운트다운엔 없다');
   // 이미 오간 신청의 답은 카운트다운 중에도 떠야 한다 (그동안 카운트가 멈춘다)

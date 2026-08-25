@@ -138,7 +138,9 @@ export function uiPrompt(st, slot, online){
     if (!st.fast && !st.melee && !denied.includes('fast')) offer.push('fast');
     // [stated] 칼전에도 신청할 수 있다 — 없앨 아이템이 없으므로 **버프를 끈다**.
     // 시뮬은 열어놨는데 이 목록에 `!st.melee` 가 남아 버튼이 안 떴다
-    if (!st.bare && !denied.includes('bare')) offer.push('bare');
+    // [stated] **칼전에는 노템전을 없앤다** — 칼전은 원래 아이템이 없어
+    // 버프를 끄는 것뿐이라 신청할 이유가 약했다
+    if (!st.melee && !st.bare && !denied.includes('bare')) offer.push('bare');
   }
   // [stated] 수락되면 화면 가운데에 알림을 띄운다.
   // 내가 신청했으면 "상대가 수락했다", 상대가 신청했으면 "내가 수락했다"
