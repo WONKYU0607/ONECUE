@@ -677,18 +677,17 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
    그래서 내용은 각자 **자기 쪽 끝으로** 붙여야 한다 — 가운데 정렬하면 둘이 겹친다 */
 /* [stated] **있던 틀 하나로** 가른다 — 조각마다 틀을 그렸더니 틀 안에 틀이 생겼다.
    조각은 `.screen` 안쪽을 덮기만 하고, 틀은 `.screen` 것을 그대로 쓴다 */
-/* [stated] **캐릭터가 사선에 잘렸다** — 자리를 맞출 때는 자르기가 꺼져 있었는데
-   실제 판에서는 켜져 있어 그 자리로 옮기면 잘려 나갔다.
-   → **배경만 사선으로 자르고, 캐릭터는 안 자른다** (`::before` 가 배경을 맡는다) */
+/* [stated] **자르기를 없앴더니 위로 삐져나와 겹쳤다** — 사용자가 자리를 맞출 때는
+   자르기가 살아 있었고, 그 안에서 보이는 만큼으로 자리를 정했다.
+   자르기를 빼면 원래 안 보이던 부분까지 나와 화면이 무너진다 → **되돌린다** */
 .vs-half{position:absolute;left:0;right:0;top:0;height:100%;display:flex;
-  background:transparent}
-.vs-half::before{content:'';position:absolute;inset:0;background:#0a0c12;z-index:-1}
+  background:#0a0c12}
 /* [stated] **사선을 훨씬 가파르게** — 왼쪽 72%, 오른쪽 28% 를 잇는다(약 42도).
    예전 42~58% 는 거의 수평이라 "자른" 느낌이 안 났다 */
-.vs-half.top{top:0;animation:vsTop .6s cubic-bezier(.2,.9,.25,1.15) both}
-.vs-half.top::before{clip-path:polygon(0 0,100% 0,100% 28%,0 72%)}
-.vs-half.bot{top:0;animation:vsBot .6s cubic-bezier(.2,.9,.25,1.15) both}
-.vs-half.bot::before{clip-path:polygon(0 72%,100% 28%,100% 100%,0 100%)}
+.vs-half.top{top:0;clip-path:polygon(0 0,100% 0,100% 28%,0 72%);
+  animation:vsTop .6s cubic-bezier(.2,.9,.25,1.15) both}
+.vs-half.bot{top:0;clip-path:polygon(0 72%,100% 28%,100% 100%,0 100%);
+  animation:vsBot .6s cubic-bezier(.2,.9,.25,1.15) both}
 @keyframes vsTop{from{transform:translate(-14%,-70%);opacity:.2}to{transform:none;opacity:1}}
 @keyframes vsBot{from{transform:translate(14%,70%);opacity:.2}to{transform:none;opacity:1}}
 /* 사선이 왼쪽으로 내려가므로 **위 조각은 왼쪽이, 아래 조각은 오른쪽이** 넓다.

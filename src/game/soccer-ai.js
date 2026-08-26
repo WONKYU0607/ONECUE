@@ -11,6 +11,7 @@
 //   3. 아니면 → **우리 골대와 공 사이에 선다**(수비)
 //
 // 어려움은 `react`(다시 생각하는 간격)와 `slop`(목표에 얼마나 정확히 붙는가)로 준다.
+import { CHARGE_MS } from './ball.js';
 import { FP, PWf, PHf, teamOf } from './config.js';
 import { FIELD, GOAL } from './ball.js';
 
@@ -22,6 +23,11 @@ const TACKLE_RANGE = 34 * FP;   // [stated] 봇이 태클을 안 해서 넓혔�
 const SHOOT_RANGE = 150 * FP;
 // 공을 들고 버틸 수 있는 시간 (2.5초). 넘으면 골대 쪽으로 그냥 찬다
 const HOLD_MAX = 150;
+// [stated] **사람은 0.6초를 눌러야 최대 세기로 찬다** (`CHARGE_MS`). 봇도 같게 맞춘다
+const CHARGE_TICKS = Math.round(CHARGE_MS / 1000 * 60);
+// 거리에 맞는 세기 — 늘 100 으로 차면 사람이 못 하는 짓이 된다.
+// 골대까지의 거리가 최대 사거리에서 차지하는 만큼 (최소 40 은 준다)
+const chargeFor = dist => Math.max(40, Math.min(100, Math.round(dist / (SHOOT_RANGE) * 100)));
 
 const LEVELS = [
   // **380ms 는 너무 느렸다** — 공이 작아진 뒤 90초 내내 0:0 이었다.
@@ -44,7 +50,7 @@ export function createSoccerAI(slot, level = 1){
   let nextAt = 0;
   let held = 0;                        // 공을 연속으로 들고 있은 틱
   let goal = null;          // 이번에 갈 자리 {x, y}
-  let wantKick = false;
+  let wantKick = false, kickCh = 100;
   let wantTackle = false;
 
   return function think(s, now){
@@ -177,18 +183,20 @@ export function createSoccerAI(slot, level = 1){
       const toG = foeGoalY - cy;
       dx = 0;
       dy = toG < 0 ? -L.speed * FP : L.speed * FP;
-      return { dx: dx | 0, dy: dy | 0, fire: 1, fch: 100, tkl: 0 };
+      return { dx: dx | 0, dy: dy | 0, fire: 1, fch: chargeFor(Math.abs(toG)), tkl: 0 };
     }
     if (own === slot){
       const toG = foeGoalY - cy;
       const lined = b.x >= GOAL.lo - 26 * FP && b.x <= GOAL.hi + 26 * FP;
-      if (lined && Math.abs(toG) < SHOOT_RANGE){
+      // [stated] **봇이 잡자마자 최대 세기로 찼다** — 사람은 0.6초를 눌러야 하는데
+      // 봇은 사람이 못 하는 짓을 하고 있었다. **봇도 같은 시간만큼 뜸을 들인다**
+      if (lined && Math.abs(toG) < SHOOT_RANGE && held >= CHARGE_TICKS){
         kickNow = true;
         dx = 0;                                   // 찰 때는 골대 쪽을 본다
         dy = toG < 0 ? -L.speed * FP : L.speed * FP;
       }
     }
-    if (kickNow) wantKick = true;
+    if (kickNow){ wantKick = true; kickCh = chargeFor(Math.abs(foeGoalY - cy)); }
     // 슛은 **꽉 채워** 찬다 (골대 앞에서만 차므로 세게가 낫다)
     return { dx: dx | 0, dy: dy | 0, fire: wantKick ? 1 : 0, fch: 100, tkl };
   };

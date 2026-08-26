@@ -159,6 +159,7 @@ export function normalizeState(st){
   if (typeof st.vsAll !== 'boolean') st.vsAll = false;
   if (typeof st.tuto !== 'boolean') st.tuto = false;
   if (typeof st.tutoPause !== 'number') st.tutoPause = 0;
+  if (typeof st.again !== 'boolean') st.again = false;
   if (!Array.isArray(st.items)) st.items = [];
   if (!Array.isArray(st.fx)) st.fx = [];
   if (!Array.isArray(st.covers)) st.covers = [];
@@ -170,6 +171,7 @@ export function normalizeState(st){
   if (typeof st.vsAll !== 'boolean') st.vsAll = false;
   if (typeof st.tuto !== 'boolean') st.tuto = false;
   if (typeof st.tutoPause !== 'number') st.tutoPause = 0;
+  if (typeof st.again !== 'boolean') st.again = false;
   if (typeof st.fast !== 'boolean') st.fast = false;
   if (typeof st.fastBy !== 'number') st.fastBy = 0;
   st.bare = !!st.bare;
@@ -266,6 +268,7 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     hold: false,                // 전원이 게임 화면에 들어올 때까지 준비 시간을 세지 않는다
     tuto: false,                // [stated] 튜토리얼 — 내 체력이 안 닳고 시간도 안 간다
     tutoPause: 0,               // 투척 설명 중 — 던지면 풀린다
+    again: false,               // 재대전 신호 (서버만 켠다)
     p: players,
     bullets: [],
     covers: newCovers(),
@@ -760,7 +763,11 @@ export function step(s, inp){
   if (s.phase === PH_OVER){
     // [stated] **축구는 다시 시작되면 안 된다** — 슛 버튼이 `fire` 를 보내는데,
     // 판이 끝난 뒤 그걸 누르면 재대전으로 읽혀 갑자기 준비 화면이 뜨고 새 판이 시작됐다
-    if (!s.soccer && (inp[0].fire || inp[1].fire)){
+    // [stated] **승리 소리는 울렸는데 판이 안 끝나고 계속됐다.**
+    // 여기서 `fire` 를 재대전 신호로 읽어, 끝난 뒤 그 비트가 한 번이라도 오면
+    // 곧바로 새 판이 열렸다. **재대전은 `t:'again'` 으로만 한다** — 이 길은 막는다.
+    // (`s.again` 은 서버가 재대전을 확정했을 때만 켠다)
+    if (!s.soccer && s.again){
       const t = s.tick, ms = s.maxStep, bv = s.bulletV, ct = s.coolT, n = newState();
       n.tick = t; n.phase = PH_READY; n.timer = 0; n.rdy = readyLimit(n.melee, n.soccer);
       s.p = n.p; s.bullets = n.bullets; s.covers = n.covers;
