@@ -1,61 +1,29 @@
-// [stated] **VS 화면 자리·크기 값** — 종목·인원마다 따로 저장한다.
+// [stated] **VS 화면 자리·크기 값** — 사용자가 폰에서 직접 맞춘 값 (2026-08-26).
 //
-// 설정의 'VS 자리 맞추기' 에서 맞춘 값이 여기 쌓인다. 기기에 저장되므로
-// 앱을 껐다 켜도 남는다. 다 맞춘 뒤 [값 복사하기] 로 꺼내 코드 기본값으로 옮기면 된다.
-const KEY = 'duel.vslayout';
-
-// [stated] 아직 정한 값이 없으면 이걸 쓴다 (전부 원래 자리·크기)
-const DEFAULTS = {};
+// 종목·인원마다 위·아래 무리를 얼마나 옮기고 얼마로 줄일지 적어 둔다.
+// 맞추는 화면은 값을 정한 뒤 걷어냈다 — 이 표가 그대로 쓰인다.
+//   tx·ty  위 무리 이동 (px)      tz  위 무리 크기 (%)
+//   bx·by  아래 무리 이동 (px)    bz  아래 무리 크기 (%)
+const V = {
+  'gun:2':       { tx: 31, ty: 153, bx:  70, by: -120, tz:  80, bz: 80 },
+  'gun:4':       { tx: 21, ty: 149, bx: 152, by:  -82, tz: 100, bz: 100 },
+  'gun:6':       { tx: 20, ty: 143, bx: 170, by:  -88, tz: 100, bz: 100 },
+  'melee:2':     { tx: 22, ty: 134, bx:  99, by: -107, tz:  90, bz: 90 },
+  'melee:4':     { tx:  4, ty: 157, bx: 151, by: -107, tz: 100, bz: 100 },
+  'melee:6':     { tx: 13, ty: 132, bx: 156, by:  -65, tz: 100, bz: 100 },
+  'melee:3:ffa': { tx:  4, ty: 128, bx: 137, by:  -79, tz: 100, bz: 100 },
+  'melee:4:ffa': { tx: -1, ty: 162, bx: 155, by:  -80, tz: 100, bz: 100 },
+  'melee:5:ffa': { tx: -2, ty: 172, bx:  26, by:  -76, tz: 100, bz: 100 },
+  'melee:6:ffa': { tx:  7, ty: 149, bx:  34, by:  -74, tz: 100, bz: 90 },
+  'soccer:2':    { tx: 24, ty: 143, bx: 146, by: -103, tz: 100, bz: 100 },
+  'soccer:4':    { tx: 22, ty: 180, bx: 172, by: -130, tz: 100, bz: 100 }
+};
 
 const NONE = { tx: 0, ty: 0, bx: 0, by: 0, tz: 100, bz: 100 };
 
-/** 종목·인원·개인전 여부로 하나의 이름을 만든다 */
-export const vsKeyOf = (kind, n, ffa) => `${kind}:${n}${ffa ? ':ffa' : ''}`;
+// 종목·인원·개인전 여부로 하나의 이름을 만든다
 
-let cache = null;
-
-function load(){
-  if (cache) return cache;
-  try {
-    const raw = localStorage.getItem(KEY);
-    cache = raw ? JSON.parse(raw) : {};
-  } catch { cache = {}; }
-  if (!cache || typeof cache !== 'object') cache = {};
-  return cache;
-}
-
-/** 저장된 값 전부 (기본값 위에 덮어쓴 결과) */
-export function getVsOffsets(){ return { ...DEFAULTS, ...load() }; }
-
-/** 이 모드의 값 — 없으면 원래 자리(0, 100%) */
+/** 이 모드의 자리·크기 */
 export function getVsOffset(kind, n, ffa){
-  const key = vsKeyOf(kind, n, ffa);
-  const v = load()[key] || DEFAULTS[key];
-  return v ? { ...NONE, ...v } : NONE;
-}
-
-/** 한 모드의 값을 저장한다 */
-export function setVsOffset(key, v){
-  const m = load();
-  m[key] = {
-    tx: v.tx | 0, ty: v.ty | 0, bx: v.bx | 0, by: v.by | 0,
-    // 크기는 %. 너무 작거나 크면 화면이 깨지므로 30~200 으로 묶는다
-    tz: Math.max(30, Math.min(200, v.tz | 0 || 100)),
-    bz: Math.max(30, Math.min(200, v.bz | 0 || 100))
-  };
-  try { localStorage.setItem(KEY, JSON.stringify(m)); } catch { /* 저장 실패는 무시 */ }
-  return m[key];
-}
-
-/** 한 모드만 되돌린다 */
-export function clearVsOffset(key){
-  const m = load();
-  delete m[key];
-  try { localStorage.setItem(KEY, JSON.stringify(m)); } catch { /* noop */ }
-}
-
-/** 전부 지운다 */
-export function resetVsOffsets(){
-  cache = {};
-  try { localStorage.removeItem(KEY); } catch { /* noop */ }
+  return V[`${kind}:${n}${ffa ? ':ffa' : ''}`] || NONE;
 }

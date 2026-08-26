@@ -5,7 +5,7 @@
 //
 // **정보가 없어도 화면은 뜬다** — 구름을 읽어야 해서 늦거나 못 올 수 있고,
 // 봇은 계정이 없어 점수·전적이 아예 없다. 없는 칸은 `-` 로 둔다.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { TEAMS } from '../game/config.js';
 import { getColor } from '../state/profile.js';
 import { t } from '../i18n/index.js';
@@ -49,39 +49,17 @@ function Portrait({ kind, color, zoom = 1 }){
   );
 }
 
-export default function VsIntro({ vs, mySlot, onDone, edit: editOpt }){
+export default function VsIntro({ vs, mySlot, onDone }){
   // [stated] **막대는 없애고 3초 뒤에 그냥 들어간다.**
   // `onDone` 을 의존성에 두면 부모가 다시 그릴 때마다 시작 시각이 초기화된다 —
   // 그래서 막대가 줄다 다시 차오르고 게임이 안 시작됐다. 참조로 붙잡아 한 번만 건다
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
-  const edit = !!editOpt;
-  const [off, setOff] = useState(() => (editOpt && editOpt.start) || getVsOffset(
-    (vs && vs.kind) || 'gun', (vs && vs.rows && vs.rows.length) || 2, !!(vs && vs.ffa)));
-  const drag = useRef(null);
-  const onDown = which => e => {
-    if (!edit) return;
-    drag.current = { which, x: e.clientX, y: e.clientY, base: { ...off } };
-  };
+  // [stated] **모드마다 자리·크기를 따로 맞춰 두었다** (사용자가 직접 맞춘 값)
+  const off = getVsOffset((vs && vs.kind) || 'gun',
+                          (vs && vs.rows && vs.rows.length) || 2, !!(vs && vs.ffa));
   useEffect(() => {
-    if (!edit) return;
-    const move = e => {
-      if (!drag.current) return;
-      const dx = Math.round(e.clientX - drag.current.x);
-      const dy = Math.round(e.clientY - drag.current.y);
-      const b = drag.current.base;
-      setOff(drag.current.which === 'top'
-        ? { ...b, tx: b.tx + dx, ty: b.ty + dy }
-        : { ...b, bx: b.bx + dx, by: b.by + dy });
-      e.preventDefault();
-    };
-    const up = () => { drag.current = null; };
-    window.addEventListener('pointermove', move, { passive: false });
-    window.addEventListener('pointerup', up);
-    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-  }, [edit, off]);
-  useEffect(() => {
-    const id = edit ? null : setTimeout(() => doneRef.current?.(), SHOW_MS);
+    const id = setTimeout(() => doneRef.current?.(), SHOW_MS);
     // 연출과 소리를 맞춘다 — 0.6초에 부딪히고, 1.0초에 번개가 다 뻗는다
     const t1 = setTimeout(() => sfx.vsClash?.(), 560);
     const t2 = setTimeout(() => sfx.vsBolt?.(), 600);
@@ -148,51 +126,22 @@ export default function VsIntro({ vs, mySlot, onDone, edit: editOpt }){
     );
   };
 
-  // 숫자 칸 하나 — 직접 쳐서 값을 넣는다 (손으로 맞추기 어려운 미세 조정용)
-  const num = (k, suffix = '') => (
-    <label className="vs-num">
-      <input type="number" value={off[k] === undefined ? (k.endsWith('z') ? 100 : 0) : off[k]}
-             onChange={e => setOff(o => ({ ...o, [k]: e.target.value === '' ? 0 : (e.target.value | 0) }))} />
-      {suffix}
-    </label>
-  );
-
   return (
     <div className="vs-wrap">
       {/* 위아래 반쪽이 사선으로 잘려 부딪힌다. 정보는 이미 붙어 있다 */}
       <div className="vs-half top">
-        <div className={'vs-pad' + (upSz.two ? ' two' : '') + (edit ? ' vs-edit' : '')}
-             onPointerDown={onDown('top')}
+        <div className={'vs-pad' + (upSz.two ? ' two' : '')}
              style={{ paddingTop: upSz.pad + '%',
                       transform: `translate(${off.tx}px, ${off.ty}px) scale(${(off.tz || 100) / 100})`,
                       transformOrigin: 'left top' }}>{upper.map(line(upSz.zoom))}</div>
       </div>
       <div className="vs-half bot">
-        <div className={'vs-pad' + (loSz.two ? ' two' : '') + (edit ? ' vs-edit' : '')}
-             onPointerDown={onDown('bot')}
+        <div className={'vs-pad' + (loSz.two ? ' two' : '')}
              style={{ paddingBottom: loSz.pad + '%',
                       transform: `translate(${off.bx}px, ${off.by}px) scale(${(off.bz || 100) / 100})`,
                       transformOrigin: 'right bottom' }}>{lower.map(line(loSz.zoom))}</div>
       </div>
       {/* 값 표시 — 화면 맨 위 (네모를 어디로 끌어도 안 가려진다) */}
-      {edit && (
-        <div className="vs-edit-hud">
-          {/* [stated] **손으로 맞추기 어렵다** — 숫자로도 넣을 수 있게 한다 */}
-          <span className="vs-hud-row">
-            <b>{t('set.vsTop')}</b>
-            {num('tx')} {num('ty')} {num('tz', '%')}
-          </span>
-          <span className="vs-hud-row">
-            <b>{t('set.vsBot')}</b>
-            {num('bx')} {num('by')} {num('bz', '%')}
-          </span>
-          <span className="vs-hud-btns">
-            <button onClick={() => setOff({ tx:0, ty:0, bx:0, by:0, tz:100, bz:100 })}>{t('set.vsReset')}</button>
-            <button onClick={() => editOpt.onSave?.(editOpt.key, off)}>{t('set.vsSave')}</button>
-            <button onClick={() => editOpt.onQuit?.()}>{t('common.back')}</button>
-          </span>
-        </div>
-      )}
 
       {/* 부딪힌 자리 — 번개 두 개 사이에 VS */}
       <div className="vs-seam">

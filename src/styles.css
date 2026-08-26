@@ -680,36 +680,12 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   animation:vsBot .6s cubic-bezier(.2,.9,.25,1.15) both}
 .vs-half.top{align-items:flex-start;justify-content:flex-start}
 .vs-half.bot{align-items:flex-end;justify-content:flex-start}
-/* [stated] **VS 자리 맞추기** — 사선 자르기는 켠 채로 옮긴다(보이는 대로가 실제 화면).
-   막대는 **맨 위**에 둔다 — 네모를 아래로 끌어도 저장 버튼이 안 가려지게 */
-.vs-pad.vs-edit{outline:2px dashed #ffd34d;outline-offset:-2px;cursor:move;touch-action:none}
-.vs-edit-hud{position:fixed;left:0;right:0;top:0;z-index:80;
-  display:flex;flex-direction:column;align-items:center;gap:4px;
-  padding:calc(var(--sat) + 6px) 8px 6px;background:rgba(8,14,24,.97);
-  border-bottom:1px solid rgba(255,211,77,.5);font:700 12px var(--gf);color:#ffd34d;letter-spacing:0}
-.vs-hud-row{display:flex;align-items:center;gap:5px}
-.vs-hud-row b{min-width:26px;text-align:right}
-.vs-hud-btns{display:flex;gap:6px;margin-top:2px}
-.vs-num{display:inline-flex;align-items:center;gap:1px}
-.vs-num input{width:52px;padding:2px 4px;border-radius:4px;text-align:center;
-  background:rgba(12,22,36,.9);border:1px solid rgba(255,211,77,.45);
-  font:700 12px var(--gf);color:#ffe9a8}
-.vs-edit-hud button{padding:3px 10px;border-radius:4px;cursor:pointer;
-  background:rgba(255,211,77,.15);border:1px solid rgba(255,211,77,.6);
-  font:700 12px var(--gf);color:#ffd34d}
-/* 목록이 한 화면을 넘치므로 스크롤되게 */
-.vs-list{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding-bottom:calc(var(--sab) + 16px)}
-/* 복사가 막히면 값을 글로 띄운다 — 길게 눌러 복사할 수 있게 */
-.vs-dump{user-select:text;-webkit-user-select:text;word-break:break-all;
-  padding:8px;border-radius:4px;background:rgba(12,22,36,.7);
-  border:1px solid rgba(90,140,190,.4);font:600 11px var(--gf);color:#cfe4ff}
 
 .vs-half.top .vs-pad{width:92%;padding:14% 0 0 16px}
 .vs-pad.two{display:flex;flex-wrap:wrap;align-content:flex-start}
 .vs-pad.two .vs-row{width:50%;box-sizing:border-box;padding-right:8px}
-.vs-half.bot .vs-pad.two .vs-row:nth-child(2n){margin-top:2.2em}
-.vs-half.top .vs-pad.two .vs-row:nth-child(2n){margin-bottom:2.2em}
+/* [stated] **오른쪽 칸을 계단처럼 밀어 키가 안 맞았다** — 사선을 피하려고 넣은 것인데
+   자리 값을 따로 맞춘 뒤로는 필요 없다. **같은 줄끼리 키를 맞춘다** */
 .vs-half.bot .vs-pad{width:92%;padding:0 0 14% 16px}
 .vs-half.bot .vs-info{align-items:flex-start}
 
