@@ -18,7 +18,7 @@ const LABEL = {
   softFlash: 'set.softFlash'
 };
 
-export default function SettingsModal({ onClose, onTuto, onVsLayout }){
+export default function SettingsModal({ onClose, onTuto }){
   const [s, setS] = useState(getSettings);
   const [lang, setL] = useState(getLang);
 
@@ -53,9 +53,6 @@ export default function SettingsModal({ onClose, onTuto, onVsLayout }){
           <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </header>
         {/* [stated] **튜토리얼 다시 하기** — 처음 켤 때만 묻지만 여기서 언제든 다시 */}
-        <button className="menu-btn sm tuto-again" onClick={() => onVsLayout?.()}>
-          <span className="t">{t('set.vsEdit')}</span>
-        </button>
         <button className="menu-btn sm tuto-again" onClick={() => { resetTuto(); onClose?.(); onTuto?.(); }}>
           <span className="t">{t('tuto.again')}</span>
         </button>
