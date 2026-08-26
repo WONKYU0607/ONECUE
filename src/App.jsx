@@ -12,6 +12,7 @@ import RoomEnter from './ui/screens/RoomEnter.jsx';
 import Result from './ui/screens/Result.jsx';
 import SettingsModal from './ui/SettingsModal.jsx';
 import Room from './ui/screens/Room.jsx';
+import VsLayout from './ui/screens/VsLayout.jsx';
 import { tutoDone, markTutoDone } from './state/tutorial.js';
 import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings, setSetting } from './state/settings.js';
@@ -113,7 +114,7 @@ export default function App(){
       if (askRoom){ setAskRoom(false); return true; }
       if (showSettings){ setShowSettings(false); return true; }
       if (screen === 'game'){ setAskQuit(true); return true; }
-      if (screen === 'matching' || screen === 'entering'){ goHome(); return true; }
+      if (screen === 'matching' || screen === 'entering' || screen === 'vslayout'){ goHome(); return true; }
       // [stated] **방에서 뒤로가기** — 바로 나가지 않고 물어본다
       if (screen === 'room'){ setAskRoom(true); return true; }
       // **화면 안에 단계가 있으면 거기부터 돌아간다** (PVP 색 고르기 → 모드 고르기 → 홈).
@@ -294,13 +295,16 @@ export default function App(){
       {/* [stated] **빠른 매칭과 방은 길이 다르다.** 한 화면에서 갈래를 나누다 계속 샜다 */}
       {screen === 'matching' && <QuickMatch session={session} onCancel={goHome} onMatched={toGame} />}
       {screen === 'entering' && <RoomEnter session={session} onCancel={goHome} onEntered={toRoom} />}
+      {/* [stated] **VS 자리 맞추기** — 판을 안 돌려도 모드를 골라 맞춘다 */}
+      {screen === 'vslayout' && <VsLayout onBack={goHome} />}
       {/* [stated] **방(로비)** — 판이 끝나면 여기로 돌아온다 */}
       {screen === 'room'     && <Room room={room || getRoom()} onLeave={() => setAskRoom(true)} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome}
                                           onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} onTuto={goHome} />}
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={(session?.mode === 'create' || session?.mode === 'join') ? backToRoom : null}
         onNext={(session?.kind === 'ai' && result === 'win' && (session.stage || 1) < 30) ? nextStage : null} onHome={goHome} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto}
+                                       onVsLayout={() => { setShowSettings(false); setScreen('vslayout'); }} />}
       {/* [stated] 처음 켰을 때 — 시작하기 / 건너뛰기 */}
       {askTuto && (
         <div className="modal-back">

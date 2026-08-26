@@ -5,7 +5,8 @@
 //
 // **정보가 없어도 화면은 뜬다** — 구름을 읽어야 해서 늦거나 못 올 수 있고,
 // 봇은 계정이 없어 점수·전적이 아예 없다. 없는 칸은 `-` 로 둔다.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { TEAMS } from '../game/config.js';
 import { getColor } from '../state/profile.js';
 import { t } from '../i18n/index.js';
 import { getVsOffset } from '../state/vslayout.js';
@@ -19,10 +20,15 @@ const SHOW_MS = 3000;
 //   soccer  1040x312, 칸 80x52 (13열 6행). 색 = 행, 자세 = 열
 //   melee   3872x1188, 칸 484x198 (8열 6행). 색 = 행, 자세 = 열(대기 = 2)
 //   gun     1008x48,  칸 42x48 (24열 1행). **색과 앞/뒤가 열에 같이 들어 있다** — 색*2
+// [stated] **칸 안에서 그림이 차지하는 자리가 종목마다 다르다.**
+// 총격전은 칸에 꽉 차는데 칼전·축구는 가운데에만 있어, 칸 전체를 상자 폭으로 쓰면
+// 좌우 빈 공간까지 자리를 먹어 **글자와의 간격이 총격전보다 훨씬 벌어졌다**.
+// `ax`·`aw` = 칸 안에서 그림이 실제로 있는 가로 시작·폭 (실측)
+// **칼전 시트는 절반으로 줄였다** — 칸도 242x99 다 (예전 484x198)
 const SHEET = {
-  soccer: { src: 'assets/soccer-chars.webp', cw: 80,  ch: 52,  cols: 13, rows: 6, col: () => 0,   row: c => c },
-  melee:  { src: 'assets/melee.webp',        cw: 484, ch: 198, cols: 8,  rows: 6, col: () => 0,    row: c => c },
-  gun:    { src: 'assets/characters.png',    cw: 42,  ch: 48,  cols: 24, rows: 1, col: c => c * 2, row: () => 0 }
+  soccer: { src: 'assets/soccer-chars.webp', cw: 80,  ch: 52, cols: 13, rows: 6, col: () => 0,    row: c => c, ax: 24, aw: 32 },
+  melee:  { src: 'assets/melee.webp',        cw: 242, ch: 99, cols: 8,  rows: 6, col: () => 0,    row: c => c, ax: 70, aw: 102 },
+  gun:    { src: 'assets/characters.png',    cw: 42,  ch: 48, cols: 24, rows: 1, col: c => c * 2, row: () => 0, ax: 0,  aw: 42 }
 };
 
 function Portrait({ kind, color, zoom = 1 }){
@@ -33,41 +39,65 @@ function Portrait({ kind, color, zoom = 1 }){
   const k = 92 * zoom / sh.ch;
   return (
     <span className="vs-por" style={{
-      width: Math.round(sh.cw * k) + 'px', height: Math.round(92 * zoom) + 'px',
+      // **그림이 있는 만큼만** 자리를 차지한다 (칸 전체가 아니라)
+      width: Math.round((sh.aw || sh.cw) * k) + 'px', height: Math.round(92 * zoom) + 'px',
       backgroundImage: `url(${sh.src})`,
       // **시트 전체 크기**를 지정해야 칸이 정확히 맞는다 (auto 로 두면 세로가 어긋난다)
       backgroundSize: `${Math.round(sh.cw * sh.cols * k)}px ${Math.round(sh.ch * sh.rows * k)}px`,
-      backgroundPosition: `-${Math.round(cx * sh.cw * k)}px -${Math.round(cy * sh.ch * k)}px`
+      backgroundPosition: `-${Math.round((cx * sh.cw + (sh.ax || 0)) * k)}px -${Math.round(cy * sh.ch * k)}px`
     }} />
   );
 }
 
-export default function VsIntro({ vs, mySlot, onDone }){
+export default function VsIntro({ vs, mySlot, onDone, edit: editOpt }){
   // [stated] **막대는 없애고 3초 뒤에 그냥 들어간다.**
   // `onDone` 을 의존성에 두면 부모가 다시 그릴 때마다 시작 시각이 초기화된다 —
   // 그래서 막대가 줄다 다시 차오르고 게임이 안 시작됐다. 참조로 붙잡아 한 번만 건다
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
-  // [stated] **자리를 옮기려면 화면이 안 넘어가야 한다** — VS 는 3초 뒤 저절로 넘어간다.
-  // 편집 모드에서는 넘기지 않고, 아래 [들어가기] 를 눌러야 판으로 간다
+  const edit = !!editOpt;
+  const [off, setOff] = useState(() => (editOpt && editOpt.start) || getVsOffset(
+    (vs && vs.kind) || 'gun', (vs && vs.rows && vs.rows.length) || 2, !!(vs && vs.ffa)));
+  const drag = useRef(null);
+  const onDown = which => e => {
+    if (!edit) return;
+    drag.current = { which, x: e.clientX, y: e.clientY, base: { ...off } };
+  };
   useEffect(() => {
-    const id = setTimeout(() => doneRef.current?.(), SHOW_MS);
+    if (!edit) return;
+    const move = e => {
+      if (!drag.current) return;
+      const dx = Math.round(e.clientX - drag.current.x);
+      const dy = Math.round(e.clientY - drag.current.y);
+      const b = drag.current.base;
+      setOff(drag.current.which === 'top'
+        ? { ...b, tx: b.tx + dx, ty: b.ty + dy }
+        : { ...b, bx: b.bx + dx, by: b.by + dy });
+      e.preventDefault();
+    };
+    const up = () => { drag.current = null; };
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', up);
+    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+  }, [edit, off]);
+  useEffect(() => {
+    const id = edit ? null : setTimeout(() => doneRef.current?.(), SHOW_MS);
     // 연출과 소리를 맞춘다 — 0.6초에 부딪히고, 1.0초에 번개가 다 뻗는다
-    // [stated] 번개 소리는 **뺐다** (별로였다). 충돌 소리만 남긴다
     const t1 = setTimeout(() => sfx.vsClash?.(), 560);
-    return () => { clearTimeout(id); clearTimeout(t1); };
+    const t2 = setTimeout(() => sfx.vsBolt?.(), 600);
+    return () => { clearTimeout(id); clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
   const rows = (vs && vs.rows) || [];
   const n = rows.length || 2;
   const kind = (vs && vs.kind) || 'gun';
-  // [stated] **3대3 인데 개인전처럼 여섯 명이 흩어져 나왔다.**
-  // `teamOf` 는 전역 아레나(`ARENA.ffa`)를 보는데, 앞 판이 개인전이면 그 표시가 남는다.
-  // **서버가 준 값으로 직접 나눈다** — 전역 상태에 기대지 않는다
+  // [stated] **3대3 인데 개인전처럼 여섯 명이 흩어져 나왔다** — `teamOf` 는 전역 아레나를
+  // 보는데, 앞 판이 개인전이면 그 표시가 남는다. **서버가 준 값으로 직접 나눈다**
   const ffa = !!(vs && vs.ffa);
   const half = n / 2;
   const teamAt = slot => (ffa ? slot : (slot < half ? 0 : 1));
   const myTeam = teamAt(mySlot);
+  // [stated] **개인전은 나 혼자 위, 나머지 전원 아래.** 팀전은 팀끼리 나눈다
   const ours = ffa ? rows.filter(r => r.slot === mySlot)
                    : rows.filter(r => teamAt(r.slot) === myTeam);
   const theirs = ffa ? rows.filter(r => r.slot !== mySlot)
@@ -88,16 +118,11 @@ export default function VsIntro({ vs, mySlot, onDone }){
     // 두 줄은 **절반 폭에 들어가게** 더 줄인다 (0.66 은 오른쪽이 잘렸다)
     // **자리는 그대로 두고 배율만 낮춰** 사선에 안 걸리는 값을 실제로 재서 찾았다
     // (2대2 0.7 / 3대3 0.6 / 4명 이상 0.6 에서 잘림이 사라진다)
-    // [stated] **개인전 6인에서 오른쪽 줄이 겹치고 잘렸다** — 다섯 명이 두 줄로 들어가면
-    //  0.6 으로는 절반 폭을 넘는다. 5명 이상은 더 줄인다
-    // [stated] **너무 아래에 있다** — 사선 쪽(가운데)으로 모으고 크기도 키운다
-    zoom: cnt >= 5 ? 0.5 : cnt === 4 ? 0.66 : cnt === 3 ? 0.72 : cnt === 2 ? 0.78 : 1,
+    zoom: cnt >= 4 ? 0.6 : cnt === 3 ? 0.6 : cnt === 2 ? 0.7 : 1,
     // 위 조각은 위에서, 아래 조각은 아래에서 붙으므로 **여백을 키워야** 가운데로 온다
     // (줄였더니 오히려 바깥으로 밀렸다)
     // **사선 쪽 줄이 잘렸다** — 조각은 사선까지밖에 안 보이므로 여백을 더 줘 안쪽으로 민다
-    // 여백을 줄이면 사선 쪽(가운데)으로 붙는다
-    // 사선에서 얼마나 떨어질지 (작을수록 가운데에 가깝다)
-    pad: cnt >= 5 ? 30 : cnt === 4 ? 32 : cnt === 3 ? 34 : cnt === 2 ? 40 : 46
+    pad: cnt >= 4 ? 4 : cnt === 3 ? 14 : cnt === 2 ? 20 : 28
   });
   const upSz = sizeOf(upper.length || 1);
   const loSz = sizeOf(lower.length || 1);
@@ -123,24 +148,51 @@ export default function VsIntro({ vs, mySlot, onDone }){
     );
   };
 
-  // [stated] **모드마다 자리를 따로 맞춰 두었다** (사용자가 직접 맞춘 값)
-  const use = getVsOffset(kind, n, ffa);
-  const topShift = `translate(${use.tx}px, ${use.ty}px)`;
-  const botShift = `translate(${use.bx}px, ${use.by}px)`;
+  // 숫자 칸 하나 — 직접 쳐서 값을 넣는다 (손으로 맞추기 어려운 미세 조정용)
+  const num = (k, suffix = '') => (
+    <label className="vs-num">
+      <input type="number" value={off[k] === undefined ? (k.endsWith('z') ? 100 : 0) : off[k]}
+             onChange={e => setOff(o => ({ ...o, [k]: e.target.value === '' ? 0 : (e.target.value | 0) }))} />
+      {suffix}
+    </label>
+  );
 
   return (
     <div className="vs-wrap">
       {/* 위아래 반쪽이 사선으로 잘려 부딪힌다. 정보는 이미 붙어 있다 */}
       <div className="vs-half top">
-        <div className={'vs-pad' + (upSz.two ? ' two' : '')}
-             style={{ paddingTop: (upSz.pad*0.28) + '%',
-                      transform: topShift }}>{upper.map(line(upSz.zoom))}</div>
+        <div className={'vs-pad' + (upSz.two ? ' two' : '') + (edit ? ' vs-edit' : '')}
+             onPointerDown={onDown('top')}
+             style={{ paddingTop: upSz.pad + '%',
+                      transform: `translate(${off.tx}px, ${off.ty}px) scale(${(off.tz || 100) / 100})`,
+                      transformOrigin: 'left top' }}>{upper.map(line(upSz.zoom))}</div>
       </div>
       <div className="vs-half bot">
-        <div className={'vs-pad' + (loSz.two ? ' two' : '')}
-             style={{ paddingBottom: (loSz.pad*0.28) + '%',
-                      transform: botShift }}>{lower.map(line(loSz.zoom))}</div>
+        <div className={'vs-pad' + (loSz.two ? ' two' : '') + (edit ? ' vs-edit' : '')}
+             onPointerDown={onDown('bot')}
+             style={{ paddingBottom: loSz.pad + '%',
+                      transform: `translate(${off.bx}px, ${off.by}px) scale(${(off.bz || 100) / 100})`,
+                      transformOrigin: 'right bottom' }}>{lower.map(line(loSz.zoom))}</div>
       </div>
+      {/* 값 표시 — 화면 맨 위 (네모를 어디로 끌어도 안 가려진다) */}
+      {edit && (
+        <div className="vs-edit-hud">
+          {/* [stated] **손으로 맞추기 어렵다** — 숫자로도 넣을 수 있게 한다 */}
+          <span className="vs-hud-row">
+            <b>{t('set.vsTop')}</b>
+            {num('tx')} {num('ty')} {num('tz', '%')}
+          </span>
+          <span className="vs-hud-row">
+            <b>{t('set.vsBot')}</b>
+            {num('bx')} {num('by')} {num('bz', '%')}
+          </span>
+          <span className="vs-hud-btns">
+            <button onClick={() => setOff({ tx:0, ty:0, bx:0, by:0, tz:100, bz:100 })}>{t('set.vsReset')}</button>
+            <button onClick={() => editOpt.onSave?.(editOpt.key, off)}>{t('set.vsSave')}</button>
+            <button onClick={() => editOpt.onQuit?.()}>{t('common.back')}</button>
+          </span>
+        </div>
+      )}
 
       {/* 부딪힌 자리 — 번개 두 개 사이에 VS */}
       <div className="vs-seam">

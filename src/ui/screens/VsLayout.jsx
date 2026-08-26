@@ -1,19 +1,17 @@
-// [stated] **VS 화면 자리를 직접 맞추는 화면.**
+// [stated] **VS 화면 자리·크기를 직접 맞추는 화면.**
 //
-// 판을 돌리지 않고도 종목·인원을 골라 그 화면을 띄우고, 위·아래 무리를 끌어 옮긴다.
-// 값은 **기기에 저장**되므로 모드마다 적어둘 필요가 없다 —
-// 다 맞춘 뒤 알려주면 코드 기본값으로 옮겨 박으면 된다.
+// 판을 돌리지 않고도 종목·인원을 골라 그 화면을 띄우고, 위·아래 무리를
+// 끌거나 숫자로 옮기고 크기도 줄인다. 값은 기기에 저장되고,
+// [값 복사하기] 로 한 번에 꺼내 코드 기본값으로 옮길 수 있다.
 import { useState } from 'react';
 import VsIntro from '../VsIntro.jsx';
-import { setInnerBack } from '../../state/back.js';
 import { getVsOffsets, setVsOffset, resetVsOffsets, vsKeyOf } from '../../state/vslayout.js';
 import { t } from '../../i18n/index.js';
 
-// 고를 수 있는 조합. 축구는 1대1·2대2 뿐이고, 개인전은 칼전만 있다
+// 고를 수 있는 조합. 축구는 1대1·2대2 뿐이고, 개인전은 칼전만 3~6인이다
 const CASES = [
   ['gun', 2, false], ['gun', 4, false], ['gun', 6, false],
   ['melee', 2, false], ['melee', 4, false], ['melee', 6, false],
-  // [stated] **개인전은 3·4·5·6인** 네 가지다 (칼전만 있다)
   ['melee', 3, true], ['melee', 4, true], ['melee', 5, true], ['melee', 6, true],
   ['soccer', 2, false], ['soccer', 4, false]
 ];
@@ -34,7 +32,6 @@ export default function VsLayout({ onBack }){
   const [, bump] = useState(0);
   const [copied, setCopied] = useState(false);
   const [show, setShow] = useState('');
-  setInnerBack(() => { if (!pick) return false; setPick(null); return true; });
 
   if (pick){
     const [kind, n, ffa] = pick;
@@ -57,7 +54,6 @@ export default function VsLayout({ onBack }){
         <span className="title">{t('set.vsEdit')}</span>
         <span className="spacer" />
       </header>
-      {/* [stated] **아래쪽 항목까지 안 내려갔다** — 열두 모드라 한 화면을 넘친다. 스크롤되게 한다 */}
       <div className="menu wide-menu vs-list">
         <p className="hint">{t('set.vsHelp')}</p>
         {CASES.map(([kind, n, ffa]) => {
@@ -69,12 +65,11 @@ export default function VsLayout({ onBack }){
                     onClick={() => setPick([kind, n, ffa])}>
               <span className="t">
                 {t(KIND_LABEL[kind])} · {label}
-                {v ? `  (${v.tx},${v.ty} / ${v.bx},${v.by})` : ''}
+                {v ? `  (${v.tx},${v.ty},${v.tz}% / ${v.bx},${v.by},${v.bz}%)` : ''}
               </span>
             </button>
           );
         })}
-        {/* [stated] **폰에서 값을 옮겨 적기 번거롭다** — 통째로 복사해 붙여넣게 한다 */}
         <button className="menu-btn sm" onClick={() => {
           const txt = JSON.stringify(saved);
           const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1500); };
