@@ -297,6 +297,7 @@ export function createGame(canvas, opts = {}){
   // [stated] 슛하면 **화면이 아주 살짝 흔들린다.** 수치는 피격(1.1)·폭발(2.4)보다 작게 —
   // 매 슛마다 나는 연출이라 크면 금방 피로해진다
   let lastKickFx = 0;
+  let overSfx = false;      // 끝 소리를 한 번만 내기 위한 표시
   function reactTo(st, dt){
     const cur = snapshot(st);
     if (!prev){ prev = cur; return; }
@@ -376,13 +377,17 @@ export function createGame(canvas, opts = {}){
       const a = Math.ceil(prev.timer / 60), b = Math.ceil(cur.timer / 60);
       if (b !== a) sfx.count(b);
     }
-    // 라운드 종료
-    if (cur.phase === PH_OVER && prev.phase !== PH_OVER){
-      const r = resultFor(st, SELF.slot);
+    // [stated] **승리 소리는 울리는데 판이 안 끝났다** — 소리는 예측으로, 화면 전환은
+    // 확정본으로 판단했다. 예측이 먼저 "끝났다" 하면 소리만 나고 판은 계속됐다.
+    // → **소리도 확정본을 본다** (화면 전환과 같은 기준)
+    if (client.s.phase === PH_OVER && !overSfx){
+      overSfx = true;
+      const r = resultFor(client.s, SELF.slot);
       if (r === 'draw') sfx.count(0);
       else if (r === 'win') sfx.win();
       else { sfx.lose(); buzz([18, 50, 18]); }
     }
+    if (client.s.phase !== PH_OVER) overSfx = false;   // 다시 하기에 대비해 되돌린다
     prev = cur;
   }
   // 슬롯1이면 화면이 뒤집혀 있으므로 연출 좌표도 뒤집는다
