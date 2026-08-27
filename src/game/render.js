@@ -875,9 +875,11 @@ export function createRenderer(canvas){
     }
     const up = me && me.shield > 0;
     const ready2 = me && me.hp > 0 && (me.shCool || 0) === 0 && (me.stun || 0) === 0;
+    // [stated] **쿨타임인지 몰랐다** → 흐림을 더 뚜렷하게. 예전에는 테두리가 0.35 → 0.12 로만
+    // 옅어져 눈에 안 띄었다. 쿨타임이면 **바탕까지 어둡게** 깔아 확실히 구분한다
     px(b.x, b.y, b.w, b.h, up ? 'rgba(159,232,255,0.30)'
-                          : ready2 ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)');
-    const c = up ? '#9fe8ff' : ready2 ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
+                          : ready2 ? 'rgba(255,255,255,0.07)' : 'rgba(20,22,30,0.55)');
+    const c = up ? '#9fe8ff' : ready2 ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.08)';
     px(b.x, b.y, b.w, 1, c); px(b.x, b.y + b.h - 1, b.w, 1, c);
     px(b.x, b.y, 1, b.h, c); px(b.x + b.w - 1, b.y, 1, b.h, c);
     // 방패 모양 (오각형)
@@ -889,7 +891,7 @@ export function createRenderer(canvas){
     ctx.lineTo(cx * RS, (cy + h2) * RS);
     ctx.lineTo((cx - w2) * RS, (cy + h2 * 0.3) * RS);
     ctx.closePath();
-    ctx.fillStyle = up ? '#9fe8ff' : ready2 ? '#d8d8e8' : '#6a6a85';
+    ctx.fillStyle = up ? '#9fe8ff' : ready2 ? '#d8d8e8' : '#454560';
     ctx.fill();
     if (me && (me.shCool || 0) > 0)
       px(b.x + 1, b.y + b.h - 3, (b.w - 2) * (1 - me.shCool / SHIELD_COOL), 1.6, '#9fe8ff');

@@ -255,7 +255,15 @@ export function createGame(canvas, opts = {}){
     canThrowNow: () => client.pred.phase === PH_PLAY,
     ammo: ammoLeft,
     onThrow: (k, ch) => { if (canThrow(client.pred, SELF.slot, k)) client.throwItem(SELF.slot, k, ch); },
-    onShield: () => { sfx.ready?.(); client.raiseShield(SELF.slot); },
+    // [stated] **방패 버튼을 눌러도 안 나가고 소리만 난다.** 소리를 누를 때마다 무조건 냈다 —
+    // 쿨타임(1.2초) 중이면 방패는 안 나가는데 소리는 나서 "눌렀는데 왜 안 나가지"가 됐다.
+    // **실제로 나갈 수 있을 때만** 소리를 낸다
+    onShield: () => {
+      const me = client.pred && client.pred.p && client.pred.p[SELF.slot];
+      const can = me && (me.shield | 0) === 0 && (me.shCool | 0) === 0 && (me.stun | 0) === 0;
+      if (can) sfx.ready?.();
+      client.raiseShield(SELF.slot);
+    },
     // [stated] 축구 슛 — 입력의 `fire` 비트를 한 틱 세운다.
     // **사람과 AI 가 같은 길로 간다**(다른 조작과 마찬가지로)
     // [stated] 슛은 **차징 세기에 따라** 소리가 갈린다 (전엔 '설치 완료' 소리를 빌려 썼다)

@@ -564,9 +564,16 @@ export function blocked(s, x, y, self = -1){
 // 앞뒤로 보내면 태클한 사람이나 넘어진 사람 발밑에 그대로 남아 실랑이가 된다.
 // 태클 방향(tx,ty)의 **수직** 두 방향 중, 공이 이미 치우친 쪽을 고른다 —
 // 정확히 가운데면 오른쪽. 전부 정수 연산이라 양쪽 화면이 갈리지 않는다
-function sideOut(tx, ty, ox, oy){
+function sideOut(tx, ty, bx, by){
   const px = -ty, py = tx;                 // 90도 돌린 방향
-  return (ox * px + oy * py) >= 0 ? [px, py] : [-px, -py];
+  // [stated] **공이 그라운드 끝에서 봇과 겹쳐 멈추고 태클해도 안 빠진다.**
+  // 처음엔 "공이 이미 치우친 쪽"으로 보냈는데, 벽에 붙어 있으면 그 방향이 **벽 쪽**이다 —
+  // 튕겨 제자리로 돌아오고 옆에 선 사람이 다시 주워 무한 반복이 됐다.
+  // → **남은 공간이 넓은 쪽**으로 보낸다. 벽까지 거리를 재서 고른다
+  const room = (dx, dy) =>
+    Math.min(dx > 0 ? FIELD.x1 - bx : dx < 0 ? bx - FIELD.x0 : 1e9,
+             dy > 0 ? FIELD.y1 - by : dy < 0 ? by - FIELD.y0 : 1e9);
+  return room(px, py) >= room(-px, -py) ? [px, py] : [-px, -py];
 }
 
 export function step(s, inp){
@@ -1262,7 +1269,7 @@ export function step(s, inp){
             a.tkl = 0;                             // 걸렸으면 그 자리에서 멈춘다
             // [stated] **태클한 사람 쪽으로** 튕겨 나온다 (미끄러진 방향의 반대)
             const [tx, ty] = faceVec(a.tklF == null ? a.face : a.tklF);
-            const [sx, sy] = sideOut(tx, ty, s.ball.x - (a.x + (PWf >> 1)), s.ball.y - (a.y + (PHf >> 1)));
+            const [sx, sy] = sideOut(tx, ty, s.ball.x, s.ball.y);
             s.ball.vx = sx * TACKLE_V; s.ball.vy = sy * TACKLE_V;
             s.lastKicker = i;                     // 태클한 사람 몸은 잠깐 통과
           }
@@ -1295,7 +1302,7 @@ export function step(s, inp){
             // 미끄러진 방향으로 보냈더니 **그 방향에 상대가 서 있어** 공이 상대에게 갔다 —
             // 태클은 상대를 향해 들어가는 동작이므로 **반대로** 나와야 내가 잡을 수 있다
             const [tx2, ty2] = faceVec(a.tklF == null ? a.face : a.tklF);
-            const [sx2, sy2] = sideOut(tx2, ty2, s.ball.x - (a.x + (PWf >> 1)), s.ball.y - (a.y + (PHf >> 1)));
+            const [sx2, sy2] = sideOut(tx2, ty2, s.ball.x, s.ball.y);
             s.ball.vx = sx2 * TACKLE_V; s.ball.vy = sy2 * TACKLE_V;
             // **태클한 사람 몸은 잠깐 통과시킨다.** 공이 그 사람 몸 안에서 출발하므로
             // 그대로 두면 자기 몸에 부딪혀 힘이 죽는다(슛에 쓰던 것과 같은 처리)
