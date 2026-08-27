@@ -13,6 +13,13 @@ const back = fs.readFileSync('src/state/back.js', 'utf8');
 // 주석에 적힌 설명까지 잡히면 안 되므로 코드만 본다
 const backCode = back.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 
+// **`setBackHandler` 는 import 줄에서 먼저 나오고, `}, [screen` 도 앞쪽 useEffect 에 먼저 있다.**
+// 그냥 찾으면 자르는 범위가 뒤집혀 아무것도 안 잡힌다 → 등록부부터, 그 뒤의 끝까지 자른다
+const backBody = src => {
+  const at = src.indexOf('setBackHandler(()');
+  return at < 0 ? '' : src.slice(at, src.indexOf('}, [screen', at));
+};
+
 console.log('뒤로가기를 받는다');
 {
   assert(/initBack\(\)/.test(app), '앱이 켜질 때 등록한다');
@@ -28,9 +35,10 @@ console.log('뒤로가기를 받는다');
 console.log('위에 뜬 것부터 닫는다');
 {
   // 처리 순서가 코드에 그대로 드러나야 한다
-  const body = app.slice(app.indexOf('setBackHandler'), app.indexOf('}, [screen'));
+  const body = backBody(app);
   // `if (X)` 로 시작하는 줄만 본다 (setAskQuit 같은 호출에 걸리지 않게)
-  const order = ['if (askQuit)', 'if (showHelp)', 'if (showSettings)',
+  // `showHelp` 는 도움말 화면과 함께 없어졌다 (App.jsx 에 그 말 자체가 없다)
+  const order = ['if (askQuit)', 'if (showSettings)',
                  "screen === 'game'", "screen === 'matching'", "screen === 'home'"];
   let at = -1;
   for (const k of order){
@@ -42,7 +50,7 @@ console.log('위에 뜬 것부터 닫는다');
 
 console.log('게임 중에는 확인 창을 띄운다');
 {
-  const body = app.slice(app.indexOf('setBackHandler'), app.indexOf('}, [screen'));
+  const body = backBody(app);
   assert(/screen === 'game'\)\{ setAskQuit\(true\)/.test(body),
     '게임 중 뒤로가기 → 바로 안 나가고 물어본다');
   assert(/QuitAsk/.test(app), '확인 창이 붙어 있다');
@@ -57,7 +65,7 @@ console.log('홈에서는 종료 확인 창이 뜬다');
   // [stated] "홈에서 뒤로가기 눌러도 게임을 종료하시겠습니까 UI 안 나옴"
   // 예전엔 "한 번 더 누르면 종료" 안내만 띄워서, 창을 기대한 사용자에게는
   // 아무 일도 안 일어난 것처럼 보였다
-  const body = app.slice(app.indexOf('setBackHandler'), app.indexOf('}, [screen'));
+  const body = backBody(app);
   assert(/screen === 'home'/.test(body), '홈을 따로 처리한다');
   assert(/setAskExit\(true\)/.test(body), '확인 창을 띄운다');
   assert(/askExit && <QuitAsk exit/.test(app), '창이 실제로 그려진다');
@@ -115,7 +123,7 @@ console.log('브라우저 뒤로가기를 두 번 눌러도 안 나간다');
 console.log('화면 안의 단계부터 돌아간다');
 {
   // [stated] "해당 단계에서 그 전 단계로 뒤로가져야 하는데 바로 홈으로 나감"
-  const body = app.slice(app.indexOf('setBackHandler'), app.indexOf('}, [screen'));
+  const body = backBody(app);
   assert(/tryInnerBack\(\)/.test(body), 'App 이 화면 안 뒤로가기를 먼저 묻는다');
   // 홈으로 보내기 **전에** 물어야 한다
   assert(body.indexOf('tryInnerBack') < body.indexOf("screen === 'result'"),

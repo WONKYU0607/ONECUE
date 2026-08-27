@@ -38,7 +38,8 @@ export function matchSummary(st, slot){
     // [stated] 축구는 체력·기여도가 없다 — 결과 화면이 **골 수만** 보여준다
     soccer: !!st.soccer,
     myGoals: st.soccer ? ((st.score || [])[me] | 0) : 0,
-    foeGoals: st.soccer ? ((st.score || [])[1 - me] | 0) : 0,
+    // `me` 는 슬롯이 아니라 **팀 번호**(`teamOf`)다. 축구는 팀이 둘뿐이라 `1 - me` 가 상대 팀이다
+    foeGoals: st.soccer ? ((st.score || [])[1 - me] | 0) : 0,   // ok: me 는 팀 번호(0/1)
     n,
     rows,
     myHp: sum(me),

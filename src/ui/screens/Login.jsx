@@ -33,13 +33,6 @@ export default function Login({ onDone }){
     try {
       const m = await import('../../cloud/firebase.js');
       const r = await m.signInGoogle();
-      // [stated] 이어붙이기가 안 됐으면 **옛 익명 기록을 새 계정으로 옮긴다**
-      if (r && r.ok && r.mergeFrom){
-        try {
-          const sync = await import('../../cloud/sync.js');
-          await sync.mergeFrom(r.mergeFrom);
-        } catch { /* 못 옮겨도 로그인은 된다 */ }
-      }
       if (r.ok){
         // **로그인한 계정의 기록으로 기기를 덮는다.** 순서가 반대면 지금 기기의
         // 빈 값이 그 계정 기록을 밀어낸다

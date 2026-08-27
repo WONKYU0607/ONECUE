@@ -65,7 +65,14 @@ assert(slotOf(guests[2]) === -1, '거절당하면 자리도 안 받는다');
 
 pick(guests[2], 1, 3); await sleep(300);
 assert(slotOf(guests[2]) === 3, '남은 팀을 고르면 앉는다');
-assert(host.msgs.some(m => m.t === 'go'), '네 자리가 다 차면 go');
+// [stated] **코드가 있는 방은 자리가 차도 자동으로 시작하지 않는다** —
+// 방장이 [시작 하기] 를 눌러야 한다 (자동 시작은 빠른 매칭만).
+// 예전 검사는 자리만 차면 `go` 가 오길 기다렸다
+assert(!host.msgs.some(m => m.t === 'go'), '자리가 차도 저절로 시작하지 않는다');
+guests[0].ws.send(JSON.stringify({ t: 'start' })); await sleep(200);
+assert(!host.msgs.some(m => m.t === 'go'), '방장이 아니면 시작 못 시킨다');
+host.ws.send(JSON.stringify({ t: 'start' })); await sleep(300);
+assert(host.msgs.some(m => m.t === 'go'), '방장이 시작하면 go');
 
 console.log('색은 겹치지 않게');
 assert(guests[0].msgs.some(m => m.t === 'colortaken'), '이미 쓰인 색은 거절 알림');

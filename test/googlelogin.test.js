@@ -53,8 +53,10 @@ console.log('홈보다 먼저 로그인 화면을 거친다');
   const app = fs.readFileSync('src/App.jsx', 'utf8');
   const login = fs.readFileSync('src/ui/screens/Login.jsx', 'utf8');
   assert(/screen === 'login'\s+&& <Login/.test(app), '  login 화면이 배선돼 있다');
-  assert(/<Splash onDone=\{\(\) => setScreen\('login'\)\}/.test(app),
-    '  진입창 다음이 홈이 아니라 로그인이다');
+  // **한 줄짜리로만 찾으면 안 된다** — onDone 안에서 소리를 여는 등 일이 늘어나 여러 줄이 됐다.
+  // Splash 블록 안에서 어디로 넘기는지만 본다
+  const sp = app.slice(app.indexOf('<Splash onDone='), app.indexOf('<Splash onDone=') + 400);
+  assert(/setScreen\('login'\)/.test(sp), '  진입창 다음이 홈이 아니라 로그인이다');
   // 이미 로그인돼 있으면 그냥 지나가야 한다 (앱을 다시 켠 경우)
   assert(/await m\.signIn\(\)/.test(login) && /if \(uid\)\{ onDone\(\); return; \}/.test(login),
     '  이미 로그인돼 있으면 바로 통과');

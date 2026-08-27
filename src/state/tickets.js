@@ -21,10 +21,6 @@ export const SOC_MAX = 3;
 // [stated] 디버깅 중에는 축구 티켓을 다 써서 게임을 못 하는 일이 없게 **무제한**.
 // **출시 전 반드시 false** — `DEBUG_INF_HP` 와 같은 부류다
 export const DEBUG_INF_SOCCER = true;
-// [stated] 디버깅 중에는 **개인전**도 판수·티켓이 없어서 못 들어가는 일이 없게 무제한.
-// **출시 전 반드시 false** — `DEBUG_INF_SOCCER`·`DEBUG_INF_HP` 와 같은 부류다.
-// 서버는 티켓이 없어도 자리를 막지 않고 기록만 남기므로(`server/index.js` 참고) 여기만 꺼도 된다
-export const DEBUG_INF_FFA = true;
 const today = () => new Date().toISOString().slice(0, 10);
 
 const empty = () => ({
@@ -83,13 +79,9 @@ export function ticketsLeft(){ regen(); return cur.tk; }
 function rollDay(){
   if (cur.day !== today()){ cur.day = today(); cur.ffa = FFA_MAX; save(); }
 }
-export function ffaLeft(){
-  if (DEBUG_INF_FFA) return FFA_MAX;         // 디버깅: 늘 가득 찬 것으로 보인다
-  rollDay(); return cur.ffa;
-}
+export function ffaLeft(){ rollDay(); return cur.ffa; }
 // 개인전 한 판: **티켓과 하루 횟수를 같이** 깎는다. 둘 중 하나라도 없으면 못 한다
 export function useFfa(){
-  if (DEBUG_INF_FFA) return true;            // 디버깅: 안 깎는다
   rollDay(); regen();
   if (cur.ffa <= 0 || cur.tk <= 0) return false;
   if (cur.tk >= TICKET_MAX) cur.at = Date.now();
@@ -99,9 +91,7 @@ export function useFfa(){
 }
 export function addFfa(n = 1){ rollDay(); cur.ffa = Math.min(FFA_MAX, cur.ffa + n); save(); return cur.ffa; }
 // 개인전은 **티켓과 하루 횟수 둘 다** 걸리므로 더 빡빡한 쪽이 실제로 할 수 있는 판수다
-// 개인전은 **일반 티켓도 같이** 걸리므로, 디버깅 중엔 그쪽도 안 보고 넘긴다
-export const leftFor = ffa => (ffa ? (DEBUG_INF_FFA ? FFA_MAX : Math.min(ticketsLeft(), ffaLeft()))
-                                   : ticketsLeft());
+export const leftFor = ffa => (ffa ? Math.min(ticketsLeft(), ffaLeft()) : ticketsLeft());
 
 /** 축구 남은 판. **일반 티켓과 별개**라 티켓이 0이어도 축구는 할 수 있다 */
 export function socLeft(){
@@ -184,9 +174,10 @@ export function __reset(){ cur = empty(); save(); return getPlay(); }
 // 구름에 올릴 내용만 추린다 (충전 시각처럼 기기에만 있어도 되는 건 뺀다)
 export function snapshot(){
   regen(); rollDay();
-  // **점수·연승·전적은 안 올린다.** 서버가 쓰고, 규칙이 클라 쓰기를 막는다.
-  // 올리려 하면 규칙에 걸려 통째로 거부돼 티켓까지 저장이 안 된다
-  return { tk: cur.tk, at: cur.at, ffa: cur.ffa, day: cur.day };
+  // **아무것도 안 올린다.** 점수·연승·전적에 이어 **티켓도 서버가 쥔다**(`SERVER_BACKED`).
+  // 예전엔 `tk`·`at`·`ffa`·`day` 를 여기서 올렸는데, 옮기다 만 흔적이었다.
+  // 규칙이 그 항목들을 막으므로 올리면 **쓰기가 통째로 거부돼 닉네임·색까지 저장이 안 된다**
+  return {};
 }
 
 // 구름에서 받은 값으로 덮는다. **없는 항목은 기기 값을 그대로 둔다**

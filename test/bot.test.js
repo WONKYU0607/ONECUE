@@ -218,10 +218,13 @@ console.log('봇이 신청에 답하고, 가끔 먼저 건다');
   const { newState, step, NOIN } = await import('../src/game/sim.js');
   const { SELF, teamOf, setArena } = await import('../src/game/config.js');
   const IN = n => Array.from({ length: n }, () => ({ ...NOIN }));
-  SELF.slot = 0; SELF.n = 2; setArena(2, true);
+  // [stated] **칼전에서는 노버프전을 없앴다** (2배속도 뺐다). sim 이 `!s.melee` 로 막는 게 맞다.
+  // 그런데 이 검사는 칼전 상태(`melee = true`)로 노버프전을 신청하고 있었다 —
+  // 신청이 아예 안 걸려 20번 다 "거절"로 세어졌다. **총격전으로 바꾼다**
+  SELF.slot = 0; SELF.n = 2; setArena(2, false);
   let yes = 0, no = 0, none = 0;
   for (let trial = 0; trial < 20; trial++){
-    const st = newState(2, true);
+    const st = newState(2, false);
     const b = { slot: 1 };
     let q = IN(2); q[0].bareReq = 1; step(st, q);
     let done = false;

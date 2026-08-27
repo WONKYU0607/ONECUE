@@ -52,10 +52,10 @@ export async function initKeyboard(){
   let Keyboard = null;
   try {
     ({ Keyboard } = await import('@capacitor/keyboard'));
-    note(Keyboard ? '꾸러미ok' : '꾸러미빔');
+    note(Keyboard ? 'plugin ok' : 'plugin none');   // 디버그 표시(kbprobe) — 번역 대상이 아니다
   } catch (e){
     Keyboard = globalThis.Capacitor?.Plugins?.Keyboard || null;   // 꾸러미가 없는 빌드
-    note(Keyboard ? '전역ok' : '못찾음:' + (e && e.message || '').slice(0, 24));
+    note(Keyboard ? 'global ok' : 'not found:' + (e && e.message || '').slice(0, 24));
   }
   if (!Keyboard) return;                         // 웹에서는 창이 안 줄어드니 할 일이 없다
   try {
@@ -63,7 +63,7 @@ export async function initKeyboard(){
     await Keyboard.setResizeMode({ mode: 'none' });
     note('resize=none');
   } catch (e){
-    note('실패:' + (e && e.message || '').slice(0, 30));
+    note('fail:' + (e && e.message || '').slice(0, 30));
   }
   try {
     // 스크롤로 밀어 올리는 기본 동작도 끈다 — 우리가 직접 민다

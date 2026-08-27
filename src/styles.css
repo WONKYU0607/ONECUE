@@ -191,7 +191,8 @@ letter-spacing:2px;cursor:pointer;line-height:1}
 /* [stated] **네 글자가 다 안 보였다.** 자간 3px 이 마지막 글자 뒤에도 붙어 가운데가 밀리고,
    86px 은 네 자리에 빠듯했다 → 폭을 넉넉히 잡고 **줄어들지 못하게** 한다.
    (키보드 건과는 무관한 문제라 되돌리지 않고 남긴다) */
-.code-input{flex:0 0 104px;min-width:104px;background:#12121c;border:2px solid #2a2a40;color:#e8e8f0;
+/* 셋이 나란히 서므로 고정 폭이면 좁은 폰(360px)에서 넘친다 → 같이 줄어들게 */
+.code-input{flex:1 1 0;min-width:0;background:#12121c;border:2px solid #2a2a40;color:#e8e8f0;
 font:900 19px/1 var(--gf);letter-spacing:2px;text-indent:2px;text-align:center;padding:0 6px}
 .code-input:focus{outline:none;border-color:#4ec9f0}
 /* **min-width:0이 핵심.** flex 항목은 기본이 min-width:auto라 내용보다 작아지지 않는다.
@@ -539,7 +540,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* [stated] 키보드로 UI 가 줄어드는 문제를 재기 위한 **임시 표시**. 원인을 잡으면 지운다 */
 .kbprobe{position:fixed;z-index:9999;left:4px;top:4px;pointer-events:none;
   padding:4px 6px;border-radius:3px;background:rgba(0,0,0,.82);
-  font:700 10px/1.35 monospace;color:#8fe;letter-spacing:0}
+  font:700 10px/1.35 var(--gf);color:#8fe;letter-spacing:0}
 .kbprobe b{color:#ffd34d}
 .kbprobe .kb-at{color:#789;font-weight:400}
 

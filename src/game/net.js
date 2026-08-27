@@ -206,7 +206,14 @@ export class Server {
     // 3 → 8 틱으로 한 번에 뛰었다. **올릴 때는 한 번에, 내릴 때는 한 틱씩** —
     // 늦게 올리면 그 사이 입력이 밀려 더 끊기고, 급히 내리면 또 튄다
     if (this.delay === undefined || want > this.delay) this.delay = want;
-    else if (want < this.delay) this.delay -= 1;
+    else if (want < this.delay){
+      // [stated] **내릴 때 한 틱씩이면 너무 느리다.** RTT 보고가 0.5초마다 오므로
+      // 초당 2틱, 갓 깬 13틱에서 원래대로 돌아오는 데 10초가 걸렸다 —
+      // 판이 1~2분인데 초반 내내 조작이 무거웠다.
+      // → **절반씩 좁힌다** (13 → 8 → 5 → 4 → 3, 약 2초). 한 번에 뛰지 않아 끊김도 덜하다.
+      // `extra` 가 이미 쓰는 방식과 같다
+      this.delay = Math.max(want, this.delay - Math.max(1, Math.floor((this.delay - want) / 2)));
+    }
   }
   update(now){
     // [stated] 회선이 멀쩡해지면 **빨리** 떨군다. 예전엔 2초에 1씩이라

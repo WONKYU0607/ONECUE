@@ -57,8 +57,11 @@ function widestNick(font){
   measCv = measCv || document.createElement('canvas');
   const g = measCv.getContext('2d');
   g.font = font;
-  // 영문 10칸 / 한글 6칸(6 x 1.6 = 9.6) 중 실제로 더 넓은 쪽
-  return Math.max(g.measureText('MMMMMMMMMM').width, g.measureText('한한한한한한').width);
+  // 영문 10칸 / 한글 6칸(6 x 1.6 = 9.6) 중 실제로 더 넓은 쪽.
+  // **한글 표본은 글자로 적지 않는다** — 화면에 안 나가는 폭 재기용인데
+  // 번역 검사(`i18n.test.js`)가 박힌 문구로 오해한다
+  const ko = String.fromCharCode(0xD55C).repeat(6);
+  return Math.max(g.measureText('MMMMMMMMMM').width, g.measureText(ko).width);
 }
 function reserveNick(pad){
   for (const el of pad.querySelectorAll('.vs-nick')){

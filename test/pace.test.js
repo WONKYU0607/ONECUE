@@ -242,11 +242,18 @@ console.log('시작 직후가 안 끊기게');
   // 처음에는 몰아서 잰다
   assert(/setInterval\(tickOnce, 150\)/.test(net), '  초반에는 0.15초 간격으로 잰다');
   assert(/let fast = 20;/.test(net), '  스무 번(약 3초) 몰아서 잰 뒤 평소로');
-  // 지연은 올릴 땐 바로, 내릴 땐 한 칸씩
-  assert(/else if \(want < this\.delay\) this\.delay -= 1;/.test(net), '  내릴 때는 한 틱씩');
+  // 지연은 올릴 땐 바로, 내릴 땐 천천히.
+  // [stated] **한 틱씩은 너무 느렸다** — RTT 보고가 0.5초마다라 갓 깬 13틱에서
+  // 회복에 10초가 걸렸다(`coldstart`). → **차이의 절반씩** 좁힌다. 여전히 한 번에 안 뛴다
+  assert(/this\.delay - Math\.max\(1, Math\.floor\(\(this\.delay - want\) \/ 2\)\)/.test(net),
+    '  내릴 때는 차이의 절반씩');
   // 실제로 그렇게 움직이는지
   let d = 3;
-  const seq = [3, 8, 8, 5, 3, 3, 3, 3].map(w => { if (w > d) d = w; else if (w < d) d -= 1; return d; });
+  const seq = [3, 8, 8, 5, 3, 3, 3, 3].map(w => {
+    if (w > d) d = w;
+    else if (w < d) d = Math.max(w, d - Math.max(1, Math.floor((d - w) / 2)));
+    return d;
+  });
   assert(seq[1] === 8, '  올릴 때는 한 번에 (밀린 입력이 더 끊기게 만든다)');
   assert(seq[3] === 7 && seq[7] === 3, '  내릴 때는 천천히 (급히 내리면 또 튄다)');
 }

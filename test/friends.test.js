@@ -98,7 +98,7 @@ console.log('방 초대');
   const inv = fs.readFileSync('src/ui/InviteFriends.jsx', 'utf8');
   const ban = fs.readFileSync('src/ui/InviteBanner.jsx', 'utf8');
   const home = fs.readFileSync('src/ui/screens/Home.jsx', 'utf8');
-  const mat = fs.readFileSync('src/ui/screens/Matching.jsx', 'utf8');
+  const mat = fs.readFileSync('src/ui/screens/Room.jsx', 'utf8');
 
   // **소켓으로 밀어 넣지 않는다** — 받을 사람은 보통 홈 화면이라 소켓이 없다
   assert(/players\/\$\{to\}\/invites\/\$\{me\}/.test(store), '  상대 문서 밑에 적어둔다');

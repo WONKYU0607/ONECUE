@@ -71,7 +71,10 @@ console.log('2배속은 그 판 한정');
   s.p[1].hp = 1;
   let n = 0;
   while (s.phase !== 3 && n < 3000){ step(s, IN({}, {})); n++; }
-  step(s, IN({ fire: 1 }, {}));      // 재시작
+  // **재시작은 서버가 확정해야 일어난다** — 예전엔 fire 로 바로 다시 시작했지만
+  // 지금은 `s.again` 을 서버가 켜 준다. 그걸 안 켜면 초기화 자체가 안 돈다
+  s.again = true;
+  step(s, IN({}, {}));               // 재시작
   assert(!s.fast && s.fastBy === 0, '다음 판은 보통 속도로 돌아간다');
 }
 console.log('fast.test.js 통과');

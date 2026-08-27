@@ -8,6 +8,7 @@
 // 매번 방을 새로 만들고 카톡으로 코드를 다시 주고받아야 했다 — 그게 가장 큰 마찰이었다.
 import { useEffect, useState } from 'react';
 import { t } from '../../i18n/index.js';
+import InviteFriends from '../InviteFriends.jsx';
 import { getColor } from '../../state/profile.js';
 import { pickTeam, unpickTeam, setRoomMode, startRoom, watchRoom } from '../../net/connection.js';
 
@@ -71,6 +72,10 @@ export default function Room({ room, onLeave }){
             );
           })}
         </div>
+
+        {/* 방을 만들어 놓고 기다리는 동안 **친구를 골라 초대**한다.
+            컴포넌트는 만들어져 있었는데 **어느 화면에도 안 붙어 있었다** — 그래서 못 쓰고 있었다 */}
+        <InviteFriends room={room} />
 
         {/* [stated] **관전 칸**을 팀과 종목 사이에 둔다 — 누가 보고 있는지, 나도 갈 수 있게 */}
         <div className="room-watch">

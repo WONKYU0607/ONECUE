@@ -2,7 +2,7 @@
 //  - 1대1: 나간 사람이 진다
 //  - 2대2: 그 자리에 멈춰 서서 계속 맞는다. 나머지 셋의 판을 망치지 않는다
 import { newState, step, forfeit, setOff, canThrow, checksum, normalizeState, cloneState, NOIN } from '../src/game/sim.js';
-import { PH_PLAY, PH_OVER, MAXHP, stepCap, THROW } from '../src/game/config.js';
+import { PH_PLAY, PH_OVER, MAXHP, stepCap, THROW, PWf } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 const IN = n => Array.from({ length: n }, () => ({ ...NOIN }));
@@ -105,8 +105,11 @@ console.log('유령은 몸으로도 안 막는다');
   const { blocked } = await import('../src/game/sim.js');
   const s = newState(4);
   s.phase = PH_PLAY;
-  s.p[1].x = s.p[0].x; s.p[1].y = s.p[0].y;
-  assert(blocked(s, s.p[0].x, s.p[0].y, 0), '살아 있으면 서로 막는다');
+  // **정확히 겹쳐 놓으면 안 된다.** sim 에는 "이미 겹쳐 있으면 안 막는다" 예외가 있다
+  // (모서리에서 둘이 끼면 영영 못 움직여서 넣은 규칙) → 살짝 떨어뜨려 두고,
+  // 그쪽으로 **들어가려 할 때** 막히는지 본다
+  s.p[1].x = s.p[0].x + PWf; s.p[1].y = s.p[0].y;
+  assert(blocked(s, s.p[1].x, s.p[1].y, 0), '살아 있으면 서로 막는다');
   setOff(s, 1, true);
   assert(!blocked(s, s.p[0].x, s.p[0].y, 0), '끊기면 통과한다');
 }

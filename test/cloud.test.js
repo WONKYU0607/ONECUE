@@ -19,7 +19,9 @@ console.log('올릴 내용 추리기');
   T.recordMatch('gun', 'win', 60);
   T.spendFor(false);
   const s = T.snapshot();
-  for (const k of ['tk', 'ffa', 'day']) assert(k in s, `  ${k} 포함`);
+  // [stated] **티켓도 서버가 쥔다**(`SERVER_BACKED`). 예전엔 `tk`·`ffa`·`day` 를 클라가 올렸는데
+  // 규칙이 그걸 막으므로 올리면 **쓰기가 통째로 거부돼 닉네임·색까지 저장이 안 된다**
+  for (const k of ['tk', 'ffa', 'day', 'at']) assert(!(k in s), `  ${k} 는 안 올린다 (서버가 쓴다)`);
   // **점수·연승·전적은 안 올린다.** 서버가 쓰고, 규칙이 클라 쓰기를 막는다.
   // 올리려 하면 규칙에 걸려 통째로 거부돼 티켓까지 저장이 안 된다
   for (const k of ['score', 'streak', 'record'])
@@ -113,8 +115,9 @@ console.log('저장 열쇠 이름이 안 겹친다');
   const st = fs.readFileSync('src/cloud/store.js', 'utf8');
   assert(/updatedAt: serverTimestamp\(\)/.test(st), '서버 시각은 updatedAt 으로');
   assert(!/[^a-zA-Z]at: serverTimestamp/.test(st), 'at 을 안 쓴다');
-  const snap = T.snapshot();
-  assert(typeof snap.at === 'number', '충전 시각은 그대로 at (숫자)');
+  // 클라는 이제 `at` 을 안 올리지만(서버가 쥔다), **이름이 겹치면 안 된다는 규칙은 남는다** —
+  // 서버가 `at` 에 서버 시각을 쓰면 충전 계산이 망가지므로 서버 시각은 `updatedAt` 이어야 한다
+  assert(!('at' in T.snapshot()), '충전 시각도 서버가 쥔다 (클라가 안 올린다)');
 }
 
 console.log('Firebase가 게임 본체에 딸려 들어가지 않는다');
