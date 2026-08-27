@@ -5,7 +5,9 @@
 // **브라우저로는 절대 안 보이는 문제** — 상태바가 없으니까.
 import fs from 'fs';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 const css = fs.readFileSync('src/styles.css', 'utf8');
 const sa = fs.readFileSync('src/state/safearea.js', 'utf8');

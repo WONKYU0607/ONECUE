@@ -8,7 +8,7 @@ import { canPlace } from '../src/game/sim.js';
 import { assert } from './harness.js';
 
 const PORT = 8191, sleep = ms => new Promise(r => setTimeout(r, ms));
-const proc = spawn(process.execPath, ['server/index.js'], { env: { ...process.env, PORT }, stdio: 'pipe' });
+const proc = spawn(process.execPath, ['server/index.js'], { env: { ...process.env, PORT: String(PORT) }, stdio: 'pipe' });
 let err = ''; proc.stderr.on('data', d => err += d);
 await sleep(700);
 

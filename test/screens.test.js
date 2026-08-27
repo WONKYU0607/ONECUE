@@ -2,7 +2,9 @@
 // **연습 모드가 검은 화면**이 됐다. 문자열이 짝이 맞는지 자동으로 확인한다.
 import fs from 'fs';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 const src = fs.readFileSync('src/App.jsx', 'utf8');
 const set = new Set([...src.matchAll(/setScreen\(\s*'([a-z]+)'\s*\)/g)].map(m => m[1]));

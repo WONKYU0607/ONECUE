@@ -7,7 +7,7 @@ import wsPkg from '../server/node_modules/ws/index.js';
 const WebSocket = wsPkg.WebSocket || wsPkg;
 const PORT = 8165;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const srv = spawn(process.execPath, ['server/index.js'], { env:{...process.env, PORT}, stdio:['ignore','pipe','pipe'] });
+const srv = spawn(process.execPath, ['server/index.js'], { env:{...process.env, PORT: String(PORT)}, stdio:['ignore','pipe','pipe'] });
 let errLog=''; srv.stderr.on('data', d => errLog += d);
 await sleep(4000);
 const conn = q => { const t={msgs:[]};

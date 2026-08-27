@@ -2,7 +2,9 @@
 // (render.js가 ui-state.js의 resultFor를 가져오는데 그 파일을 안 보내서 빌드가 깨졌다)
 import fs from 'fs';
 import path from 'path';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const roots = ['src', 'server', 'test'];
 const files = [];
 const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})){

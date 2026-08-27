@@ -7,7 +7,9 @@ import { newState, checksum, normalizeState, cloneState } from '../src/game/sim.
 import { SELF } from '../src/game/config.js';
 import { matchSummary } from '../src/game/ui-state.js';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const { WebSocket } = wsPkg;
 const PORT = 8191;
 const sleep = ms => new Promise(r => setTimeout(r, ms));

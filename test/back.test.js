@@ -4,7 +4,9 @@
 // [stated] 게임을 나가기 전에 "종료하시겠습니까" 확인 창을 띄운다
 import fs from 'fs';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 const app = fs.readFileSync('src/App.jsx', 'utf8');
 const back = fs.readFileSync('src/state/back.js', 'utf8');

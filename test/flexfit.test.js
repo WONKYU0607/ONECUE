@@ -6,7 +6,9 @@
 // 늘어나는(flex-grow) 항목에는 `min-width:0`이 반드시 같이 있어야 한다.
 import fs from 'fs';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const css = fs.readFileSync('src/styles.css', 'utf8');
 
 // 규칙 블록을 통째로 잘라 본다 (여러 줄에 걸쳐 있다)

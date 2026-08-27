@@ -6,7 +6,9 @@
 // 이 검사는 서버를 띄우지 않고 **고르는 규칙만** 확인한다.
 import fs from 'fs';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 // 서버의 고르는 규칙과 같은 식 (server/index.js 의 pairUp 안)
 const mid = 1000;

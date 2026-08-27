@@ -7,7 +7,9 @@ import fs from 'fs';
 import { AI_STAGES } from '../src/game/ai.js';
 import { THROW_DEF, THROW, teamOf, setArena } from '../src/game/config.js';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 console.log('30단계가 있다');
 {

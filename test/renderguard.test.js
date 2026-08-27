@@ -6,7 +6,9 @@
 import fs from 'fs';
 import * as CFG from '../src/game/config.js';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 const src = fs.readFileSync('src/game/render.js', 'utf8');
 

@@ -7,7 +7,7 @@ import { assert } from './harness.js';
 const PORT = 8141;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const proc = spawn(process.execPath, ['server/index.js'], {
-  env: { ...process.env, PORT }, stdio: ['ignore', 'pipe', 'pipe']
+  env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'pipe', 'pipe']
 });
 let err = ''; proc.stderr.on('data', d => err += d);
 await sleep(700);

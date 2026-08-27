@@ -11,7 +11,7 @@ const PORT = 8123;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const proc = spawn(process.execPath, ['server/index.js'], {
-  env: { ...process.env, PORT }, stdio: ['ignore', 'pipe', 'pipe']
+  env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'pipe', 'pipe']
 });
 const logs = [];
 proc.stdout.on('data', d => logs.push(String(d)));

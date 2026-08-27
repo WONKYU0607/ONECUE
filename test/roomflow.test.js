@@ -6,7 +6,9 @@ import fs from 'fs';
 import { newState, resetForNextRound } from '../src/game/sim.js';
 import { PH_OVER, PH_READY } from '../src/game/config.js';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 console.log('다시 시작하면 판이 새로 차려진다');
 {

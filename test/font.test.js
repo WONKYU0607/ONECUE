@@ -2,7 +2,9 @@
 // 설정·물음표 같은 요소가 따로 놀았다. 새 스타일을 넣을 때 또 빠뜨리지 않게 고정한다.
 import fs from 'fs';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const css = fs.readFileSync('src/styles.css', 'utf8');
 
 // 조절 패널(.tune)은 개발용 도구라 숫자 정렬이 중요해 monospace를 남겨둔다

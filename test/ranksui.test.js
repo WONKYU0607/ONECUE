@@ -5,7 +5,9 @@
 import fs from 'fs';
 import { soccerDelta } from '../src/state/tickets.js';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 const app = fs.readFileSync('src/App.jsx', 'utf8');
 const home = fs.readFileSync('src/ui/screens/Home.jsx', 'utf8');

@@ -6,7 +6,9 @@
 import fs from 'fs';
 import { H, FP, ARENA, ROW_MIN, ROW_MAX, YMIN_S, YMAX_S, setArena } from '../src/game/config.js';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 console.log('카운트다운이 중앙선을 피한다');
 {

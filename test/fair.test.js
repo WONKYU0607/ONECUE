@@ -13,7 +13,9 @@ import fs from 'fs';
 import { Server, Client, setClock } from '../src/game/net.js';
 import { SELF, PH_PLAY, FP, stepCap, setArena } from '../src/game/config.js';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 // 실제 클라 2개를 붙여, 한 화면에 그려지는 속도를 잰다
 function run(fps, ow = 60){

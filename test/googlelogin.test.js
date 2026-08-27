@@ -2,7 +2,9 @@
 // 실제 로그인은 여기서 못 돌린다(구글 인증이 필요하다) — **배선과 함정만** 고정한다.
 import fs from 'fs';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 const fb = fs.readFileSync('src/cloud/firebase.js', 'utf8');
 const sync = fs.readFileSync('src/cloud/sync.js', 'utf8');

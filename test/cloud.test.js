@@ -3,7 +3,9 @@
 // Firebase를 같이 묶으면 gzip 88KB → 255KB가 되므로 **따로 받아온다**
 import fs from 'fs';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 globalThis.localStorage = { _s: new Map(),
   getItem(k){ return this._s.has(k) ? this._s.get(k) : null },

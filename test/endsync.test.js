@@ -8,7 +8,9 @@ import fs from 'fs';
 import { newState, step, NOIN } from '../src/game/sim.js';
 import { SELF, PH_PLAY, PH_OVER, FP, ATK_TICKS, MELEE_DAMAGE, setArena } from '../src/game/config.js';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 const IN = n => Array.from({ length: n }, () => ({ ...NOIN }));
 

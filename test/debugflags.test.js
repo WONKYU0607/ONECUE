@@ -7,7 +7,9 @@ import fs from 'fs';
 import { DEBUG_INF_HP } from '../src/game/config.js';
 import { DEBUG_INF_SOCCER } from '../src/state/tickets.js';
 import { assert } from './harness.js';
-process.chdir(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'url';
+// **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 const flags = [
   ['DEBUG_INF_HP', DEBUG_INF_HP, 'src/game/config.js', '무한 체력 — 판이 안 끝난다'],
