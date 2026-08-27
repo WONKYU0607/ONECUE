@@ -16,7 +16,7 @@ const openOrDie = ws => new Promise((res, rej) => {
   ws.on('error', e => { clearTimeout(t); rej(e); });
   ws.on('close', () => { clearTimeout(t); rej(new Error('붙기 전에 끊겼다')); });
 });
-import { assert } from './harness.js';
+import { assert, waitPort } from './harness.js';
 import { fileURLToPath } from 'url';
 // **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
@@ -86,7 +86,7 @@ console.log('실제 서버 — 혼자 기다리면 판이 열린다');
   const proc = spawn(process.execPath, ['server/index.js'],
     { env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'ignore', 'inherit'] });
   try {
-    await sleep(900);
+    await waitPort(PORT);   // 뜰 때까지 기다린다 (고정 대기는 윈도우에서 모자랐다)
     const msgs = [];
     const ws = new WebSocket(`ws://127.0.0.1:${PORT}?sid=alone&mode=queue&melee=1&nick=원구`);
     ws.on('message', d => { try { msgs.push(JSON.parse(d)); } catch { /* 무시 */ } });
@@ -147,7 +147,7 @@ console.log('실제 클라 흐름 — 모든 모드가 매칭을 끝낸다');
   const proc = spawn(process.execPath, ['server/index.js'],
     { env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'ignore', 'inherit'] });
   try {
-    await sleep(900);
+    await waitPort(PORT);   // 뜰 때까지 기다린다 (고정 대기는 윈도우에서 모자랐다)
     for (const [n, melee, ffa, nm] of [[2, 0, 0, '1대1'], [4, 0, 0, '2대2'],
                                        [6, 1, 0, '3대3 칼전'], [4, 1, 1, '개인전']]){
       const url = `ws://127.0.0.1:${PORT}?sid=t${n}${melee}${ffa}&mode=queue&n=${n}` +

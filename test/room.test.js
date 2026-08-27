@@ -2,7 +2,7 @@
 import { spawn } from 'child_process';
 import wsPkg from '../server/node_modules/ws/index.js';
 const { WebSocket } = wsPkg;
-import { assert } from './harness.js';
+import { assert, waitPort } from './harness.js';
 
 const PORT = 8141;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -10,7 +10,7 @@ const proc = spawn(process.execPath, ['server/index.js'], {
   env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'pipe', 'pipe']
 });
 let err = ''; proc.stderr.on('data', d => err += d);
-await sleep(700);
+await waitPort(PORT);   // 뜰 때까지 기다린다 (고정 대기는 윈도우에서 모자랐다)
 
 function conn(sid, mode = 'queue', code = '', resume = false){
   const t = { msgs: [], ws: null };

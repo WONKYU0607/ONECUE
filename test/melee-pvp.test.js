@@ -5,7 +5,7 @@
 import { spawn } from 'child_process';
 import wsPkg from '../server/node_modules/ws/index.js';
 const { WebSocket } = wsPkg;
-import { assert } from './harness.js';
+import { assert, waitPort } from './harness.js';
 
 const PORT = 8129;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -29,7 +29,7 @@ function conn(sid, opt = {}){
 const proc = spawn(process.execPath, ['server/index.js'], {
   env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'ignore', 'inherit']
 });
-await sleep(700);
+await waitPort(PORT);   // 뜰 때까지 기다린다 (고정 대기는 윈도우에서 모자랐다)
 
 try {
   console.log('칼전 랜덤 매칭 1대1');

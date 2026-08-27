@@ -7,7 +7,7 @@
 import fs from 'fs';
 import { newState, step, NOIN } from '../src/game/sim.js';
 import { SELF, PH_PLAY, PH_OVER, FP, ATK_TICKS, MELEE_DAMAGE, setArena } from '../src/game/config.js';
-import { assert } from './harness.js';
+import { assert, waitPort } from './harness.js';
 import { fileURLToPath } from 'url';
 // **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
@@ -68,7 +68,7 @@ console.log('실제 서버 — 두 클라가 같은 시점에 끝난다');
   };
   const proc = spawn(process.execPath, ['server/index.js'],
     { env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'ignore', 'inherit'] });
-  await sleep(700);
+  await waitPort(PORT);   // 뜰 때까지 기다린다 (고정 대기는 윈도우에서 모자랐다)
   try {
     const a = conn('e1'), b = conn('e2');
     await sleep(1400);

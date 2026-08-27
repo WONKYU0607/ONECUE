@@ -6,7 +6,7 @@ import wsPkg from '../server/node_modules/ws/index.js';
 import { newState, checksum, normalizeState, cloneState } from '../src/game/sim.js';
 import { SELF } from '../src/game/config.js';
 import { matchSummary } from '../src/game/ui-state.js';
-import { assert } from './harness.js';
+import { assert, waitPort } from './harness.js';
 import { fileURLToPath } from 'url';
 // **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
@@ -40,7 +40,7 @@ console.log('닉네임은 체크섬에 안 들어간다 (데싱크 방지)');
 
 const proc = spawn(process.execPath, ['server/index.js'],
   { env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'ignore', 'inherit'] });
-await sleep(700);
+await waitPort(PORT);   // 뜰 때까지 기다린다 (고정 대기는 윈도우에서 모자랐다)
 try {
   console.log('1대1 — 서로의 닉네임이 보인다');
   const a = conn('n1', { nick: '원구' }), b = conn('n2', { nick: 'player9' });

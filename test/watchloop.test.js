@@ -2,14 +2,14 @@
 // 방장 판정·조작이 어긋났다 → 방 상태가 알려주는 자리로 늘 맞춘다.
 // 세 번으로는 안 잡혀서 **30번** 빠르게 오간다
 import { spawn } from 'child_process';
-import { assert } from './harness.js';
+import { assert, waitPort } from './harness.js';
 import wsPkg from '../server/node_modules/ws/index.js';
 const WebSocket = wsPkg.WebSocket || wsPkg;
 const PORT = 8165;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const srv = spawn(process.execPath, ['server/index.js'], { env:{...process.env, PORT: String(PORT)}, stdio:['ignore','pipe','pipe'] });
 let errLog=''; srv.stderr.on('data', d => errLog += d);
-await sleep(4000);
+await waitPort(PORT);   // 뜰 때까지 기다린다 (고정 대기는 윈도우에서 모자랐다)
 const conn = q => { const t={msgs:[]};
   t.ws=new WebSocket(`ws://127.0.0.1:${PORT}?${q}`);
   t.ws.on('message',r=>t.msgs.push(JSON.parse(r)));

@@ -18,12 +18,12 @@ function conn(sid, opt = {}){
   t.last = k => [...t.msgs].reverse().find(m => m.t === k);
   all.push(t); return t;
 }
-import { assert } from './harness.js';
+import { assert, waitPort } from './harness.js';
 import { fileURLToPath } from 'url';
 // **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const proc = spawn(process.execPath, ['server/index.js'], { env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore','ignore','inherit'] });
-await sleep(700);
+await waitPort(PORT);   // 뜰 때까지 기다린다 (고정 대기는 윈도우에서 모자랐다)
 try {
   for (const n of [3, 4, 5, 6]){
     const cs = [];

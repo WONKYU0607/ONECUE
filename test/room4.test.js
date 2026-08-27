@@ -5,12 +5,12 @@ const { WebSocket } = wsPkg;
 import { Client } from '../src/game/net.js';
 import { GRID_ROWS, GRID_COLS, itemKinds, itemQuota, isCover, coverBudget } from '../src/game/config.js';
 import { canPlace } from '../src/game/sim.js';
-import { assert } from './harness.js';
+import { assert, waitPort } from './harness.js';
 
 const PORT = 8191, sleep = ms => new Promise(r => setTimeout(r, ms));
 const proc = spawn(process.execPath, ['server/index.js'], { env: { ...process.env, PORT: String(PORT) }, stdio: 'pipe' });
 let err = ''; proc.stderr.on('data', d => err += d);
-await sleep(700);
+await waitPort(PORT);   // 뜰 때까지 기다린다 (고정 대기는 윈도우에서 모자랐다)
 
 function conn(sid, mode, code = '', n = 2){
   const t = { msgs: [], toClient: null };

@@ -46,3 +46,22 @@ export function assert(cond, msg){
   if (!cond) throw new Error('실패: ' + msg);
   console.log('  ok  ' + msg);
 }
+
+// **고정 대기(700~900ms)로 서버 뜨기를 기다리면 안 된다.**
+// 윈도우에서는 그보다 오래 걸려 `ECONNREFUSED` 로 무더기 실패했다.
+// 포트가 실제로 받을 때까지 두드린다
+export async function waitPort(port, ms = 20000){
+  const net = await import('net');
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms){
+    const ok = await new Promise(res => {
+      const s = net.connect(port, '127.0.0.1');
+      const done = v => { try { s.destroy(); } catch { /* 무시 */ } res(v); };
+      s.once('connect', () => done(true));
+      s.once('error', () => done(false));
+    });
+    if (ok){ await new Promise(r => setTimeout(r, 120)); return true; }
+    await new Promise(r => setTimeout(r, 100));
+  }
+  throw new Error(`서버가 ${ms}ms 안에 안 떴다 (포트 ${port})`);
+}
