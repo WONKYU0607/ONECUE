@@ -103,6 +103,31 @@ export function createRenderer(canvas){
     whiteCache.set(img, c);
     return c;
   }
+  // [stated] **칼전 초반에 캐릭터가 움직이면 렉이 걸린다** (인원이 많을수록 심하다).
+  // 칼전 시트는 한 칸이 242x99 인데 화면에는 30x12 월드px 로 그린다 — **8배 축소**를
+  // 캐릭터마다 매 프레임 다시 계산한다. 총격전은 3배라 티가 덜 났을 뿐 같은 구조다.
+  // → **실제 그릴 크기로 시트를 한 번만 줄여 두고, 그 뒤로는 1:1 로 찍는다.**
+  //   피격 흰색 판(`whiteOf`)에 이미 쓰던 방식과 같다. 배율은 화면 크기가 바뀔 때만
+  //   달라지므로 캐시가 몇 개를 넘지 않는다
+  const sheetCache = new Map();
+  function sheetAt(img, fw0, fh0, fw, fh){
+    if (!isReady(img) || typeof document === 'undefined' || fw < 1 || fh < 1) return null;
+    const cols = Math.max(1, Math.round(img.naturalWidth / fw0));
+    const rows = Math.max(1, Math.round(img.naturalHeight / fh0));
+    let m = sheetCache.get(img);
+    if (!m){ m = new Map(); sheetCache.set(img, m); }
+    const key = fw + 'x' + fh;
+    let c = m.get(key);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = cols * fw; c.height = rows * fh;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = true;
+    // 시트 전체를 한 번에 줄인다 → 칸 하나가 정확히 fw x fh 가 된다
+    g.drawImage(img, 0, 0, c.width, c.height);
+    m.set(key, c);
+    return c;
+  }
   const flashfx = getImage('flashfx');
   const throwImg = THROW_DEF.map(d => getImage(d.key));
   const fireImg = getImage('fire');
@@ -216,9 +241,15 @@ export function createRenderer(canvas){
       // 밝기만 올리면 색이 남아 '몸 색이 바뀐 것'처럼 보이므로 완전히 하얗게 만든다
       // 시트는 몸통 가로 중심 기준이라, 캐릭터 상자 가운데에 맞춰 그린다
       const meleeSrc = (hit && whiteOf(melee)) || melee;
-      ctx.drawImage(meleeSrc, fc * MELEE_FW, col * MELEE_FH, MELEE_FW, MELEE_FH,
-        Math.round((xw + ARENA.pw / 2 - dw / 2) * RS), Math.round((yw + ARENA.ph - dh) * RS),
-        Math.round(dw * RS), Math.round(dh * RS));
+      const dxp = Math.round((xw + ARENA.pw / 2 - dw / 2) * RS);
+      const dyp = Math.round((yw + ARENA.ph - dh) * RS);
+      const fwp = Math.round(dw * RS), fhp = Math.round(dh * RS);
+      // 미리 줄여둔 시트가 있으면 **1:1 로 찍는다**(축소 계산이 매 프레임 사라진다).
+      // 없으면(검사 환경 등) 예전처럼 원본을 줄여 그린다
+      const pre = sheetAt(meleeSrc, MELEE_FW, MELEE_FH, fwp, fhp);
+      if (pre) ctx.drawImage(pre, fc * fwp, col * fhp, fwp, fhp, dxp, dyp, fwp, fhp);
+      else ctx.drawImage(meleeSrc, fc * MELEE_FW, col * MELEE_FH, MELEE_FW, MELEE_FH,
+        dxp, dyp, fwp, fhp);
       // 방패를 든 동안: 바라보는 쪽에 빛나는 호를 그린다 (시트에 방패 프레임이 없다)
       if (p.shield > 0){
         const cx = xw + ARENA.pw / 2, cy = yw + ARENA.ph / 2;
@@ -294,7 +325,7 @@ export function createRenderer(canvas){
       if (isReady(portalImg)){
         // 살짝 커졌다 작아지며 도는 느낌
         const puls = 1 + Math.sin(s.tick / 18 + k * 2) * 0.06;
-        const w = GRID_CW * 1.8 * puls, h = GRID_CH * 1.8 * puls;
+        const w = GRID_CW * 1.7 * puls, h = GRID_CH * 1.7 * puls;   // [stated] 1.8 → 1.7
         ctx.drawImage(portalImg, k * PORTAL_PX, 0, PORTAL_PX, PORTAL_PX,
           Math.round((cx - w / 2) * RS), Math.round((cy - h / 2) * RS),
           Math.round(w * RS), Math.round(h * RS));
@@ -321,7 +352,7 @@ export function createRenderer(canvas){
       const x = cellX(b.c), y = fy(cellY(b.r), GRID_CH);
       const bob = Math.sin(s.tick / 12 + b.c + b.r) * 0.8;
       // [stated] 아이콘이 너무 작아 안 보인다 → 칸보다 크게 그린다
-      const w = GRID_CW * 1.5, h = GRID_CH * 1.5;
+      const w = GRID_CW * 1.3, h = GRID_CH * 1.3;   // [stated] 1.5 → 1.3
       ctx.drawImage(buffImg, b.k * BUFF_PX, 0, BUFF_PX, BUFF_PX,
         Math.round((x + (GRID_CW - w) / 2) * RS),
         Math.round((y + (GRID_CH - h) / 2 + bob) * RS),

@@ -90,7 +90,7 @@ import {
 import {
   stepBall, stepBallInGoal, ballHome, KICKOFF, GOAL, FIELD,
   GOAL_HOLD, GOAL_SEQ, GOAL_TO_WIN, SOCCER_TICKS, TACKLE_TICKS, TACKLE_COOL, FOOT_OFF,
-  TACKLE_SLIDE, faceVec, SOC_STUN, RELEASE_TICKS, TACKLE_HIT,
+  TACKLE_SLIDE, faceVec, SOC_STUN, RELEASE_TICKS, TACKLE_HIT, TACKLE_BOX,
   TACKLE_V
 } from './ball.js';
 
@@ -558,6 +558,15 @@ export function blocked(s, x, y, self = -1){
     return true;
   }
   return false;
+}
+
+// [stated] **태클로 뺏은 공은 앞뒤가 아니라 양옆으로 빠진다.**
+// 앞뒤로 보내면 태클한 사람이나 넘어진 사람 발밑에 그대로 남아 실랑이가 된다.
+// 태클 방향(tx,ty)의 **수직** 두 방향 중, 공이 이미 치우친 쪽을 고른다 —
+// 정확히 가운데면 오른쪽. 전부 정수 연산이라 양쪽 화면이 갈리지 않는다
+function sideOut(tx, ty, ox, oy){
+  const px = -ty, py = tx;                 // 90도 돌린 방향
+  return (ox * px + oy * py) >= 0 ? [px, py] : [-px, -py];
 }
 
 export function step(s, inp){
@@ -1253,7 +1262,8 @@ export function step(s, inp){
             a.tkl = 0;                             // 걸렸으면 그 자리에서 멈춘다
             // [stated] **태클한 사람 쪽으로** 튕겨 나온다 (미끄러진 방향의 반대)
             const [tx, ty] = faceVec(a.tklF == null ? a.face : a.tklF);
-            s.ball.vx = -tx * TACKLE_V; s.ball.vy = -ty * TACKLE_V;
+            const [sx, sy] = sideOut(tx, ty, s.ball.x - (a.x + (PWf >> 1)), s.ball.y - (a.y + (PHf >> 1)));
+            s.ball.vx = sx * TACKLE_V; s.ball.vy = sy * TACKLE_V;
             s.lastKicker = i;                     // 태클한 사람 몸은 잠깐 통과
           }
         }
@@ -1266,7 +1276,11 @@ export function step(s, inp){
           // **몸 중심끼리** 재야 한다. 좌상단끼리 재면 크기만큼 어긋난다
           const adx = (a.x - o.x), ady = (a.y - o.y);
           const near2 = adx * adx + ady * ady <= TACKLE_HIT * TACKLE_HIT;
-          if (!near2 && !overlap(a.x, a.y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
+          // [stated] **멀리서 태클해도 걸린다** → 몸 전체가 아니라 **줄인 상자**(70%)로 본다.
+          // 어깨만 스치는 것으로는 안 걸린다. 상자는 몸 가운데를 기준으로 줄인다
+          const bw = (PWf * TACKLE_BOX / 100) | 0, bh = (PHf * TACKLE_BOX / 100) | 0;
+          const ix = (PWf - bw) >> 1, iy = (PHf - bh) >> 1;
+          if (!near2 && !overlap(a.x + ix, a.y + iy, bw, bh, o.x + ix, o.y + iy, bw, bh)) continue;
           o.stun = SOC_STUN;
           // [stated] **태클이 걸리면 거기서 멈춘다.** 계속 미끄러지면 상대를 지나쳐 버려
           // 공을 내 쪽으로 보내도 **결과적으로 상대 뒤에 남는다**(실측: 상대를 30px 지나침).
@@ -1281,7 +1295,8 @@ export function step(s, inp){
             // 미끄러진 방향으로 보냈더니 **그 방향에 상대가 서 있어** 공이 상대에게 갔다 —
             // 태클은 상대를 향해 들어가는 동작이므로 **반대로** 나와야 내가 잡을 수 있다
             const [tx2, ty2] = faceVec(a.tklF == null ? a.face : a.tklF);
-            s.ball.vx = -tx2 * TACKLE_V; s.ball.vy = -ty2 * TACKLE_V;
+            const [sx2, sy2] = sideOut(tx2, ty2, s.ball.x - (a.x + (PWf >> 1)), s.ball.y - (a.y + (PHf >> 1)));
+            s.ball.vx = sx2 * TACKLE_V; s.ball.vy = sy2 * TACKLE_V;
             // **태클한 사람 몸은 잠깐 통과시킨다.** 공이 그 사람 몸 안에서 출발하므로
             // 그대로 두면 자기 몸에 부딪혀 힘이 죽는다(슛에 쓰던 것과 같은 처리)
             s.lastKicker = i;

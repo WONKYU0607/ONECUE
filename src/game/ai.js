@@ -189,8 +189,13 @@ function planPlace(s, me, p){
   return null;
 }
 
-export function createAI(stage = 1){
-  const p = AI_STAGES[Math.max(0, Math.min(AI_STAGES.length - 1, stage - 1))];
+/** `stage` 는 AI 스테이지 단계(1~10).
+ *  [stated] **PVP 는 봇이든 사람이든 이동 속도 같은 피지컬이 같아야 한다.**
+ *  스테이지는 일부러 어렵게 만든 것이라 그대로 두고, **PVP 에 채우는 봇만** `fair: true` 로 부른다 —
+ *  그러면 `speed`(이동 속도)를 사람과 같은 1.0 으로 쓴다. 단계 차이는 판단(`react`·`aim`·`horizon`)으로만 난다 */
+export function createAI(stage = 1, fair = false){
+  const base = AI_STAGES[Math.max(0, Math.min(AI_STAGES.length - 1, stage - 1))];
+  const p = fair ? { ...base, speed: 1 } : base;
   let targetX = null, nextPlan = 0;
   let mNext = 0, mvx = 0, mvy = 0;   // 칼전: 다음 판단 시각과 그때 정한 방향
   let goal = null, goalAt = 0, goalFoe = -1;   // 칼전: 지금 노리는 것

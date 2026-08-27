@@ -177,7 +177,7 @@ export const THROW_DEF = [
 // 칼전(근접전). 총알·아이템 없이 칼로만 싸운다
 // [stated] **칼전 이동 속도** — 총격전은 좌우로만 다니는데 칼전은 사방으로 움직여
 // 같은 값이어도 훨씬 빠르게 느껴진다. 0.8 = 80%
-export const MELEE_SPD = 0.68;   // [stated] 80% 에서 **15% 더** 낮춤 (0.8 → 0.68)
+export const MELEE_SPD = 0.61;   // [stated] 0.8 → 0.68(15%↓) → **0.61(10%↓)**. 칼전 속도는 여기 하나로 정한다
 export const MELEE_DAMAGE = 8;          // 한 방에 최대 체력의 8%
 export const ATK_TICKS = 18;            // 휘두르는 모션 길이 (0.3초)
 export const ATK_HIT = 12;              // 이 틱에 판정 (모션 중간)
@@ -360,9 +360,9 @@ const A4 = {
   wl: W4L, wr: W4R, wt: T4, wb: B4,
   // 칼전처럼 **아레나 전체를 양쪽이 같이 쓴다** (중앙선도 진영도 없다)
   melee: true, soccer: true,
-  // 경기장이 짧은 만큼 이동 속도도 낮춘다. [stated] 초당 65px 에서 **10% 더** 낮춤
-  // (기본 170 x 0.344 = 초당 약 58px)
-  spd: 0.344
+  // 경기장이 짧은 만큼 이동 속도도 낮춘다. [stated] 초당 65px 에서 10% 낮췄고(0.382 → 0.344),
+  // **거기서 또 10%** (기본 170 x 0.310 = 초당 약 53px)
+  spd: 0.310
 };
 
 export const ARENA = { ...A1 };

@@ -168,7 +168,8 @@ class Room {
     // [stated] 축구는 **공을 쫓는 봇**이 따로 있다. 총·칼 봇은 공을 아예 안 본다
     this.server.bots.push({ slot: i, stage: 5,
       // [stated] 축구 봇은 **쉬움(0)** 으로. 1 은 사람이 이기기 버거웠다
-      ai: this.soccer ? createSoccerAI(i, 0) : createAI(5) });
+      // [stated] **PVP 봇은 사람과 피지컬이 같다** → `fair: true`
+      ai: this.soccer ? createSoccerAI(i, 0) : createAI(5, true) });
   }
 
   // 사람 점수에 맞춰 봇 단계를 정한다. 점수를 모르면 중간값 그대로
@@ -188,7 +189,7 @@ class Room {
       b.stage = stage;
       // 축구 봇은 단계가 셋뿐이라 1~10 을 0~2 로 접는다
       b.ai = this.soccer ? createSoccerAI(b.slot, Math.min(2, Math.floor((stage - 1) / 4)))
-                         : createAI(stage);
+                         : createAI(stage, true);   // PVP 봇 — 이동 속도는 사람과 같다
     }
     console.log(`봇 단계 ${stage} (사람 평균 ${Math.round(avg)}점)`);
   }

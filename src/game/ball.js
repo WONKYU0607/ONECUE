@@ -50,7 +50,7 @@ export const BALL_STOP = Math.round(0.15 * FP);    // 이보다 느리면 세운
 // 캐릭터 속도가 170px/초. 슛은 그보다 확실히 빨라야 하고,
 // 미는 속도는 조금 느려야 **따라가며 몰 수 있다**(빠르면 공이 도망간다)
 // [stated] "현재 속도를 슛 속도로 하고 몰고 가는 건 반으로 줄여"
-export const KICK_V = Math.round(3.83 * FP);  // [stated] 슛 속도 25% 낮춤(6→4.5) 뒤 **15% 더** (4.5→3.83)          // 슛 — 지금 속도 그대로 (굴러가는 거리 약 154px)
+export const KICK_V = Math.round(3.45 * FP);  // [stated] 6 → 4.5(25%↓) → 3.83(15%↓) → **3.45(10%↓)**. 꽉 채운 슛 기준
 // [stated] 태클로 공을 차면 **슛보다 약하게** 튕겨 나간다. 슛의 절반
 // [stated] **태클로 뺏은 공이 넘어진 사람 앞에 그대로 떨어진다.**
 // 방향은 맞는데 **35px 밖에 안 굴러** 둘 사이에 남아 있었다 → 60px 쯤 굴러가게.
@@ -98,7 +98,11 @@ export const SOC_STUN = 48;   // [stated] 0.5초 → 0.8초
 // [stated] **태클이 너무 멀리서도 먹힌다** — 캐릭터가 9px 인데 중심 거리 14px 이면
 // 몸이 5px 떨어져 있어도 걸렸다. 몸이 거의 닿을 때만 걸리게 좁힌다
 // [stated] **8px 까지만 걸리게.** 미끄러지며 더 붙으므로 실제로는 8px 근처가 한계가 된다
-export const TACKLE_HIT = Math.round(3 * FP);
+// [stated] **멀리서 태클해도 걸린다** → 3 → 2. 캐릭터가 9px 이므로 몸이 거의 겹쳐야 한다
+export const TACKLE_HIT = Math.round(2 * FP);
+// 몸 겹침으로 볼 때 쓰는 **줄인 판정 상자**(%). 100 이면 몸 전체.
+// [stated] 범위를 더 좁혀 달라 → **70%** — 어깨만 스치는 것으로는 안 걸린다
+export const TACKLE_BOX = 70;
 export const KICK_COOL = 18;                       // 연타 방지 (틱)
 export const GOAL_TO_WIN = 3;
 export const SOCCER_TICKS = 90 * 60;               // 90초

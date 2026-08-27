@@ -36,9 +36,21 @@ const LEVELS = [
   // 90초 내내 0:0 이었다. 단계 차이는 간격보다 **속도·정확도**로 준다
   // [stated] "AI 가 축구를 좀 잘해서 PVP 로 이기기가 쉽지 않다" → 쉬움을 더 낮춘다.
   // 늦게 판단하고(340ms) 느리게 달린다(0.62)
-  { react: 340, slop: 10 * FP, aim: 0.45, speed: 0.62 },  // 쉬움
-  { react: 170, slop: 5 * FP, aim: 0.75, speed: 0.88 },   // 보통
-  { react: 120, slop: 3 * FP, aim: 0.92, speed: 1.0 }     // 어려움
+  // [stated] **봇이 드리블도 움직임도 전혀 없다** — `slop` 이 커서 수비 자리에 닿는 순간
+  // 입력을 0 으로 내고 그대로 굳었다(실측: 단계 0 이 90초의 **97%** 를 가만히 서 있었다).
+  // 예전에 같은 일이 있어 **접근·드리블 목표만** 1px 로 고쳤고 **수비 자리는 안 고쳤다**.
+  // 서버 봇은 쉬움(0)을 쓰므로 사람이 만나는 게 정확히 이 굳은 봇이다.
+  // 약하게 두는 건 `react`(판단 느림)·`speed`(느림)로 하고, **자리는 제대로 잡으러 간다**
+  // [stated] **슛·태클을 너무 자주 하면 재미가 없다** → 단계별로 절제한다.
+  // [stated] **다만 피지컬은 사람이든 봇이든 항상 같아야 한다** — 사거리·판정은 손대지 않는다.
+  // 단계 차이는 **얼마나 자주 시도하는지**(간격)로만 낸다. 사람도 버튼을 연타하지는 않는다
+  // **`speed` 는 전 단계 1.0 으로 고정한다.** 이동 속도는 피지컬이라 사람과 같아야 한다 —
+  // 봇만 62% 로 걷게 하면 대전이 공평하지 않다. 단계 차이는 **판단**으로만 낸다:
+  // `react`(얼마나 자주 다시 생각하는지) · `slop`(자리를 얼마나 꼼꼼히 잡는지) ·
+  // `aim`(조준 정확도) · `tklGap`/`kickGap`(버튼을 얼마나 자주 누르는지)
+  { react: 340, slop: 3 * FP, aim: 0.45, speed: 1.0, tklGap: 1600, kickGap: 1200 },  // 쉬움
+  { react: 170, slop: 2 * FP, aim: 0.75, speed: 1.0, tklGap: 1000, kickGap: 800 },   // 보통
+  { react: 120, slop: 2 * FP, aim: 0.92, speed: 1.0, tklGap: 600,  kickGap: 500 }    // 어려움
 ];
 
 const half = v => v >> 1;
@@ -46,12 +58,13 @@ const dist2 = (ax, ay, bx, by) => { const dx = ax - bx, dy = ay - by; return dx 
 
 /** 슬롯 하나를 맡는 축구 봇. `think(state, nowMs)` 가 입력을 돌려준다 */
 export function createSoccerAI(slot, level = 1){
-  const L = LEVELS[Math.max(0, Math.min(LEVELS.length - 1, level))];
+  const L = LEVELS[Math.max(0, Math.min(LEVELS.length - 1, level))];   // speed 는 전 단계 1.0
   let nextAt = 0;
   let held = 0;                        // 공을 연속으로 들고 있은 틱
   let goal = null;          // 이번에 갈 자리 {x, y}
   let wantKick = false, kickCh = 100;
   let wantTackle = false;
+  let lastTkl = -1e9, lastKick = -1e9;   // 마지막으로 시도한 시각 (절제용)
 
   return function think(s, now){
     const me = s.p[slot];
@@ -118,11 +131,7 @@ export function createSoccerAI(slot, level = 1){
                    y: half(b.y + ourGoalY) - half(PHf), slop: L.slop };
         } else {
           goal = { x: o.x, y: o.y, slop: FP };
-          const dBody = dist2(cx, cy, ox, oy);
-          const dBall = dist2(cx, cy, b.x, b.y);
-          if ((me.tklCool | 0) === 0 && (me.tkl | 0) === 0 &&
-              Math.min(dBody, dBall) <= TACKLE_RANGE * TACKLE_RANGE)
-            wantTackle = true;
+          // 태클할지는 여기서 정하지 않는다 — **매 틱** 아래에서 다시 본다
         }
       } else if (teamBall){
         // 팀원이 들고 있다 → 앞으로 벌려 준다 (뭉치면 서로 막는다)
@@ -143,7 +152,12 @@ export function createSoccerAI(slot, level = 1){
       // **벽에서 한 뼘 떨어진 곳까지만** 목표로 삼는다
       // **공을 몰고 갈 때는 여백을 두지 않는다** — 골대 앞으로 다가가야 하는데
       // 여백에 걸려 목표가 뒤로 밀리면 **영영 안 찬다**(실측: 단계 0·1 이 슛 0회)
-      const M = mineBall ? 0 : 10 * FP;
+      // [stated] **공이 벽에 붙으면 봇이 못 따라가고 서 있었다** — 실측: 봇 x134.1 / 공 x148.2 에서 멈춤.
+      // 여백이 **공을 쫓는 목표에도** 걸려 목표가 벽에서 10px 앞에서 잘렸다.
+      // 여백은 **수비·벌려주기 자리에만** 쓴다. 공을 잡으러 가거나 몰고 갈 때는 끝까지 간다
+      //(접근 목표는 `slop` 이 `FP` 인 것으로 구분한다)
+      const chasing = mineBall || goal.slop === FP;
+      const M = chasing ? 0 : 10 * FP;
       goal.x = Math.max(FIELD.x0 + M, Math.min(FIELD.x1 - PWf - M, goal.x));
       goal.y = Math.max(GOAL.top + M, Math.min(GOAL.bot - PHf - M, goal.y));
       // 내가 이미 모서리에 몰려 있으면 **가운데로 한 번 빠져나온다**.
@@ -168,6 +182,7 @@ export function createSoccerAI(slot, level = 1){
     // **쿨다운 중에는 태클 입력을 안 낸다.** 계속 1로 내보내면 의미도 없고
     // 기록만 부풀려진다(90초에 800회가 찍혔다)
     const tkl = wantTackle && (me.tklCool | 0) === 0 && (me.tkl | 0) === 0 ? 1 : 0;
+    if (tkl) lastTkl = now;
     // [stated] **찰 때는 골대 쪽을 보게 만든다.** 슛은 보는 방향으로 나가는데,
     // 판단이 느린 단계(0·1)는 `face` 가 낡아서 **63번 차고 한 골도 못 넣었다**.
     // 조준을 따로 맞추려 애쓸 필요 없이, 차는 그 틱에 골대 쪽 입력을 넣으면 된다
@@ -175,6 +190,17 @@ export function createSoccerAI(slot, level = 1){
     // 어긋나서, 63번 "차자"고 정해도 **실제로 잡은 채로 찬 건 한 번**뿐이었다.
     // 지금 잡고 있고 골대 쪽이면 그냥 찬다 — 봇은 이 정도로 충분하다
     const own = s.ballOwner == null ? -1 : s.ballOwner;
+    // [stated] **봇이 태클을 아예 안 한다** — 태클할지를 계획할 때(340ms 마다)만 봤다.
+    // 상대가 공을 잡는 순간과 계획 시점이 어긋나면 다가가는 내내 판단을 안 한다.
+    // 슛에서 똑같은 일이 있어 "매 틱 본다"로 고쳤는데 **태클은 안 고쳤다** → 같이 맞춘다
+    if (own >= 0 && teamOf(own, s.n) !== team && (me.tklCool | 0) === 0 && (me.tkl | 0) === 0
+        && now - lastTkl >= L.tklGap){
+      const o = s.p[own];
+      const d1 = dist2(cx, cy, o.x + half(PWf), o.y + half(PHf));
+      const d2 = dist2(cx, cy, b.x, b.y);
+      // 사거리는 **모든 단계가 같다** — 봇만 좁히면 피지컬을 다르게 준 셈이 된다
+      if (Math.min(d1, d2) <= TACKLE_RANGE * TACKLE_RANGE) wantTackle = true;
+    }
     let kickNow = false;
     // [stated] **봇이 공을 잡고 버티면 사람이 할 수 있는 게 없다.**
     // 오래 들고 있으면 골대 쪽으로 그냥 차 버린다 — 실제 축구도 계속 안 들고 있는다
@@ -190,13 +216,13 @@ export function createSoccerAI(slot, level = 1){
       const lined = b.x >= GOAL.lo - 26 * FP && b.x <= GOAL.hi + 26 * FP;
       // [stated] **봇이 잡자마자 최대 세기로 찼다** — 사람은 0.6초를 눌러야 하는데
       // 봇은 사람이 못 하는 짓을 하고 있었다. **봇도 같은 시간만큼 뜸을 들인다**
-      if (lined && Math.abs(toG) < SHOOT_RANGE && held >= CHARGE_TICKS){
+      if (lined && Math.abs(toG) < SHOOT_RANGE && held >= CHARGE_TICKS && now - lastKick >= L.kickGap){
         kickNow = true;
         dx = 0;                                   // 찰 때는 골대 쪽을 본다
         dy = toG < 0 ? -L.speed * FP : L.speed * FP;
       }
     }
-    if (kickNow){ wantKick = true; kickCh = chargeFor(Math.abs(foeGoalY - cy)); }
+    if (kickNow){ wantKick = true; lastKick = now; kickCh = chargeFor(Math.abs(foeGoalY - cy)); }
     // 슛은 **꽉 채워** 찬다 (골대 앞에서만 차므로 세게가 낫다)
     return { dx: dx | 0, dy: dy | 0, fire: wantKick ? 1 : 0, fch: 100, tkl };
   };
