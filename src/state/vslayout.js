@@ -9,21 +9,21 @@
 // 자리 값은 px 이라, 화면 끝 기준으로 잡으면 기기마다 간격이 달라져 번개에 물렸다.
 // 번개 그림의 세로 반폭이 47px 이라 이 값이 그보다 작으면 겹친다.
 const V = {
-  'gun:2':       { tx: 31, ty:  58, bx:  70, by:  58, tz:  80, bz: 80 },
-  'gun:4':       { tx: 21, ty:  58, bx: 152, by:  58, tz: 100, bz: 100 },
-  'gun:6':       { tx: 20, ty:  58, bx: 170, by:  58, tz: 100, bz: 100 },
-  'melee:2':     { tx: 22, ty:  58, bx:  99, by:  58, tz:  90, bz: 90 },
-  'melee:4':     { tx:  4, ty:  58, bx: 151, by:  58, tz: 100, bz: 100 },
-  'melee:6':     { tx: 13, ty:  58, bx: 156, by:  58, tz: 100, bz: 100 },
-  'melee:3:ffa': { tx:  4, ty:  58, bx: 137, by:  58, tz: 100, bz: 100 },
-  'melee:4:ffa': { tx: -1, ty:  58, bx: 155, by:  58, tz: 100, bz: 100 },
-  'melee:5:ffa': { tx: -2, ty:  58, bx:  26, by:  58, tz: 100, bz: 100 },
-  'melee:6:ffa': { tx:  7, ty:  58, bx:  -3, by:  58, tz: 100, bz: 90 },
-  'soccer:2':    { tx: 24, ty:  58, bx: 146, by:  58, tz: 100, bz: 100 },
-  'soccer:4':    { tx: 22, ty:  58, bx: 172, by:  58, tz: 100, bz: 100 }
+  'gun:2':       { tx: 31, ty:  58, bx:  70, by:  58, tz:  72, bz:  72 },
+  'gun:4':       { tx: 21, ty:  58, bx: 152, by:  58, tz:  90, bz:  90 },
+  'gun:6':       { tx: 20, ty:  58, bx: 170, by:  58, tz:  90, bz:  90 },
+  'melee:2':     { tx: 22, ty:  58, bx:  99, by:  58, tz:  81, bz:  81 },
+  'melee:4':     { tx:  4, ty:  58, bx: 151, by:  58, tz:  90, bz:  90 },
+  'melee:6':     { tx: 13, ty:  58, bx: 156, by:  58, tz:  90, bz:  90 },
+  'melee:3:ffa': { tx:  4, ty:  58, bx: 137, by:  58, tz:  90, bz:  90 },
+  'melee:4:ffa': { tx: -1, ty:  58, bx: 155, by:  58, tz:  90, bz:  90 },
+  'melee:5:ffa': { tx: -2, ty:  58, bx:  26, by:  58, tz:  90, bz:  90 },
+  'melee:6:ffa': { tx:  7, ty:  58, bx:  -3, by:  58, tz:  90, bz:  81 },
+  'soccer:2':    { tx: 24, ty:  58, bx: 146, by:  58, tz:  90, bz:  90 },
+  'soccer:4':    { tx: 22, ty:  58, bx: 172, by:  58, tz:  90, bz:  90 }
 };
 
-const NONE = { tx: 0, ty:  58, bx: 0, by:  58, tz: 100, bz: 100 };
+const NONE = { tx: 0, ty:  58, bx: 0, by:  58, tz:  90, bz:  90 };
 
 // 종목·인원·개인전 여부로 하나의 이름을 만든다
 

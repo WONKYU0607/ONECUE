@@ -133,6 +133,20 @@ export default function VsIntro({ vs, mySlot, onDone }){
   const SEAM_L = 0.72, SEAM_R = 0.28;      // styles.css 의 clip-path 와 **같은 값이어야 한다**
   const wrapRef = useRef(null), topRef = useRef(null), botRef = useRef(null);
   const [pos, setPos] = useState(null);   // {tx,ty,tz,bx,by,bz} — 재서 정한 실제 자리·크기
+  // **한 번만 재면 안 된다.** 앱에서는 안전영역(상단바·내비바)이 첫 그림보다 **늦게** 들어와서
+  // `--vh` 가 나중에 줄어든다. 그러면 사선(높이의 %)만 위로 올라오고 자리는 그대로라 **번개에 물린다**.
+  // 실측: 창 827 → 743 으로 줄자 여유가 58 → 18 로 무너졌다. 글꼴도 나중에 바뀌면 글자 폭이 달라진다
+  // → 크기가 바뀌거나 글꼴이 준비되면 **다시 잰다**
+  const [, setBeat] = useState(0);   // 값은 안 쓴다 — 다시 재게 만드는 용도
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setBeat(v => v + 1));
+    ro.observe(el);
+    let alive = true;
+    document.fonts && document.fonts.ready && document.fonts.ready.then(() => { if (alive) setBeat(v => v + 1); });
+    return () => { alive = false; ro.disconnect(); };
+  }, []);
   useLayoutEffect(() => {
     const w = wrapRef.current, T = topRef.current, B = botRef.current;
     if (!w || !T || !B) return;
