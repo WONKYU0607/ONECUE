@@ -18,7 +18,12 @@ function conn(sid, mode, code = '', n = 2){
   t.clientSend = m => { if (t.ws.readyState === 1) t.ws.send(JSON.stringify(m)); };
   t.serverSend = () => {};
   t.ws.on('message', raw => { const m = JSON.parse(raw); t.msgs.push(m); if (t.toClient) t.toClient(m); });
-  t.ready = new Promise(r => t.ws.on('open', r));
+  // **안 열리면 영원히 기다린다** → 열리거나·오류거나·10초 중 먼저 오는 것으로 끝낸다
+  t.ready = new Promise((res, rej) => {
+    const to = setTimeout(() => rej(new Error('서버에 10초 안에 못 붙었다')), 10000);
+    t.ws.on('open', () => { clearTimeout(to); res(); });
+    t.ws.on('error', e => { clearTimeout(to); rej(e); });
+  });
   return t;
 }
 

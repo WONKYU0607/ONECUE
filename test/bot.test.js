@@ -6,6 +6,16 @@
 // **AI 는 서버에서 돌린다** — 클라가 돌리면 기기마다 다르게 움직인다
 import fs from 'fs';
 import { spawn } from 'child_process';
+
+// **소켓이 안 열리면 영원히 기다린다** — 그래서 검사 전체가 여기서 멈췄다.
+// (서버가 늦게 뜨면 접속이 거부되는데 'error' 는 무시하고 있었다)
+// 열리거나, 오류거나, 10초가 지나면 반드시 끝낸다
+const openOrDie = ws => new Promise((res, rej) => {
+  const t = setTimeout(() => rej(new Error('서버에 10초 안에 못 붙었다')), 10000);
+  ws.on('open', () => { clearTimeout(t); res(); });
+  ws.on('error', e => { clearTimeout(t); rej(e); });
+  ws.on('close', () => { clearTimeout(t); rej(new Error('붙기 전에 끊겼다')); });
+});
 import { assert } from './harness.js';
 import { fileURLToPath } from 'url';
 // **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
@@ -81,7 +91,7 @@ console.log('실제 서버 — 혼자 기다리면 판이 열린다');
     const ws = new WebSocket(`ws://127.0.0.1:${PORT}?sid=alone&mode=queue&melee=1&nick=원구`);
     ws.on('message', d => { try { msgs.push(JSON.parse(d)); } catch { /* 무시 */ } });
     ws.on('error', () => { /* 무시 */ });
-    await new Promise(r => ws.on('open', r));
+    await openOrDie(ws);
     let hello = null;
     for (let i = 0; i < 40 && !hello; i++){ await sleep(500); hello = msgs.find(m => m.t === 'hello'); }
     assert(hello, '혼자 기다려도 방이 잡힌다');
@@ -151,7 +161,7 @@ console.log('실제 클라 흐름 — 모든 모드가 매칭을 끝낸다');
         if (m.t === 'lobby') seen.lobby = true;
       });
       ws.on('error', () => { /* 무시 */ });
-      await new Promise(r => ws.on('open', r));
+      await openOrDie(ws);
       for (let i = 0; i < 30 && !seen.go; i++) await sleep(500);
       assert(seen.hello, `  ${nm}: 방을 받는다`);
       assert(seen.go, `  ${nm}: go 까지 와서 매칭이 끝난다`);
