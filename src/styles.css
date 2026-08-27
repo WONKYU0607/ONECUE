@@ -683,7 +683,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 
 .vs-half.top .vs-pad{width:92%;padding:14% 0 0 16px}
 .vs-pad.two{display:flex;flex-wrap:wrap;align-content:flex-start}
-.vs-pad.two .vs-row{width:50%;box-sizing:border-box;padding-right:8px}
+.vs-pad.two .vs-row{width:50%;box-sizing:border-box;padding-right:16px}
 /* [stated] **오른쪽 칸을 계단처럼 밀어 키가 안 맞았다** — 사선을 피하려고 넣은 것인데
    자리 값을 따로 맞춘 뒤로는 필요 없다. **같은 줄끼리 키를 맞춘다** */
 .vs-half.bot .vs-pad{width:92%;padding:0 0 14% 16px}

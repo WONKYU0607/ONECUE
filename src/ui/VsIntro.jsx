@@ -5,7 +5,7 @@
 //
 // **정보가 없어도 화면은 뜬다** — 구름을 읽어야 해서 늦거나 못 올 수 있고,
 // 봇은 계정이 없어 점수·전적이 아예 없다. 없는 칸은 `-` 로 둔다.
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TEAMS } from '../game/config.js';
 import { getColor } from '../state/profile.js';
 import { t } from '../i18n/index.js';
@@ -49,6 +49,26 @@ function Portrait({ kind, color, zoom = 1 }){
   );
 }
 
+// [stated] 닉네임은 **폭 예산 10칸**(영문 1칸, 한글 1.6칸)까지 쓸 수 있다 → `profile.js NICK_BUDGET`.
+// 가장 넓게 나올 수 있는 글자열을 실제 글꼴로 재서 그만큼 자리를 미리 잡아 둔다.
+// 이걸 안 하면 **지금 화면에 뜬 사람 기준으로만** 맞춰져 다음 판에 긴 닉을 만나면 잘린다
+let measCv = null;
+function widestNick(font){
+  measCv = measCv || document.createElement('canvas');
+  const g = measCv.getContext('2d');
+  g.font = font;
+  // 영문 10칸 / 한글 6칸(6 x 1.6 = 9.6) 중 실제로 더 넓은 쪽
+  return Math.max(g.measureText('MMMMMMMMMM').width, g.measureText('한한한한한한').width);
+}
+function reserveNick(pad){
+  for (const el of pad.querySelectorAll('.vs-nick')){
+    if (el.dataset.res) continue;                 // 한 번만 — 다시 재면 예약폭을 또 재게 된다
+    const cs = getComputedStyle(el);
+    const w = widestNick(`${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`);
+    el.style.minWidth = Math.ceil(w) + 'px';
+    el.dataset.res = '1';
+  }
+}
 export default function VsIntro({ vs, mySlot, onDone }){
   // [stated] **막대는 없애고 3초 뒤에 그냥 들어간다.**
   // `onDone` 을 의존성에 두면 부모가 다시 그릴 때마다 시작 시각이 초기화된다 —
@@ -96,7 +116,7 @@ export default function VsIntro({ vs, mySlot, onDone }){
     // 두 줄은 **절반 폭에 들어가게** 더 줄인다 (0.66 은 오른쪽이 잘렸다)
     // **자리는 그대로 두고 배율만 낮춰** 사선에 안 걸리는 값을 실제로 재서 찾았다
     // (2대2 0.7 / 3대3 0.6 / 4명 이상 0.6 에서 잘림이 사라진다)
-    zoom: cnt >= 4 ? 0.6 : cnt === 3 ? 0.6 : cnt === 2 ? 0.7 : 1,
+    zoom: cnt >= 4 ? 0.45 : cnt === 3 ? 0.6 : cnt === 2 ? 0.7 : 1,
     // 위 조각은 위에서, 아래 조각은 아래에서 붙으므로 **여백을 키워야** 가운데로 온다
     // (줄였더니 오히려 바깥으로 밀렸다)
     // **사선 쪽 줄이 잘렸다** — 조각은 사선까지밖에 안 보이므로 여백을 더 줘 안쪽으로 민다
@@ -104,6 +124,90 @@ export default function VsIntro({ vs, mySlot, onDone }){
   });
   const upSz = sizeOf(upper.length || 1);
   const loSz = sizeOf(lower.length || 1);
+
+  // [stated] **위아래 자리는 사선에서 얼마나 띄울지로 잡는다.**
+  // 사선(`clip-path`)·번개·VS 는 **화면 높이의 %** 로 움직이는데 자리 값은 px 이라,
+  // 예전처럼 화면 끝을 기준으로 잡으면 **화면 높이가 다른 기기마다 간격이 달라졌다**
+  // (미리보기 827 / 폰 703 → 위 무리와 사선 사이가 56px 좁아짐).
+  // 여기서 `ty`·`by` 는 **사선까지 띄울 px** 이다. 좌우(`tx`·`bx`)와 크기(`tz`·`bz`)는 안 건드린다.
+  const SEAM_L = 0.72, SEAM_R = 0.28;      // styles.css 의 clip-path 와 **같은 값이어야 한다**
+  const wrapRef = useRef(null), topRef = useRef(null), botRef = useRef(null);
+  const [pos, setPos] = useState(null);   // {tx,ty,tz,bx,by,bz} — 재서 정한 실제 자리·크기
+  useLayoutEffect(() => {
+    const w = wrapRef.current, T = topRef.current, B = botRef.current;
+    if (!w || !T || !B) return;
+    const H = w.clientHeight, W = w.clientWidth;
+    if (!H || !W) return;
+    // 사선의 y (vs-wrap 안 좌표)
+    const diag = x => H * (SEAM_L - (SEAM_L - SEAM_R) * (x / W));
+    // **`getBoundingClientRect` 를 쓰면 안 된다** — 조각(`.vs-half`)에 들어오는 연출이
+    // 걸려 있어 재는 순간마다 값이 달라지고, 그걸 보고 자리를 고치면 서로 밀며 튄다.
+    // `offsetLeft/Top` 은 변형(transform)을 안 타므로 연출 중에도 같은 값이 나온다.
+    // 조각이 `position:absolute` 라 자식들의 offset 기준이 곧 vs-wrap 기준이다
+    // **`.vs-pad` 에 변형이 걸려 있으면 그게 자식들의 `offsetParent` 가 된다.**
+    // 그래서 자식 값만 읽으면 조각 안에서의 자리가 통째로 빠진다(아래 무리가 611px 어긋났다).
+    // 조각에 닿을 때까지 거슬러 올라가며 더한다
+    const at = (n, stop) => {
+      let x = 0, y = 0, e = n;
+      while (e && e !== stop){ x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; }
+      return { x, y };
+    };
+    // [stated] **닉네임 최대 길이 기준으로 자리를 잡는다.** 지금 뜬 사람 기준으로 맞추면
+    // 다음 판에 긴 닉을 만나 잘린다 → 예산(10칸)을 꽉 채운 닉이 들어갈 폭을 미리 잡아 둔다.
+    // 그래서 **상대가 누구든 크기·자리가 안 변한다**
+    reserveNick(T); reserveNick(B);
+    // 무리의 **안 줄인 상태** 치수. 배율은 나중에 수학으로만 먹인다(DOM 을 다시 안 읽는다)
+    const rawOf = el => {
+      const stop = el.offsetParent, p = at(el, stop);
+      const items = [...el.querySelectorAll('.vs-por,.vs-nick,.vs-score,.vs-rec')].map(n => {
+        const q = at(n, stop);
+        return { l: q.x, t: q.y, r: q.x + n.offsetWidth, b: q.y + n.offsetHeight };
+      });
+      return { px: p.x, py: p.y, pw: el.offsetWidth, ph: el.offsetHeight, items };
+    };
+    const scaled = (raw, z, oy) => {
+      const k = z / 100;
+      const ax = oy === 'bottom' ? raw.px + raw.pw : raw.px;
+      const ay = oy === 'bottom' ? raw.py + raw.ph : raw.py;
+      const m = (v, aa) => aa + (v - aa) * k;
+      return raw.items.map(e => ({ l: m(e.l, ax), t: m(e.t, ay), r: m(e.r, ax), b: m(e.b, ay) }));
+    };
+    // 한 무리의 배율·좌우·위아래를 한꺼번에 푼다.
+    // ① 폭에 맞춰 줄이고 ② 오른쪽으로 넘으면 왼쪽으로 당기고 ③ 사선에서 `want` 만큼 띄운다.
+    // 화면 끝에 걸려 `want` 를 못 지키면 **더 줄여서** 다시 푼다(최대 10번)
+    const solve = (raw, oy, baseZ, baseX, want) => {
+      const w0 = Math.max(...raw.items.map(e => e.r)) - Math.min(...raw.items.map(e => e.l));
+      let z = w0 > 0 ? Math.min(baseZ, (W - 8) / w0 * 100) : baseZ;
+      let out = { z, x: baseX, y: 0 };
+      for (let i = 0; i < 10; i++){
+        const bx = scaled(raw, z, oy);
+        const over = Math.max(...bx.map(e => e.r + baseX)) - (W - 4);
+        let x = over > 0 ? baseX - over : baseX;
+        x = Math.max(x, 4 - Math.min(...bx.map(e => e.l)));
+        const q = bx.map(e => ({ ...e, l: e.l + x, r: e.r + x }));
+        let y, gap;
+        if (oy === 'top'){
+          const g0 = Math.min(...q.map(e => Math.min(diag(e.l) - e.b, diag(e.r) - e.b)));
+          y = Math.max(g0 - want, 4 - Math.min(...q.map(e => e.t)));
+          gap = g0 - y;
+        } else {
+          const g0 = Math.min(...q.map(e => Math.min(e.t - diag(e.l), e.t - diag(e.r))));
+          y = Math.min(want - g0, H - 4 - Math.max(...q.map(e => e.b)));
+          gap = g0 + y;
+        }
+        out = { z, x, y };
+        if (gap >= want - 1 || z <= 45) break;
+        z *= 0.95;
+      }
+      return out;
+    };
+    const rt = rawOf(T), rb = rawOf(B);
+    if (!rt.items.length || !rb.items.length) return;
+    const A = solve(rt, 'top', off.tz || 100, off.tx, off.ty);
+    const C = solve(rb, 'bottom', off.bz || 100, off.bx, off.by);
+    const next = { tx: A.x, ty: A.y, tz: A.z, bx: C.x, by: C.y, bz: C.z };
+    if (!pos || Object.keys(next).some(k => Math.abs(next[k] - pos[k]) > 0.5)) setPos(next);
+  });
 
   const line = (zoom) => r => {
     const rec = r.record || null;
@@ -127,18 +231,18 @@ export default function VsIntro({ vs, mySlot, onDone }){
   };
 
   return (
-    <div className="vs-wrap">
+    <div className="vs-wrap" ref={wrapRef}>
       {/* 위아래 반쪽이 사선으로 잘려 부딪힌다. 정보는 이미 붙어 있다 */}
       <div className="vs-half top">
-        <div className={'vs-pad' + (upSz.two ? ' two' : '')}
+        <div ref={topRef} className={'vs-pad' + (upSz.two ? ' two' : '')}
              style={{ paddingTop: upSz.pad + '%',
-                      transform: `translate(${off.tx}px, ${off.ty}px) scale(${(off.tz || 100) / 100})`,
+                      transform: `translate(${pos ? pos.tx : off.tx}px, ${pos ? pos.ty : 0}px) scale(${(pos ? pos.tz : (off.tz || 100)) / 100})`,
                       transformOrigin: 'left top' }}>{upper.map(line(upSz.zoom))}</div>
       </div>
       <div className="vs-half bot">
-        <div className={'vs-pad' + (loSz.two ? ' two' : '')}
+        <div ref={botRef} className={'vs-pad' + (loSz.two ? ' two' : '')}
              style={{ paddingBottom: loSz.pad + '%',
-                      transform: `translate(${off.bx}px, ${off.by}px) scale(${(off.bz || 100) / 100})`,
+                      transform: `translate(${pos ? pos.bx : off.bx}px, ${pos ? pos.by : 0}px) scale(${(pos ? pos.bz : (off.bz || 100)) / 100})`,
                       transformOrigin: 'right bottom' }}>{lower.map(line(loSz.zoom))}</div>
       </div>
       {/* 값 표시 — 화면 맨 위 (네모를 어디로 끌어도 안 가려진다) */}
