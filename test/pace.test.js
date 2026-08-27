@@ -83,7 +83,9 @@ console.log('내 캐릭터와 상대 캐릭터가 둘 다 매끄럽다 (진짜 �
   const { PH_PLAY, WALL_L, wallIdx } = await import('../src/game/config.js');
   const keep = { slot: SELF.slot, n: SELF.n };
 
-  function world(oneway, jitter){
+  // **블록 안에서 `function` 으로 선언하면 lint(no-inner-declarations)가 오류로 잡는다.**
+  // `npm test` 는 `lint && run-all` 이라 여기서 막히면 검사가 통째로 안 돌았다 → const 로 바꿈
+  const world = (oneway, jitter) => {
     let now = 0; const q = [];
     setClock({ now: () => now, delay: (fn, d) => q.push([now + d, fn]) });
     const lat = () => Math.max(0, oneway + (jitter ? (Math.random() * 2 - 1) * jitter : 0));
@@ -117,9 +119,9 @@ console.log('내 캐릭터와 상대 캐릭터가 둘 다 매끄럽다 (진짜 �
       }
     };
     return { srv, cs, frame };
-  }
+  };
 
-  function run(oneway, jitter){
+  const run = (oneway, jitter) => {
     const w = world(oneway, jitter);
     for (let f = 0; f < 400; f++) w.frame(null);
     for (const st of [w.srv.s, ...w.cs.map(c => c.s), ...w.cs.map(c => c.pred)]) st.phase = PH_PLAY;
@@ -139,7 +141,7 @@ console.log('내 캐릭터와 상대 캐릭터가 둘 다 매끄럽다 (진짜 �
       return { avg: d.reduce((a, b) => a + b, 0) / d.length, p95: s2[Math.floor(s2.length * 0.95)] };
     };
     return { me: stat(rec[0]), foe: stat(rec[1]) };
-  }
+  };
 
   for (const [ow, j] of [[0, 0], [60, 0], [120, 0], [120, 40]]){
     const r = run(ow, j);

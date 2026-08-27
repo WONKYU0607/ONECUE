@@ -1,7 +1,7 @@
 import { newState, step, checksum } from '../src/game/sim.js';
 import {
   FP, PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_TICKS, coolTicks,
-  WALL_L, WALL_R, wallIdx, YMIN_S, YMAX_S, DEBUG_INF_HP, H, MAXHP, ROUND_TICKS
+  WALL_L, WALL_R, wallIdx, YMIN_S, YMAX_S, DEBUG_INF_HP, MAXHP, ROUND_TICKS
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 

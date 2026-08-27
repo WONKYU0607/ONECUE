@@ -5,8 +5,7 @@
 import { FP, PWf, PHf, setArena } from '../src/game/config.js';
 import {
   stepBall, stepBallInGoal, ballHome, makeRoller, KICKOFF, FIELD, GOAL,
-  KICK_V, PUSH_V, BALL_R, KICK_COOL, GOAL_HOLD, GOAL_SEQ, TACKLE_V, TACKLE_TICKS, TACKLE_COOL,
-  PICK_R, FOOT_OFF, RELEASE_TICKS, SOC_STUN, kickSpeed, KICK_MIN, CHARGE_MS, CATCH_MAX
+  KICK_V, PUSH_V, BALL_R, KICK_COOL, GOAL_HOLD, GOAL_SEQ, TACKLE_V, TACKLE_TICKS, TACKLE_COOL, FOOT_OFF, RELEASE_TICKS, SOC_STUN, kickSpeed, KICK_MIN, CHARGE_MS, CATCH_MAX
 } from '../src/game/ball.js';
 import { assert } from './harness.js';
 

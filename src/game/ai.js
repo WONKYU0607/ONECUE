@@ -1,8 +1,8 @@
 import {
   FP, WALL_L, WALL_R, wallIdx, PH_PLAY, THROW,
-  GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CW, GRID_CH, GRID_X0, GRID_Y0,
+  GRID_COLS, GRID_MIDROW, GRID_CW, GRID_CH, GRID_X0, GRID_Y0,
   ATK_TICKS, ATK_HIT, FLY_TICKS, FUSE_TICKS, cellX, cellY, teamOf, teamYMin, teamYMax, ROW_MIN, ROW_MAX, PHf, PWf, MAXHP, BUFF, PORTAL_N,
-  ITEM, ITEM_DEF, isCover, coverBudget, itemQuota, PH_READY, coverUsed, coverCells, THROW_DEF, setArena } from './config.js';
+  ITEM, ITEM_DEF, coverBudget, itemQuota, PH_READY, coverUsed, coverCells, THROW_DEF, setArena } from './config.js';
 import { canPlace } from './sim.js';
 
 // 노릴 상대. 2대2에서는 살아 있는 적 중 가로로 가장 가까운 쪽을 본다.

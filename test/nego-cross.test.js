@@ -2,7 +2,7 @@
 //
 // [stated] "2배속 신청을 해서 수락했는데 노템전을 수락했다고 뜨고, 게임도 노템전이 진행된다."
 // 신청 → 전송 → 적용 → 문구까지 네 단계를 전부 본다. 한 군데라도 뒤바뀌면 여기서 잡힌다.
-import { PH_READY, PH_COUNT, FP } from '../src/game/config.js';
+import { PH_READY } from '../src/game/config.js';
 import { newState, step, NOIN } from '../src/game/sim.js';
 import { uiPrompt } from '../src/game/ui-state.js';
 import { assert } from './harness.js';

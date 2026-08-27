@@ -1,7 +1,7 @@
 // 1대1에서 겪었던 오류들이 2대2에서 되살아나지 않는지 확인한다
 import { newState, step, checksum, normalizeState, cloneState } from '../src/game/sim.js';
 import {
-  FP, MAXHP, PH_PLAY, CD_TICKS, PROTO_VER, teamOf, coolTicks, ITEM, GRID_ROWS, GRID_MIDROW, cellOwner
+  FP, MAXHP, CD_TICKS, PROTO_VER, teamOf, coolTicks, ITEM, GRID_MIDROW
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 

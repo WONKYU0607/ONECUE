@@ -1,5 +1,5 @@
 import { newState, step, itemRect, blocked } from '../src/game/sim.js';
-import { FP, ITEM, PH_PLAY, CD_TICKS, GRID_ROWS, MAXHP, cellX, GRID_CW } from '../src/game/config.js';
+import { FP, ITEM, CD_TICKS, GRID_ROWS, MAXHP } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 const mk = (o = {}) => ({ dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0, ...o });

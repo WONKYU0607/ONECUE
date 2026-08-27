@@ -1,6 +1,6 @@
 import { newState, step, canPlace, canThrow, itemRect, allPlaced, myItemAt, blocked, NOIN } from '../src/game/sim.js';
 import {
-  FP, ITEM, ITEM_DEF, PH_READY, PH_PLAY, PH_OVER, CD_TICKS, GRID_ROWS, GRID_COLS,
+  FP, ITEM, ITEM_DEF, PH_READY, PH_PLAY, CD_TICKS, GRID_ROWS, GRID_COLS,
   cellOwner, MAXHP, DRUM_DAMAGE, DRUM_RADIUS, GRID_MIDROW, EXPLO_TICKS, THROW, PWf, PHf } from '../src/game/config.js';
 import { assert } from './harness.js';
 

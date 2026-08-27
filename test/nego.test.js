@@ -7,7 +7,7 @@
 // 화면은 여기서 못 잡지만, **신청이 상대 클라까지 도달하는지**는 잡을 수 있다.
 // 한 클라가 양쪽을 조작하는 하네스로는 이걸 못 본다 — 클라 두 개를 따로 붙인다.
 import { Server, Client, setClock } from '../src/game/net.js';
-import { SELF, PH_READY, PH_COUNT, PH_PLAY, ITEM, GRID_ROWS } from '../src/game/config.js';
+import { SELF, PH_READY, PH_PLAY, ITEM, GRID_ROWS } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 function world(melee, n = 2){

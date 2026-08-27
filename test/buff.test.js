@@ -4,7 +4,7 @@
 //
 // **결정론이 핵심이다** — 서버와 클라가 같은 자리에 띄워야 하므로 Math.random 을 쓰면 안 된다
 import { newState, step, rnd, isInvul, checksum, normalizeState, cloneState, NOIN } from '../src/game/sim.js';
-import { SELF, PH_PLAY, FP, MAXHP, BUFF, BUFF_DEF, BUFF_EVERY, BUFF_MAX, BUFF_KINDS,
+import { SELF, PH_PLAY, FP, MAXHP, BUFF, BUFF_DEF, BUFF_MAX, BUFF_KINDS,
          ATK_TICKS, cellX, cellY, GRID_CW, GRID_CH, setArena } from '../src/game/config.js';
 import { assert } from './harness.js';
 

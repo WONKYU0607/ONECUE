@@ -2,7 +2,7 @@
 //  - 1대1: 나간 사람이 진다
 //  - 2대2: 그 자리에 멈춰 서서 계속 맞는다. 나머지 셋의 판을 망치지 않는다
 import { newState, step, forfeit, setOff, canThrow, checksum, normalizeState, cloneState, NOIN } from '../src/game/sim.js';
-import { FP, PH_PLAY, PH_OVER, MAXHP, stepCap, THROW } from '../src/game/config.js';
+import { PH_PLAY, PH_OVER, MAXHP, stepCap, THROW } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 const IN = n => Array.from({ length: n }, () => ({ ...NOIN }));

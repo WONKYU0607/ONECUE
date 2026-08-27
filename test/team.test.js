@@ -1,8 +1,8 @@
 import fs from 'fs';
-import { newState, step, canPlace, allPlaced, blocked, itemRect } from '../src/game/sim.js';
+import { newState, step, canPlace, allPlaced, blocked } from '../src/game/sim.js';
 import {
-  FP, MAXHP, ITEM, ITEM_DEF, PH_PLAY, PH_OVER, CD_TICKS, BULLET_DAMAGE,
-  ROUND_TICKS, ROUND_TICKS_4, GRID_ROWS, GRID_MIDROW, teamOf, cellOwner, setArena
+  FP, MAXHP, ITEM, PH_PLAY, PH_OVER, CD_TICKS, BULLET_DAMAGE,
+  ROUND_TICKS, ROUND_TICKS_4, GRID_MIDROW, teamOf, setArena
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 

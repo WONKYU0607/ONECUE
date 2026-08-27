@@ -1,9 +1,9 @@
 import { newState, step, throwCol, throwRow, canThrow } from '../src/game/sim.js';
 import {
-  FP, THROW, THROW_DEF, PH_PLAY, PH_READY, CD_TICKS, FLY_TICKS, FUSE_TICKS,
+  FP, THROW, THROW_DEF, PH_PLAY, CD_TICKS, FLY_TICKS, FUSE_TICKS,
   BLIND_TICKS, NADE_DAMAGE, NADE_CENTER_DAMAGE, BLIND_CENTER_BONUS, NADE_RADIUS, FLASH_RADIUS,
-  GRID_MIDROW, GRID_ROWS, GRID_COLS,
-  cellOwner, MAXHP, cellX, cellY, GRID_CW, GRID_CH
+  GRID_MIDROW,
+  cellOwner, MAXHP, cellX, cellY, GRID_CW
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 

@@ -1,4 +1,4 @@
-import { W, H, TUNE, FAST, FAST_MUL, HAND, itemKinds, THROW_DEF, ARENA, BARE } from './config.js';
+import { W, H, TUNE, HAND, itemKinds, THROW_DEF, ARENA, BARE } from './config.js';
 
 // 감도 값은 튜닝 패널에서 실시간으로 바꾼다
 const dead = () => TUNE.dead.v;   // 중심 근처는 무시

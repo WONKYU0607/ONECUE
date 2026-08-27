@@ -3,7 +3,7 @@
 // 조용히 깨지기 쉽다. 1대1 값이 1FP라도 달라지면 결정론이 깨진다.
 import { newState, step, canPlace, checksum, NOIN } from '../src/game/sim.js';
 import {
-  FP, H, ITEM, ITEM_DEF, PH_PLAY, teamOf, setArena, ARENA, itemQuota, itemKinds, coverBudget, coverUsed,
+  FP, ITEM, ITEM_DEF, PH_PLAY, teamOf, setArena, ARENA, itemQuota, itemKinds, coverBudget, coverUsed,
   rowCols, cellUsable, topSpan, botSpan,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_CH, GRID_Y0,
   PWf, PHf, WALL_L, WALL_R, YMIN_S, YMAX_S, ROW_MIN, ROW_MAX, cellOwner, wallIdx

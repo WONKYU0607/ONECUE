@@ -2,7 +2,7 @@
 //
 // 봇은 **사람과 똑같은 입력만** 낸다(`dx/dy/fire`). 상태를 직접 건드리면
 // 서버 판정·예측 구조를 통째로 우회하게 된다.
-import { FP, PH_PLAY, PWf, PHf, teamOf } from '../src/game/config.js';
+import { FP, PH_PLAY } from '../src/game/config.js';
 import { newState, step, kickoff, NOIN } from '../src/game/sim.js';
 import { SOCCER_TICKS, GOAL, FIELD } from '../src/game/ball.js';
 import { createSoccerAI } from '../src/game/soccer-ai.js';

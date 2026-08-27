@@ -1,6 +1,6 @@
 // 가상 시계로 게임 루프 없이 서버·클라를 돌리는 테스트 하네스
 import { setClock, Loopback, Server, Client } from '../src/game/net.js';
-import { DEBUG_LOCAL_BOTH, NET } from '../src/game/config.js';
+import { NET } from '../src/game/config.js';
 
 export function makeClock(){
   let now = 0;

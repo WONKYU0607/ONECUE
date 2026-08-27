@@ -2,8 +2,7 @@
 // 한 판에 한 개만 던질 수 있다.
 import { newState, step, canThrow, checksum, cloneState, normalizeState, NOIN } from '../src/game/sim.js';
 import {
-  FP, PH_PLAY, THROW, THROW_DEF, FIRE_TICKS, FIRE_RADIUS, FIRE_DMG_EVERY, FIRE_DAMAGE,
-  MAXHP, cellX, cellY, GRID_MIDROW, ROW_MIN
+  FP, PH_PLAY, THROW, THROW_DEF, FIRE_TICKS, FIRE_DMG_EVERY, FIRE_DAMAGE, cellX, cellY, GRID_MIDROW, ROW_MIN
 } from '../src/game/config.js';
 import { assert } from './harness.js';
 

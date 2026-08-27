@@ -3,7 +3,7 @@ import { spawn } from 'child_process';
 import wsPkg from '../server/node_modules/ws/index.js';
 const { WebSocket } = wsPkg;
 import { Client } from '../src/game/net.js';
-import { GRID_ROWS, GRID_COLS, teamOf, itemKinds, itemQuota, isCover, coverBudget } from '../src/game/config.js';
+import { GRID_ROWS, GRID_COLS, itemKinds, itemQuota, isCover, coverBudget } from '../src/game/config.js';
 import { canPlace } from '../src/game/sim.js';
 import { assert } from './harness.js';
 

@@ -3,7 +3,7 @@
 // 처음엔 칼전·불이 체력을 먼저 깎고 나서 세어 8~40씩 모자랐다 (깎기 전 체력으로 상한을 잡아야 한다)
 import { newState, step, blast, NOIN, addDealt } from '../src/game/sim.js';
 import { createAI } from '../src/game/ai.js';
-import { FP, PH_PLAY, SELF, MAXHP, TUNE, teamOf, GRID_MIDROW, cellX, cellY, FIRE_TICKS } from '../src/game/config.js';
+import { FP, PH_PLAY, SELF, MAXHP, TUNE, teamOf, GRID_MIDROW, cellX, cellY } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 const IN = n => Array.from({ length: n }, () => ({ ...NOIN }));

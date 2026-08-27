@@ -1,5 +1,5 @@
 import { newState, step } from '../src/game/sim.js';
-import { FP, FAST_MUL, PH_PLAY, CD_TICKS, MAXHP, coolTicks } from '../src/game/config.js';
+import { FP, FAST_MUL, CD_TICKS, MAXHP } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 const mk = (o = {}) => ({ dx:0, dy:0, fire:0, ready:0, place:null, thr:null, fastReq:0, fastAns:0, ...o });

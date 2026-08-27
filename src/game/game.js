@@ -1,5 +1,5 @@
 import {
-  FP, SELF, NET, TUNE, DEBUG_LOCAL_BOTH, setArena,
+  FP, SELF, NET, TUNE, setArena,
   stepCap, bulletFP, coolTicks, clampi, BUFF, BUFF_DEF, FAST_MUL, assignColors, MAXHP
 } from './config.js';
 import { Loopback, Server, Client } from './net.js';
@@ -7,18 +7,18 @@ import { createRenderer } from './render.js';
 import { attachInput } from './input.js';
 import { createAI, AI_STAGES } from './ai.js';
 import { createJuice } from './juice.js';
-import { sfx, buzz, unlockAudio, playMusic, stopMusic } from './audio.js';
+import { sfx, buzz, playMusic, stopMusic } from './audio.js';
 import { canPlace, canThrow, allPlaced, myItemAt, newState } from './sim.js';
 import { getColor } from '../state/profile.js';
 import { usableW, usableH } from '../state/safearea.js';
 import {
-  FAST, BARE, ITEM, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, teamOf, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
+  FAST, BARE, ITEM_DEF, PH_READY, PH_COUNT, PH_OVER, teamOf, GRID_COLS, GRID_ROWS, GRID_CW, GRID_CH,
   ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed, coverCells, coverSizes,
-  GRID_X0, GRID_Y0, GRID_MIDROW, H, cellOwner, cellX, cellY
+  GRID_X0, GRID_Y0, GRID_MIDROW, cellOwner, cellX, cellY
 } from './config.js';
 import { paletteSlots, uiBoxRect, stickGeom, throwSlots } from './layout.js';
 import { uiPrompt, resultFor, matchSummary } from './ui-state.js';
-import { CHARGE_MAX_MS, PH_PLAY, THROW } from './config.js';
+import { CHARGE_MAX_MS, PH_PLAY } from './config.js';
 import { t } from '../i18n/index.js';
 
 // 이속 버프 배율. 시뮬과 **같은 값**을 써야 예측이 어긋나지 않는다

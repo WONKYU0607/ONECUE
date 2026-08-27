@@ -4,7 +4,7 @@ import { spawn } from 'child_process';
 import wsPkg from '../server/node_modules/ws/index.js';
 const { WebSocket } = wsPkg;
 import { Client } from '../src/game/net.js';
-import { SELF, PH_PLAY, PH_COUNT, stepCap, bulletFP, coolTicks, PROTO_VER, ITEM, GRID_ROWS, cellOwner } from '../src/game/config.js';
+import { PH_COUNT, PROTO_VER, ITEM, GRID_ROWS, cellOwner } from '../src/game/config.js';
 import { assert } from './harness.js';
 
 const PORT = 8123;
