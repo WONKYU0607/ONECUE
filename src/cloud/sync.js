@@ -84,6 +84,22 @@ export async function mergeFrom(oldUid){
   return true;
 }
 
+/** [stated] **프로필 점수와 순위표 점수가 달랐다** (9900 vs 6500).
+ *  판이 끝나면 **클라도 자기 계산으로 기기에 쌓고, 서버도 자기 계산으로 구름에 쓴다.**
+ *  공식은 같지만 **기준값이 달라** 한 번이라도 어긋나면 차이가 영영 남는다
+ *  (서버 쓰기 실패·로그인 전 판 등).
+ *
+ *  → **판이 끝나면 구름 값으로 다시 맞춘다.** 결과 화면은 클라 계산으로 바로 보여주고(반응 유지),
+ *  뒤에서 조용히 덮는다. 서버 쓰기가 조금 늦으므로 **잠깐 기다렸다가 한 번 더** 시도한다 */
+export async function resyncAfterMatch(){
+  for (const wait of [900, 2200]){
+    await new Promise(r => setTimeout(r, wait));
+    try { if (await resyncAccount()) return true; }
+    catch { /* 망이 끊겨도 게임은 돌아가야 한다 */ }
+  }
+  return false;
+}
+
 export async function resyncAccount(){
   const m = await load();
   setUid(await m.uid());

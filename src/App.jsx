@@ -223,6 +223,11 @@ export default function App(){
     }
     setScore(sc);
     setSummary(summary || null);
+    // [stated] **프로필 점수와 순위표 점수가 달랐다.** 위 계산은 결과 화면을 바로 보여주기 위한
+    // 기기 값이고, **구름에는 서버가 쓴다.** 둘이 어긋난 채로 쌓이지 않게 **끝나고 다시 맞춘다**
+    if (session?.kind === 'pvp')
+      import('./cloud/sync.js').then(m => m.resyncAfterMatch && m.resyncAfterMatch())
+        .catch(() => {});
     // AI 모드에서 이기면 다음 단계가 열린다
     // 모드별로 따로 기록한다 (1대1을 깼다고 3대3까지 열리면 안 된다)
     if (session?.kind === 'ai') recordResult(session.stage, r, modeKey(session.n || 2, !!session.melee));
