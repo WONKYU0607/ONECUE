@@ -22,7 +22,7 @@
 // 슛·태클도 **점수**로 본다 — "될 것 같으면" 하고, 아니면 더 몬다.
 //
 // 단계 차이는 **판단**으로만 준다. [stated] **피지컬(속도·사거리)은 사람과 항상 같아야 한다**
-import { CHARGE_MS, FIELD, GOAL, PICK_R, TACKLE_TICKS } from './ball.js';
+import { CHARGE_MS, FIELD, GOAL, PICK_R, TACKLE_TICKS, FRICT_NUM, FRICT_DEN } from './ball.js';
 import { FP, PWf, PHf, teamOf } from './config.js';
 
 const half = v => v >> 1;
@@ -74,6 +74,20 @@ export function createSoccerAI(slot, level = 1){
 
     const cx = me.x + half(PWf), cy = me.y + half(PHf);
     const own = s.ballOwner == null ? -1 : s.ballOwner;
+    // [stated] **뺏어낸 공을 못 챙긴다** — 태클로 떼어놓고도 상대가 먼저 줍는다.
+    // 봇이 **공이 지금 있는 자리**로 가서 늘 뒤를 쫓기 때문이다. 사람은 **갈 자리**로 미리 간다.
+    // 마찰까지 반영해 앞을 내다본 지점을 쫓는다 (굴러가는 공일수록 크게 앞선다)
+    let aimBx = b.x, aimBy = b.y;
+    if (own < 0 && (b.vx || b.vy)){
+      let vx = b.vx, vy = b.vy;
+      for (let k = 0; k < 14; k++){
+        aimBx += vx; aimBy += vy;
+        vx = (vx * FRICT_NUM / FRICT_DEN) | 0;
+        vy = (vy * FRICT_NUM / FRICT_DEN) | 0;
+      }
+      aimBx = clamp(aimBx, FIELD.x0, FIELD.x1);
+      aimBy = clamp(aimBy, FIELD.y0, FIELD.y1);
+    }
     const mine = own === slot;
     const foeHas = own >= 0 && teamOf(own, s.n) !== team;
     const mateHas = own >= 0 && own !== slot && teamOf(own, s.n) === team;
@@ -88,55 +102,51 @@ export function createSoccerAI(slot, level = 1){
     }
 
     // ── 자리 점수 ────────────────────────────────────────────────
-    // 0~1 로 맞춰 더한다. 거리는 경기장 대각선으로 나눠 정규화
-    const spanX = FIELD.x1 - FIELD.x0, spanY = FIELD.y1 - FIELD.y0;
-    const far = Math.sqrt(spanX * spanX + spanY * spanY);
-    const near = (ax, ay, bx, by) => 1 - Math.min(1, Math.sqrt(d2(ax, ay, bx, by)) / far);
+    // **정규화하지 않는다.** 경기장 대각선으로 나눴더니 한 걸음(10~28px) 차이가 0.05 밖에 안 돼서
+    // 흔들림·관성 같은 보정값이 **신호를 덮었다** — 낮은 단계는 무작위로 걷고, 높은 단계는
+    // 비긴 자리에서 못 빠져나와 8.8초씩 굳었다.
+    // 이제 **월드 px 그대로** 쓴다(가까울수록 큰 점수). 한 걸음마다 점수가 확실히 달라져
+    // 비기는 상황 자체가 안 생긴다
+    const dist = (ax, ay, bx, by) => Math.sqrt(d2(ax, ay, bx, by)) / FP;
 
-    // 제일 가까운 상대까지 거리 (몰리면 안 좋다)
-    const foeNear = (px, py) => {
-      let best = 0;
+    // 제일 가까운 상대까지 거리 (멀수록 좋다)
+    const foeGap = (px, py) => {
+      let best = 1e9;
       for (let i = 0; i < s.n; i++){
         if (teamOf(i, s.n) === team || s.p[i].hp <= 0) continue;
-        best = Math.max(best, near(px, py, s.p[i].x + half(PWf), s.p[i].y + half(PHf)));
+        best = Math.min(best, dist(px, py, s.p[i].x + half(PWf), s.p[i].y + half(PHf)));
       }
-      return best;
+      return Math.min(best, 40);          // 40px 넘게 떨어지면 더 벌려도 의미 없다
     };
-    // 벽에 몰리면 안 좋다 (0 = 벽에 붙음, 1 = 넉넉함)
-    const room = (px, py) => {
-      const m = 18 * FP;
-      return Math.min(1, Math.min(px - FIELD.x0, FIELD.x1 - px, py - FIELD.y0, FIELD.y1 - py) / m);
-    };
+    // 벽까지 여유 (0~18px). 몰리면 나쁘다
+    const room = (px, py) => Math.min(18,
+      Math.min(px - FIELD.x0, FIELD.x1 - px, py - FIELD.y0, FIELD.y1 - py) / FP);
 
     function scoreAt(px, py){
       let v = 0;
       if (mine){
-        // 골대에 다가가고, 골대 입구와 줄을 맞추고, 상대를 피하고, 벽을 피한다
-        v += 1.15 * near(px, py, goalCx, foeGoalY);
-        v += 1.05 * (1 - Math.min(1, Math.abs(px - goalCx) / (mouthHalf * 3)));
-        v += 0.85 * (1 - foeNear(px, py));
-        v += 0.55 * room(px, py);
+        v -= 1.00 * dist(px, py, goalCx, foeGoalY);                    // 골대에 다가간다
+        v -= 1.30 * Math.abs(px - goalCx) / FP;                        // 입구와 줄을 맞춘다
+        v += 0.45 * foeGap(px, py);                                    // 상대를 피한다
+        v += 0.35 * room(px, py);                                      // 벽을 피한다
       } else if (foeHas){
         if (closest){
-          // 공을 뺏으러 — 공에 붙는다
-          v += 1.40 * near(px, py, b.x, b.y);
-          v += 0.30 * room(px, py);
+          v -= 1.60 * dist(px, py, aimBx, aimBy);                      // 공에 붙는다
+          v += 0.20 * room(px, py);
         } else {
-          // 수비 — 우리 골대와 공 사이를 막는다
-          v += 1.30 * near(px, py, half(b.x + goalCx), half(b.y + ourGoalY));
-          v += 0.30 * room(px, py);
+          v -= 1.40 * dist(px, py, half(b.x + goalCx), half(b.y + ourGoalY));   // 길목을 막는다
+          v += 0.20 * room(px, py);
         }
       } else if (mateHas){
-        // 팀원이 몰고 간다 → 앞으로 벌려 준다 (뭉치면 서로 막는다)
         const openX = goalCx + (slot % 2 ? 26 * FP : -26 * FP);
-        v += 1.10 * near(px, py, openX, half(b.y + foeGoalY));
-        v += 0.40 * (1 - foeNear(px, py));
+        v -= 1.20 * dist(px, py, openX, half(b.y + foeGoalY));         // 앞으로 벌려 준다
+        v += 0.40 * foeGap(px, py);
       } else {
-        // 자유공 — 가까이 가되, **우리 골대 쪽에서** 붙어야 앞으로 밀 수 있다
-        v += 1.35 * near(px, py, b.x, b.y);
-        const behind = (team === 0) ? (py > b.y) : (py < b.y);
-        v += behind ? 0.35 : 0;
-        v += 0.25 * room(px, py);
+        v -= 1.50 * dist(px, py, aimBx, aimBy);                        // 공이 **갈 자리**로 간다
+        // 우리 골대 쪽에서 붙으면 앞으로 밀기 좋다. 다만 **경주에서 지면 소용없으므로** 작게 준다
+        const behind = (team === 0) ? (py > aimBy) : (py < aimBy);
+        v += behind ? 3 : 0;
+        v += 0.20 * room(px, py);
       }
       return v;
     }
@@ -144,16 +154,24 @@ export function createSoccerAI(slot, level = 1){
     // ── 방향 고르기 ──────────────────────────────────────────────
     if (now >= nextAt){
       nextAt = now + L.react;
-      const step = 10 * FP;                       // 한 걸음 앞을 내다본다
-      let bestV = -1e9, bestD = [0, 0];
-      for (const [ux, uy] of DIRS){
-        const px = clamp(cx + ux * step, FIELD.x0, FIELD.x1);
-        const py = clamp(cy + uy * step, FIELD.y0, FIELD.y1);
-        // 흔들림: 단계가 낮을수록 엉뚱한 쪽을 고를 수 있다
-        const v = scoreAt(px, py) + (Math.random() - 0.5) * L.sloppy
-                + (ux === dir[0] && uy === dir[1] ? 0.12 : 0);   // 가던 방향에 약간의 관성
+      // **한 걸음이 짧으면 방향끼리 점수 차가 안 난다.** 10px 로 뒀더니 차이가 0.05 인데
+      // 흔들림이 ±0.22 라 **잡음이 신호를 덮어** 사실상 무작위로 걸었다 —
+      // "안 따라붙다가 공이 가까워지면 그제야 쫓아온다"가 그 증상이었다.
+      // → 멀리 내다보고(28px), **흔들림도 그 판의 점수 폭에 비례**하게 준다
+      const look = 14 * FP;
+      const raw = DIRS.map(([ux, uy]) => scoreAt(
+        clamp(cx + ux * look, FIELD.x0, FIELD.x1),
+        clamp(cy + uy * look, FIELD.y0, FIELD.y1)));
+      // 흔들림은 **한 걸음 값(px)** 기준의 작은 실수다. 신호를 덮지 않는다
+      const jitter = L.sloppy * 14;
+      let bestV = -1e9, bestD = dir;
+      DIRS.forEach(([ux, uy], i) => {
+        const v = raw[i]
+                + (Math.random() - 0.5) * jitter
+                + (ux === dir[0] && uy === dir[1] ? 1.2 : 0)     // 가던 방향에 약간의 관성
+                - (ux === 0 && uy === 0 ? 1.5 : 0);              // 제자리는 조금 불리하게
         if (v > bestV){ bestV = v; bestD = [ux, uy]; }
-      }
+      });
       dir = bestD;
     }
 

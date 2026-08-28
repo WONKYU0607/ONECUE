@@ -669,6 +669,17 @@ export class Client {
   // dt 기준 지수 감쇠로 바꿔야 주사율과 무관하게 같은 시간에 같은 만큼 수렴한다.
   updateRender(a, dt = 1 / 60){
     if (!this.rx || !this.pred.p[SELF.slot]) return;
+    // [stated] **골 넣고 제자리로 갈 때 캐릭터가 걸어서 간다.** 그 사이에 경기가 이미 시작돼 있다.
+    // 시뮬은 킥오프에서 좌표를 바로 넣는데(순간이동), 화면은 그걸 **거리**로만 판단해
+    // 문턱보다 짧으면 평범한 보정으로 보고 미끄러뜨린다 — 걸어가는 것처럼 보인 이유다.
+    // 거리로 재지 말고 **킥오프인 것을 직접 안다**: 골 연출이 끝나는 그 프레임에 화면을 맞춘다
+    const gT = this.pred.goalT | 0;
+    if ((this._lastGoalT | 0) > 0 && gT === 0){
+      for (let i = 0; i < this.pred.p.length; i++){
+        this.rx[i] = this.pred.p[i].x; this.ry[i] = this.pred.p[i].y;
+      }
+    }
+    this._lastGoalT = gT;
     // 보정 속도 상한. 낮추면 매끄럽고 높이면 빨리 따라붙는다 — 정확히 맞바꿈이다.
     // **1.0배 = 상대가 실제 최고 속도를 절대 넘지 않는다.**
     // 보정을 빨리 하려고 이 값을 올리면 그만큼 상대가 순간적으로 빨라 보인다.

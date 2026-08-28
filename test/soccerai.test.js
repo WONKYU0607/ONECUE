@@ -2,11 +2,10 @@
 //
 // 봇은 **사람과 똑같은 입력만** 낸다(`dx/dy/fire`). 상태를 직접 건드리면
 // 서버 판정·예측 구조를 통째로 우회하게 된다.
-import { FP, PH_PLAY, teamOf } from '../src/game/config.js';
+import { FP, PH_PLAY, teamOf, PWf, PHf } from '../src/game/config.js';
 import { newState, step, kickoff, NOIN } from '../src/game/sim.js';
 import { SOCCER_TICKS, GOAL, FIELD } from '../src/game/ball.js';
 import { createSoccerAI } from '../src/game/soccer-ai.js';
-import fs from 'fs';
 import { assert } from './harness.js';
 
 function match(n = 2, level = 1, ticks = SOCCER_TICKS){
@@ -42,17 +41,90 @@ console.log('봇이 움직이고 공을 건드린다');
   assert(r.touched > 0, `  멈춰 있던 공을 움직인다 (${r.touched}회)`);
 }
 
-console.log('골을 넣는다');
+// [stated] **골이 났느냐로 보면 안 된다.** 그건 결과지 "경기를 하는가"가 아니다 —
+// 봇끼리는 전개가 늘 같아 0:0 도 3:2 도 나오고, 그 숫자에 맞춰 수치를 만지다 몇 번을 헛돌았다.
+// **의도한 방향으로 실제로 움직였는가**를 상황별로 본다. 상대는 가만히 있는 사람으로 둔다
+console.log('봇이 축구를 한다 (상황별)');
 {
-  // **90초 안에 한 골도 못 넣으면 봇이 아니다.**
-  // 다만 **한 단계만 보면 안 된다** — 시뮬에 무작위가 없어 봇끼리는 전개가 늘 똑같고,
-  // 같은 실력끼리는 서로를 그대로 따라 해 0:0 으로 굳는 판이 나온다(파일 아래에도 같은 주의가 있다).
-  // 세 단계를 다 돌려 **어디서든 골이 나는지**로 본다
-  const rs = [0, 1, 2].map(lv => match(2, lv));
-  const total = rs.reduce((n, r) => n + r.s.score[0] + r.s.score[1], 0);
-  assert(total > 0, `  90초 안에 골이 난다 (${rs.map(r => r.s.score.join(':')).join(' / ')})`);
-  const kicked = rs.reduce((n, x) => n + x.kicked, 0);
-  assert(kicked > 0, `  버튼도 쓴다 (${kicked}회)`);
+  const half2 = v => v >> 1;
+  const dist = (ax, ay, bx, by) => Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2) / FP;
+  const fresh = () => {
+    const st = newState(2, false, false, true);
+    st.phase = PH_PLAY; st.clock = SOCCER_TICKS; kickoff(st, -1);
+    return st;
+  };
+  // 봇은 슬롯0(위 골대로 공격), 상대(슬롯1)는 아무것도 안 한다
+  const drive = (st, lv, ticks) => {
+    const bot = createSoccerAI(0, lv); let now = 0;
+    for (let t = 0; t < ticks; t++){
+      now += 1000 / 60;
+      step(st, [{ ...NOIN, ...bot(st, now) }, { ...NOIN }]);
+    }
+  };
+  const give = (st, who) => {
+    st.ball.x = st.p[who].x + half2(PWf); st.ball.y = st.p[who].y + half2(PHf);
+    st.ball.vx = 0; st.ball.vy = 0; st.ballOwner = who; st.freeT = 0;
+  };
+  for (const lv of [0, 1, 2]){
+    // ① 자유공에 다가간다
+    {
+      const st = fresh();
+      st.ball.x = Math.round(60 * FP); st.ball.y = Math.round(110 * FP);
+      st.ball.vx = 0; st.ball.vy = 0; st.ballOwner = -1; st.freeT = 0;
+      st.p[0].x = Math.round(120 * FP); st.p[0].y = Math.round(220 * FP);
+      const d0 = dist(st.p[0].x, st.p[0].y, st.ball.x, st.ball.y);
+      drive(st, lv, 90);
+      const d1 = dist(st.p[0].x, st.p[0].y, st.ball.x, st.ball.y);
+      assert(d1 < d0 - 20, `  단계 ${lv} 자유공에 다가간다 (${d0.toFixed(0)} → ${d1.toFixed(0)})`);
+    }
+    // ② 공을 잡으면 상대 골대로 몬다
+    {
+      const st = fresh();
+      st.p[0].x = Math.round(88 * FP); st.p[0].y = Math.round(210 * FP);
+      give(st, 0);
+      const g0 = Math.abs(st.p[0].y - GOAL.top) / FP;
+      drive(st, lv, 90);
+      const g1 = Math.abs(st.p[0].y - GOAL.top) / FP;
+      assert(g1 < g0 - 20, `  단계 ${lv} 골대로 몰고 간다 (${g0.toFixed(0)} → ${g1.toFixed(0)})`);
+    }
+    // ③ 치우쳐 있으면 골대 입구와 줄을 맞춘다
+    {
+      const st = fresh();
+      st.p[0].x = Math.round(35 * FP); st.p[0].y = Math.round(120 * FP);
+      give(st, 0);
+      const cxG = half2(GOAL.lo + GOAL.hi);
+      const o0 = Math.abs(st.p[0].x + half2(PWf) - cxG) / FP;
+      drive(st, lv, 90);
+      const o1 = Math.abs(st.p[0].x + half2(PWf) - cxG) / FP;
+      assert(o1 < o0 - 15, `  단계 ${lv} 골대와 줄을 맞춘다 (${o0.toFixed(0)} → ${o1.toFixed(0)})`);
+    }
+    // ④ 상대가 잡으면 쫓아간다
+    {
+      const st = fresh();
+      st.p[1].x = Math.round(70 * FP); st.p[1].y = Math.round(100 * FP);
+      give(st, 1);
+      st.p[0].x = Math.round(120 * FP); st.p[0].y = Math.round(220 * FP);
+      const d0 = dist(st.p[0].x, st.p[0].y, st.p[1].x, st.p[1].y);
+      drive(st, lv, 90);
+      const d1 = dist(st.p[0].x, st.p[0].y, st.p[1].x, st.p[1].y);
+      assert(d1 < d0 - 20, `  단계 ${lv} 상대를 쫓아간다 (${d0.toFixed(0)} → ${d1.toFixed(0)})`);
+    }
+    // ⑤ 오래 굳지 않는다. **골 연출 중은 세지 않는다** —
+    //    판이 멈춰 있는 시간이라 봇이 굳은 게 아니다(이걸 안 빼서 529틱으로 잘못 읽었다)
+    {
+      const st = fresh(); const bot = createSoccerAI(0, lv);
+      let now = 0, run2 = 0, worst = 0, prev = null;
+      for (let t = 0; t < 600; t++){
+        now += 1000 / 60;
+        step(st, [{ ...NOIN, ...bot(st, now) }, { ...NOIN }]);
+        if (st.goalT){ run2 = 0; prev = null; continue; }
+        const p0 = st.p[0];
+        if (prev && Math.abs(p0.x - prev.x) + Math.abs(p0.y - prev.y) < FP / 4) run2++; else run2 = 0;
+        worst = Math.max(worst, run2); prev = { x: p0.x, y: p0.y };
+      }
+      assert(worst < 120, `  단계 ${lv} 가 굳지 않는다 (가장 오래 멈춘 구간 ${worst}틱)`);
+    }
+  }
 }
 
 console.log('싸우지 않는다');
@@ -81,22 +153,15 @@ console.log('2대2도 넷 다 움직인다');
 
 // **쉬운 단계가 멈춰 서 있으면 안 된다.** slop(6~10px)이 접근 거리(8px)보다 커서
 // "다 왔다"고 판단하고 굳어버린 적이 있다 — 90초 내내 0:0, 슛 0회였다
-console.log('모든 단계가 실제로 논다');
+console.log('모든 단계가 움직이고 공을 건드린다');
 {
-  // **"매 판 골이 난다"로 검사하면 안 된다.** 시뮬에 무작위가 없어 봇끼리는 전개가
-  // 늘 똑같고, 수치를 조금만 건드려도 0:0 과 3:2 사이를 오간다 — 실력이 아니라
-  // 판정선 근처의 흔들림이다. **논다는 것**(움직임·슛·공 건드림)으로 본다
-  let goals = 0, kicks = 0;
+  // 골 수는 안 본다 — 위 상황별 검사가 "경기를 하는가"를 이미 본다.
+  // 여기서는 **판이 굴러가는지**만 확인한다
   for (const lv of [0, 1, 2]){
     const r = match(2, lv);
-    goals += r.s.score[0] + r.s.score[1];
-    kicks += r.kicked;
     assert(r.moved > 500, `  단계 ${lv} 가 움직인다 (${r.moved}틱)`);
     assert(r.touched > 0, `  단계 ${lv} 가 공을 건드린다 (${r.touched}회)`);
   }
-  // 슛·골은 **판마다** 요구하지 않는다 — 봇끼리 교착이면 안 나올 수 있다
-  assert(kicks > 0, `  세 판을 합치면 슛을 낸다 (${kicks}회)`);
-  assert(goals > 0, `  세 판을 합치면 골이 난다 (${goals}골)`);
 }
 
 // [stated] 봇도 **태클로 공을 뺏는다**

@@ -88,7 +88,7 @@ import {
   NEG_SHOW, BARR_BLAST_DMG, BARR_FIRE_DMG, MELEE_SPD
 } from './config.js';
 import {
-  stepBall, stepBallInGoal, ballHome, KICKOFF, GOAL, FIELD,
+  stepBall, stepBallInGoal, ballHome, KICKOFF, GOAL, FIELD, PICK_R,
   GOAL_HOLD, GOAL_SEQ, GOAL_TO_WIN, SOCCER_TICKS, TACKLE_TICKS, TACKLE_COOL, FOOT_OFF,
   TACKLE_SLIDE, faceVec, SOC_STUN, RELEASE_TICKS, TACKLE_HIT, TACKLE_BOX,
   TACKLE_V
@@ -564,6 +564,25 @@ export function blocked(s, x, y, self = -1){
 // 앞뒤로 보내면 태클한 사람이나 넘어진 사람 발밑에 그대로 남아 실랑이가 된다.
 // 태클 방향(tx,ty)의 **수직** 두 방향 중, 공이 이미 치우친 쪽을 고른다 —
 // 정확히 가운데면 오른쪽. 전부 정수 연산이라 양쪽 화면이 갈리지 않는다
+// [stated] **공이 골대 앞에서 멈추면 아무도 못 빼고 경기가 멈춘다.**
+// 실측: 선수가 갈 수 있는 한계 y 231.3 / 공이 멈춘 자리 246.1 / 줍는 거리 8.5 →
+// **15px 떨어져 영영 못 줍는다.** 봇 문제가 아니라 사람끼리도 똑같이 막히는 규칙 구멍이다.
+//
+// 선수의 세로 한계는 x 마다 다르므로(`topSpan`/`botSpan`) **그 표를 그대로 써서** 닿는 범위를 구한다.
+// **멈춘 자유공에만** 손댄다 — 굴러가는 중이면 골로 들어가는 길일 수 있고, 주인이 있으면 발밑이다
+function freeBallReach(s){
+  const b = s.ball;
+  if (!b || (s.ballOwner != null && s.ballOwner >= 0)) return;
+  if (b.vx || b.vy) return;                      // 굴러가는 중에는 안 건드린다
+  if (s.goalT) return;                           // 골 연출 중에는 안 건드린다
+  // 공의 x 에서 선수가 닿을 수 있는 위/아래 끝. 선수 몸 기준이라 발끝은 `PICK_R` 만큼 더 간다
+  const lx = Math.max(0, b.x - (PWf >> 1));
+  const lo = topSpan(lx) + PICK_R;
+  const hi = botSpan(lx) - PHf + PICK_R;
+  if (b.y < lo) b.y = lo;
+  else if (b.y > hi) b.y = hi;
+}
+
 function sideOut(tx, ty, bx, by){
   const px = -ty, py = tx;                 // 90도 돌린 방향
   // [stated] **공이 그라운드 끝에서 봇과 겹쳐 멈추고 태클해도 안 빠진다.**
@@ -1231,7 +1250,11 @@ export function step(s, inp){
         const p = s.p[i];
         const q = s.off[i] ? NOIN : (inp[i] || NOIN);
         if (p.stun > 0) p.stun--;                   // 쓰러진 동안은 아무것도 못 한다
-        if (q.tkl && (p.stun | 0) === 0 && (p.tklCool | 0) === 0 && (p.tkl | 0) === 0){
+        // [stated] **공을 들고 있으면 태클을 못 한다.** 예전엔 들고 태클하면 "약하게 앞으로 차기"가
+        // 됐는데, 뺏은 공은 옆으로 빠지고 들고 찬 공은 앞으로 나가서 **같은 버튼이 두 가지로 동작**했다.
+        // 태클은 뺏는 동작이다 — 내 공에는 쓰지 않는다
+        const hasBall = (s.ballOwner != null && s.ballOwner === i);
+        if (q.tkl && !hasBall && (p.stun | 0) === 0 && (p.tklCool | 0) === 0 && (p.tkl | 0) === 0){
           p.tkl = TACKLE_TICKS; p.tklCool = TACKLE_COOL + TACKLE_TICKS;
           // **시작할 때 방향을 굳힌다** — 미끄러지는 동안 방향이 바뀌면 모션과 어긋난다
           p.tklF = p.face | 0;
@@ -1311,6 +1334,8 @@ export function step(s, inp){
         }
       }
       const g = stepBall(s, kicks, chs);
+      // 공이 멈춘 뒤에 본다 — 아무도 못 닿는 띠에 들어갔으면 닿는 자리로 되돌린다
+      if (!g) freeBallReach(s);
       if (g){
         s.score[g.goal]++;
         s.goalBy = g.goal;
