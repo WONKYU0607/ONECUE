@@ -2,7 +2,7 @@
 //
 // 봇은 **사람과 똑같은 입력만** 낸다(`dx/dy/fire`). 상태를 직접 건드리면
 // 서버 판정·예측 구조를 통째로 우회하게 된다.
-import { FP, PH_PLAY } from '../src/game/config.js';
+import { FP, PH_PLAY, teamOf } from '../src/game/config.js';
 import { newState, step, kickoff, NOIN } from '../src/game/sim.js';
 import { SOCCER_TICKS, GOAL, FIELD } from '../src/game/ball.js';
 import { createSoccerAI } from '../src/game/soccer-ai.js';
@@ -44,11 +44,15 @@ console.log('봇이 움직이고 공을 건드린다');
 
 console.log('골을 넣는다');
 {
-  // **90초 안에 한 골도 못 넣으면 봇이 아니다**
-  const r = match(2, 1);
-  const total = r.s.score[0] + r.s.score[1];
-  assert(total > 0, `  90초 안에 골이 난다 (${r.s.score.join(':')})`);
-  assert(r.kicked > 0, `  버튼도 쓴다 (${r.kicked}회)`);
+  // **90초 안에 한 골도 못 넣으면 봇이 아니다.**
+  // 다만 **한 단계만 보면 안 된다** — 시뮬에 무작위가 없어 봇끼리는 전개가 늘 똑같고,
+  // 같은 실력끼리는 서로를 그대로 따라 해 0:0 으로 굳는 판이 나온다(파일 아래에도 같은 주의가 있다).
+  // 세 단계를 다 돌려 **어디서든 골이 나는지**로 본다
+  const rs = [0, 1, 2].map(lv => match(2, lv));
+  const total = rs.reduce((n, r) => n + r.s.score[0] + r.s.score[1], 0);
+  assert(total > 0, `  90초 안에 골이 난다 (${rs.map(r => r.s.score.join(':')).join(' / ')})`);
+  const kicked = rs.reduce((n, x) => n + x.kicked, 0);
+  assert(kicked > 0, `  버튼도 쓴다 (${kicked}회)`);
 }
 
 console.log('싸우지 않는다');
@@ -100,11 +104,24 @@ console.log('봇이 태클을 쓴다');
 {
   const r = match(2, 2);
   assert(r.tackled > 0, `  태클을 낸다 (${r.tackled}회)`);
-  // **내가 공을 잡았을 땐 안 한다** — 내 공을 스스로 걷어차는 꼴이 된다
-  const ai = fs.readFileSync('src/game/soccer-ai.js', 'utf8');
-  // **상대가 들고 있을 때만** 태클한다 — 내 공을 스스로 걷어차거나 같은 편을 넘어뜨리면 안 된다
-  assert(/} else if \(foeBall\)/.test(ai), '  상대가 들고 있을 때만 태클한다');
-  assert(/const foeBall = owner >= 0 && !teamBall/.test(ai), '  같은 편은 상대로 안 친다');
+  // **상대가 들고 있을 때만** 태클한다 — 내 공을 스스로 걷어차거나 같은 편을 넘어뜨리면 안 된다.
+  // **소스 문자열로 보면 안 된다** — 구조를 바꾸면 같이 깨진다(실제로 깨졌다). 동작으로 본다
+  {
+    const st = newState(2, false, false, true);
+    st.phase = PH_PLAY; st.clock = SOCCER_TICKS; kickoff(st, -1);
+    const bots = [createSoccerAI(0, 2), createSoccerAI(1, 2)];
+    let bad = 0, now2 = 0;
+    for (let t = 0; t < SOCCER_TICKS && !st.over; t++){
+      now2 += 1000 / 60;
+      const q = [0, 1].map(i => ({ ...NOIN, ...bots[i](st, now2) }));
+      const own = st.ballOwner == null ? -1 : st.ballOwner;
+      for (let i = 0; i < 2; i++)
+        if (q[i].tkl && (own < 0 || teamOf(own, st.n) === teamOf(i, st.n))) bad++;
+      step(st, q);
+    }
+    assert(bad === 0, `  상대가 들고 있을 때만 태클한다 (어긋난 틱 ${bad})`);
+  }
+  // "같은 편은 상대로 안 친다" 도 위 동작 검사가 같이 본다 (같은 팀이면 `bad` 로 센다)
 }
 
 // [stated] 태클하면 캐릭터가 **스윽 밀려난다**
