@@ -808,7 +808,14 @@ export function step(s, inp){
         dy = Math.round(dy * 70 / 100);
       }
       if ((s.melee || s.soccer) && (dx || dy)){
-        p.face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 2 : 3) : (dy < 0 ? 0 : 1);
+        // [stated] **캐릭터가 뚝뚝 끊어져 보인다.** 대각선으로 갈 때 `|dx|`와 `|dy|`가 비슷해
+        // 매 틱 판정이 뒤집혀 **옆모습 ↔ 정면이 초당 수십 번 갈아끼워졌다**.
+        // 칼전은 사방으로 다녀 대각선이 대부분이라 특히 심하다(총격전은 좌우 위주).
+        // → **확실히 커야**(1.3배) 방향을 바꾼다. 애매하면 보던 쪽을 그대로 본다
+        const ax = Math.abs(dx), ay = Math.abs(dy);
+        const wasSide = p.face === 2 || p.face === 3;
+        const side = wasSide ? (ax * 10 >= ay * 8) : (ax * 10 > ay * 13);
+        p.face = side ? (dx < 0 ? 2 : 3) : (dy < 0 ? 0 : 1);
       }
       // **벽에 막힌 몫은 다른 축으로 넘긴다.** 대각선은 벡터 길이로 잘리는데,
       // 가로가 벽에 막혀 버려지면 세로만 남아 느려진다 —

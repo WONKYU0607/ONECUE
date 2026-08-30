@@ -43,9 +43,11 @@ const LEVELS = [
   // sloppy 점수에 섞는 흔들림(0~1) — 클수록 엉뚱한 선택을 한다
   // shotOK 슛을 낼 점수 문턱 — 높을수록 좋은 자리에서만 찬다(= 자주 안 찬다)
   // tklGap/kickGap  버튼 사이 최소 간격(ms) — 사람도 연타하지는 않는다
-  { react: 260, sloppy: 0.45, shotOK: 0.72, tklGap: 1400, kickGap: 1000 },  // 쉬움
-  { react: 160, sloppy: 0.22, shotOK: 0.58, tklGap:  900, kickGap:  700 },  // 보통
-  { react: 100, sloppy: 0.08, shotOK: 0.46, tklGap:  550, kickGap:  450 }   // 어려움
+  // [stated] **내가 공을 들고 가만히 있으면 봇도 앞에 서서 가만히 있다** — 붙은 뒤
+  // 태클 간격(1.4초)만 기다리느라 아무것도 안 하는 것처럼 보였다. 간격을 줄인다
+  { react: 260, sloppy: 0.45, shotOK: 0.72, tklGap: 800, kickGap: 1000 },  // 쉬움
+  { react: 160, sloppy: 0.22, shotOK: 0.58, tklGap: 550, kickGap:  700 },  // 보통
+  { react: 100, sloppy: 0.08, shotOK: 0.46, tklGap: 380, kickGap:  450 }   // 어려움
 ];
 
 // 여덟 방향 + 제자리

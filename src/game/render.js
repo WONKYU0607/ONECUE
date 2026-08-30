@@ -323,8 +323,12 @@ export function createRenderer(canvas){
       const cx = cellX(g.c) + GRID_CW / 2;
       const cy = fy(cellY(g.r) + GRID_CH / 2, 0);
       if (isReady(portalImg)){
-        // 살짝 커졌다 작아지며 도는 느낌
-        const puls = 1 + Math.sin(s.tick / 18 + k * 2) * 0.06;
+        // 살짝 커졌다 작아지며 도는 느낌.
+        // [stated] **다만 매 프레임 크기가 다르면** 브라우저가 축소 결과를 재활용 못 해
+        // 그릴 때마다 다시 계산한다 — 칼전에서만 도는 그림이라 끊김의 후보였다.
+        // **몇 단계로 끊어** 같은 크기가 반복되게 한다
+        const pulsRaw = 1 + Math.sin(s.tick / 18 + k * 2) * 0.06;
+        const puls = 1 + Math.round((pulsRaw - 1) * 1000 / 15) * 15 / 1000;
         const w = GRID_CW * 1.7 * puls, h = GRID_CH * 1.7 * puls;   // [stated] 1.8 → 1.7
         ctx.drawImage(portalImg, k * PORTAL_PX, 0, PORTAL_PX, PORTAL_PX,
           Math.round((cx - w / 2) * RS), Math.round((cy - h / 2) * RS),
