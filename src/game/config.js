@@ -469,6 +469,9 @@ export const PROTO_VER = 71;   // 태클 판정·방향 · 칼전/축구 속도 
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;
+// [stated] **밀리는 느낌의 원인을 기기에서 가리기 위한 표시.** 전투 중 화면 위에
+// 프레임률·RTT·입력지연·화면뒤처짐을 띄운다. **원인 확인이 끝나면 false 로 되돌릴 것**
+export const SHOW_LAGHUD = true;
 export const GUN_C = '#23232b', LENS_C = '#101014', GLINT_C = '#dfe8f0';
 
 export const COL = {

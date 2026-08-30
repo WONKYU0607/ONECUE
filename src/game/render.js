@@ -1,5 +1,5 @@
 import {
-  W, H, FP, COL, TEAMS, TEAM_OF, SELF, MAXHP, FLASH_T, VIEW, SHOW_HUD,
+  W, H, FP, COL, TEAMS, TEAM_OF, SELF, MAXHP, FLASH_T, VIEW, SHOW_HUD, SHOW_LAGHUD,
   GRID_COLS, GRID_ROWS, GRID_MIDROW, GRID_X0, GRID_Y0, GRID_CW, GRID_CH, cellX, cellY,
   PH_READY, PH_COUNT, PH_PLAY, PH_OVER, CD_STEP, CD_GO, HP_MARKS,
   ITEM, ITEM_DEF, cellOwner, teamOf, COLOR_COUNT, BUFF, DRUM_RADIUS, EXPLO_TICKS, ARENA, setArena, SHEET_CW, SHEET_CH,
@@ -128,6 +128,7 @@ export function createRenderer(canvas){
     m.set(key, c);
     return c;
   }
+  const lagHud = { t0: 0, n: 0, fps: 0 };   // 계기판용 프레임률 계산
   const flashfx = getImage('flashfx');
   const throwImg = THROW_DEF.map(d => getImage(d.key));
   const fireImg = getImage('fire');
@@ -1147,6 +1148,33 @@ export function createRenderer(canvas){
       ctx.font = '700 ' + (8*RS) + 'px ' + GF; ctx.textAlign = 'left';
       ctx.fillStyle = COL.dim;
       ctx.fillText(dbg, 4*RS, (H + uiH - 3) * RS);
+    }
+    // [stated] **밀리는 느낌이 넷코드인지 기기인지 가리기 위한 표시.**
+    // 여기서 잰 걸로는 내 캐릭터가 0프레임에 반응하고 화면 뒤처짐도 0px 이라,
+    // 남은 후보는 **실제 프레임률**과 **상대가 보이는 시점**뿐이다. 그 둘을 화면에 띄운다.
+    // **확인이 끝나면 `SHOW_LAGHUD` 를 false 로**
+    if (SHOW_LAGHUD && cl){
+      const t = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      if (!lagHud.t0){ lagHud.t0 = t; lagHud.n = 0; }
+      lagHud.n++;
+      if (t - lagHud.t0 >= 500){
+        lagHud.fps = Math.round(lagHud.n * 1000 / (t - lagHud.t0));
+        lagHud.t0 = t; lagHud.n = 0;
+      }
+      const rttArr = Array.isArray(cl.rtt) ? cl.rtt : [cl.rtt];
+      const rtt = Math.round(Math.max(0, ...rttArr.map(v => v || 0)));
+      const dly = cl.delay | 0;
+      // 내 화면이 예측보다 몇 px 뒤처졌는지 (0 이면 넷코드 탓이 아니다)
+      const me = cl.pred && cl.pred.p && cl.pred.p[SELF.slot];
+      const behind = (me && cl.rx && cl.rx[SELF.slot] !== undefined)
+        ? ((me.x - cl.rx[SELF.slot]) / FP).toFixed(1) : '-';
+      ctx.font = '700 ' + (7 * RS) + 'px ' + GF;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(2 * RS, 2 * RS, 108 * RS, 11 * RS);
+      ctx.fillStyle = lagHud.fps && lagHud.fps < 50 ? '#ff8080' : '#9fe8ff';
+      ctx.fillText(`fps ${lagHud.fps || '-'}  rtt ${rtt}  지연 ${dly}틱  뒤처짐 ${behind}px`,
+                   5 * RS, 10 * RS);
     }
     ctx.textAlign = 'center';
     if (s.phase === PH_COUNT){
