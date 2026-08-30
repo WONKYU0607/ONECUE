@@ -213,8 +213,14 @@ export function createRenderer(canvas){
       const sc = ARENA.ph / SOC_BODY * 1.35 * (SOC_SCALE[fc] || 1);
       const dw = SOC_FW * sc, dh = SOC_FH * sc;
       const socSrc = (hit && whiteOf(soccerImg)) || soccerImg;
-      const dx0 = Math.round((xw + ARENA.pw / 2 - dw / 2) * RS);
-      const dy0 = Math.round((yw + ARENA.ph - dh) * RS);
+      // [stated] **화면에서 살짝씩 끊겨 보인다.** 캔버스는 540px 고정인데 폰은 1080px 이라
+      // **2배로 늘려서** 보여준다. 여기서 자리를 정수로 반올림하면 그 1px 이 화면에서는 2px 이고,
+      // 칼전 속도(초당 80px)면 한 프레임에 0.67px 이라 **움직이는 프레임과 안 움직이는 프레임이
+      // 번갈아 나온다**(120fps 면 세 프레임 중 둘이 제자리). 속도를 낮출수록 심해진다.
+      // → **반올림하지 않는다.** 소수점 자리로 그리면 브라우저가 부드럽게 처리한다.
+      // 캔버스를 키우는 방법도 있지만 그리는 양이 4배라 저사양 기기에서 프레임이 떨어진다
+      const dx0 = (xw + ARENA.pw / 2 - dw / 2) * RS;
+      const dy0 = (yw + ARENA.ph - dh) * RS;
       if (mirror){
         ctx.save();
         ctx.translate(dx0 + Math.round(dw * RS), dy0);
@@ -242,8 +248,10 @@ export function createRenderer(canvas){
       // 밝기만 올리면 색이 남아 '몸 색이 바뀐 것'처럼 보이므로 완전히 하얗게 만든다
       // 시트는 몸통 가로 중심 기준이라, 캐릭터 상자 가운데에 맞춰 그린다
       const meleeSrc = (hit && whiteOf(melee)) || melee;
-      const dxp = Math.round((xw + ARENA.pw / 2 - dw / 2) * RS);
-      const dyp = Math.round((yw + ARENA.ph - dh) * RS);
+      // 자리는 반올림하지 않는다 (위 축구 쪽 설명과 같은 이유).
+      // **크기(fwp/fhp)는 반올림한 채로 둔다** — 미리 줄여둔 시트를 1:1 로 찍어야 하므로
+      const dxp = (xw + ARENA.pw / 2 - dw / 2) * RS;
+      const dyp = (yw + ARENA.ph - dh) * RS;
       const fwp = Math.round(dw * RS), fhp = Math.round(dh * RS);
       // 미리 줄여둔 시트가 있으면 **1:1 로 찍는다**(축소 계산이 매 프레임 사라진다).
       // 없으면(검사 환경 등) 예전처럼 원본을 줄여 그린다
