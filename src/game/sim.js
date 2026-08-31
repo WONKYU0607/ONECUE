@@ -1260,7 +1260,8 @@ export function step(s, inp){
         // [stated] **공을 들고 있으면 태클을 못 한다.** 예전엔 들고 태클하면 "약하게 앞으로 차기"가
         // 됐는데, 뺏은 공은 옆으로 빠지고 들고 찬 공은 앞으로 나가서 **같은 버튼이 두 가지로 동작**했다.
         // 태클은 뺏는 동작이다 — 내 공에는 쓰지 않는다
-        const hasBall = (s.ballOwner != null && s.ballOwner === i);
+        // [stated] **공을 들고 있는 사람만 태클을 못 한다.** 상대가 몰고 있으면 나는 언제든 태클한다
+        const hasBall = s.ballOwner != null && s.ballOwner === i;
         if (q.tkl && !hasBall && (p.stun | 0) === 0 && (p.tklCool | 0) === 0 && (p.tkl | 0) === 0){
           p.tkl = TACKLE_TICKS; p.tklCool = TACKLE_COOL + TACKLE_TICKS;
           // **시작할 때 방향을 굳힌다** — 미끄러지는 동안 방향이 바뀌면 모션과 어긋난다

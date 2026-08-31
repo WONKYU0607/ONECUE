@@ -177,7 +177,7 @@ export const THROW_DEF = [
 // 칼전(근접전). 총알·아이템 없이 칼로만 싸운다
 // [stated] **칼전 이동 속도** — 총격전은 좌우로만 다니는데 칼전은 사방으로 움직여
 // 같은 값이어도 훨씬 빠르게 느껴진다. 0.8 = 80%
-export const MELEE_SPD = 0.47;   // [stated] 0.8 → 0.68 → 0.61 → 0.55 → **0.47(15%↓)**. 초당 80px (총격전의 47%)
+export const MELEE_SPD = 0.40;   // [stated] 0.8 → 0.68 → 0.61 → 0.55 → 0.47 → **0.40**. 초당 68px (총격전의 40%)
 export const MELEE_DAMAGE = 8;          // 한 방에 최대 체력의 8%
 export const ATK_TICKS = 18;            // 휘두르는 모션 길이 (0.3초)
 export const ATK_HIT = 12;              // 이 틱에 판정 (모션 중간)

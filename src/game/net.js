@@ -18,7 +18,7 @@ import {
   lerp,
   stepCap,
   teamOf,
-  BUFF, BUFF_DEF} from './config.js';
+  BUFF, BUFF_DEF, MELEE_SPD } from './config.js';
 import {
   NOIN,
   checksum,
@@ -689,7 +689,12 @@ export class Client {
     // **버프를 먹은 사람은 그만큼 빨리 따라가야 한다.**
     // 이 상한이 1.0배 고정이라, 상대가 1.5배로 움직여도 화면은 1.0배까지만 따라가
     // 계속 뒤처진 채로 보였다 — "내 폰에선 빨라지는데 상대가 보기엔 안 빨라 보인다"
-    const base = capMul * (this.pred.maxStep || stepCap()) * (this.pred.fast ? FAST_MUL : 1);
+    // [stated] **상대가 더 빨라 보인다(칼전).** 이 상한에 **칼전 감속이 빠져 있었다** —
+    // 실제 속도는 `maxStep x MELEE_SPD` 인데 따라잡기는 `maxStep` 까지 허용돼
+    // **실제보다 2.1배 빠르게 붙었다.** 내 캐릭터는 다른 경로로 그려서 안 걸리니 상대만 빨라 보인다
+    const base = capMul * (this.pred.maxStep || stepCap())
+               * (this.pred.melee ? MELEE_SPD : 1)
+               * (this.pred.fast ? FAST_MUL : 1);
     const capOf = i => base
       * (((this.pred.spdMul && this.pred.spdMul[i]) || 1))
       * ((this.pred.bf && this.pred.bf[i] && this.pred.bf[i][BUFF.SPD] > 0)

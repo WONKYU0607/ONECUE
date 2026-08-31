@@ -881,7 +881,7 @@ export function createRenderer(canvas){
       // [stated] **차징 게이지** — 누르고 있는 동안 아래에서 위로 찬다 (최대 1초)
 
       const tb = tackleBtn(uiH2);
-      // [stated] **공을 들고 있으면 태클을 못 한다** → 그동안 버튼도 흐리게. 왜 안 되는지 보여야 한다
+      // [stated] **공을 들고 있는 사람은 태클을 못 한다**(규칙) → 그동안 버튼을 흐리게
       const holding = s.ballOwner != null && s.ballOwner === SELF.slot;
       const tOn = me ? ((me.tklCool | 0) === 0 && !holding) : true;
       label(tb, 'SLIDE', tOn ? '#f2f2f2' : 'rgba(242,242,242,0.28)',
