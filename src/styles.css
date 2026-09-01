@@ -885,3 +885,25 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .exit-hint{position:fixed;left:50%;bottom:calc(var(--sab) + 8%);transform:translateX(-50%);z-index:60;
   margin:0;padding:8px 16px;background:rgba(8,14,26,.92);border:1px solid #5a96c8;
   font:700 13px var(--gf);color:#dceaf6;white-space:nowrap}
+
+/* ── 상점 ─────────────────────────────────────────────────────
+   [stated] 아레나 / 스킨 / 광고 제거 / 아이템 네 탭.
+   탭 넷이 한 줄에 들어가므로 **고정 폭을 주면 안 된다** — 좁은 폰에서 넘친다
+   (`.code-input` 이 104px 고정이라 360px 폰에서 넘쳤던 것과 같은 종류) */
+.shop-tabs{display:flex;gap:4px;padding:0 8px 6px}
+.shop-tabs .menu-btn{flex:1 1 0;min-width:0}
+.shop-list{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:0 8px 10px}
+.shop-row{display:flex;align-items:center;gap:7px;padding:7px 8px;margin-bottom:3px;
+  background:rgba(10,18,30,.7);border:1px solid rgba(90,140,190,.28);border-radius:3px}
+.shop-info{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.shop-info .nm{font-weight:900;color:#e8e8f0}
+.shop-info .ds{font-size:11px;color:#9fb0c8}
+.shop-empty{text-align:center;color:#7f8ea6;padding:24px 0}
+
+/* 스킨 상품 — 8모션 미리보기 한 줄 + 이름·값 */
+.shop-sub{padding:6px 2px 4px;color:#9fb0c8;font-weight:900}
+.shop-row.skin{flex-direction:column;align-items:stretch;gap:5px}
+.skin-strip{display:flex;min-width:0;overflow-x:auto;gap:1px;
+  background:rgba(0,0,0,.25);border-radius:3px;padding:2px}
+.skin-strip i{flex:0 0 auto;display:block;image-rendering:auto}
+.shop-row.skin .shop-info{flex-direction:row;align-items:baseline;gap:8px}

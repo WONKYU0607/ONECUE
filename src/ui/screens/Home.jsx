@@ -4,7 +4,7 @@ import RankCards from '../RankCards.jsx';
 import InviteBanner from '../InviteBanner.jsx';
 import { t } from '../../i18n/index.js';
 
-export default function Home({ onPvp, onAi, onPractice, onSettings, onRanks, onJoin, onFriends }){
+export default function Home({ onPvp, onAi, onPractice, onSettings, onRanks, onJoin, onFriends, onShop }){
   return (
     <div className="screen home">
 
@@ -25,6 +25,10 @@ export default function Home({ onPvp, onAi, onPractice, onSettings, onRanks, onJ
         </button>
         <button className="menu-btn" onClick={onPractice}>
           <span className="t">{t('mode.practice')}</span>
+        </button>
+        {/* [stated] **상점은 연습 모드 밑에** */}
+        <button className="menu-btn" onClick={onShop}>
+          <span className="t">{t('shop.title')}</span>
         </button>
       </div>
 

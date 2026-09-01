@@ -108,6 +108,8 @@ export function normalizeState(st){
   if (st.soccer && !st.ball) st.ball = ballHome();
   if (!Array.isArray(st.score)) st.score = [0, 0];
   if (typeof st.goalT !== 'number') st.goalT = 0;
+  // 옛 서버 상태에는 스킨이 없다 — 없으면 기본(0)으로 채운다
+  if (!Array.isArray(st.skin)) st.skin = Array.from({ length: st.n || 2 }, () => 0);
   if (typeof st.goalBy !== 'number') st.goalBy = -1;
   if (!st.kickFx || typeof st.kickFx.t !== 'number') st.kickFx = null;
   if (typeof st.ballOwner !== 'number') st.ballOwner = -1;
@@ -242,6 +244,10 @@ export function newState(n = 2, melee = false, ffa = false, soccer = false){
     done: Array(n).fill(false),      // 아이템 배치를 끝냈는가 (설치 완료)
     ready: Array(n).fill(false),     // 준비완료까지 눌렀는가 — 전원이 눌러야 시작
     color: Array.from({ length: n }, (_, i) => i),   // 슬롯별 캐릭터 색 (0 ~ COLOR_COUNT-1)
+    // [stated] **축구 유니폼 스킨.** 색과 **별개 값**이다 — 총격전·칼전은 색을 그대로 쓰고
+    // 축구에서만 이 값을 본다. 0 이면 기본(색), 1~5 가 유니폼.
+    // **상대에게도 보여야 하므로** 상태에 실어 서버가 알려준다(체크섬에도 넣는다)
+    skin: Array.from({ length: n }, () => 0),
     solo: false,
     fast: false,
     fastBy: 0,
@@ -1464,6 +1470,7 @@ export function checksum(s){
   h = (h*31 + (s.negDone ? s.negDone.t * 7 + s.negDone.by * 3 : 0)) | 0;
   h = (h*31 + (s.solo ? 4 : 0) + (s.fast ? 8 : 0) + s.fastBy*16 + (s.bare ? 32 : 0) + s.bareBy*64 + s.fastT*3 + s.bareT*5 + s.negOk.length*13) | 0;
   for (const c of (s.color || [])) h = (h*31 + c) | 0;
+  for (const k of (s.skin || [])) h = (h*31 + (k | 0)) | 0;
   for (const f of s.fx) h = (h*31 + f.c*5 + f.r*11 + f.t + (f.k||0)*3) | 0;
   for (const pr of s.proj) h = (h*31 + pr.k*3 + pr.by*5 + pr.c*7 + pr.r1*13 + pr.t + pr.fuse) | 0;
   // by가 없는 옛 상태는 -1로 본다. 원본과 복제본이 어긋나지 않게 여기서도 같은 기본값

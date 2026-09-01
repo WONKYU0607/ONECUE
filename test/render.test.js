@@ -235,9 +235,12 @@ console.log('맞은 표시가 비싸지 않게');
   assert(/function whiteOf\(img\)/.test(src), '  하얀 판을 미리 만들어 둔다');
   assert(/whiteCache\.set\(img, c\)/.test(src), '  한 번만 만들고 다시 쓴다');
   assert(/source-atop/.test(src), '  그림이 있는 자리만 하얗게');
-  // 칼전·축구 둘 다 쓴다 (총격전은 흰색 그림이 시트에 따로 있다)
+  // 칼전·축구 둘 다 쓴다 (총격전은 흰색 그림이 시트에 따로 있다).
+  // **변수 이름으로 보면 안 된다** — 축구는 스킨이 붙으면서 `soccerImg` 대신
+  // 기본/스킨 중 고른 시트(`baseImg`)를 넘긴다. 그래도 하얀 판은 그대로 쓴다
   assert(/whiteOf\(melee\)/.test(src), '  칼전에 쓴다');
-  assert(/whiteOf\(soccerImg\)/.test(src), '  축구에도 쓴다');
+  const soc = src.slice(src.indexOf('ARENA.soccer && isReady(soccerImg)'));
+  assert(/whiteOf\(/.test(soc.slice(0, 2000)), '  축구에도 쓴다');
 }
 
 

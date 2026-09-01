@@ -9,6 +9,10 @@ export const ASSET_SRC = {
   kickfx:     'assets/kickfx.webp',   // 슛 충격 연출 (사용자가 준 그림)
   vsbolt:     'assets/vsbolt.webp',   // 대결 화면 번개
   soccer:     'assets/soccer-chars.webp',  // 축구 캐릭터 6색 x 8자세(앞뒤좌우 x 서기·뛰기)
+  // [stated] 축구 **유니폼 스킨**. 칸 배치는 기본 시트와 **완전히 같다**(13칸 x 5줄).
+  // 줄 = 스킨 번호(0 맨유 / 1 레알 / 2 맨시티 / 3 바르셀로나 / 4 첼시).
+  // 칸마다 세로 길이·아래 여백·긴 쪽 길이를 기본 시트에서 재서 맞췄다 — **크기가 달라지면 안 된다**
+  socskin:    'assets/soccer-skins.webp',
   melee:      'assets/melee.webp',    // 칼전 캐릭터 4색 x 4자세
   characters: 'assets/characters.png',
   items:      'assets/items.webp',
@@ -83,7 +87,7 @@ export function keysFor({ melee, soccer, n = 2 } = {}){
   const arena = soccer ? 'arena4' : (melee ? 'arena3' : (n > 2 ? 'arena2' : 'arena'));
   const who = soccer ? 'soccer' : (melee ? 'melee' : 'characters');
   return soccer
-    ? [arena, who, 'ball', 'kickfx']
+    ? [arena, who, 'socskin', 'ball', 'kickfx']
     : [arena, who, 'items', 'explosion', 'fire', 'flash', 'flashfx',
        'grenade', 'molotov', 'portal'];
 }

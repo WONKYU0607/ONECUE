@@ -77,7 +77,9 @@ export function createRenderer(canvas){
   const ctx = canvas.getContext('2d');
   const sheet = getImage('characters'), items = getImage('items');
   const melee = getImage('melee');          // 칼전 캐릭터 시트 (310x184, 4색 x 4자세)
-  const soccerImg = getImage('soccer');     // 축구 캐릭터 시트 (336x288, 6색 x 8자세)
+  const soccerImg = getImage('soccer');     // 축구 캐릭터 시트
+  // [stated] 축구 유니폼 스킨. 칸 배치는 기본 시트와 같고 **줄만 스킨 번호**다
+  const socSkinImg = getImage('socskin');
   const ballImg = getImage('ball');         // 축구공
   const kickImg = getImage('kickfx');       // 슛 충격 연출
   const roll = makeRoller();                // 공 굴림 각도 (그리기 전용)
@@ -180,7 +182,7 @@ export function createRenderer(canvas){
     if (key !== viewKey){ viewKey = key; viewCache = viewColors(s.color, s.n, SELF.slot, s.n > 2 && !s.ffa); }
     return viewCache;
   }
-  function drawPlayer(p, i, xOverride, yOverride, blind = 0, tick = 0, colorOf = null, off = false){
+  function drawPlayer(p, i, xOverride, yOverride, blind = 0, tick = 0, colorOf = null, off = false, skin = 0){
     if (p.hp <= 0) return;                       // 쓰러지면 아레나에서 사라진다
     if (p.invul > 0 && (p.invul >> 2) % 2 === 0) return;
     // 끊긴 사람은 유령이다. 총알·칼이 통과하므로 **보기에도 통과하게** 흐리게 그린다
@@ -212,7 +214,14 @@ export function createRenderer(canvas){
       // 그래서 자세마다 **긴 쪽 길이를 48 로 맞추는** 배율을 따로 곱한다
       const sc = ARENA.ph / SOC_BODY * 1.35 * (SOC_SCALE[fc] || 1);
       const dw = SOC_FW * sc, dh = SOC_FH * sc;
-      const socSrc = (hit && whiteOf(soccerImg)) || soccerImg;
+      // [stated] **스킨을 장착하면 그 유니폼으로 뛴다.** 스킨은 색과 별개 값이라
+      // 총격전·칼전은 그대로 색을 쓰고 **축구에서만** 스킨 시트를 본다.
+      // `skin` 은 1부터(0 = 기본), 시트의 줄은 `skin - 1`
+      const sk = skin | 0;
+      const useSkin = sk > 0 && isReady(socSkinImg) && sk <= 5;
+      const baseImg = useSkin ? socSkinImg : soccerImg;
+      const socRow = useSkin ? sk - 1 : col;
+      const socSrc = (hit && whiteOf(baseImg)) || baseImg;
       // [stated] **화면에서 살짝씩 끊겨 보인다.** 캔버스는 540px 고정인데 폰은 1080px 이라
       // **2배로 늘려서** 보여준다. 여기서 자리를 정수로 반올림하면 그 1px 이 화면에서는 2px 이고,
       // 칼전 속도(초당 80px)면 한 프레임에 0.67px 이라 **움직이는 프레임과 안 움직이는 프레임이
@@ -225,11 +234,11 @@ export function createRenderer(canvas){
         ctx.save();
         ctx.translate(dx0 + Math.round(dw * RS), dy0);
         ctx.scale(-1, 1);
-        ctx.drawImage(socSrc, fc * SOC_FW, col * SOC_FH, SOC_FW, SOC_FH,
+        ctx.drawImage(socSrc, fc * SOC_FW, socRow * SOC_FH, SOC_FW, SOC_FH,
           0, 0, Math.round(dw * RS), Math.round(dh * RS));
         ctx.restore();
       } else {
-        ctx.drawImage(socSrc, fc * SOC_FW, col * SOC_FH, SOC_FW, SOC_FH,
+        ctx.drawImage(socSrc, fc * SOC_FW, socRow * SOC_FH, SOC_FW, SOC_FH,
           dx0, dy0, Math.round(dw * RS), Math.round(dh * RS));
       }
       if (off) ctx.globalAlpha = 1;
@@ -1132,7 +1141,8 @@ export function createRenderer(canvas){
     // 렌더 위치 배열은 첫 예측이 끝나야 생긴다. 없으면 보정 없이 확정 위치로 그린다
     const rx = cl.rx || [], ry = cl.ry || [];
     for (let i = 0; i < s.p.length; i++)
-      drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, viewOf(s), (s.off || [])[i]);
+      drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, viewOf(s), (s.off || [])[i],
+                 (s.skin || [])[i] || 0);
     drawMiniHp(s, rx, ry);
     drawMeMark(s, rx, ry);
     drawOffline(s, rx, ry);
@@ -1181,7 +1191,8 @@ export function createRenderer(canvas){
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
       ctx.fillRect(2 * RS, 2 * RS, 108 * RS, 11 * RS);
       ctx.fillStyle = lagHud.fps && lagHud.fps < 50 ? '#ff8080' : '#9fe8ff';
-      ctx.fillText(`fps ${lagHud.fps || '-'}  rtt ${rtt}  지연 ${dly}틱  뒤처짐 ${behind}px`,
+      // 디버그 표시라 번역하지 않는다 (한글을 넣으면 번역 검사가 잡는다)
+      ctx.fillText(`fps ${lagHud.fps || '-'} rtt ${rtt} dly ${dly} lag ${behind}`,
                    5 * RS, 10 * RS);
     }
     ctx.textAlign = 'center';

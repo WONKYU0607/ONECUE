@@ -7,6 +7,7 @@ import PvpMenu from './ui/screens/PvpMenu.jsx';
 import RankBoard from './ui/screens/RankBoard.jsx';
 import Login from './ui/screens/Login.jsx';
 import Friends from './ui/screens/Friends.jsx';
+import Shop from './ui/screens/Shop.jsx';
 import QuickMatch from './ui/screens/QuickMatch.jsx';
 import RoomEnter from './ui/screens/RoomEnter.jsx';
 import Result from './ui/screens/Result.jsx';
@@ -290,9 +291,11 @@ export default function App(){
                                      onSettings={() => setShowSettings(true)}
                                      onRanks={k => { setRankKind(k); setScreen('ranks'); }}
                                      onJoin={beginPvp}
-                                     onFriends={() => setScreen('friends')} />}
+                                     onFriends={() => setScreen('friends')}
+                                     onShop={() => setScreen('shop')} />}
       {screen === 'ranks'    && <RankBoard kind={rankKind} onBack={goHome} />}
       {screen === 'friends'  && <Friends onBack={goHome} />}
+      {screen === 'shop'     && <Shop onBack={goHome} />}
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} onMelee={startMeleeAi} />}
       {screen === 'practice' && <PracticeMenu onBack={goHome} onStart={startPractice} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
