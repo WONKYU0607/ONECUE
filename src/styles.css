@@ -900,10 +900,23 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .shop-info .ds{font-size:11px;color:#9fb0c8}
 .shop-empty{text-align:center;color:#7f8ea6;padding:24px 0}
 
-/* 스킨 상품 — 8모션 미리보기 한 줄 + 이름·값 */
-.shop-sub{padding:6px 2px 4px;color:#9fb0c8;font-weight:900}
-.shop-row.skin{flex-direction:column;align-items:stretch;gap:5px}
-.skin-strip{display:flex;min-width:0;overflow-x:auto;gap:1px;
-  background:rgba(0,0,0,.25);border-radius:3px;padding:2px}
-.skin-strip i{flex:0 0 auto;display:block;image-rendering:auto}
-.shop-row.skin .shop-info{flex-direction:row;align-items:baseline;gap:8px}
+/* [stated] 상점 머리: 제목 없이 **뒤로 버튼만 우상단에 작게** */
+.shop-head{display:flex;justify-content:flex-end;padding:6px 8px 4px}
+.menu-btn.xs{flex:0 0 auto;min-width:0;padding:3px 10px;font-size:12px}
+
+/* 스킨 상품 — [stated] 서있기·뛰기 **두 줄**, 캐릭터를 크게, **옆으로 넘겨서** 본다 */
+.shop-tabs.sub{padding-top:0}
+.shop-tabs.sub .menu-btn{font-size:12px}
+/* 옆으로 넘기기: 한 상품이 화면 하나를 채우고 손을 떼면 딱 맞춰 선다 */
+.shop-swipe{flex:1 1 auto;min-width:0;min-height:0;display:flex;gap:8px;
+  overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;
+  padding:0 8px 10px;-webkit-overflow-scrolling:touch}
+.shop-card{flex:0 0 100%;min-width:0;scroll-snap-align:center;
+  display:flex;flex-direction:column;justify-content:center;gap:8px;
+  background:rgba(10,18,30,.7);border:1px solid rgba(90,140,190,.28);border-radius:4px;padding:10px}
+.skin-prev{display:flex;flex-direction:column;align-items:center;gap:4px}
+.skin-line{display:flex;justify-content:center;gap:2px}
+.skin-line i{flex:0 0 auto;display:block;image-rendering:auto}
+.shop-card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.shop-card-foot .pr{font-weight:900;color:#ffd34d}
+.shop-card-foot .menu-btn{flex:0 0 auto;min-width:0}
