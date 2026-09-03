@@ -892,7 +892,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
    (`.code-input` 이 104px 고정이라 360px 폰에서 넘쳤던 것과 같은 종류) */
 .shop-tabs{display:flex;gap:4px;padding:0 8px 6px}
 .shop-tabs .menu-btn{flex:1 1 0;min-width:0}
-.shop-list{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:0 8px 10px}
+.shop-list{width:100%;flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:0 8px 10px}
 .shop-row{display:flex;align-items:center;gap:7px;padding:7px 8px;margin-bottom:3px;
   background:rgba(10,18,30,.7);border:1px solid rgba(90,140,190,.28);border-radius:3px}
 .shop-info{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
@@ -900,23 +900,85 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .shop-info .ds{font-size:11px;color:#9fb0c8}
 .shop-empty{text-align:center;color:#7f8ea6;padding:24px 0}
 
-/* [stated] 상점 머리: 제목 없이 **뒤로 버튼만 우상단에 작게** */
-.shop-head{display:flex;justify-content:flex-end;padding:6px 8px 4px}
-.menu-btn.xs{flex:0 0 auto;min-width:0;padding:3px 10px;font-size:12px}
+/* [stated] 상점 머리: 제목 없이 **뒤로 버튼만 우상단에 작게**.
+   `.menu-btn` 은 min-height 58px + 금속 틀이라 상점에는 너무 크다 → 틀 없는 작은 버튼 */
+.shop-head{width:100%;display:flex;justify-content:flex-end;padding:5px 8px 2px}
+.shop-btn{flex:0 0 auto;min-width:0;padding:4px 12px;font:900 12px/1.2 var(--gf);
+  color:#cfe4ff;background:rgba(20,34,52,.9);border:1px solid rgba(90,140,190,.5);
+  border-radius:3px;cursor:pointer}
+.shop-btn.on{background:rgba(40,110,180,.9);color:#fff;border-color:rgba(150,210,255,.8)}
+.shop-btn:disabled{opacity:.45}
 
-/* 스킨 상품 — [stated] 서있기·뛰기 **두 줄**, 캐릭터를 크게, **옆으로 넘겨서** 본다 */
-.shop-tabs.sub{padding-top:0}
-.shop-tabs.sub .menu-btn{font-size:12px}
-/* 옆으로 넘기기: 한 상품이 화면 하나를 채우고 손을 떼면 딱 맞춰 선다 */
-.shop-swipe{flex:1 1 auto;min-width:0;min-height:0;display:flex;gap:8px;
+/* 탭 — [stated] 글씨 크기는 그대로 두고 **테두리만 예전 금속 틀**로.
+   `.menu-btn` 은 틀 두께가 15/17px 이라 작은 버튼에는 과하다 → 얇게 줄여 쓴다 */
+.shop-tabs{width:100%;display:flex;gap:4px;padding:0 8px 5px}
+.shop-tabs .shop-btn{flex:1 1 0;min-width:0;padding:3px 2px;text-align:center;
+  background:transparent;border-radius:0;
+  border-style:solid;border-width:9px 10px;
+  border-color:#1b2b3a;                    /* 틀 이미지를 못 받았을 때의 모습 */
+  border-image:var(--frame) 86 fill stretch}
+.shop-tabs .shop-btn.on{color:#fff;
+  text-shadow:0 0 10px rgba(110,200,255,.75), 0 2px 3px rgba(0,0,0,.8)}
+.shop-tabs.sub{padding-bottom:6px}
+.shop-tabs.sub .shop-btn{font-size:11px}
+
+/* [stated] 상품을 감싸는 네모 상자를 없앤다. 그림과 값만 보이게 */
+.shop-wrap{position:relative;width:100%;flex:1 1 auto;min-width:0;min-height:0;
+  display:flex;flex-direction:column}
+/* [stated] 점 다섯 개가 **상자 바로 밑**에 와야 한다 — 예전엔 남은 높이를 다 차지해
+   점이 화면 맨 아래로 밀려 있었다 → 높이를 내용만큼만 쓴다 */
+.shop-swipe{width:100%;flex:0 0 auto;min-width:0;display:flex;
   overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;
-  padding:0 8px 10px;-webkit-overflow-scrolling:touch}
+  -webkit-overflow-scrolling:touch}
+/* [stated] 한 상품을 묶는 **얇은 테두리 하나**. 예전 두꺼운 상자와 달리 선만 두른다 */
+/* [stated] **상품을 위로 당긴다** — 가운데 정렬이라 탭 아래가 3분의 1이나 비어 있었다 */
 .shop-card{flex:0 0 100%;min-width:0;scroll-snap-align:center;
-  display:flex;flex-direction:column;justify-content:center;gap:8px;
-  background:rgba(10,18,30,.7);border:1px solid rgba(90,140,190,.28);border-radius:4px;padding:10px}
-.skin-prev{display:flex;flex-direction:column;align-items:center;gap:4px}
-.skin-line{display:flex;justify-content:center;gap:2px}
-.skin-line i{flex:0 0 auto;display:block;image-rendering:auto}
-.shop-card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.shop-card-foot .pr{font-weight:900;color:#ffd34d}
-.shop-card-foot .menu-btn{flex:0 0 auto;min-width:0}
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  gap:10px;padding:2px 4px}
+/* 화살표가 **테두리 바깥**에 서도록 좌우를 비워 둔다 (겹치지 않게) */
+/* [stated] **상자를 양옆으로 최대한 넓힌다.** 화살표를 작게 줄여 자리를 아낀다:
+   화살표 14px + 좌우 여백 2px 씩 → 한쪽 18px, 양쪽 36px 만 비우면 된다.
+   좁은 폰(360px)에서 상자 안쪽 = 360 - 36 - 16 = 308px 로 미리보기 4칸(296)이 넉넉히 들어간다 */
+.shop-card-in{width:calc(100% - 36px);display:flex;flex-direction:column;align-items:center;
+  gap:12px;padding:18px 8px 14px;
+  border:1px solid rgba(110,170,220,.42);border-radius:4px;background:rgba(8,16,28,.35)}
+.skin-prev{display:flex;flex-direction:column;align-items:center;gap:2px}
+/* [stated] 칸끼리 너무 붙어 보인다 → 사이를 조금 벌린다.
+   빈 여백을 잘라 쓰다 보니 캐릭터끼리 맞닿았다 */
+.skin-line{display:flex;justify-content:center;gap:10px}
+.skin-line i{flex:0 0 auto;display:block}
+/* [stated] **이름과 값의 키가 안 맞았다** — 글꼴 크기가 달라 밑선이 어긋난다.
+   `align-items:baseline` 으로 글자 밑선을 맞추고, 버튼만 따로 가운데로 */
+.shop-card-foot{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;justify-content:center}
+.shop-card-foot .nm{font:900 15px/1 var(--gf);color:#e8e8f0}
+.shop-card-foot .pr{font:900 15px/1 var(--gf);color:#ffd34d}
+.shop-card-foot .shop-btn{align-self:center}
+
+/* [stated] 양옆 화살표 — 눌러도 넘어간다. 그림을 가리지 않게 반투명 */
+/* [stated] 화살표를 **캐릭터 두 줄 사이**로 올리고, **겹치지 않게 작게**.
+   `50%` 는 점(dots)까지 포함한 가운데라 그림보다 아래로 내려간다 → 그만큼 올린다 */
+/* 상품이 위로 붙었으므로 화살표도 **미리보기 두 줄 사이 높이**로 올린다.
+   `.shop-card-in` 이 좌우를 비워 둬서 그림·테두리와 겹치지 않는다 */
+.shop-arrow{position:absolute;top:123px;transform:translateY(-50%);z-index:2;
+  width:14px;height:26px;display:flex;align-items:center;justify-content:center;
+  font:900 13px/1 var(--gf);color:#cfe4ff;cursor:pointer;
+  background:rgba(12,22,36,.72);border:1px solid rgba(90,140,190,.5);border-radius:3px}
+.shop-arrow.l{left:2px}
+.shop-arrow.r{right:2px}
+.shop-arrow:disabled{opacity:.25}
+
+/* [stated] 몇 번째인지 점 다섯 개 */
+.shop-dots{display:flex;justify-content:center;gap:8px;padding:10px 0 4px}
+.shop-dots i{width:7px;height:7px;border-radius:50%;background:#3c4a60;cursor:pointer}
+.shop-dots i.on{background:#8fd0ff}
+
+/* [stated] 5종 세트 — 개별 상품 아래 빈 공간을 채운다. 넘기지 않으므로 화살표·점이 없다 */
+/* [stated] 세트 상자를 **조금 더 아래로**, 캐릭터는 **키우고**,
+   윗줄 두 명은 **양옆으로 벌린다**(가운데가 비어 보이던 것) */
+.shop-set{width:100%;display:flex;justify-content:center;padding:16px 0 8px}
+.shop-set .shop-card-in{width:calc(100% - 36px);padding:14px 8px 10px;gap:8px}
+.shop-set .skin-line{gap:12px}
+/* 첫 줄은 둘뿐이라 붙어 보인다 → 조금만 벌린다.
+   [stated] 64px 은 **너무 넓었다** — 아랫줄 3명과 폭이 안 맞아 보인다 */
+.shop-set .skin-line:first-child{gap:22px}
+.shop-empty{text-align:center;color:#7f8ea6;padding:24px 0}

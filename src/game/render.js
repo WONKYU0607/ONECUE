@@ -10,6 +10,7 @@ import {
 import { makeRoller, BALL_R, GOAL_SEQ, GOAL_HOLD, GOAL_SCORE, KICK_FX_TICKS } from './ball.js';
 import { RS, computeLayout, stickGeom, shieldBtn, tackleBtn } from './layout.js';
 import { resultFor } from './ui-state.js';
+import { GUN_FW, GUN_FH, MSK_FW, MSK_FH } from './skins.js';
 import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
 import { t, getLang } from '../i18n/index.js';
@@ -80,6 +81,10 @@ export function createRenderer(canvas){
   const soccerImg = getImage('soccer');     // 축구 캐릭터 시트
   // [stated] 축구 유니폼 스킨. 칸 배치는 기본 시트와 같고 **줄만 스킨 번호**다
   const socSkinImg = getImage('socskin');
+  // [stated] 총격전 스킨 — 칸이 넓어(80x60) 그릴 때도 그만큼 넓게 그린다
+  const gunSkinImg = getImage('gunskin');
+  // [stated] 칼전 스킨 — 칸이 넓어(270x108) 그릴 때도 그만큼 넓게 그린다
+  const melSkinImg = getImage('melskin');
   const ballImg = getImage('ball');         // 축구공
   const kickImg = getImage('kickfx');       // 슛 충격 연출
   const roll = makeRoller();                // 공 굴림 각도 (그리기 전용)
@@ -264,10 +269,19 @@ export function createRenderer(canvas){
       const fwp = Math.round(dw * RS), fhp = Math.round(dh * RS);
       // 미리 줄여둔 시트가 있으면 **1:1 로 찍는다**(축소 계산이 매 프레임 사라진다).
       // 없으면(검사 환경 등) 예전처럼 원본을 줄여 그린다
-      const pre = sheetAt(meleeSrc, MELEE_FW, MELEE_FH, fwp, fhp);
-      if (pre) ctx.drawImage(pre, fc * fwp, col * fhp, fwp, fhp, dxp, dyp, fwp, fhp);
-      else ctx.drawImage(meleeSrc, fc * MELEE_FW, col * MELEE_FH, MELEE_FW, MELEE_FH,
-        dxp, dyp, fwp, fhp);
+      // [stated] **스킨을 장착하면 그 모습으로 싸운다.** 칸이 기본보다 넓으므로 그릴 크기도
+      // 그 비율만큼 넓힌다 — 몸통은 같게 맞춰 뒀으니 캐릭터가 커지지 않는다
+      const msk = skin | 0;
+      if (msk > 0 && isReady(melSkinImg) && msk <= 5){
+        const mw = fwp * MSK_FW / MELEE_FW, mh = fhp * MSK_FH / MELEE_FH;
+        ctx.drawImage(melSkinImg, fc * MSK_FW, (msk - 1) * MSK_FH, MSK_FW, MSK_FH,
+          dxp - (mw - fwp) / 2, dyp - (mh - fhp), mw, mh);
+      } else {
+        const pre = sheetAt(meleeSrc, MELEE_FW, MELEE_FH, fwp, fhp);
+        if (pre) ctx.drawImage(pre, fc * fwp, col * fhp, fwp, fhp, dxp, dyp, fwp, fhp);
+        else ctx.drawImage(meleeSrc, fc * MELEE_FW, col * MELEE_FH, MELEE_FW, MELEE_FH,
+          dxp, dyp, fwp, fhp);
+      }
       // 방패를 든 동안: 바라보는 쪽에 빛나는 호를 그린다 (시트에 방패 프레임이 없다)
       if (p.shield > 0){
         const cx = xw + ARENA.pw / 2, cy = yw + ARENA.ph / 2;
@@ -305,7 +319,19 @@ export function createRenderer(canvas){
       // 월드 정수px가 아니라 디바이스 픽셀 단위로 반올림해야 계단이 안 생긴다
       // 2대2는 칸이 작아 캐릭터를 줄여 그린다. 원본 칸은 그대로 두고 그릴 크기만 바꾼다
       const dw = ARENA.pw * RS, dh = ARENA.ph * RS;
-      ctx.drawImage(sheet, idx*FW, 0, FW, FH, Math.round(xw*RS), Math.round(yw*RS), dw, dh);
+      // [stated] **스킨을 장착하면 그 모습으로 싸운다.** 스킨 칸은 기본(42x48)보다 넓은 80x60 이라
+      // 그릴 크기도 그 비율만큼 넓힌다 — **몸통 크기는 같게 맞춰 뒀으므로** 캐릭터가 커지지 않는다.
+      // 넘치는 만큼은 좌우·위로 고르게 나눠 캐릭터 자리가 안 밀리게 한다
+      const gsk = skin | 0;
+      if (gsk > 0 && isReady(gunSkinImg) && gsk <= 5){
+        const gw = dw * GUN_FW / FW, gh = dh * GUN_FH / FH;
+        const gi = (hit ? 2 : 0) + (mineSide ? 1 : 0);
+        ctx.drawImage(gunSkinImg, gi*GUN_FW, (gsk-1)*GUN_FH, GUN_FW, GUN_FH,
+          Math.round(xw*RS - (gw - dw)/2), Math.round(yw*RS - (gh - dh)),
+          Math.round(gw), Math.round(gh));
+      } else {
+        ctx.drawImage(sheet, idx*FW, 0, FW, FH, Math.round(xw*RS), Math.round(yw*RS), dw, dh);
+      }
     }
     if (hit) drawBurst(xw, yw, (colorOf && colorOf[i] != null) ? colorOf[i] : TEAM_OF[i], 1 - p.flash / FLASH_T);
     if (off) ctx.globalAlpha = 1;   // **반드시 되돌린다.** 안 그러면 뒤에 그려지는 게 전부 흐려진다

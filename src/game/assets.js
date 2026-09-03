@@ -13,6 +13,11 @@ export const ASSET_SRC = {
   // 줄 = 스킨 번호(0 맨유 / 1 레알 / 2 맨시티 / 3 바르셀로나 / 4 첼시).
   // 칸마다 세로 길이·아래 여백·긴 쪽 길이를 기본 시트에서 재서 맞췄다 — **크기가 달라지면 안 된다**
   socskin:    'assets/soccer-skins.webp',
+  // [stated] 총격전 스킨. 칸 80x60 (기본 42x48 보다 넓다 — 날개·후광·피격 효과 때문).
+  // 몸통 크기는 기본과 같게 맞췄다. 줄 = 스킨 번호
+  gunskin:    'assets/gun-skins.webp',
+  // [stated] 칼전 스킨. 칸 270x108 (기본 242x99 보다 넓다 — 칼빛·날개 때문)
+  melskin:    'assets/melee-skins.webp',
   melee:      'assets/melee.webp',    // 칼전 캐릭터 4색 x 4자세
   characters: 'assets/characters.png',
   items:      'assets/items.webp',
@@ -86,8 +91,10 @@ export function warmUp(keys){
 export function keysFor({ melee, soccer, n = 2 } = {}){
   const arena = soccer ? 'arena4' : (melee ? 'arena3' : (n > 2 ? 'arena2' : 'arena'));
   const who = soccer ? 'soccer' : (melee ? 'melee' : 'characters');
+  // 칼전이면 칼전 스킨, 총격전이면 총격전 스킨을 같이 받는다
+  const sk = melee ? 'melskin' : 'gunskin';
   return soccer
     ? [arena, who, 'socskin', 'ball', 'kickfx']
-    : [arena, who, 'items', 'explosion', 'fire', 'flash', 'flashfx',
+    : [arena, who, sk, 'items', 'explosion', 'fire', 'flash', 'flashfx',
        'grenade', 'molotov', 'portal'];
 }
