@@ -9,6 +9,7 @@
 // [stated] 상품은 아래로 쌓지 않고 **옆으로 넘겨서** 본다 — 한 칸이 커졌기 때문
 import { useState, useEffect, useRef } from 'react';
 import { setInnerBack } from '../../state/back.js';
+import { DEBUG_TRY_SKIN, tryOf, setTry } from '../../state/tryskin.js';
 import { SOCCER_SKINS, SOCCER_SET, PREV_IMG, PREV_FW, PREV_FH, PREV_COLS, PREV_ROWS_N,
   PREV_LINES, GUN_SKINS, GUN_SET, GUN_PREV_IMG, GUN_PREV_FW, GUN_PREV_FH, GUN_PREV_COLS,
   GUN_PREV_ROWS_N, GUN_PREV_LINES, MELEE_SKINS, MELEE_SET, MEL_PREV_IMG, MEL_PREV_FW,
@@ -21,14 +22,15 @@ import { SOCCER_SKINS, SOCCER_SET, PREV_IMG, PREV_FW, PREV_FH, PREV_COLS, PREV_R
 // `chH`/`chW` 는 시트 안 캐릭터의 실제 크기, `pad` 는 양옆에 남길 여백(시트 px)
 const SHEETS = {
   soccer: { img: PREV_IMG, fw: PREV_FW, fh: PREV_FH, cols: PREV_COLS, rows: PREV_ROWS_N,
-            lines: PREV_LINES, chH: 150, chW: 85, pad: 22 },
+            lines: PREV_LINES, chH: 150, chW: 85, chY: 26, pad: 18 },
   gun:    { img: GUN_PREV_IMG, fw: GUN_PREV_FW, fh: GUN_PREV_FH, cols: GUN_PREV_COLS,
-            rows: GUN_PREV_ROWS_N, lines: GUN_PREV_LINES, chH: 144, chW: 139, pad: 22 },
+            rows: GUN_PREV_ROWS_N, lines: GUN_PREV_LINES, chH: 144, chW: 139, chY: 38, pad: 18 },
   melee:  { img: MEL_PREV_IMG, fw: MEL_PREV_FW, fh: MEL_PREV_FH, cols: MEL_PREV_COLS,
-            rows: MEL_PREV_ROWS_N, lines: MEL_PREV_LINES, chH: 170, chW: 165, pad: 22 }
+            rows: MEL_PREV_ROWS_N, lines: MEL_PREV_LINES, chH: 171, chW: 166, chY: 21, pad: 18 }
 };
 // 화면에 그릴 캐릭터 키 (px). 개별 상품과 세트를 각각 하나로 통일한다
-const H_ITEM = 88, H_SET = 74;
+// [stated] **상품이 커서 화면에 안 담긴다** (브라우저 주소창까지 있으면 더 짧다) → 줄인다
+const H_ITEM = 64, H_SET = 52;
 
 const GOODS = {
   soccer: { list: SOCCER_SKINS, set: SOCCER_SET },
@@ -45,10 +47,13 @@ export const SKIN_SUBS = ['gun', 'melee', 'soccer'];
  *  `h` 는 **화면에 그릴 캐릭터 키**. 칸 안 빈 여백(`fw - chW`)은 잘라내 자리를 아낀다 */
 function view(sh, h){
   const k = h / sh.chH;                       // 시트 → 화면 배율
-  const cw = sh.chW + sh.pad;                 // 잘라 쓸 폭 (시트 px)
+  const cw = sh.chW + sh.pad;                 // 잘라 쓸 가로 (시트 px)
+  const ch = sh.chH + sh.pad;                 // [stated] **세로도 잘라 쓴다** — 칸마다 캐릭터
+  // 위 여백이 달라서(축구 26 / 총격전 38 / 칼전 21) 종목마다 박스 높이가 달라 보였다
   return {
-    k, w: Math.round(cw * k), hpx: Math.round(sh.fh * k),
-    off: (sh.fw - cw) / 2,                    // 칸 안에서 잘라내기 시작하는 자리
+    k, w: Math.round(cw * k), hpx: Math.round(ch * k),
+    offX: (sh.fw - cw) / 2,
+    offY: sh.chY - sh.pad / 2,                // 캐릭터 위쪽부터 조금 여유를 두고 자른다
     bg: `${Math.round(sh.fw * sh.cols * k)}px ${Math.round(sh.fh * sh.rows * k)}px`
   };
 }
@@ -58,9 +63,10 @@ function cellStyle(sh, v, row, col){
     backgroundImage: `url(${sh.img})`,
     backgroundSize: v.bg,
     backgroundPosition:
-      `-${Math.round((col * sh.fw + v.off) * v.k)}px -${Math.round(row * sh.fh * v.k)}px`
+      `-${Math.round((col * sh.fw + v.offX) * v.k)}px -${Math.round((row * sh.fh + v.offY) * v.k)}px`
   };
 }
+
 function SkinPreview({ sh, row, h }){
   const v = view(sh, h);
   return (
@@ -84,6 +90,8 @@ export default function Shop({ onBack }){
   const [sub, setSub] = useState('gun');
   // [stated] 몇 번째인지 보이게 **점 다섯 개**, 그리고 **양옆 화살표**로도 넘긴다
   const [at, setAt] = useState(0);
+  // [stated] 디버그: 실제 필드에서 입어볼 수 있게. 출시 전 `DEBUG_TRY_SKIN` 을 false 로
+  const [worn, setWorn] = useState(0);
   const swipe = useRef(null);
   const goTo = i => {
     const el = swipe.current;
@@ -104,6 +112,7 @@ export default function Shop({ onBack }){
   const subLabel = {
     gun: t('shop.sub.gun'), melee: t('shop.sub.melee'), soccer: t('shop.sub.soccer')
   };
+  void worn;   // 눌렀을 때 다시 그리려고 둔다
   const skinName = {
     'skin.no1': t('skin.no1'), 'skin.no2': t('skin.no2'), 'skin.no3': t('skin.no3'),
     'skin.no4': t('skin.no4'), 'skin.no5': t('skin.no5'), 'skin.set': t('skin.set')
@@ -155,7 +164,14 @@ export default function Shop({ onBack }){
                   <div className="shop-card-foot">
                     <span className="nm">{skinName[s2.key]}</span>
                     <span className="pr">{s2.price.toLocaleString()}원</span>
-                    <button className="shop-btn" disabled>{t('shop.soon')}</button>
+                    {DEBUG_TRY_SKIN ? (
+                      <button className={'shop-btn' + (tryOf(sub) === s2.id ? ' on' : '')}
+                              onClick={() => setWorn(setTry(sub, s2.id))}>
+                        {tryOf(sub) === s2.id ? t('shop.wearing') : t('shop.wear')}
+                      </button>
+                    ) : (
+                      <button className="shop-btn" disabled>{t('shop.soon')}</button>
+                    )}
                   </div>
                 </div>
               </div>

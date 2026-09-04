@@ -940,7 +940,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
    화살표 14px + 좌우 여백 2px 씩 → 한쪽 18px, 양쪽 36px 만 비우면 된다.
    좁은 폰(360px)에서 상자 안쪽 = 360 - 36 - 16 = 308px 로 미리보기 4칸(296)이 넉넉히 들어간다 */
 .shop-card-in{width:calc(100% - 36px);display:flex;flex-direction:column;align-items:center;
-  gap:12px;padding:18px 8px 14px;
+  gap:8px;padding:10px 8px 8px;
   border:1px solid rgba(110,170,220,.42);border-radius:4px;background:rgba(8,16,28,.35)}
 .skin-prev{display:flex;flex-direction:column;align-items:center;gap:2px}
 /* [stated] 칸끼리 너무 붙어 보인다 → 사이를 조금 벌린다.
@@ -968,17 +968,17 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .shop-arrow:disabled{opacity:.25}
 
 /* [stated] 몇 번째인지 점 다섯 개 */
-.shop-dots{display:flex;justify-content:center;gap:8px;padding:10px 0 4px}
+.shop-dots{display:flex;justify-content:center;gap:8px;padding:6px 0 2px}
 .shop-dots i{width:7px;height:7px;border-radius:50%;background:#3c4a60;cursor:pointer}
 .shop-dots i.on{background:#8fd0ff}
 
 /* [stated] 5종 세트 — 개별 상품 아래 빈 공간을 채운다. 넘기지 않으므로 화살표·점이 없다 */
 /* [stated] 세트 상자를 **조금 더 아래로**, 캐릭터는 **키우고**,
    윗줄 두 명은 **양옆으로 벌린다**(가운데가 비어 보이던 것) */
-.shop-set{width:100%;display:flex;justify-content:center;padding:16px 0 8px}
-.shop-set .shop-card-in{width:calc(100% - 36px);padding:14px 8px 10px;gap:8px}
+.shop-set{width:100%;display:flex;justify-content:center;padding:8px 0 4px}
+.shop-set .shop-card-in{width:calc(100% - 36px);padding:10px 8px 8px;gap:6px}
 .shop-set .skin-line{gap:12px}
 /* 첫 줄은 둘뿐이라 붙어 보인다 → 조금만 벌린다.
    [stated] 64px 은 **너무 넓었다** — 아랫줄 3명과 폭이 안 맞아 보인다 */
-.shop-set .skin-line:first-child{gap:22px}
+.shop-set .skin-line:first-child{gap:18px}
 .shop-empty{text-align:center;color:#7f8ea6;padding:24px 0}

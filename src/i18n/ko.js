@@ -259,6 +259,8 @@ export default {
   'shop.own': '보유',
   'shop.equip': '장착',
   'shop.equipped': '장착 중',
+  'shop.wear': '입어보기',
+  'shop.wearing': '입는 중',
   'shop.soon': '준비 중',
   'shop.title': '상점',
   'shop.tab.arena': '아레나',

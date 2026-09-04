@@ -11,6 +11,7 @@ import { makeRoller, BALL_R, GOAL_SEQ, GOAL_HOLD, GOAL_SCORE, KICK_FX_TICKS } fr
 import { RS, computeLayout, stickGeom, shieldBtn, tackleBtn } from './layout.js';
 import { resultFor } from './ui-state.js';
 import { GUN_FW, GUN_FH, MSK_FW, MSK_FH } from './skins.js';
+import { tryForArena } from '../state/tryskin.js';
 import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
 import { t, getLang } from '../i18n/index.js';
@@ -1166,9 +1167,13 @@ export function createRenderer(canvas){
       px(b.x/FP, fy((b.y + b.vy * a)/FP, 5), 2, 5, TEAMS[viewOf(s)[b.o]].m);
     // 렌더 위치 배열은 첫 예측이 끝나야 생긴다. 없으면 보정 없이 확정 위치로 그린다
     const rx = cl.rx || [], ry = cl.ry || [];
-    for (let i = 0; i < s.p.length; i++)
+    for (let i = 0; i < s.p.length; i++){
+      // [stated] 디버그 **입어보기**는 내 캐릭터에만, 그리기 단계에서만 적용한다
+      // (시뮬 상태를 바꾸면 체크섬이 갈려 판이 깨진다)
+      const skinOf = (s.skin || [])[i] || (i === SELF.slot ? tryForArena(s) : 0);
       drawPlayer(s.p[i], i, rx[i], ry[i], (s.blind || [])[i] || 0, s.tick, viewOf(s), (s.off || [])[i],
-                 (s.skin || [])[i] || 0);
+                 skinOf);
+    }
     drawMiniHp(s, rx, ry);
     drawMeMark(s, rx, ry);
     drawOffline(s, rx, ry);

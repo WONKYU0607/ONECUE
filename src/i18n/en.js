@@ -259,6 +259,8 @@ export default {
   'shop.own': 'Owned',
   'shop.equip': 'Equip',
   'shop.equipped': 'Equipped',
+  'shop.wear': 'Try on',
+  'shop.wearing': 'Wearing',
   'shop.soon': 'Coming soon',
   'shop.title': 'Shop',
   'shop.tab.arena': 'Arena',

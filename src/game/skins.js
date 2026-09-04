@@ -61,7 +61,7 @@ export const GUN_SET = {
 export const GUN_FW = 80, GUN_FH = 60;
 // 상점 전용 미리보기 (원본에서 크게 다시 뽑았다)
 export const GUN_PREV_IMG = 'assets/gun-preview.webp';
-export const GUN_PREV_FW = 240, GUN_PREV_FH = 180, GUN_PREV_COLS = 4, GUN_PREV_ROWS_N = 5;
+export const GUN_PREV_FW = 240, GUN_PREV_FH = 186, GUN_PREV_COLS = 4, GUN_PREV_ROWS_N = 5;
 // [stated] 미리보기는 네 자세를 **두 줄**로 (앞·뒤 / 피격앞·피격뒤)
 export const GUN_PREV_LINES = [[0, 1], [2, 3]];
 
@@ -82,9 +82,9 @@ export const MELEE_SET = {
   grants: [1, 2, 3, 4, 5],
   lines: [[0, 1], [2, 3, 4]]
 };
-export const MSK_FW = 270, MSK_FH = 108;
+export const MSK_FW = 270, MSK_FH = 131;
 export const MEL_PREV_IMG = 'assets/melee-preview.webp';
 // 미리보기 시트에는 **대기 4자세만** 담았다 (공격은 칼빛이 커서 뺐다) → 4칸
-export const MEL_PREV_FW = 300, MEL_PREV_FH = 190, MEL_PREV_COLS = 4, MEL_PREV_ROWS_N = 5;
+export const MEL_PREV_FW = 300, MEL_PREV_FH = 220, MEL_PREV_COLS = 4, MEL_PREV_ROWS_N = 5;
 // [stated] 4칸을 한 줄에 놓으면 좁은 폰에서 넘친다(418 > 308) → **2칸씩 두 줄**
 export const MEL_PREV_LINES = [[0, 1], [2, 3]];
