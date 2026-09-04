@@ -212,7 +212,9 @@ export function createRenderer(canvas){
       const sideways = face === 2 || face === 3;
       const mirror = face === 3;
       const fc = (p.stun | 0) > 0 ? SOC_FALL
-               : ((p.tkl | 0) > 0 ? (sideways ? 10 : SOC_TACKLE[face])
+               // [stated] **좌우로 태클해도 같은 모션이 나갔다** — 옆으로 갈 때 늘 10(좌태클)만 썼다.
+               // 보는 방향에 맞춰 좌 10 / 우 11 로 가른다
+               : ((p.tkl | 0) > 0 ? (sideways ? (face === 3 ? 11 : 10) : SOC_TACKLE[face])
                                   : (sideways ? (run ? 6 : 2) : SOC_STAND[face] + (run ? 4 : 0)));
       // **칸이 아니라 몸 높이(44)를 기준**으로 배율을 잡는다.
       // 칸 기준으로 잡으면 칸을 넓힐 때마다 캐릭터가 같이 작아진다

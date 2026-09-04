@@ -17,18 +17,19 @@ import { SOCCER_SKINS, SOCCER_SET, PREV_IMG, PREV_FW, PREV_FH, PREV_COLS, PREV_R
 
 // 종목마다 미리보기 시트가 다르다. 한 곳에 모아 두고 하위 탭으로 고른다.
 //
-// [stated] **자르는 범위는 모든 칸의 최대치로 잡는다** — 첫 칸(대기)만 보고 잘랐더니
+// [stated] **자르는 범위는 가로·세로 모두 모든 칸의 최대치로 잡는다**
+// (가로를 첫 칸 기준으로 뒀다가 총격전 피격 효과가 90px 잘렸다) — 첫 칸(대기)만 보고 잘랐더니
 // 피격 자세의 날개·반짝임이 위에서 잘렸다(총격전은 첫 칸 22px 위까지 올라간다).
 // [stated] **칸 폭으로 맞추면 안 된다** — 시트마다 칸 안에서 캐릭터가 차지하는 비율이 달라
 // 축구 세트가 개별보다 커 보였다(95px vs 84px). **캐릭터 키를 기준**으로 맞춘다.
 // `chH`/`chW` 는 시트 안 캐릭터의 실제 크기, `pad` 는 양옆에 남길 여백(시트 px)
 const SHEETS = {
   soccer: { img: PREV_IMG, fw: PREV_FW, fh: PREV_FH, cols: PREV_COLS, rows: PREV_ROWS_N,
-            lines: PREV_LINES, chH: 150, chW: 85, chY: 26, pad: 18 },
+            lines: PREV_LINES, chH: 150, chW: 103, chY: 26, pad: 14 },
   gun:    { img: GUN_PREV_IMG, fw: GUN_PREV_FW, fh: GUN_PREV_FH, cols: GUN_PREV_COLS,
-            rows: GUN_PREV_ROWS_N, lines: GUN_PREV_LINES, chH: 162, chW: 139, chY: 22, pad: 18 },
+            rows: GUN_PREV_ROWS_N, lines: GUN_PREV_LINES, chH: 162, chW: 229, chY: 22, pad: 6 },
   melee:  { img: MEL_PREV_IMG, fw: MEL_PREV_FW, fh: MEL_PREV_FH, cols: MEL_PREV_COLS,
-            rows: MEL_PREV_ROWS_N, lines: MEL_PREV_LINES, chH: 176, chW: 166, chY: 17, pad: 18 }
+            rows: MEL_PREV_ROWS_N, lines: MEL_PREV_LINES, chH: 176, chW: 222, chY: 17, pad: 6 }
 };
 // 화면에 그릴 캐릭터 키 (px). 개별 상품과 세트를 각각 하나로 통일한다
 // [stated] **상품이 커서 화면에 안 담긴다** (브라우저 주소창까지 있으면 더 짧다) → 줄인다

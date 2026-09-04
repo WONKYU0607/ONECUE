@@ -120,7 +120,10 @@ export default function App(){
       // **화면 안에 단계가 있으면 거기부터 돌아간다** (PVP 색 고르기 → 모드 고르기 → 홈).
       // 이걸 안 물어보면 어느 단계에 있든 통째로 홈으로 나가버린다
       if (tryInnerBack()) return true;
-      if (screen === 'result' || screen === 'ai' || screen === 'practice' || screen === 'pvp'){
+      // [stated] **하단바 뒤로가기는 말 안 해도 넣어야 하는 기본**이다.
+      // 새 화면을 만들 때 여기 목록에 넣지 않으면 앱이 그냥 닫힌다
+      if (screen === 'result' || screen === 'ai' || screen === 'practice' || screen === 'pvp'
+          || screen === 'shop'){
         goHome(); return true;
       }
       // [stated] 홈에서도 **종료 확인 창**이 떠야 한다.
