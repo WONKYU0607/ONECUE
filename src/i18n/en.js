@@ -262,6 +262,8 @@ export default {
   'shop.wear': 'Try on',
   'shop.wearing': 'Wearing',
   'shop.soon': 'Coming soon',
+  'cost.title': 'Costume',
+  'cost.none': 'Default',
   'shop.title': 'Shop',
   'shop.tab.arena': 'Arena',
   'shop.tab.skin': 'Skins',

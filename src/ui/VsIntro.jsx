@@ -9,6 +9,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TEAMS } from '../game/config.js';
 import { getColor } from '../state/profile.js';
 import { t } from '../i18n/index.js';
+import { tryOf } from '../state/tryskin.js';
 import { getVsOffset } from '../state/vslayout.js';
 import { sfx } from '../game/audio.js';
 
@@ -25,16 +26,28 @@ const SHOW_MS = 3000;
 // 좌우 빈 공간까지 자리를 먹어 **글자와의 간격이 총격전보다 훨씬 벌어졌다**.
 // `ax`·`aw` = 칸 안에서 그림이 실제로 있는 가로 시작·폭 (실측)
 // **칼전 시트는 절반으로 줄였다** — 칸도 242x99 다 (예전 484x198)
+// [stated] **스킨을 입었으면 VS 화면에도 입혀야 한다.**
+// 자리·크기는 그대로 두고 **그림만** 스킨 시트에서 가져온다.
+// 스킨 시트는 줄이 스킨 번호이고, 대기 자세 칸이 종목마다 다르다
+const SKIN_SHEET = {
+  soccer: { src: 'assets/soccer-skins.webp', cw: 80,  ch: 52,  cols: 13, rows: 5, still: 0, ax: 24, aw: 32 },
+  melee:  { src: 'assets/melee-skins.webp',  cw: 270, ch: 131, cols: 8,  rows: 5, still: 0, ax: 84, aw: 102 },
+  gun:    { src: 'assets/gun-skins.webp',    cw: 80,  ch: 60,  cols: 4,  rows: 5, still: 0, ax: 19, aw: 42 }
+};
+
 const SHEET = {
   soccer: { src: 'assets/soccer-chars.webp', cw: 80,  ch: 52, cols: 13, rows: 6, col: () => 0,    row: c => c, ax: 24, aw: 32 },
   melee:  { src: 'assets/melee.webp',        cw: 242, ch: 99, cols: 8,  rows: 6, col: () => 0,    row: c => c, ax: 70, aw: 102 },
   gun:    { src: 'assets/characters.png',    cw: 42,  ch: 48, cols: 24, rows: 1, col: c => c * 2, row: () => 0, ax: 0,  aw: 42 }
 };
 
-function Portrait({ kind, color, zoom = 1 }){
-  const sh = SHEET[kind] || SHEET.gun;
+function Portrait({ kind, color, zoom = 1, skin = 0 }){
+  // 스킨이 있으면 스킨 시트를 쓴다 (자리·크기는 그대로)
+  const sk = skin | 0;
+  const ss = sk > 0 ? SKIN_SHEET[kind] : null;
+  const sh = ss || SHEET[kind] || SHEET.gun;
   const ci = Math.max(0, color | 0);
-  const cx = sh.col(ci), cy = sh.row(ci);
+  const cx = ss ? ss.still : sh.col(ci), cy = ss ? sk - 1 : sh.row(ci);
   // 칸 높이를 이 크기에 맞춘다. **가로·세로 배율을 따로 주면 안 된다** — 찌그러진다
   const k = 92 * zoom / sh.ch;
   return (
@@ -231,9 +244,11 @@ export default function VsIntro({ vs, mySlot, onDone }){
     const w = rec ? (rec.w | 0) : 0, l = rec ? (rec.l | 0) : 0;
     const played = w + l;
     const color = r.slot === mySlot ? getColor() : (r.slot % 6);
+    // [stated] **입어보기 중이면 VS 화면에도 그 스킨으로.** 내 자리에만 (그리기 단계 처리와 같다)
+    const skin = r.slot === mySlot ? tryOf(kind) : 0;
     return (
       <div key={r.slot} className="vs-row" style={{ fontSize: Math.round(100 * zoom) + '%' }}>
-        <Portrait kind={kind} color={color} zoom={zoom} />
+        <Portrait kind={kind} color={color} zoom={zoom} skin={skin} />
         <span className="vs-info">
           <b className="vs-nick">{r.nick || (r.bot ? 'AI' : '-')}</b>
           <span className="vs-score">

@@ -4,7 +4,7 @@ import RankCards from '../RankCards.jsx';
 import InviteBanner from '../InviteBanner.jsx';
 import { t } from '../../i18n/index.js';
 
-export default function Home({ onPvp, onAi, onPractice, onSettings, onRanks, onJoin, onFriends, onShop }){
+export default function Home({ onPvp, onAi, onPractice, onSettings, onRanks, onJoin, onFriends, onShop, onCostume }){
   return (
     <div className="screen home">
 
@@ -12,6 +12,9 @@ export default function Home({ onPvp, onAi, onPractice, onSettings, onRanks, onJ
 
       {/* [stated] 상단바 **바로 밑에** 순위표 두 칸 */}
       <RankCards onOpen={onRanks} />
+
+      {/* [stated] **순위표 밑에 코스튬 칸.** 겉모습(색·스킨)을 한곳에서 고른다 */}
+      <button className="cost-entry" onClick={onCostume}>{t('cost.title')}</button>
 
       {/* 받은 방 초대 — 홈에는 소켓이 없어서 문서를 주기적으로 본다 */}
       <InviteBanner onJoin={onJoin} />

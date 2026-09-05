@@ -8,6 +8,7 @@ import RankBoard from './ui/screens/RankBoard.jsx';
 import Login from './ui/screens/Login.jsx';
 import Friends from './ui/screens/Friends.jsx';
 import Shop from './ui/screens/Shop.jsx';
+import Costume from './ui/screens/Costume.jsx';
 import QuickMatch from './ui/screens/QuickMatch.jsx';
 import RoomEnter from './ui/screens/RoomEnter.jsx';
 import Result from './ui/screens/Result.jsx';
@@ -123,7 +124,7 @@ export default function App(){
       // [stated] **하단바 뒤로가기는 말 안 해도 넣어야 하는 기본**이다.
       // 새 화면을 만들 때 여기 목록에 넣지 않으면 앱이 그냥 닫힌다
       if (screen === 'result' || screen === 'ai' || screen === 'practice' || screen === 'pvp'
-          || screen === 'shop'){
+          || screen === 'shop' || screen === 'costume'){
         goHome(); return true;
       }
       // [stated] 홈에서도 **종료 확인 창**이 떠야 한다.
@@ -158,7 +159,6 @@ export default function App(){
     setSession({ kind: 'melee', n, ffa });
     setScreen('game');
   }, []);
-  // [stated] **칼전 AI 도 단계별로.** 총격전과 같은 흐름 — 단계가 난이도를 정한다
   // [stated] **튜토리얼** — 총격전만. 실제 판을 돌리며 단계별로 안내한다
   const startTuto = useCallback(() => {
     disconnect();
@@ -172,15 +172,11 @@ export default function App(){
     setSession({ kind: 'ai', stage: 1, n: 2, tuto: true });
     setScreen('game');
   }, []);
-  const startMeleeAi = useCallback((n = 2, stage = 1) => {
-    disconnect();
-    setResult(null);
-    warm({ melee: true, n });
-    setSession({ kind: 'ai', melee: true, stage, n });
-    setScreen('game');
-  }, []);
   const startAi   = useCallback((stage, n = 2) => {
     SELF.slot = 0;                       // AI전은 항상 내가 아래쪽
+    // [stated] 그림을 미리 받아 둔다 — 안 하면 판이 열릴 때 한 박자 멈춘다.
+    // 칼전 AI 를 없애면서 그쪽에 있던 준비 호출이 같이 사라져 여기에 남긴다
+    warm({ melee: false, n });
     setSession({ kind: 'ai', stage, n });
     setScreen('game');
   }, []);
@@ -203,7 +199,11 @@ export default function App(){
   const onFinish  = useCallback((r, summary, host) => {
     // **PVP만 점수를 매긴다.** AI·연습은 연습이므로 기록하지 않는다
     let sc = null;
-    if (session?.kind === 'pvp' && summary?.state && summary.state.soccer){
+    // [stated] **축구를 이겼는데 총격전 점수가 올랐다.** 여기서 `summary.state.soccer` 만 봤는데
+    // 그 값이 비면 아래 총격전 갈래로 새어 나간다.
+    // `session.soccer` 는 결과 화면도 쓰는 확실한 값이라 **둘 중 하나만 켜져 있어도 축구**로 본다
+    const isSoccer = !!(summary?.state?.soccer || session?.soccer);
+    if (session?.kind === 'pvp' && summary?.state && isSoccer){
       // [stated] **축구는 점수 계산이 다르다** — 이기면 골x100x연승, 지면 골x50.
       // 순위표·티어 없이 0점에서 시작하고 1대1·2대2 구분도 없다
       const st = summary.state;
@@ -295,11 +295,13 @@ export default function App(){
                                      onRanks={k => { setRankKind(k); setScreen('ranks'); }}
                                      onJoin={beginPvp}
                                      onFriends={() => setScreen('friends')}
-                                     onShop={() => setScreen('shop')} />}
+                                     onShop={() => setScreen('shop')}
+                                     onCostume={() => setScreen('costume')} />}
       {screen === 'ranks'    && <RankBoard kind={rankKind} onBack={goHome} />}
       {screen === 'friends'  && <Friends onBack={goHome} />}
       {screen === 'shop'     && <Shop onBack={goHome} />}
-      {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} onMelee={startMeleeAi} />}
+      {screen === 'costume'  && <Costume onBack={goHome} />}
+      {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} />}
       {screen === 'practice' && <PracticeMenu onBack={goHome} onStart={startPractice} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {/* [stated] **빠른 매칭과 방은 길이 다르다.** 한 화면에서 갈래를 나누다 계속 샜다 */}

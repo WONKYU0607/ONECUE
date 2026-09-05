@@ -140,7 +140,13 @@ export default function Shop({ onBack }){
         <div className="shop-tabs sub">
           {SKIN_SUBS.map(k => (
             <button key={k} className={'shop-btn' + (sub === k ? ' on' : '')}
-                    onClick={() => { setSub(k); setAt(0); }}>{subLabel[k]}</button>
+                    onClick={() => {
+                      // [stated] **탭을 옮기면 늘 첫 상품부터.** `at` 만 0 으로 두면
+                      // 화면은 그대로라 3번을 보다 넘어가면 3번이 나왔다 — 실제로 되감아야 한다
+                      setSub(k); setAt(0);
+                      const el = swipe.current;
+                      if (el) el.scrollTo({ left: 0, behavior: 'auto' });
+                    }}>{subLabel[k]}</button>
           ))}
         </div>
       )}

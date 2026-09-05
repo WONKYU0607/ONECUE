@@ -115,17 +115,7 @@ export default function ProfileTab({ onClose, onFriends }){
         {edit && <p className="hint nick-hint">영문 {NICK_MAX}자 · 한글 {NICK_MAX_KO}자까지</p>}
         {nickMsg && <p className="hint nick-hint">{nickMsg}</p>}
 
-        {/* [stated] 여기서 고른 색으로 **항상** 들어간다 (판마다 안 고른다) */}
-        <div className="prof-card prof-colors">
-          <span className="prof-clabel">{t('prof.color')}</span>
-          <div className="cgrid">
-            {[0, 1, 2, 3, 4, 5].map(c => (
-              <button key={c} className={'cdot c' + c + (c === color ? ' on' : '')}
-                      onClick={() => setC(setColor(c))}
-                      aria-label={t('prof.color') + ' ' + (c + 1)} />
-            ))}
-          </div>
-        </div>
+        {/* [stated] **기본 색 고르기는 코스튬으로 옮겼다** — 겉모습은 한곳에 모은다 */}
 
         {/* [stated] 총격전·칼전 점수 줄 **밑에 각각 한 줄씩** 순위를 붙인다 */}
         <div className="prof-rows">

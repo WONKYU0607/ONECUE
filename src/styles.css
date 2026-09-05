@@ -927,9 +927,12 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   display:flex;flex-direction:column}
 /* [stated] 점 다섯 개가 **상자 바로 밑**에 와야 한다 — 예전엔 남은 높이를 다 차지해
    점이 화면 맨 아래로 밀려 있었다 → 높이를 내용만큼만 쓴다 */
+/* [stated] 점 다섯 개로 충분하니 **스크롤 막대는 숨긴다** */
 .shop-swipe{width:100%;flex:0 0 auto;min-width:0;display:flex;
   overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;
-  -webkit-overflow-scrolling:touch}
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;-ms-overflow-style:none}
+.shop-swipe::-webkit-scrollbar{display:none;width:0;height:0}
 /* [stated] 한 상품을 묶는 **얇은 테두리 하나**. 예전 두꺼운 상자와 달리 선만 두른다 */
 /* [stated] **상품을 위로 당긴다** — 가운데 정렬이라 탭 아래가 3분의 1이나 비어 있었다 */
 .shop-card{flex:0 0 100%;min-width:0;scroll-snap-align:center;
@@ -982,3 +985,23 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
    [stated] 64px 은 **너무 넓었다** — 아랫줄 3명과 폭이 안 맞아 보인다 */
 .shop-set .skin-line:first-child{gap:18px}
 .shop-empty{text-align:center;color:#7f8ea6;padding:24px 0}
+
+/* ── 코스튬 ───────────────────────────────────────────────────
+   [stated] 보유한 스킨을 보고 자유롭게 장착한다. 색 고르기도 여기로 옮겼다 */
+.cost-entry{width:calc(100% - 16px);margin:6px 8px 2px;padding:8px 0;
+  font:900 15px/1 var(--gf);color:#cfe4ff;background:rgba(20,34,52,.9);
+  border:1px solid rgba(90,140,190,.5);border-radius:3px;cursor:pointer}
+.screen.list.cost{align-items:stretch;overflow-y:auto}
+.cost-sec{width:100%;min-width:0;padding:6px 10px 10px}
+.cost-h{display:block;font:900 13px/1 var(--gf);color:#9fb0c8;padding-bottom:6px}
+/* 한 줄에 다 못 넣으니 옆으로 넘긴다 */
+.cost-row{display:flex;gap:6px;min-width:0;overflow-x:auto;
+  scrollbar-width:none;-ms-overflow-style:none}
+.cost-row::-webkit-scrollbar{display:none;width:0;height:0}
+.cost-item{flex:0 0 auto;min-width:0;display:flex;align-items:center;justify-content:center;
+  padding:4px;background:rgba(8,16,28,.5);border:1px solid rgba(90,140,190,.35);
+  border-radius:3px;cursor:pointer}
+.cost-item.on{border-color:#8fd0ff;background:rgba(40,110,180,.35)}
+.cost-item.lock{opacity:.35}
+.cost-item i{display:block}
+.cost-none{font:900 12px/1 var(--gf);color:#cfe4ff;padding:0 10px}

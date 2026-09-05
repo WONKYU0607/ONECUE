@@ -262,6 +262,8 @@ export default {
   'shop.wear': '입어보기',
   'shop.wearing': '입는 중',
   'shop.soon': '준비 중',
+  'cost.title': '코스튬',
+  'cost.none': '기본',
   'shop.title': '상점',
   'shop.tab.arena': '아레나',
   'shop.tab.skin': '스킨',
