@@ -29,16 +29,23 @@ const SHOW_MS = 3000;
 // [stated] **스킨을 입었으면 VS 화면에도 입혀야 한다.**
 // 자리·크기는 그대로 두고 **그림만** 스킨 시트에서 가져온다.
 // 스킨 시트는 줄이 스킨 번호이고, 대기 자세 칸이 종목마다 다르다
+// [stated] **기본과 스킨 크기가 달랐다** — 배율을 `92 / 칸 높이` 로 잡았는데
+// 스킨 칸이 더 높아서 캐릭터가 작아졌다(총격 92 → 73.6, 칼전 80.8 → 61.8).
+// → **몸통 높이(`bh`)를 기준**으로 잡는다. 시트에서 잰 값:
+//   총격 기본 48 / 스킨 48, 칼전 기본 87 / 스킨 88, 축구 기본 45 / 스킨 48
+// `tgt` 는 기본이 화면에서 차지하던 몸통 크기 — 여기에 맞춘다
 const SKIN_SHEET = {
-  soccer: { src: 'assets/soccer-skins.webp', cw: 80,  ch: 52,  cols: 13, rows: 5, still: 0, ax: 24, aw: 32 },
-  melee:  { src: 'assets/melee-skins.webp',  cw: 270, ch: 131, cols: 8,  rows: 5, still: 0, ax: 84, aw: 102 },
-  gun:    { src: 'assets/gun-skins.webp',    cw: 80,  ch: 60,  cols: 4,  rows: 5, still: 0, ax: 19, aw: 42 }
+  soccer: { src: 'assets/soccer-skins.webp', cw: 80,  ch: 52,  cols: 13, rows: 5, still: 0, ax: 23, aw: 34, bh: 48 },
+  melee:  { src: 'assets/melee-skins.webp',  cw: 270, ch: 131, cols: 8,  rows: 5, still: 0, ax: 92, aw: 97, bh: 88 },
+  gun:    { src: 'assets/gun-skins.webp',    cw: 80,  ch: 60,  cols: 4,  rows: 5, still: 0, ax: 15, aw: 46, bh: 48 }
 };
+// 기본 캐릭터가 화면에서 차지하던 몸통 크기 (92 x 몸통 / 칸높이)
+const TGT = { gun: 92, melee: 80.8, soccer: 79.6 };
 
 const SHEET = {
-  soccer: { src: 'assets/soccer-chars.webp', cw: 80,  ch: 52, cols: 13, rows: 6, col: () => 0,    row: c => c, ax: 24, aw: 32 },
-  melee:  { src: 'assets/melee.webp',        cw: 242, ch: 99, cols: 8,  rows: 6, col: () => 0,    row: c => c, ax: 70, aw: 102 },
-  gun:    { src: 'assets/characters.png',    cw: 42,  ch: 48, cols: 24, rows: 1, col: c => c * 2, row: () => 0, ax: 0,  aw: 42 }
+  soccer: { src: 'assets/soccer-chars.webp', cw: 80,  ch: 52, cols: 13, rows: 6, col: () => 0,    row: c => c, ax: 24, aw: 32, bh: 45 },
+  melee:  { src: 'assets/melee.webp',        cw: 242, ch: 99, cols: 8,  rows: 6, col: () => 0,    row: c => c, ax: 70, aw: 102, bh: 87 },
+  gun:    { src: 'assets/characters.png',    cw: 42,  ch: 48, cols: 24, rows: 1, col: c => c * 2, row: () => 0, ax: 0,  aw: 42, bh: 48 }
 };
 
 function Portrait({ kind, color, zoom = 1, skin = 0 }){
@@ -49,7 +56,7 @@ function Portrait({ kind, color, zoom = 1, skin = 0 }){
   const ci = Math.max(0, color | 0);
   const cx = ss ? ss.still : sh.col(ci), cy = ss ? sk - 1 : sh.row(ci);
   // 칸 높이를 이 크기에 맞춘다. **가로·세로 배율을 따로 주면 안 된다** — 찌그러진다
-  const k = 92 * zoom / sh.ch;
+  const k = (TGT[kind] || TGT.gun) * zoom / sh.bh;
   return (
     <span className="vs-por" style={{
       // **그림이 있는 만큼만** 자리를 차지한다 (칸 전체가 아니라)
