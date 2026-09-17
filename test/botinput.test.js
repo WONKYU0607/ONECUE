@@ -25,7 +25,9 @@ for (let t = 0; t < 900 && stole < 0; t++){
   const a = ai(s, t * (1000 / 60));
   // **서버가 옮기는 것과 똑같은 모양으로** 만든다 — 여기서 빠지면 실제로도 빠진다
   const q = { ...NOIN, dx: a.dx | 0, dy: a.dy | 0,
-    fire: a.fire ? 1 : 0, fch: a.fch ? 1 : 0, tkl: a.tkl ? 1 : 0, ready: 1, go: 1 };
+    fire: a.fire ? 1 : 0,
+    fch: a.fch == null ? 100 : Math.max(0, Math.min(100, a.fch | 0)),
+    tkl: a.tkl ? 1 : 0, ready: 1, go: 1 };
   step(s, [q, { ...NOIN }]);
   if (s.ballOwner !== 1) stole = t;
 }
@@ -37,4 +39,6 @@ const src = (await import('fs')).readFileSync('src/game/net.js', 'utf8');
 const blk = src.slice(src.indexOf('if (this.s.soccer){'), src.indexOf('if (this.s.soccer){') + 700);
 for (const k of ['dx', 'dy', 'fire', 'fch', 'tkl'])
   assert(new RegExp(`${k}:`).test(blk), `  ${k} 를 옮긴다`);
+// [stated] **`fch` 를 참/거짓으로 뭉개면 안 된다** — 0~100 값이라 슛 세기가 망가진다
+assert(!/fch:\s*\w+\.fch\s*\?/.test(blk), '  fch 를 참/거짓으로 뭉개지 않는다');
 console.log('botinput.test.js 통과');

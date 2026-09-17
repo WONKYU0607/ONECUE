@@ -251,8 +251,13 @@ export class Server {
           // 봇 AI 는 내고 있는데 여기서 안 실어 보내서, 봇은 공을 쫓기만 하고 영영 못 뺏었다 —
           // 사람이 공을 들고 가만히 서 있으면 **경기가 그대로 멈췄다**.
           // 봇이 내는 입력은 **하나도 빼지 말고 그대로** 옮긴다
+          // **`fch` 는 참/거짓이 아니라 0~100 값**이다 (슛 세기, 기본 100).
+          // 참/거짓으로 뭉갰더니 봇이 매 틱 0 또는 1 을 보내 슛이 약해지고 차징 상태가 계속됐다.
+          // 봇이 내는 값을 **그대로** 옮긴다
           inp[b.slot] = { ...NOIN, dx: a2.dx | 0, dy: a2.dy | 0,
-            fire: a2.fire ? 1 : 0, fch: a2.fch ? 1 : 0, tkl: a2.tkl ? 1 : 0, ready: 1, go: 1 };
+            fire: a2.fire ? 1 : 0,
+            fch: a2.fch == null ? 100 : Math.max(0, Math.min(100, a2.fch | 0)),
+            tkl: a2.tkl ? 1 : 0, ready: 1, go: 1 };
           continue;
         }
         const a = b.ai.think(this.s, b.slot, TICK_MS / 1000, this.s.tick * TICK_MS);

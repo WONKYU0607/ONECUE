@@ -279,8 +279,15 @@ export function createRenderer(canvas){
       const msk = skin | 0;
       if (msk > 0 && isReady(melSkinImg) && msk <= 5){
         const mw = fwp * MSK_FW / MELEE_FW, mh = fhp * MSK_FH / MELEE_FH;
-        ctx.drawImage(melSkinImg, fc * MSK_FW, (msk - 1) * MSK_FH, MSK_FW, MSK_FH,
-          dxp - (mw - fwp) / 2, dyp - (mh - fhp), mw, mh);
+        // [stated] **스킨도 미리 줄여둔다.** 기본 시트만 `sheetAt` 을 쓰고 스킨은 매 프레임
+        // 270x131 을 12px 로 줄이고 있었다 — 스킨을 입으면 렉이 나던 이유.
+        // 크기를 **정수로 맞춰야** 캐시가 맞는다 (소수점이면 매 프레임 새로 만든다)
+        const mwp = Math.max(1, Math.round(mw)), mhp = Math.max(1, Math.round(mh));
+        const pre2 = sheetAt(melSkinImg, MSK_FW, MSK_FH, mwp, mhp);
+        const ox = dxp - (mwp - fwp) / 2, oy = dyp - (mhp - fhp);
+        if (pre2) ctx.drawImage(pre2, fc * mwp, (msk - 1) * mhp, mwp, mhp, ox, oy, mwp, mhp);
+        else ctx.drawImage(melSkinImg, fc * MSK_FW, (msk - 1) * MSK_FH, MSK_FW, MSK_FH,
+          ox, oy, mwp, mhp);
       } else {
         const pre = sheetAt(meleeSrc, MELEE_FW, MELEE_FH, fwp, fhp);
         if (pre) ctx.drawImage(pre, fc * fwp, col * fhp, fwp, fhp, dxp, dyp, fwp, fhp);
@@ -329,11 +336,14 @@ export function createRenderer(canvas){
       // 넘치는 만큼은 좌우·위로 고르게 나눠 캐릭터 자리가 안 밀리게 한다
       const gsk = skin | 0;
       if (gsk > 0 && isReady(gunSkinImg) && gsk <= 5){
-        const gw = dw * GUN_FW / FW, gh = dh * GUN_FH / FH;
+        const gw = Math.round(dw * GUN_FW / FW), gh = Math.round(dh * GUN_FH / FH);
         const gi = (hit ? 2 : 0) + (mineSide ? 1 : 0);
-        ctx.drawImage(gunSkinImg, gi*GUN_FW, (gsk-1)*GUN_FH, GUN_FW, GUN_FH,
-          Math.round(xw*RS - (gw - dw)/2), Math.round(yw*RS - (gh - dh)),
-          Math.round(gw), Math.round(gh));
+        // 스킨도 미리 줄여둔다 (칼전과 같은 이유)
+        const pg = sheetAt(gunSkinImg, GUN_FW, GUN_FH, gw, gh);
+        const gx0 = Math.round(xw*RS - (gw - dw)/2), gy0 = Math.round(yw*RS - (gh - dh));
+        if (pg) ctx.drawImage(pg, gi*gw, (gsk-1)*gh, gw, gh, gx0, gy0, gw, gh);
+        else ctx.drawImage(gunSkinImg, gi*GUN_FW, (gsk-1)*GUN_FH, GUN_FW, GUN_FH,
+          gx0, gy0, gw, gh);
       } else {
         ctx.drawImage(sheet, idx*FW, 0, FW, FH, Math.round(xw*RS), Math.round(yw*RS), dw, dh);
       }
