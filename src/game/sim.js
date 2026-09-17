@@ -810,8 +810,8 @@ export function step(s, inp){
       if (s.soccer && (p.stun | 0) > 0){ dx = 0; dy = 0; }   // 쓰러진 동안은 못 움직인다
       // [stated] **공을 잡은 사람은 15% 느리다** — 안 그러면 잡고 도망만 다니면 된다
       if (s.soccer && s.ballOwner === i){
-        dx = Math.round(dx * 70 / 100);   // [stated] 80 → 70
-        dy = Math.round(dy * 70 / 100);
+        dx = Math.round(dx * 80 / 100);   // [stated] 80 → 70 → **80**
+        dy = Math.round(dy * 80 / 100);
       }
       if ((s.melee || s.soccer) && (dx || dy)){
         // [stated] **캐릭터가 뚝뚝 끊어져 보인다.** 대각선으로 갈 때 `|dx|`와 `|dy|`가 비슷해
