@@ -82,7 +82,11 @@ export default function Costume({ onBack }){
             {/* [stated] **기본 칸은 없앤다** — 스킨이 없으면 어차피 기본 색으로 나온다.
                 [stated] **안 가진 스킨은 실루엣만** 보여 준다 */}
             <div className="cost-row">
-              {sh.list.map(s => {
+              {/* [stated] **보유한 것을 앞으로.** 안 가진 실루엣을 헤치고 넘길 필요가 없게.
+                  같은 무리 안에서는 원래 번호 순서를 지킨다 */}
+              {[...sh.list].sort((x, y) =>
+                (ownsSkin(kind, y.id) ? 1 : 0) - (ownsSkin(kind, x.id) ? 1 : 0) || x.id - y.id
+              ).map(s => {
                 const owned = ownsSkin(kind, s.id);
                 const wearing = on === s.id;
                 return (

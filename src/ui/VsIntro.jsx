@@ -74,8 +74,12 @@ function Portrait({ kind, color, zoom = 1, skin = 0 }){
       backgroundSize: `${Math.round(sh.cw * sh.cols * k)}px ${Math.round(sh.ch * sh.rows * k)}px`,
       // 높이는 92 로 고정이므로 **캐릭터 발끝을 창 아래에 맞춘다** — 안 그러면 칸이 큰
       // 스킨이 위아래로 잘린다. `by` 는 칸 위에서 캐릭터 아래끝까지의 거리
-      backgroundPosition: `-${Math.round((cx * sh.cw + (sh.ax || 0)) * k)}px `
-        + `-${Math.round((cy * sh.ch + (sh.by || sh.ch)) * k - (sh.vh || 92) * zoom)}px`
+      // [stated] **`-${...}` 로 쓰면 값이 음수일 때 `--6px` 이 되어 CSS 가 깨진다.**
+      // 축구 스킨이 그 경우였고(계산값 -6) 자리가 통째로 틀어져 잘려 보였다.
+      // 부호를 문자열로 붙이지 말고 **음수 그대로** 넣는다
+      backgroundPosition:
+        `${-Math.round((cx * sh.cw + (sh.ax || 0)) * k)}px `
+        + `${-Math.round((cy * sh.ch + (sh.by || sh.ch)) * k - (sh.vh || 92) * zoom)}px`
     }} />
   );
 }
