@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react';
 import { setInnerBack } from '../../state/back.js';
 import { getColor, setColor, avatarPos } from '../../state/profile.js';
-import { tryOf, setTry, DEBUG_TRY_SKIN } from '../../state/tryskin.js';
+import { tryOf, setTry, ownsSkin } from '../../state/tryskin.js';
 import { GUN_SKINS, MELEE_SKINS, SOCCER_SKINS,
   GUN_PREV_IMG, GUN_PREV_FW, GUN_PREV_FH, GUN_PREV_COLS, GUN_PREV_ROWS_N,
   MEL_PREV_IMG, MEL_PREV_FW, MEL_PREV_FH, MEL_PREV_COLS, MEL_PREV_ROWS_N,
@@ -27,9 +27,6 @@ const SHEETS = {
 };
 const KINDS = ['gun', 'melee', 'soccer'];
 const H = 56;   // 화면에 그릴 캐릭터 키
-
-/** 아직 소유 개념이 없다 — 디버그 중에는 전부 가진 것으로 본다 */
-function ownedOf(){ return DEBUG_TRY_SKIN; }
 
 function Thumb({ sh, row }){
   const k = H / sh.chH;
@@ -60,17 +57,19 @@ export default function Costume({ onBack }){
         <button className="shop-btn" onClick={onBack}>{t('common.back')}</button>
       </div>
 
-      {/* [stated] 기본 색 — 프로필에서 옮겨왔다 */}
+      {/* [stated] 기본 색 — 프로필에서 옮겨왔다. 미리보기는 **오른쪽 끝 여백**으로 */}
       <div className="cost-sec">
-        <span className="cost-h">{t('prof.color')}</span>
-        <div className="cgrid">
-          {[0, 1, 2, 3, 4, 5].map(c => (
-            <button key={c} className={'cdot c' + c + (c === color ? ' on' : '')}
-                    onClick={() => setC(setColor(c))}
-                    aria-label={t('prof.color') + ' ' + (c + 1)} />
-          ))}
+        <span className="cost-h">{t('cost.base')}</span>
+        <div className="cost-row base">
+          <div className="cgrid">
+            {[0, 1, 2, 3, 4, 5].map(c => (
+              <button key={c} className={'cdot c' + c + (c === color ? ' on' : '')}
+                      onClick={() => setC(setColor(c))}
+                      aria-label={t('cost.base') + ' ' + (c + 1)} />
+            ))}
+          </div>
+          <span className="cost-av" style={{ backgroundPositionX: avatarPos(color) }} />
         </div>
-        <span className="prof-av" style={{ backgroundPositionX: avatarPos(color) }} />
       </div>
 
       {/* 종목마다 한 줄. 맨 앞은 **기본**(벗기) */}
@@ -80,20 +79,25 @@ export default function Costume({ onBack }){
         return (
           <div key={kind} className="cost-sec">
             <span className="cost-h">{label[kind]}</span>
+            {/* [stated] **기본 칸은 없앤다** — 스킨이 없으면 어차피 기본 색으로 나온다.
+                [stated] **안 가진 스킨은 실루엣만** 보여 준다 */}
             <div className="cost-row">
-              <button className={'cost-item' + (on === 0 ? ' on' : '')}
-                      onClick={() => { setTry(kind, on); bump(x => x + 1); }}>
-                <span className="cost-none">{t('cost.none')}</span>
-              </button>
               {sh.list.map(s => {
-                const owned = ownedOf(kind, s.id);
+                const owned = ownsSkin(kind, s.id);
+                const wearing = on === s.id;
                 return (
-                  <button key={s.id}
-                          className={'cost-item' + (on === s.id ? ' on' : '') + (owned ? '' : ' lock')}
-                          disabled={!owned}
-                          onClick={() => { setTry(kind, s.id); bump(x => x + 1); }}>
+                  <div key={s.id}
+                       className={'cost-item' + (wearing ? ' on' : '') + (owned ? '' : ' lock')}>
                     <Thumb sh={sh} row={s.row} />
-                  </button>
+                    {/* [stated] 칸 **오른쪽 아래에 장착/해제 버튼**. 그림을 눌러도 되지만
+                        버튼이 있어야 무엇이 걸려 있는지 한눈에 보인다 */}
+                    {owned && (
+                      <button className={'cost-eq' + (wearing ? ' off' : '')}
+                              onClick={() => { setTry(kind, s.id); bump(x => x + 1); }}>
+                        {wearing ? t('cost.off') : t('cost.on')}
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>

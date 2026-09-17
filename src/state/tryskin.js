@@ -27,12 +27,24 @@ function load(){
 /** 지금 입어보는 중인 스킨 번호 (0 이면 기본) */
 export function tryOf(kind){ return DEBUG_TRY_SKIN ? (load()[kind] | 0) : 0; }
 
-/** 같은 걸 다시 고르면 벗는다 */
+/** 같은 걸 다시 고르면 벗는다.
+ *  [stated] **상점에서 입어본 것만 보유**로 친다 — 코스튬에서 확인할 수 있게.
+ *  진짜 소유는 결제·서버가 붙을 때 이 목록을 서버 것으로 갈아끼운다 */
 export function setTry(kind, id){
   const c = load();
   c[kind] = (c[kind] === id) ? 0 : (id | 0);
+  if (id) {
+    c.own = c.own || {};
+    c.own[kind] = [...new Set([...(c.own[kind] || []), id | 0])];
+  }
   try { localStorage.setItem(KEY, JSON.stringify(c)); } catch { /* 무시 */ }
   return c[kind];
+}
+
+/** 그 스킨을 가지고 있는가 */
+export function ownsSkin(kind, id){
+  const c = load();
+  return !!(c.own && c.own[kind] && c.own[kind].includes(id | 0));
 }
 
 /** 지금 판이 어느 종목인지 → 입어볼 스킨 */

@@ -988,9 +988,22 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 
 /* ── 코스튬 ───────────────────────────────────────────────────
    [stated] 보유한 스킨을 보고 자유롭게 장착한다. 색 고르기도 여기로 옮겼다 */
-.cost-entry{width:calc(100% - 16px);margin:6px 8px 2px;padding:8px 0;
-  font:900 15px/1 var(--gf);color:#cfe4ff;background:rgba(20,34,52,.9);
-  border:1px solid rgba(90,140,190,.5);border-radius:3px;cursor:pointer}
+/* [stated] 홈 진입 칸: **총격전 순위표 바로 밑, 폭은 4분의 1**.
+   글씨는 PVP 버튼처럼 **찐한 흰색**, 테두리는 눈에 띄게 */
+/* 순위표가 화면 위에 **절대 위치로 떠 있어서** 코스튬 칸도 같은 방식으로 그 밑에 붙인다.
+   왼쪽 끝에 맞추면 **총격전 순위표 바로 밑**이 된다 */
+.cost-entry{position:absolute;z-index:24;
+  left:calc(var(--h-barX,0) * var(--u));
+  top:calc((var(--h-barY,2) + var(--h-rowH,20) + 3) * var(--u) + 46px);
+  width:calc((100% - var(--h-barX,0) * var(--u) * 2 - var(--h-boxGap,3) * var(--u) * 2) / 3);
+  padding:5px 0;
+  font:900 13px/1 var(--gf);color:#fff;letter-spacing:1px;
+  -webkit-text-stroke:0.5px rgba(255,255,255,.5);
+  text-shadow:0 0 8px rgba(110,200,255,.5), 0 2px 3px rgba(0,0,0,.8);
+  background:rgba(20,40,66,.95);
+  border:1px solid #7fd2ff;border-radius:3px;
+  box-shadow:0 0 8px rgba(110,200,255,.35) inset;cursor:pointer}
+
 .screen.list.cost{align-items:stretch;overflow-y:auto}
 .cost-sec{width:100%;min-width:0;padding:6px 10px 10px}
 .cost-h{display:block;font:900 13px/1 var(--gf);color:#9fb0c8;padding-bottom:6px}
@@ -998,10 +1011,23 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .cost-row{display:flex;gap:6px;min-width:0;overflow-x:auto;
   scrollbar-width:none;-ms-overflow-style:none}
 .cost-row::-webkit-scrollbar{display:none;width:0;height:0}
-.cost-item{flex:0 0 auto;min-width:0;display:flex;align-items:center;justify-content:center;
-  padding:4px;background:rgba(8,16,28,.5);border:1px solid rgba(90,140,190,.35);
-  border-radius:3px;cursor:pointer}
+/* 색 줄은 넘기지 않는다 — 미리보기를 **오른쪽 끝**에 붙인다 */
+.cost-row.base{overflow:visible;align-items:center;justify-content:space-between}
+/* 미리보기 얼굴 — 스킨 칸(56px)과 비슷한 크기로. 시트는 24칸이라 2400% */
+.cost-av{flex:0 0 auto;height:56px;width:49px;
+  background:var(--chars) 0 0/2400% 100% no-repeat;image-rendering:pixelated}
+/* [stated] **버튼이 캐릭터와 겹치면 안 된다** → 얹지 않고 **아래에 자리를 따로 준다**.
+   칸을 세로로 쌓아 그림과 버튼이 서로 침범하지 않게 한다 */
+.cost-item{flex:0 0 auto;min-width:0;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:4px;background:rgba(8,16,28,.5);
+  border:1px solid rgba(90,140,190,.35);border-radius:3px}
+/* 장착/해제 — 칸 아래 오른쪽에 붙인다 */
+.cost-eq{align-self:flex-end;
+  padding:2px 8px;font:900 10px/1 var(--gf);color:#0d1420;
+  background:#8fd0ff;border:1px solid rgba(255,255,255,.5);border-radius:2px;cursor:pointer}
+.cost-eq.off{color:#cfe4ff;background:rgba(20,34,52,.95);border-color:rgba(143,208,255,.7)}
 .cost-item.on{border-color:#8fd0ff;background:rgba(40,110,180,.35)}
-.cost-item.lock{opacity:.35}
+/* [stated] 안 가진 스킨은 **실루엣만** */
+.cost-item.lock i{filter:brightness(0) saturate(0);opacity:.45}
 .cost-item i{display:block}
-.cost-none{font:900 12px/1 var(--gf);color:#cfe4ff;padding:0 10px}
