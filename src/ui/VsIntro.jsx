@@ -34,18 +34,24 @@ const SHOW_MS = 3000;
 // → **몸통 높이(`bh`)를 기준**으로 잡는다. 시트에서 잰 값:
 //   총격 기본 48 / 스킨 48, 칼전 기본 87 / 스킨 88, 축구 기본 45 / 스킨 48
 // `tgt` 는 기본이 화면에서 차지하던 몸통 크기 — 여기에 맞춘다
+// [stated] **기본과 스킨 크기가 달랐고 스킨이 잘렸다.**
+// 배율을 `92 / 칸높이` 로 잡아 스킨이 작아졌고, 높이를 92 로 고정해 칸이 큰 스킨이 넘쳤다.
+// 시트에서 직접 잰 값을 넣는다 — `bh` 몸통, `ax`~`aw` 가로 창, `by` 캐릭터 아래끝(칸 위에서)
 const SKIN_SHEET = {
-  soccer: { src: 'assets/soccer-skins.webp', cw: 80,  ch: 52,  cols: 13, rows: 5, still: 0, ax: 23, aw: 34, bh: 48 },
-  melee:  { src: 'assets/melee-skins.webp',  cw: 270, ch: 131, cols: 8,  rows: 5, still: 0, ax: 92, aw: 97, bh: 88 },
-  gun:    { src: 'assets/gun-skins.webp',    cw: 80,  ch: 60,  cols: 4,  rows: 5, still: 0, ax: 15, aw: 46, bh: 48 }
+  soccer: { src: 'assets/soccer-skins.webp', cw: 80,  ch: 52,  cols: 13, rows: 5, still: 0,
+            ax: 21, aw: 38,  by: 52,  bh: 48,  vh: 92 },
+  melee:  { src: 'assets/melee-skins.webp',  cw: 270, ch: 131, cols: 8,  rows: 5, still: 0,
+            ax: 65, aw: 130, by: 114, bh: 94,  vh: 92 },
+  gun:    { src: 'assets/gun-skins.webp',    cw: 80,  ch: 60,  cols: 4,  rows: 5, still: 0,
+            ax: 8,  aw: 61,  by: 57,  bh: 50,  vh: 100 }
 };
 // 기본 캐릭터가 화면에서 차지하던 몸통 크기 (92 x 몸통 / 칸높이)
 const TGT = { gun: 92, melee: 80.8, soccer: 79.6 };
 
 const SHEET = {
-  soccer: { src: 'assets/soccer-chars.webp', cw: 80,  ch: 52, cols: 13, rows: 6, col: () => 0,    row: c => c, ax: 24, aw: 32, bh: 45 },
-  melee:  { src: 'assets/melee.webp',        cw: 242, ch: 99, cols: 8,  rows: 6, col: () => 0,    row: c => c, ax: 70, aw: 102, bh: 87 },
-  gun:    { src: 'assets/characters.png',    cw: 42,  ch: 48, cols: 24, rows: 1, col: c => c * 2, row: () => 0, ax: 0,  aw: 42, bh: 48 }
+  soccer: { src: 'assets/soccer-chars.webp', cw: 80,  ch: 52, cols: 13, rows: 6, col: () => 0,    row: c => c, ax: 24, aw: 32, by: 52, bh: 45, vh: 92 },
+  melee:  { src: 'assets/melee.webp',        cw: 242, ch: 99, cols: 8,  rows: 6, col: () => 0,    row: c => c, ax: 70, aw: 102, by: 98, bh: 87, vh: 92 },
+  gun:    { src: 'assets/characters.png',    cw: 42,  ch: 48, cols: 24, rows: 1, col: c => c * 2, row: () => 0, ax: 0,  aw: 42, by: 48, bh: 48, vh: 92 }
 };
 
 function Portrait({ kind, color, zoom = 1, skin = 0 }){
@@ -60,11 +66,16 @@ function Portrait({ kind, color, zoom = 1, skin = 0 }){
   return (
     <span className="vs-por" style={{
       // **그림이 있는 만큼만** 자리를 차지한다 (칸 전체가 아니라)
-      width: Math.round((sh.aw || sh.cw) * k) + 'px', height: Math.round(92 * zoom) + 'px',
+      // [stated] 후광·날개가 있는 스킨은 92 로는 **위가 잘린다** → 시트마다 필요한 창 높이(`vh`)
+      width: Math.round((sh.aw || sh.cw) * k) + 'px',
+      height: Math.round((sh.vh || 92) * zoom) + 'px',
       backgroundImage: `url(${sh.src})`,
       // **시트 전체 크기**를 지정해야 칸이 정확히 맞는다 (auto 로 두면 세로가 어긋난다)
       backgroundSize: `${Math.round(sh.cw * sh.cols * k)}px ${Math.round(sh.ch * sh.rows * k)}px`,
-      backgroundPosition: `-${Math.round((cx * sh.cw + (sh.ax || 0)) * k)}px -${Math.round(cy * sh.ch * k)}px`
+      // 높이는 92 로 고정이므로 **캐릭터 발끝을 창 아래에 맞춘다** — 안 그러면 칸이 큰
+      // 스킨이 위아래로 잘린다. `by` 는 칸 위에서 캐릭터 아래끝까지의 거리
+      backgroundPosition: `-${Math.round((cx * sh.cw + (sh.ax || 0)) * k)}px `
+        + `-${Math.round((cy * sh.ch + (sh.by || sh.ch)) * k - (sh.vh || 92) * zoom)}px`
     }} />
   );
 }

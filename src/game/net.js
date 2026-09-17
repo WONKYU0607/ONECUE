@@ -247,7 +247,12 @@ export class Server {
         // 총·칼 봇은 -1~1 방향을 주므로 여기서 속도를 곱한다 — 섞으면 안 된다
         if (this.s.soccer){
           const a2 = b.ai(this.s, this.s.tick * TICK_MS);
-          inp[b.slot] = { ...NOIN, dx: a2.dx | 0, dy: a2.dy | 0, fire: a2.fire ? 1 : 0, ready: 1, go: 1 };
+          // [stated] **태클(`tkl`)과 차징(`fch`)을 빠뜨리고 있었다.**
+          // 봇 AI 는 내고 있는데 여기서 안 실어 보내서, 봇은 공을 쫓기만 하고 영영 못 뺏었다 —
+          // 사람이 공을 들고 가만히 서 있으면 **경기가 그대로 멈췄다**.
+          // 봇이 내는 입력은 **하나도 빼지 말고 그대로** 옮긴다
+          inp[b.slot] = { ...NOIN, dx: a2.dx | 0, dy: a2.dy | 0,
+            fire: a2.fire ? 1 : 0, fch: a2.fch ? 1 : 0, tkl: a2.tkl ? 1 : 0, ready: 1, go: 1 };
           continue;
         }
         const a = b.ai.think(this.s, b.slot, TICK_MS / 1000, this.s.tick * TICK_MS);
