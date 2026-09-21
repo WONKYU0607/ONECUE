@@ -4,7 +4,7 @@
 // 보안은 Firestore 규칙으로 막는다(자기 문서만 읽기·쓰기, 점수는 서버만).
 import { initializeApp } from 'firebase/app';
 import {
-  getAuth, onAuthStateChanged,
+  getAuth, onAuthStateChanged, signInAnonymously, linkWithCredential, linkWithPopup,
   GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut,
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
@@ -84,9 +84,8 @@ async function nativeGoogleCredential(){
 /**
  * 구글 로그인.
  *
- * [stated] **익명 계정은 안 만든다** — 구글 로그인 하나뿐이다.
- * 그래서 익명 기록을 이어붙이던 경로(계정 잇기)도 필요 없다.
- * 예전엔 그 길이 있었는데 **익명을 없앤 뒤에도 코드만 남아 있었다** — 절대 안 도는 죽은 길이다.
+ * 게스트(익명)는 **"로그인 없이 시작"을 눌렀을 때만** 생긴다. 게스트가 구글로 옮기려면
+ * 여기가 아니라 `linkGoogle` 을 쓴다 — 여기로 로그인하면 **다른 계정**이 되어 기록이 안 따라간다
  *
  *  돌려주는 값: `{ok:true}` 또는 `{ok:false, reason:'cancel'|'fail'}` */
 export async function signInGoogle(){
@@ -120,6 +119,56 @@ export async function signOutAll(){
   } catch { /* 무시 */ }
   try { await signOut(auth); } catch { /* 무시 */ }
   uid = null;
+}
+
+/** [stated] **로그인 없이 시작(게스트).** 서버에 익명 계정이 생겨 **순위표·PVP 가 다 된다.**
+ *
+ *  예전에 익명을 뺀 이유: **켤 때마다 자동으로** 익명을 만들어 구글 세션을 밀어냈다.
+ *  이제는 **이 버튼을 눌렀을 때만** 만든다. 켤 때(`signIn`)는 여전히 만들지 않는다 —
+ *  이미 있는 계정(구글이든 게스트든)을 그대로 쓸 뿐이다 */
+export async function signInGuest(){
+  try {
+    const r = await signInAnonymously(auth);
+    uid = r && r.user ? r.user.uid : (auth.currentUser ? auth.currentUser.uid : null);
+    return { ok: !!uid };
+  } catch (e){
+    console.warn('[firebase] 게스트 시작 실패', (e && e.code) || e);
+    return { ok: false, reason: 'fail' };
+  }
+}
+
+/** 지금 게스트(익명)인가 */
+export function isGuest(){ return !!(auth.currentUser && auth.currentUser.isAnonymous); }
+
+/** [stated] **게스트를 구글 계정으로 잇는다.** 같은 계정(uid)이 유지되므로 점수·닉네임·
+ *  스킨이 **그대로** 따라간다. 이미 다른 기기에서 쓰던 구글 계정이면 이을 수 없다 —
+ *  그때는 `taken` 을 돌려주고, 부르는 쪽이 "그 계정으로 로그인" 을 권한다 */
+export async function linkGoogle(){
+  const u = auth.currentUser;
+  if (!u || !u.isAnonymous) return { ok: false, reason: 'notGuest' };
+  try {
+    if (await isNative()) await linkWithCredential(u, await nativeGoogleCredential());
+    else await linkWithPopup(u, new GoogleAuthProvider());
+    uid = auth.currentUser ? auth.currentUser.uid : uid;
+    return { ok: true };
+  } catch (e){
+    const code = (e && e.code) || '';
+    if (code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use')
+      return { ok: false, reason: 'taken' };
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request')
+      return { ok: false, reason: 'cancel' };
+    console.warn('[firebase] 구글 잇기 실패', code || e);
+    return { ok: false, reason: 'fail' };
+  }
+}
+
+/** [stated] **로그아웃 — 일반 앱과 같게.** 계정에 붙은 기록은 기기에서 지우고
+ *  기기 설정(소리·언어·화면 배치)은 남긴다. 다음에 같은 계정으로 들어오면 서버에서 다시 받는다.
+ *  기기에 남겨 두면 **다른 계정으로 들어갈 때 기록이 섞인다** */
+const ACCOUNT_KEYS = ['duel.play.v2', 'duel.profile.v1', 'duel.progress.v2', 'duel.tryskin', 'duel.sid'];
+export async function logOut(){
+  await signOutAll();
+  for (const k of ACCOUNT_KEYS){ try { localStorage.removeItem(k); } catch { /* 무시 */ } }
 }
 
 /** 지금 구글로 로그인돼 있는가 */

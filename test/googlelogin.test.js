@@ -10,14 +10,19 @@ const fb = fs.readFileSync('src/cloud/firebase.js', 'utf8');
 const sync = fs.readFileSync('src/cloud/sync.js', 'utf8');
 const prof = fs.readFileSync('src/ui/ProfileTab.jsx', 'utf8');
 
-// [stated] 출시 빌드라 **익명 계정은 안 만든다** — 구글 로그인만.
-// 익명이 없으니 승격(link)·계정 충돌 처리 자체가 필요 없다
-console.log('익명 계정을 만들지 않는다');
+// [stated] **게스트(익명)를 되살렸다** — 로그인 없이 시작해도 순위표·PVP 가 되게.
+// 예전에 뺀 이유는 익명 자체가 아니라 **켤 때마다 자동으로 만든 것**이었다.
+// 그게 구글 세션을 밀어내 로그인이 안 붙는 것처럼 보였다.
+// → 익명은 **"로그인 없이 시작" 버튼을 눌렀을 때만** 만든다. 켤 때(`signIn`)는 만들지 않는다
+console.log('게스트는 버튼을 눌렀을 때만 만든다 (켤 때 자동으로 만들지 않는다)');
 {
-  assert(!/signInAnonymously/.test(fb), '  익명 로그인이 코드에 없다');
-  assert(!/linkWithCredential|linkWithPopup/.test(fb), '  승격(link) 경로가 없다');
-  assert(!/credential-already-in-use/.test(fb), '  계정 충돌 처리가 필요 없어졌다');
-  assert(/export async function signInGoogle/.test(fb), '  구글 로그인 하나만 있다');
+  const signInBody = fb.slice(fb.indexOf('export function signIn()'),
+                              fb.indexOf('export function signIn()') + 1600);
+  assert(!/signInAnonymously/.test(signInBody), '  켤 때(signIn) 익명을 만들지 않는다');
+  assert(/export async function signInGuest/.test(fb), '  게스트 시작이 따로 있다');
+  assert(/export async function linkGoogle/.test(fb), '  게스트를 구글로 이을 수 있다 (기록이 따라간다)');
+  assert(/credential-already-in-use/.test(fb), '  이미 쓰는 구글 계정이면 따로 알린다');
+  assert(/export async function signInGoogle/.test(fb), '  구글 로그인도 그대로 있다');
   assert(/export async function signOutAll/.test(fb), '  로그아웃도 있다 (계정 바꾸기)');
   // 앱에서는 네이티브 쪽 계정 선택까지 지워야 다른 계정으로 바꿀 수 있다
   assert(/FirebaseAuthentication\.signOut/.test(fb), '  앱에서는 네이티브 계정도 지운다');

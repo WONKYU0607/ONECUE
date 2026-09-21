@@ -313,7 +313,15 @@ export default function App(){
                                           onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} onTuto={goHome} />}
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={(session?.mode === 'create' || session?.mode === 'join') ? backToRoom : null}
         onNext={(session?.kind === 'ai' && result === 'win' && (session.stage || 1) < 30) ? nextStage : null} onHome={goHome} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto}
+        onLogout={async () => {
+          // [stated] **로그아웃하면 로그인 화면으로.** 기기에 남은 계정 기록을 지우고,
+          // 메모리에 올라간 값도 버리려고 **앱을 새로 띄운다** — 하나씩 초기화하다 빠뜨리면
+          // 이전 계정의 점수·티켓이 다음 계정 화면에 남는다
+          setShowSettings(false);
+          try { const m = await import('./cloud/firebase.js'); await m.logOut(); } catch { /* 무시 */ }
+          location.reload();
+        }} />}
       {/* [stated] 처음 켰을 때 — 시작하기 / 건너뛰기 */}
       {askTuto && (
         <div className="modal-back">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getSettings, setSetting } from '../state/settings.js';
 import { resetTuto } from '../state/tutorial.js';
 import { unlockAudio, sfx, playMusic, stopMusic, applyBgmVolume } from '../game/audio.js';
@@ -18,7 +18,22 @@ const LABEL = {
   softFlash: 'set.softFlash'
 };
 
-export default function SettingsModal({ onClose, onTuto }){
+export default function SettingsModal({ onClose, onTuto, onLogout }){
+  const [askOut, setAskOut] = useState(false);   // 로그아웃 확인 창
+  // [stated] **게스트면 구글 계정 연결을 권한다** — 앱을 지우면 기록이 사라지므로
+  const [guest, setGuest] = useState(false);
+  const [linkMsg, setLinkMsg] = useState('');
+  useEffect(() => {
+    import('../cloud/firebase.js').then(m => setGuest(m.isGuest && m.isGuest())).catch(() => {});
+  }, []);
+  const link = async () => {
+    setLinkMsg('');
+    const m = await import('../cloud/firebase.js');
+    const r = await m.linkGoogle();
+    if (r.ok){ setGuest(false); setLinkMsg(t('acc.linked')); }
+    else if (r.reason === 'taken') setLinkMsg(t('acc.linkTaken'));
+    else if (r.reason !== 'cancel') setLinkMsg(t('acc.fail'));
+  };
   const [s, setS] = useState(getSettings);
   const [lang, setL] = useState(getLang);
 
@@ -89,6 +104,29 @@ export default function SettingsModal({ onClose, onTuto }){
             ))}
           </span>
         </div>
+
+        {/* 게스트면 구글 연결 — 로그아웃보다 먼저 보여 준다 */}
+        {guest && (
+          <div className="guest-box">
+            <p>{t('acc.guestNow')}</p>
+            <button className="link-btn" onClick={link}>{t('acc.link')}</button>
+          </div>
+        )}
+        {linkMsg && <p className="hint link-msg">{linkMsg}</p>}
+
+        {/* [stated] **로그아웃.** 다른 계정으로 바꾸려면 있어야 한다. 맨 아래 — 실수로 안 누르게 */}
+        <button className="logout-btn" onClick={() => setAskOut(true)}>{t('acc.logout')}</button>
+        {askOut && (
+          <div className="logout-ask">
+            <p>{t('acc.logoutAsk')}</p>
+            <div className="logout-row">
+              <button className="logout-btn" onClick={() => setAskOut(false)}>{t('common.cancel')}</button>
+              <button className="logout-btn go" onClick={() => { setAskOut(false); onLogout?.(); }}>
+                {t('acc.logout')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

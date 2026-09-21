@@ -1,7 +1,8 @@
-// [stated] **진입할 때 로그인시킨다.** 익명 계정을 없앴으므로 구글 로그인만 있다.
+// [stated] **진입할 때 계정을 정한다.** 구글로 로그인하거나, **로그인 없이 시작(게스트)**.
+// 게스트도 서버에 익명 계정이 생겨 순위표·PVP 가 다 된다. 나중에 설정에서 구글로 이을 수 있다.
 //
-// 로그인이 없으면 uid 가 없고, 그러면 순위표·점수 기록·이름 바꾸기가 전부 안 된다.
-// 그래서 홈으로 들어가기 전에 여기서 막는다.
+// 계정이 없으면 uid 가 없고, 그러면 순위표·점수 기록·이름 바꾸기가 전부 안 된다.
+// 그래서 홈으로 들어가기 전에 여기서 정한다.
 //
 // **막되 가둬두지는 않는다** — 망이 끊겼거나 구글이 답을 안 주면 다시 시도할 수
 // 있어야 한다. 실패 메시지를 삼키고 버튼만 멀쩡히 두면 사용자는 앱이 고장난 줄 안다.
@@ -46,12 +47,31 @@ export default function Login({ onDone }){
     setBusy(false);
   };
 
+  // [stated] **로그인 없이 시작.** 서버에 익명 계정이 생긴다 — 순위표·PVP 가 다 된다
+  const guest = async () => {
+    if (busy) return;
+    setBusy(true); setMsg('');
+    try {
+      const m = await import('../../cloud/firebase.js');
+      const r = await m.signInGuest();
+      if (r.ok){
+        const { resyncAccount } = await import('../../cloud/sync.js');
+        await resyncAccount().catch(() => {});
+        onDone();
+        return;
+      }
+      setMsg(t('acc.fail'));
+    } catch { setMsg(t('acc.fail')); }
+    setBusy(false);
+  };
+
   return (
     <div className="screen login">
       <button className="menu-btn primary" disabled={busy} onClick={go}>
         <span className="t">{busy ? t('acc.busy') : t('acc.google')}</span>
       </button>
-      <p className="hint login-why">{msg || t('acc.need')}</p>
+      <button className="login-guest" disabled={busy} onClick={guest}>{t('acc.guest')}</button>
+      <p className="hint login-why">{msg || t('acc.guestWhy')}</p>
     </div>
   );
 }
