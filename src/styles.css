@@ -578,36 +578,53 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 
 /* [stated] 방(로비) — 자리·종목·인원을 한 화면에서 */
 .room-teams{display:flex;gap:8px;width:100%}
-.room-team{flex:1 1 0;min-width:0;padding:8px;border-radius:4px;
+.room-team{flex:1 1 0;min-width:0;padding:5px;border-radius:4px;
   background:rgba(12,22,36,.6);border:1px solid rgba(90,140,190,.3)}
 .room-team.mine{border-color:#ffd34d}
 .room-team-h{display:flex;justify-content:space-between;align-items:center;
-  font:900 13px var(--gf);color:#cfe4ff;margin-bottom:6px;letter-spacing:1px}
+  font:900 12px var(--gf);color:#cfe4ff;margin-bottom:4px;letter-spacing:1px}
 .room-team-h .c{font-size:11px;color:#8fd8ff;letter-spacing:0}
-.seat{height:26px;display:flex;align-items:center;padding:0 8px;margin-bottom:4px;
+.seat{height:22px;display:flex;align-items:center;padding:0 8px;margin-bottom:3px;
   border-radius:3px;background:rgba(255,255,255,.05);
   font:700 12px var(--gf);color:#e8e8f0;letter-spacing:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .seat.empty{color:#5a6b82;background:rgba(255,255,255,.02);
   border:1px dashed rgba(90,140,190,.3)}
 .seat.me{background:rgba(255,211,77,.15);color:#ffd34d}
-.room-modes{display:flex;gap:6px;width:100%}
-.room-modes .menu-btn{flex:1 1 0;min-width:0}
-/* [stated] 로비 버튼(이동·관전하기·종목·인원)은 **20% 작게** */
-.menu-btn.sm{padding:5px 3px;min-height:34px}
+/* [stated] **방 안 버튼은 금속 틀을 떼고 CSS 로.** 틀이 거추장스럽고 높이만 잡아먹었다.
+   틀 두께(15/17px)가 사라져서 2대2 로비도 한 화면에 들어온다 */
+.room-btn{display:flex;align-items:center;justify-content:center;
+  min-width:0;padding:6px 8px;cursor:pointer;
+  font:900 12px/1.2 var(--gf);color:#cfe4ff;letter-spacing:1px;
+  background:rgba(20,34,52,.9);
+  border:1px solid rgba(110,170,220,.5);border-radius:3px}
+.room-btn.on{color:#ffd34d;background:rgba(40,90,150,.55);
+  border-color:rgba(255,211,77,.7);text-shadow:0 0 8px rgba(255,211,77,.45)}
+.room-btn:disabled{opacity:.4}
+/* 시작하기 — 한 줄 꽉 차게, 눈에 띄게 */
+.room-btn.go{width:100%;padding:11px 0;font-size:16px;color:#fff;
+  background:rgba(30,80,140,.9);border-color:#7fd2ff;
+  box-shadow:0 0 10px rgba(110,200,255,.3) inset;
+  text-shadow:0 0 10px rgba(110,200,255,.6)}
+.room-btn.go:disabled{background:rgba(20,34,52,.8);color:#7f8ea6;border-color:rgba(90,140,190,.4)}
+.room-btn.inv-open{width:100%;padding:8px 0;font-size:13px}
+
+.room-modes{display:flex;gap:5px;width:100%}
+.room-modes .room-btn{flex:1 1 0;min-width:0}
+/* [stated] 로비 버튼(이동·관전하기·종목·인원)은 **20% 작게**.
+   [stated] **2대2 로비에서 시작하기 버튼이 화면 밖으로 밀렸다**(640px 화면에 내용이 664px) →
+   틀 두께까지 줄여 더 작게 만든다. `.menu-btn` 은 틀이 15/17px 이라 그게 높이를 잡아먹는다 */
+.menu-btn.sm{padding:2px 3px;min-height:26px;border-width:9px 10px}
 .menu-btn.sm .t{font-size:11px}
 /* 관전 칸 — 팀과 종목 사이 */
-.room-watch{width:100%;padding:8px;border-radius:4px;
+.room-watch{width:100%;padding:5px;border-radius:4px;
   background:rgba(12,22,36,.6);border:1px solid rgba(90,140,190,.3)}
-.room-watch .watch-list{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.room-watch .watch-list{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px}
 .room-watch .seat{margin:0;flex:0 0 auto;max-width:100%}
 /* [stated] **고른 종목·인원에도 노란 테두리.**
    고른 것은 `disabled` 라 흐려지므로 **불투명도까지 되살려야** 보인다 */
 /* [stated] **종목·인원은 테두리 말고 글자만 노랗게.** 테두리는 팀 칸에만 */
-.room-modes .menu-btn.primary,
-.room-modes .menu-btn.primary[disabled]{opacity:1}
-.room-modes .menu-btn.primary .t,
-.room-modes .menu-btn.primary[disabled] .t{color:#ffd34d;text-shadow:0 0 8px rgba(255,211,77,.5)}
+.room-modes .room-btn.on[disabled]{opacity:1}
 .room-watch .menu-btn.primary,
 .room-watch .menu-btn.primary[disabled]{opacity:1}
 .room-watch .menu-btn.primary .t,

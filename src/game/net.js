@@ -142,12 +142,17 @@ export class WsTransport {
 // ================= SERVER (authoritative) =================
 export class Server {
   constructor(net, n = 2, melee = false, ffa = false, soccer = false){
+    // 입력이 늦었을 때 이어 쓸 직전 입력과, 몇 틱째 안 왔는지
+    // (`lastIn` 은 이미 다른 뜻으로 쓰고 있다 — 이름을 따로 둔다)
+    this.heldIn = [];
+    this.heldMiss = [];
     this.net = net;
     this.n = n;
     this.s = newState(n, melee, ffa, soccer);
     this.inbox = new Map();     // tick -> 슬롯별 입력
     this.rtt = Array(n).fill(0);
     this.delay = MIN_DELAY;     // 양 플레이어에게 동일 적용되는 공통 입력 지연
+    this.rttHist = [];          // 슬롯별 최근 핑 (중앙값을 쓰려고)
     this.extra = 0;             // 지각 입력 발생 시 즉시 늘리는 여유분
     this.lastDrop = -1e9;
     this.lateDrops = 0;
@@ -164,7 +169,16 @@ export class Server {
       b[m.t] = (b[m.t] || 0) + 1;
     }
     if (m.t === 'p'){ this.net.serverSend({ t:'q', id:m.id, pid:m.pid }, m.pid); return; }   // 핑 응답은 보낸 클라에게만
-    if (m.t === 'rtt'){ this.rtt[m.pid] = m.rtt; this.recalcDelay(); return; }
+    if (m.t === 'rtt'){
+      // [stated] **핑이 한 번 튀면 지연이 세 배가 된다** (RTT 140 → 640 이면 6 → 21틱).
+      // 스파이크는 지나가는 건데 그걸로 판 전체 기준을 잡으니 예측이 0.67초를 앞서 달리다
+      // 되감기며 순간이동한다. → **최근 5번의 중앙값**을 쓴다. 한 번 튄 값은 무시된다
+      const h = (this.rttHist[m.pid] = this.rttHist[m.pid] || []);
+      h.push(m.rtt); if (h.length > 5) h.shift();
+      const sorted = [...h].sort((x, y) => x - y);
+      this.rtt[m.pid] = sorted[sorted.length >> 1];
+      this.recalcDelay(); return;
+    }
     if (m.t === 'cfg'){ this.pendingCfg = Object.assign(this.pendingCfg || {}, m.cfg); return; }
     if (m.t !== 'in') return;
     this.lastIn[m.pid] = { tick: m.tick, at: this.s.tick, ready: m.ready ? 1 : 0, place: !!m.place };
@@ -238,7 +252,20 @@ export class Server {
     while (this.s.tick < want && guard++ < 8){
       const t = this.s.tick + 1;
       const f = this.inbox.get(t) || [];
-      const inp = Array.from({ length: this.n }, (_, i) => f[i] || NOIN);   // 미도착 입력은 무입력
+      // [stated] **입력이 늦으면 직전 입력을 이어 쓴다.**
+      // 예전에는 안 온 자리를 무입력(`NOIN`)으로 뒀는데, 그러면 서버는 "그 틱에 멈춰 있었다"로
+      // 확정하고 클라는 계속 움직였다고 예측한다 → **양쪽 화면이 순간이동한다**.
+      // 봇은 입력이 서버에서 바로 만들어져 늦는 법이 없어서 **봇전만 멀쩡했다**.
+      // 다만 영원히 이어 쓰면 연결이 끊긴 사람이 계속 달린다 → **몇 틱까지만**
+      const inp = Array.from({ length: this.n }, (_, i) => {
+        if (f[i]){ this.heldIn[i] = f[i]; this.heldMiss[i] = 0; return f[i]; }
+        if ((this.heldMiss[i] = (this.heldMiss[i] | 0) + 1) <= HOLD_INPUT && this.heldIn[i]){
+          // 한 번만 쓰는 것(놓기·던지기 같은 것)은 빼고 **움직임만** 이어 쓴다
+          const L = this.heldIn[i];
+          return { ...NOIN, dx: L.dx | 0, dy: L.dy | 0, ready: 1, go: 1 };
+        }
+        return NOIN;
+      });
       // **빈 자리는 서버가 AI로 채운다.** 사람이 모자라도 판이 열리게 하려는 것.
       // AI 는 반드시 서버에서 돌려야 모두가 같은 움직임을 본다
       if (this.bots) for (const b of this.bots){
@@ -336,6 +363,11 @@ export const RENDER_BUF = 2;   // 상대를 확정 기록보다 이만큼 뒤에
 // ================= CLIENT =================
 // [stated] 이 틱 수보다 많이 밀렸으면 **따라잡지 말고 건너뛴다** (약 1초).
 // 평소 지연(수십 ms)으로는 절대 안 걸리고, 화면을 나갔다 온 경우에만 걸린다
+// [stated] 입력이 늦을 때 직전 입력을 이어 쓰는 한도 (0.2초).
+// 더 길게 두면 연결이 끊긴 사람이 계속 달린다
+const HOLD_INPUT = 12;
+// 예측이 확정보다 앞설 수 있는 최대 틱
+const PRED_MAX = 12;
 const CATCHUP_SKIP = 60;
 
 export class Client {
@@ -555,7 +587,10 @@ export class Client {
       this.seedRender(this.pred);      // 렌더 위치는 미리 채워둔다 (draw가 먼저 돌 수 있다)
       return;
     }
-    let target = this.nextInputTick - 1;
+    // [stated] **예측이 확정보다 40틱(0.67초)까지 앞서 달리다 되감기며 순간이동한다.**
+    // 그 구간의 상대 입력은 추측이거나 0이라, 멀리 갈수록 틀린 위에 쌓인다.
+    // 예측의 목적은 **내 입력을 바로 보여주는 것**이지 미래를 멀리 보는 게 아니다 → 거리를 막는다
+    let target = Math.min(this.nextInputTick - 1, this.s.tick + PRED_MAX);
     const p = cloneState(this.s);
     const inputsFor = t => {
       const n = p.n || 2;

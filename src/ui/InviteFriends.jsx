@@ -33,7 +33,7 @@ export default function InviteFriends({ room }){
 
   if (!open){
     return (
-      <button className="menu-btn small inv-open" onClick={() => setOpen(true)}>
+      <button className="room-btn inv-open" onClick={() => setOpen(true)}>
         <span className="t">{t('fr.invite')}</span>
       </button>
     );

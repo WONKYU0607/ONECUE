@@ -465,7 +465,7 @@ export const BARE = { on: false };
 // 스틱을 어느 쪽에 둘지 (왼손잡이 설정)
 export const HAND = { left: false };
 
-export const PROTO_VER = 71;   // 태클 판정·방향 · 칼전/축구 속도 · 슛 속도 · 방패 쿨 0.8초
+export const PROTO_VER = 72;   // 축구 기절 1.2초 · 공 잡고 뛰는 속도 80% · 넘어짐 크기
 // 넷코드 계기판(소켓·프레임·RTT·보냄 등)을 배치 대기 화면에 표시할지.
 // 평소엔 꺼두고, 온라인이 이상할 때만 켜서 원인을 본다
 export const SHOW_NETINFO = false;

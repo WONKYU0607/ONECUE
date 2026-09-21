@@ -63,7 +63,7 @@ export default function Room({ room, onLeave }){
                   <span className="c">{roster.length}/{need}</span>
                 </div>
                 {Array.from({ length: need }, (_, i) => <Seat key={i} who={roster[i]} />)}
-                <button className={'menu-btn pick sm' + (mine ? ' primary' : '')}
+                <button className={'room-btn' + (mine ? ' on' : '')}
                         disabled={!mine && roster.length >= need}
                         onClick={() => (mine ? unpickTeam() : pickTeam(tm, getColor()))}>
                   <span className="t">{mine ? t('room.leaveTeam') : t('room.joinTeam')}</span>
@@ -91,7 +91,7 @@ export default function Room({ room, onLeave }){
               </span>
             ))}
           </div>
-          <button className={'menu-btn pick sm' + (mineTeam < 0 ? ' primary' : '')}
+          <button className={'room-btn' + (mineTeam < 0 ? ' on' : '')}
                   disabled={mineTeam < 0}
                   onClick={() => watchRoom()}>
             <span className="t">{mineTeam < 0 ? t('room.watchingNow') : t('room.goWatch')}</span>
@@ -104,7 +104,7 @@ export default function Room({ room, onLeave }){
           {MODES.filter(([k]) => !(k === 'soccer' && n > 4))
                 .filter(([k]) => !(k === 'gun' && ffa))
                 .map(([k, m, label]) => (
-            <button key={k} className={'menu-btn pick sm' + (kind === k ? ' primary' : '')}
+            <button key={k} className={'room-btn' + (kind === k ? ' on' : '')}
                     disabled={!host || kind === k}
                     onClick={() => setRoomMode({ ...m, ffa, n })}>
               <span className="t">{t(label)}</span>
@@ -115,7 +115,7 @@ export default function Room({ room, onLeave }){
         <span className="pick-title">{t('room.size')}</span>
         <div className="room-modes">
           {counts.map(k => (
-            <button key={k} className={'menu-btn pick sm' + (n === k ? ' primary' : '')}
+            <button key={k} className={'room-btn' + (n === k ? ' on' : '')}
                     disabled={!host || n === k}
                     onClick={() => setRoomMode({ melee, ffa, soccer, n: k })}>
               <span className="t">{ffa ? t('pvp.players', { n: k }) : `${k / 2} vs ${k / 2}`}</span>
@@ -125,7 +125,7 @@ export default function Room({ room, onLeave }){
 
         {/* 시작 — 방장만. 자리가 다 차야 한다 */}
         {host ? (
-          <button className="menu-btn primary" disabled={!full} onClick={() => startRoom()}>
+          <button className="room-btn go" disabled={!full} onClick={() => startRoom()}>
             <span className="t">{t('room.start')}</span>
           </button>
         ) : (
