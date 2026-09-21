@@ -21,7 +21,7 @@ import { onLangChange, t } from './i18n/index.js';
 import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
-import { playAgain, setRoomMode, getRoom, onRoom, onGo } from './net/connection.js';
+import { playAgain, setRoomMode, getRoom, onRoom, onGo, onKicked } from './net/connection.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -43,10 +43,18 @@ export default function App(){
   const [isHost, setIsHost] = useState(false);   // [stated] 방장이면 결과 화면에 '다시 하기'
   // [stated] **방(로비)** — 소켓으로 흘러오는 방 상태를 그대로 담는다
   const [room, setRoom] = useState(null);
+  const [kickedNote, setKickedNote] = useState(false);   // 강퇴 알림
   useEffect(() => {
     onRoom(r => setRoom(r));
     onGo(() => setScreen('game'));
-    return () => { onRoom(null); onGo(null); };
+    // [stated] **강퇴당하면 홈으로 보내고 알린다**
+    onKicked(() => {
+      disconnect();
+      setRoom(null);
+      setKickedNote(true);
+      setScreen('home');
+    });
+    return () => { onRoom(null); onGo(null); onKicked(null); };
   }, []);
   const [summary, setSummary] = useState(null);   // 결과 창에 띄울 한 판 요약
   const [score, setScore] = useState(null);       // 이번 판 점수 변화 (PVP만)
@@ -313,15 +321,14 @@ export default function App(){
                                           onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} onTuto={goHome} />}
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={(session?.mode === 'create' || session?.mode === 'join') ? backToRoom : null}
         onNext={(session?.kind === 'ai' && result === 'win' && (session.stage || 1) < 30) ? nextStage : null} onHome={goHome} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto}
-        onLogout={async () => {
-          // [stated] **로그아웃하면 로그인 화면으로.** 기기에 남은 계정 기록을 지우고,
-          // 메모리에 올라간 값도 버리려고 **앱을 새로 띄운다** — 하나씩 초기화하다 빠뜨리면
-          // 이전 계정의 점수·티켓이 다음 계정 화면에 남는다
-          setShowSettings(false);
-          try { const m = await import('./cloud/firebase.js'); await m.logOut(); } catch { /* 무시 */ }
-          location.reload();
-        }} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto} />}
+      {kickedNote && (
+        <div className="modal-back" onClick={() => setKickedNote(false)}>
+          <div className="kick-ask"><p>{t('room.kickedMsg')}</p>
+            <button className="room-btn" onClick={() => setKickedNote(false)}>{t('common.ok')}</button>
+          </div>
+        </div>
+      )}
       {/* [stated] 처음 켰을 때 — 시작하기 / 건너뛰기 */}
       {askTuto && (
         <div className="modal-back">

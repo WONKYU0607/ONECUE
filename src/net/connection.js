@@ -107,7 +107,7 @@ function openOnce(transport){
 
 // 접속해서 상대가 들어올 때까지 기다린다. onStage로 진행 상황을 알린다.
 // mode: 'queue'(랜덤) | 'create'(방 만들기) | 'join'(코드 입장)
-export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'queue', code = '', n = 2, melee = false, ffa = false, color = -1, soccer = false } = {}){
+export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs, mode = 'queue', code = '', n = 2, melee = false, ffa = false, color = -1, soccer = false } = {}){
   SELF.watching = false;    // 새 접속마다 초기화 — 지난 판의 관전 상태가 남으면 안 된다
   // 깨우기를 여러 번 두드린다. 한 번에 응답이 없어도 화면이 멈추지 않게 진행 상황을 알린다
   let health = null;
@@ -132,6 +132,11 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
 
   return new Promise((resolve, reject) => {
     let slot = -1, room = -1, settled = false;
+    // [stated] **로비에 들어왔는가.** 방장은 코드를 받자마자, 입장자는 방에 들어오자마자 로비로 가는데
+    // 그때 `settled`(접속 끝)는 아직 false 다. `settled` 만 보고 시작 알림을 걸렀더니
+    // **방장이 [시작하기] 를 눌러도 로비에 남았다.** 로비에 있음을 따로 표시한다.
+    // 빠른 매칭은 로비가 없으므로 이 값이 false 로 남아 VS 화면이 먼저 뜬다 (예전 그대로)
+    let lobby = false;
     transport.onStatus = st => {
       if (st === 'closed' && !settled){ settled = true; reject(new Error(t('err.lost'))); }
     };
@@ -161,7 +166,12 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
       }
       // [stated] **빠른 매칭에서 VS 화면이 안 떴다** — 이 알림이 매칭 순간에도 발동해
       // 화면을 바로 게임으로 넘겨버렸다. **접속이 끝난 뒤**(= 로비에 있을 때)만 쓴다
-      if (m.t === 'go' && settled){ try { goWatch?.(); } catch { /* 무시 */ } }
+      if (m.t === 'go' && (settled || lobby)){ try { goWatch?.(); } catch { /* 무시 */ } }
+      // [stated] **강퇴당했다** — 자동 재접속을 꺼야 한다. 안 끄면 끊기자마자 같은 방으로 다시 붙는다
+      if (m.t === 'kicked'){
+        transport.auto = false;
+        try { kickWatch?.(); } catch { /* 무시 */ }
+      }
     };
     transport.always = always;
     transport.toClient = m => {
@@ -187,6 +197,12 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
         transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer);
         onStage?.('waiting');
         if (m.back && m.pid >= 0) done();    // 자리까지 돌려받은 재접속. 서버가 go를 다시 보내지 않는다
+        // [stated] **코드로 들어간 사람이 "서버에 연결하는 중" 에서 안 넘어갔다.**
+        // 방은 방장이 [시작하기] 를 눌러야 시작하므로 서버가 `go` 를 안 보낸다 — 그런데 입장자는
+        // `go` 를 받아야만 로비로 가게 돼 있었다. 방장이 시작을 누를 때까지 갇혀 있다가
+        // 로비를 건너뛰고 곧장 게임으로 들어갔다.
+        // → **방장이 코드를 받는 순간 로비로 가는 것과 똑같이**, 입장자는 방에 들어온 순간 로비로
+        else if (mode === 'join'){ lobby = true; onJoined?.(); }
       } else if (m.t === 'watch'){
         // [stated] **자리가 다 차서 관전으로 들어왔다** — 조작 없이 보기만 한다
         SELF.slot = -1; SELF.n = m.n | 0; SELF.melee = !!m.melee;
@@ -205,12 +221,14 @@ export async function connectAndWait({ onStage, onCode, onLobby, onVs, mode = 'q
       } else if (m.t === 'colortaken'){
         onLobby?.({ colorFail: m.color });
       } else if (m.t === 'room'){
+        lobby = true;
         onCode?.(m.code);
         onStage?.('hosting');
       } else if (m.t === 'joinfail'){
         settled = true;
         transport.close();
-        reject(new Error(m.reason === 'full' ? t('err.roomFull') : t('err.noRoom')));
+        reject(new Error(m.reason === 'full' ? t('err.roomFull')
+          : m.reason === 'kicked' ? t('room.kickedMsg') : t('err.noRoom')));
       } else if (m.t === 'queued'){
         onStage?.('waiting', m.ahead);
       } else if (m.t === 'vs'){
@@ -243,6 +261,15 @@ export function onRoom(fn){ roomWatch = fn; }
 let goWatch = null;
 /** 방장이 시작을 누르면 모두 이걸 받는다 */
 export function onGo(fn){ goWatch = fn; }
+
+/** [stated] **강퇴당하면 불린다** — 홈으로 보내고 알린다 */
+let kickWatch = null;
+export function onKicked(fn){ kickWatch = fn; }
+
+/** [stated] **방장이 강퇴한다** — 방장 확인·대상 확인은 서버가 한다 */
+export function kickPlayer(slot){
+  tell({ t: 'kick', slot });
+}
 
 /** [stated] **방장이 판을 시작한다** */
 export function startRoom(){

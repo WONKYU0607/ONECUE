@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { t } from '../../i18n/index.js';
 import InviteFriends from '../InviteFriends.jsx';
 import { getColor } from '../../state/profile.js';
-import { pickTeam, unpickTeam, setRoomMode, startRoom, watchRoom } from '../../net/connection.js';
+import { pickTeam, unpickTeam, setRoomMode, startRoom, watchRoom, kickPlayer } from '../../net/connection.js';
 
 /** 종목 고르기 — 인원수에 따라 못 고르는 것이 있다 */
 const MODES = [
@@ -21,6 +21,8 @@ const MODES = [
 
 export default function Room({ room, onLeave }){
   const [, tick] = useState(0);
+  // [stated] 강퇴 확인 창 — 누구를 뺄지 ({slot, nick})
+  const [kickWho, setKickWho] = useState(null);
   useEffect(() => {
     // 방 상태는 소켓으로 흘러온다. 바뀌면 다시 그린다
     const id = setInterval(() => tick(v => v + 1), 300);
@@ -36,9 +38,16 @@ export default function Room({ room, onLeave }){
   const counts = soccer ? [2, 4] : (ffa ? [3, 4, 5, 6] : [2, 4, 6]);
   const full = (names[0]?.length || 0) + (names[1]?.length || 0) >= n;
 
+  // [stated] **방장만, 방장을 뺀 사람 옆에 강퇴 버튼.** 방장은 `host` 가 나 자신이므로 내 자리를 뺀다
   const Seat = ({ who }) => (
     <div className={'seat' + (who ? '' : ' empty') + (who && who.slot === mySlot ? ' me' : '')}>
-      {who ? (who.nick || t('match.teamAnon')) : t('room.empty')}
+      <span className="seat-nm">{who ? (who.nick || t('match.teamAnon')) : t('room.empty')}</span>
+      {host && who && who.slot !== mySlot && (
+        <button className="kick-btn"
+                onClick={() => setKickWho({ slot: who.slot, nick: who.nick || t('match.teamAnon') })}>
+          {t('room.kick')}
+        </button>
+      )}
     </div>
   );
 
@@ -132,6 +141,19 @@ export default function Room({ room, onLeave }){
           <p className="res-wait">{t('room.waitHost')}</p>
         )}
       </div>
+      {/* [stated] 강퇴 확인 — "OO 플레이어를 강퇴하시겠습니까?" 예 / 아니오 */}
+      {kickWho && (
+        <div className="modal-back" onClick={() => setKickWho(null)}>
+          <div className="kick-ask" onClick={e => e.stopPropagation()}>
+            <p>{t('room.kickAsk', { nick: kickWho.nick })}</p>
+            <div className="kick-row">
+              <button className="room-btn" onClick={() => setKickWho(null)}>{t('common.no')}</button>
+              <button className="room-btn kick-yes"
+                      onClick={() => { kickPlayer(kickWho.slot); setKickWho(null); }}>{t('common.yes')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

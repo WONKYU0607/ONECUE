@@ -23,6 +23,14 @@ export default function ProfileTab({ onClose, onFriends }){
   // firebase 가 통째로 딸려 들어가 292kB 가 1,170kB 가 된다(실측). 필요할 때만 받는다
   const [linked, setLinked] = useState(false);
   const [accName, setAccName] = useState(null);
+  const [askOut, setAskOut] = useState(false);   // 로그아웃 확인 창
+  // 로그아웃: 계정 기록은 기기에서 지우고(`logOut`) 앱을 새로 띄운다 —
+  // 메모리에 올라간 값을 하나씩 초기화하다 빠뜨리면 이전 계정 점수가 다음 계정 화면에 남는다
+  const doLogout = async () => {
+    setAskOut(false);
+    try { const m = await import('../cloud/firebase.js'); await m.logOut(); } catch { /* 무시 */ }
+    location.reload();
+  };
   const [accMsg, setAccMsg] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -39,7 +47,9 @@ export default function ProfileTab({ onClose, onFriends }){
     setBusy(true); setAccMsg('');
     try {
       const m = await import('../cloud/firebase.js');
-      const r = await m.signInGoogle();
+      // [stated] **게스트면 잇는다(link).** 그냥 구글 로그인을 하면 **다른 계정**으로 갈아타서
+      // 게스트로 쌓은 점수·닉네임·스킨이 버려진다. 잇기는 같은 계정(uid)을 유지한다
+      const r = (m.isGuest && m.isGuest()) ? await m.linkGoogle() : await m.signInGoogle();
       if (r.ok){
         // 로그인한 계정의 기록으로 **기기를 덮는다.** 순서가 반대면 지금 기기 값이
         // 그 계정 기록을 밀어낸다 (새로 깐 기기면 점수 1000·티켓 5 로 덮여 버린다)
@@ -47,6 +57,8 @@ export default function ProfileTab({ onClose, onFriends }){
         setLinked(m.googleLinked());
         setAccName(m.accountName());
         setN(getNick());          // 계정 것으로 이름도 맞춘다
+      } else if (r.reason === 'taken'){
+        setAccMsg(t('acc.linkTaken'));   // 이미 다른 기기에서 쓰는 구글 계정
       } else if (r.reason !== 'cancel'){
         setAccMsg(t('acc.fail'));
       }
@@ -167,6 +179,19 @@ export default function ProfileTab({ onClose, onFriends }){
         <div className="prof-foot">
           <button className="menu-btn" onClick={onClose}><span className="t">{t('common.ok')}</span></button>
         </div>
+
+        {/* [stated] **로그아웃은 프로필 맨 밑.** 다른 계정으로 바꾸려면 있어야 한다.
+            실수로 안 누르게 한 번 더 묻는다 */}
+        <button className="logout-btn" onClick={() => setAskOut(true)}>{t('acc.logout')}</button>
+        {askOut && (
+          <div className="logout-ask">
+            <p>{t('acc.logoutAsk')}</p>
+            <div className="logout-row">
+              <button className="logout-btn" onClick={() => setAskOut(false)}>{t('common.cancel')}</button>
+              <button className="logout-btn go" onClick={doLogout}>{t('acc.logout')}</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

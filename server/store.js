@@ -303,11 +303,17 @@ export const REGEN_MS = 10 * 60 * 1000;
 export const FFA_MAX = 3;
 const dayKey = () => new Date().toISOString().slice(0, 10);
 
-/** 지난 시간만큼 채운 값을 돌려준다 (문서를 고치지는 않는다) */
-function grown(v, now){
-  let tk = Math.max(0, Math.min(TICKET_MAX, (v && v.tk) | 0));
+/** 지난 시간만큼 채운 값을 돌려준다 (문서를 고치지는 않는다).
+ *
+ *  [stated] **새 계정이 티켓 0장으로 시작했다.** 앱이 닉네임·색을 저장하며 플레이어 문서를
+ *  먼저 만드는데, 거기엔 티켓 항목이 없다. 문서가 "있으니" 기본값(가득)을 안 쓰고
+ *  없는 `tk` 를 `| 0` 으로 **0 으로 읽었다.** 충전 기준 시각(`at`)도 없어 매번 "지금"이 돼
+ *  **영영 차지도 않았다.** → 항목이 없으면 0 이 아니라 **처음 값(가득)** 으로 본다.
+ *  (점수는 `?? 1000` 으로 이미 그렇게 읽고 있었다) */
+export function grown(v, now){
+  let tk = (v && typeof v.tk === 'number') ? Math.max(0, Math.min(TICKET_MAX, v.tk | 0)) : TICKET_MAX;
   let at = (v && typeof v.at === 'number' && isFinite(v.at)) ? v.at : now;
-  let ffa = Math.max(0, Math.min(FFA_MAX, (v && v.ffa) | 0));
+  let ffa = (v && typeof v.ffa === 'number') ? Math.max(0, Math.min(FFA_MAX, v.ffa | 0)) : FFA_MAX;
   const day = (v && v.day) || '';
   // **꽉 차 있으면 시계를 지금으로 당긴다** — 안 그러면 오래 쉬었다 한 장 쓰는 순간
   // 여러 장이 한꺼번에 들어온다

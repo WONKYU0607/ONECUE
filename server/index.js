@@ -58,6 +58,10 @@ class Room {
     // [stated] **방장** — 판이 끝나도 방이 유지되고, 방장이 다시 시작한다.
     // 나가면 남아 있는 사람에게 자동으로 넘어간다
     this.hostSid = null;
+    // [stated] **강퇴한 사람** — 자동 재접속이나 같은 코드로 다시 못 들어오게.
+    // 접속 아이디(sid)는 **탭마다 달라서** 앱을 껐다 켜면 새 사람이 된다 → **계정(uid)으로도** 막는다
+    this.kicked = new Set();
+    this.kickedUid = new Set();
     this.waitingList = [];      // 아직 팀을 안 고른 사람들
     this.watchers = new Set();  // [stated] 관전자 — 자리 없이 보기만 한다. 인원 제한 없음
     // 팀을 고르기 전에는 자리가 없어서 sid를 남길 데가 없다.
@@ -371,7 +375,12 @@ class Room {
   }
   /** [stated] **방장이 나가면 남은 사람에게 넘긴다.** 자리 순서대로 첫 사람 */
   ensureHost(){
-    if (this.hostSid && this.seats.some(x => x.sid === this.hostSid)) return;
+    // [stated] **방을 만든 사람이 방장이 아니게 됐다** (2대2). 팀을 골라야 자리에 앉는데,
+    // 방장이 아직 고르는 중(또는 관전 중)이면 "자리가 없다" 고 보고 **앉아 있는 친구에게 넘겼다.**
+    // → 자리가 없어도 **방 안에 있으면**(팀 고르는 중·관전 중) 방장을 유지한다
+    const inRoom = sid => this.waitingList.some(w => w.sid === sid && w.readyState === 1)
+      || [...this.watchers].some(w => w.sid === sid && w.readyState === 1);
+    if (this.hostSid && (this.seats.some(x => x.sid === this.hostSid) || inRoom(this.hostSid))) return;
     const seat = this.seats.find(x => x.sid && x.ws);
     this.hostSid = seat ? seat.sid : null;
   }
@@ -580,6 +589,31 @@ class Room {
     this.server.s.color[slot] = slot;        // 색을 다시 고를 수 있게
     this.send({ t: 'peer', slot, state: 'left' });
     if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
+  }
+
+  /** [stated] **방장이 강퇴한다.** 로비(시작 전)에서만 — 판 중에 빼면 판이 깨진다.
+   *  `quit` 을 쓰지 않는다: 축구는 나간 자리를 AI 가 채우는데, 강퇴는 **빈자리**가 돼야
+   *  다른 사람이 들어올 수 있다 */
+  kick(slot){
+    if (this.server.s.phase !== PH_READY) return false;
+    const seat = this.seats[slot];
+    if (!seat || !seat.sid || seat.sid === this.hostSid) return false;   // 빈자리·방장은 못 뺀다
+    const ws = seat.ws;
+    this.kicked.add(seat.sid);
+    if (ws && ws.uid) this.kickedUid.add(ws.uid);
+    this.pending.delete(seat.sid);
+    seat.sid = null; seat.ws = null; seat.goneAt = 0; seat.bot = null;
+    this.server.s.color[slot] = slot;          // 색을 다시 고를 수 있게
+    if (this.server.s.nick) this.server.s.nick[slot] = '';
+    if (ws){
+      try { ws.send(JSON.stringify({ t: 'kicked' })); } catch { /* 무시 */ }
+      ws.room = null; ws.slot = -1; ws.kicked = true;
+      try { ws.close(); } catch { /* 무시 */ }
+    }
+    this.send({ t: 's', tick: this.server.s.tick, st: JSON.parse(JSON.stringify(this.server.s)) });
+    this.sendLobby();
+    this.sendRoom();
+    return true;
   }
 
   // 유예 시간이 지난 자리는 비운다
@@ -886,6 +920,7 @@ wss.on('connection', (ws, req) => {
     const room = new Room(nextRoomId++, newCode(), want, melee, ffa, soccer);
     rooms.set(room.id, room);
     codes.set(room.code, room);
+    room.hostSid = sid;          // [stated] **만든 사람이 방장** — 먼저 팀을 고른 사람이 아니라
     ws.room = room;
     if (want > 2 && !ffa){
       room.waitJoin(ws, sid);
@@ -897,6 +932,9 @@ wss.on('connection', (ws, req) => {
   } else if (mode === 'join'){
     const room = codes.get(code);
     if (!room){ ws.send(JSON.stringify({ t: 'joinfail', reason: 'notfound' })); ws.close(); return; }
+    if (room.kicked.has(sid) || (ws.uid && room.kickedUid.has(ws.uid))){
+      ws.send(JSON.stringify({ t: 'joinfail', reason: 'kicked' })); ws.close(); return;
+    }
     ws.room = room;
     // [stated] **자리가 다 차면 관전으로 들어온다.** 인원 제한 없음, 조작 없이 보기만 한다
     if (room.full){
@@ -1067,6 +1105,15 @@ wss.on('connection', (ws, req) => {
       room.ensureHost();
       if (ws.sid !== room.hostSid){ ws.send(JSON.stringify({ t: 'nothost' })); return; }
       if (!room.setMode(m)) ws.send(JSON.stringify({ t: 'nomode' }));
+      return;
+    }
+    // [stated] **방장이 강퇴한다** — 방장인지는 서버가 본다 (클라 말을 믿지 않는다)
+    if (m.t === 'kick' && ws.room){
+      const room = ws.room;
+      room.ensureHost();
+      if (ws.sid !== room.hostSid){ ws.send(JSON.stringify({ t: 'nothost' })); return; }
+      const slot = m.slot | 0;
+      if (room.kick(slot)) console.log(`강퇴: room ${room.id} slot ${slot}`);
       return;
     }
     // [stated] **방장이 판을 시작한다** — 자리가 다 차야 한다

@@ -30,7 +30,10 @@ export default function RoomEnter({ session, onCancel, onEntered }){
       soccer: !!session?.soccer,
       color: Number.isInteger(session?.color) ? session.color : -1,
       // **방을 만들면 코드를 받는 순간이 방이 생긴 순간이다** → 바로 로비로
-      onCode: () => { if (alive.current) go(); }
+      onCode: () => { if (alive.current) go(); },
+      // [stated] **코드로 들어가도 방에 들어온 순간 로비로** — 예전엔 방장이 시작을 누를 때까지
+      // "서버에 연결하는 중" 에 갇혀 있었다
+      onJoined: () => { if (alive.current) go(); }
     })
       .then(c => {
         if (!alive.current) return;

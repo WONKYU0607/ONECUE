@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="UTF-8"><title>e2e room probe</title></head>
+<body>
+<!-- 시나리오 검사(e2e-room.test.js)가 띄우는 페이지. **앱이 쓰는 것과 같은 접속 코드**를 부른다.
+     화면은 없고, 일어난 일을 window.E2E 에 적어 둔다 -->
+<script type="module">
+import { connectAndWait, pickTeam, startRoom, kickPlayer, onRoom, onGo, onKicked } from '/src/net/connection.js';
+import { t } from '/src/i18n/index.js';
+const E = window.E2E = { stage: [], entered: null, code: null, room: null, go: false,
+                         kicked: false, err: null, kickedText: t('room.kickedMsg') };
+onRoom(r => { E.room = r; });
+onGo(() => { E.go = true; });
+onKicked(() => { E.kicked = true; });
+window.act = { pickTeam, startRoom, kickPlayer };
+window.start = (mode, code, n) => {
+  connectAndWait({ mode, code, n,
+    onStage: s => E.stage.push(s),
+    onCode: c => { E.code = c; E.entered = 'code'; },
+    onJoined: () => { E.entered = 'joined'; } })
+    .then(() => { E.resolved = true; })
+    .catch(e => { E.err = (e && e.message) || 'err'; });
+};
+window.READY = true;
+</script>
+</body></html>
