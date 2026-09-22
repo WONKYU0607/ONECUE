@@ -54,6 +54,10 @@ class Room {
     // 판 시작 전 점수·연승. **매칭 때 한 번만 읽는다** — 판마다 읽으면 할당량이 닳는다
     this.preScore = Array.from({ length: n }, () => ({ score: 1000, streak: 0 }));
     this.settled = false;        // 점수를 이미 썼는가 (한 판에 한 번만)
+    // [stated] **총·칼 점수가 자꾸 같은 값(900)으로 돌아갔다.** 판 시작 전 점수를 **방당 한 번만**
+    // 읽고 `primed` 를 영영 안 껐다 → 같은 방의 두 번째 판부터 **첫 판 시작 전 점수**로 계산해
+    // 덮어썼다. 새 판이 차려질 때마다 다시 읽는다
+    this.primed = false;
     this.emptyAt = 0;
     // [stated] **방장** — 판이 끝나도 방이 유지되고, 방장이 다시 시작한다.
     // 나가면 남아 있는 사람에게 자동으로 넘어간다
@@ -393,7 +397,8 @@ class Room {
     // 다시 시작할 때도 **전원이 화면에 들어올 때까지** 준비 시간을 세지 않는다
     for (const x of this.seats) if (x.ws) x.ws.seen = false;
     st.hold = true;
-    this.settled = false;                 // 다음 판 점수를 다시 쓸 수 있게
+    this.settled = false;
+    this.primed = false;                  // **판 시작 전 점수를 다시 읽는다**
     // **`charged` 를 비우면 안 된다** — 빠른 매칭에서 다시 하기로 무한히 돌 수 있다.
     // 친구방은 애초에 안 깎으므로 그대로 두면 된다
     this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
@@ -412,6 +417,7 @@ class Room {
     for (const x of this.seats) if (x.ws) x.ws.seen = false;
     st.hold = true;
     this.settled = false;
+    this.primed = false;                  // 새 판이면 점수를 다시 읽는다
     this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
     this.sendLobby();
     this.sendRoom();
@@ -463,6 +469,7 @@ class Room {
     st.nick = fit(keepNick, ''); st.color = fit(keepColor, 0); st.off = fit(keepOff, false);
     st.rdy = readyLimit(this.melee, this.soccer);
     this.settled = false;
+    this.primed = false;                  // 종목이 바뀌면 점수를 다시 읽는다
     this.send({ t: 'mode', melee: this.melee, ffa: this.ffa, soccer: this.soccer, n: this.n });
     this.sendRoom();
     this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
@@ -1153,6 +1160,11 @@ wss.on('connection', (ws, req) => {
       const st = ws.room.server.s;
       if (st.phase === PH_PLAY || st.phase === PH_READY){ st.over = true; st.phase = PH_OVER; st.winner = 1; }
       ws.room.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+      return;
+    }
+    // **검사 전용** — 저장된 점수를 돌려준다. `E2E_DEBUG=1` 일 때만
+    if (m.t === '__score' && process.env.E2E_DEBUG === '1'){
+      ws.send(JSON.stringify({ t: '__score', uid: m.uid, v: store.fakeGet(m.uid) }));
       return;
     }
     // **검사 전용** — 선수를 정한 자리에 세운다(공 주인까지). `E2E_DEBUG=1` 일 때만

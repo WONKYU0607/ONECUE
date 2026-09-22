@@ -1,0 +1,70 @@
+<!doctype html>
+<html><head><meta charset="UTF-8"><title>e2e melee probe</title></head>
+<body>
+<!-- 실제 서버로 칼전 한 판. **스킨 입은 쪽과 기본 쪽을 같은 거리에 세우고** 누가 언제 맞는지 잰다.
+     화면 쪽도 같이 잰다: 내 캐릭터가 그려지는 자리(머리·발끝·좌우)를 픽셀로 -->
+<script type="module">
+import { connectAndWait, startRoom, onGo, getConnection } from '/src/net/connection.js';
+import { Client } from '/src/game/net.js';
+import { SELF, setArena, FP, PH_PLAY } from '/src/game/config.js';
+import { createRenderer } from '/src/game/render.js';
+import { setTry } from '/src/state/tryskin.js';
+import { warmUp, keysFor } from '/src/game/assets.js';
+const q = new URLSearchParams(location.search);
+const host = q.get('host') === '1';
+const skin = +(q.get('skin') || 0);
+if (skin) setTry('melee', skin);                    // 내 화면에서만 입는다 (판정과 무관)
+const E = window.E2E = { entered: null, code: null, rep: null, err: null };
+onGo(() => setTimeout(runGame, 50));
+window.start = (mode, code) => { connectAndWait({ mode, code, n: 2, melee: true,
+  onCode: c => { E.code = c; E.entered = 'code'; }, onJoined: () => { E.entered = 'joined'; } })
+  .catch(e => { E.err = (e && e.message) || 'err'; }); };
+window.startRoom = startRoom;
+async function runGame(){
+  await warmUp(keysFor({ melee: true, n: 2 }));
+  await new Promise(r => setTimeout(r, 600));
+  const conn = getConnection(), tr = conn.transport;
+  SELF.slot = conn.slot; SELF.n = 2; SELF.melee = true;
+  setArena(2, true, false, false);
+  const cv = document.createElement('canvas'); cv.width = 540; cv.height = 1200;
+  cv.style.cssText = 'position:fixed;left:0;top:0;width:393px';
+  document.body.appendChild(cv);
+  const view = createRenderer(cv); view.resize(393, 760);
+  const client = new Client(tr, [conn.slot]);
+  const me = conn.slot, A = host ? me : 1 - me, B = 1 - A;
+  let f = 0, nextRd = 0, placed = -1, last = performance.now();
+  const log = { firstHitA: -1, firstHitB: -1, hpA: 100, hpB: 100, gap: q.get('gap') };
+  function loop(now){
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (client.s.phase !== PH_PLAY && now >= nextRd){ client.setReady(me); client.setGo(me); nextRd = now + 250; }
+    const s = client.s;
+    if (s.phase === PH_PLAY){
+      if (placed < 0){
+        if (host){
+          // A 는 왼쪽에서 오른쪽(face 3), B 는 오른쪽에서 왼쪽(face 2). 간격은 gap(px)
+          const g = +q.get('gap'), cx = 88, cy = 150;
+          tr.clientSend({ t: '__place', at: [{ slot: A, x: cx - g / 2, y: cy, face: 3 },
+                                             { slot: B, x: cx + g / 2, y: cy, face: 2 }] });
+        }
+        placed = f;
+      }
+      const k = f - placed;
+      if (k > 20){
+        if (log.firstHitA < 0 && s.p[A].hp < 100){ log.firstHitA = k; log.hpA = s.p[A].hp; }
+        if (log.firstHitB < 0 && s.p[B].hp < 100){ log.firstHitB = k; log.hpB = s.p[B].hp; }
+      }
+      if (k >= 240 && !E.rep){
+        E.rep = { me, slotA: A, ...log, hpNowA: s.p[A].hp, hpNowB: s.p[B].hp, skin, tick: s.tick };
+      }
+    }
+    client.ping(now); client.sendInputs(now); client.applyFrames(); client.predict();
+    client.updateRender(client.alpha(now), dt);
+    try { view.draw(client.pred || client.s, '', 0, client, { on: 0, nx: 0, ny: 0 }, null, 0, true, {}); }
+    catch (e){ if (!E.drawErr) E.drawErr = String(e).slice(0, 120); }   // 그림 한 장이 없어도 계속 잰다
+    f++;
+    if (!E.rep) requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+window.READY = true;
+</script></body></html>

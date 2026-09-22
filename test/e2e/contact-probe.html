@@ -40,11 +40,14 @@ function runGame(){
       if (me === A && k === 100) client.tackle(me);
       if (k === 40){ log.pushB0 = s.p[B].y / FP; }
       if (k === 99){ log.pushB1 = s.p[B].y / FP; }
-      if (k >= 40 && k < 160){
+      // **미는 구간(40~99)에서만** 통과 여부를 잰다 — 태클은 미끄러져 지나가는 동작이라 따로 본다
+      if (k >= 40 && k < 100){
         const g = (s.p[A].y - s.p[B].y) / FP;          // A 가 B 보다 아래 있어야(+) 통과 안 한 것
         log.minGap = Math.min(log.minGap, g);
         if (g < 0) log.passed = true;
-        if (k >= 100 && !log.tackled && ((s.p[B].stun | 0) > 0 || s.ballOwner !== B)){ log.tackled = true; log.tkFrame = k; }
+      }
+      if (k >= 100 && k < 160 && !log.tackled && ((s.p[B].stun | 0) > 0 || s.ballOwner !== B)){
+        log.tackled = true; log.tkFrame = k;
       }
       if (k >= 170 && !E.rep) E.rep = { me, role: me === A ? '미는 쪽' : '공 가진 쪽', ...log,
         pushed: log.pushB0 != null && log.pushB1 != null ? +(log.pushB0 - log.pushB1).toFixed(1) : null };

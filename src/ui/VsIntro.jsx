@@ -38,12 +38,14 @@ const SHOW_MS = 3000;
 // 배율을 `92 / 칸높이` 로 잡아 스킨이 작아졌고, 높이를 92 로 고정해 칸이 큰 스킨이 넘쳤다.
 // 시트에서 직접 잰 값을 넣는다 — `bh` 몸통, `ax`~`aw` 가로 창, `by` 캐릭터 아래끝(칸 위에서)
 const SKIN_SHEET = {
+  // [stated] **스킨 시트를 기본과 같은 자리에 다시 맞췄다**(사거리가 짧게 느껴지던 원인) →
+  // 잘라 쓰는 자리도 새 시트 기준으로. 몸통 발끝 y 와 몸통 높이는 실제로 재서 넣은 값이다
   soccer: { src: 'assets/soccer-skins.webp', cw: 80,  ch: 52,  cols: 13, rows: 5, still: 0,
-            ax: 21, aw: 38,  by: 52,  bh: 48,  vh: 92 },
+            ax: 23, aw: 33,  by: 51,  bh: 45,  vh: 92 },
   melee:  { src: 'assets/melee-skins.webp',  cw: 270, ch: 131, cols: 8,  rows: 5, still: 0,
-            ax: 65, aw: 130, by: 114, bh: 94,  vh: 92 },
+            ax: 66, aw: 130, by: 129, bh: 92,  vh: 92 },
   gun:    { src: 'assets/gun-skins.webp',    cw: 80,  ch: 60,  cols: 4,  rows: 5, still: 0,
-            ax: 8,  aw: 61,  by: 57,  bh: 50,  vh: 100 }
+            ax: 9,  aw: 61,  by: 59,  bh: 48,  vh: 100 }
 };
 // 기본 캐릭터가 화면에서 차지하던 몸통 크기 (92 x 몸통 / 칸높이)
 const TGT = { gun: 92, melee: 80.8, soccer: 79.6 };

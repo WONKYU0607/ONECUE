@@ -26,7 +26,10 @@ try {
 // stderr로 내보내면 서버 오류를 감시하는 테스트가 실패한다
 if (!db) console.log('[store] 꺼짐 —', why, '· 점수는 저장되지 않는다');
 
-export const isOn = () => !!db;
+// **검사 전용 가짜 저장소** — `E2E_FAKE_STORE=1` 일 때만. 파이어스토어 없이 점수 흐름을 확인한다
+const FAKE = process.env.E2E_FAKE_STORE === '1' ? new Map() : null;
+export const fakeGet = uid => (FAKE ? FAKE.get(uid) || null : null);
+export const isOn = () => !!db || !!FAKE;
 
 /** 로그인 증표 확인. **uid 를 그냥 믿으면 남의 이름을 바꿔버릴 수 있다** —
  *  이름 바꾸기처럼 쓰기가 일어나는 곳은 반드시 이걸로 본인인지 확인한다 */
@@ -103,6 +106,16 @@ export function warmup(){
 /** 여러 사람의 기록을 한 번에 읽는다. 없으면 기본값.
  *  **매칭 때 한 번만** 부른다 — 판마다 읽으면 할당량이 금방 닳는다 */
 export async function readPlayers(uids){
+  if (FAKE){
+    const out = new Map();
+    for (const u of uids){
+      const d = FAKE.get(u) || {};
+      out.set(u, { nick: d.nick || '',
+        score: { gun: d.gun ?? 1000, melee: d.melee ?? 1000, soccer: d.soccer ?? 0 },
+        streak: { gun: d.sgun | 0, melee: d.smelee | 0, soccer: d.ssoccer | 0 } });
+    }
+    return out;
+  }
   const out = new Map();
   if (!db || !uids.length) return out;
   try {
@@ -129,6 +142,17 @@ export async function readPlayers(uids){
 
 /** 판이 끝나면 점수를 쓴다. **여러 명을 한 번에** (묶음 쓰기 1회) */
 export async function writeResults(rows){
+  if (FAKE){
+    for (const r of rows){
+      const kind = r.kind === 'melee' ? 'melee' : (r.kind === 'soccer' ? 'soccer' : 'gun');
+      const d = FAKE.get(r.uid) || {};
+      d[kind] = Math.max(0, r.score | 0);
+      d['s' + kind] = Math.max(0, r.streak | 0);
+      d.n = (d.n | 0) + 1;
+      FAKE.set(r.uid, d);
+    }
+    return true;
+  }
   if (!db || !rows.length) return false;
   try {
     const batch = db.batch();
