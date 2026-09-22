@@ -536,6 +536,61 @@ export function canThrow(s, slot, k){
 
 // 이 위치에 서면 엄폐물과 겹치는가. 드럼통은 함정이라 막지 않는다
 // (막으면 안 보이는 상태에서 길이 막혀 위치가 드러난다)
+/**
+ * [stated] **축구: 부딪히면 민다.** 규칙 7번 "상대를 밀 수 있다".
+ *  - 내가 움직인 쪽(큰 축)으로 상대를 밀어낸다. **미는 동안 나는 반만 나아간다**(상대가 버틴다) —
+ *    안 그러면 가만히 선 수비수가 드리블 속도 그대로 밀려나 수비가 의미 없어진다
+ *  - 마주 보고 밀면 서로 반씩 밀어 **제자리**(힘겨루기)
+ *  - 상대가 벽이나 다른 사람에 막히면 더 못 밀고 **나도 거기서 멈춘다**
+ *  - 2대2 에서 둘 사이에 끼어도 **옆으로는** 빠져나간다(옆으로 움직이면 옆으로 민다)
+ *  전부 정수라 서버·클라가 똑같이 계산한다
+ */
+function pushOthers(s, i, ox, oy){
+  const p = s.p[i];
+  for (let j = 0; j < s.n; j++){
+    if (j === i) continue;
+    const o = s.p[j];
+    if (o.hp <= 0 || (s.off && s.off[j])) continue;
+    if (!overlap(p.x, p.y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
+    const mdx = p.x - ox, mdy = p.y - oy;
+    if (Math.abs(mdx) >= Math.abs(mdy)){
+      const dir = mdx > 0 ? 1 : -1;
+      p.x = ox + ((mdx / 2) | 0);                                  // 버티는 만큼 반만 나아간다
+      const need = dir > 0 ? (p.x + PWf) - o.x : (o.x + PWf) - p.x;
+      if (need <= 0) continue;
+      const wi = wallIdx(o.y);
+      let nx = Math.max(WALL_L[wi], Math.min(WALL_R[wi], o.x + dir * need));
+      if (bodyHit(s, nx, o.y, i, j)) nx = o.x;                      // 뒤에 사람이 있으면 못 밀린다
+      const moved = Math.abs(nx - o.x);
+      o.x = nx;
+      if (moved < need) p.x -= dir * (need - moved);                // 못 민 만큼 나도 멈춘다
+    } else {
+      const dir = mdy > 0 ? 1 : -1;
+      p.y = oy + ((mdy / 2) | 0);
+      const need = dir > 0 ? (p.y + PHf) - o.y : (o.y + PHf) - p.y;
+      if (need <= 0) continue;
+      const tj = teamOf(j, s.n);
+      const lo = Math.max(teamYMin(tj), topSpan(o.x));
+      const hi = Math.min(teamYMax(tj), botSpan(o.x) - PHf);
+      let ny = Math.max(lo, Math.min(Math.max(lo, hi), o.y + dir * need));
+      if (bodyHit(s, o.x, ny, i, j)) ny = o.y;
+      const moved = Math.abs(ny - o.y);
+      o.y = ny;
+      if (moved < need) p.y -= dir * (need - moved);
+    }
+  }
+}
+// 밀려난 자리에 **다른 사람**(미는 사람·밀리는 사람 빼고)이 있는가
+function bodyHit(s, x, y, a, b){
+  for (let k = 0; k < s.n; k++){
+    if (k === a || k === b) continue;
+    const q = s.p[k];
+    if (q.hp <= 0 || (s.off && s.off[k])) continue;
+    if (overlap(x, y, PWf, PHf, q.x, q.y, PWf, PHf)) return true;
+  }
+  return false;
+}
+
 export function blocked(s, x, y, self = -1){
   setArena(s.n, s.melee, s.ffa, s.soccer, s.vsAll);
   // **이미 그 안에 서 있으면 막지 않는다.** 안 그러면 아이템 안에 갇혀 영영 못 나온다
@@ -553,8 +608,9 @@ export function blocked(s, x, y, self = -1){
     if (i === self) continue;
     const o = s.p[i];
     if (o.hp <= 0 || (s.off && s.off[i])) continue;   // 끊긴 사람은 유령 — 몸도 통과
-    // [stated] **축구는 캐릭터끼리 안 막는다** — 앞뒤를 둘이 막으면 가운데 사람이
-    // 영영 못 움직였다. 원래 규칙도 "상대를 밀 수 있다" 였다
+    // **축구는 여기서 막지 않는다 — 대신 이동 뒤에 민다**(`pushOthers`).
+    // 예전에 2대2 에서 앞뒤로 끼면 못 움직여 막기를 뺐는데, **통과만 남고 밀기는 없었다**
+    // (사용자가 시킨 적 없는 동작이다 — 규칙 7번은 "상대를 밀 수 있다").
     if (s.soccer) continue;
     if (!overlap(x, y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
     // [stated] **모서리에서 둘이 끼면 못 움직였다.**
@@ -867,8 +923,10 @@ export function step(s, inp){
         tx = best;
       }
       p.x = tx;
+      // [stated] **축구: 부딪히면 민다** (규칙 7번 "상대를 밀 수 있다")
+      if (s.soccer && (p.x !== ox || p.y !== oy)) pushOthers(s, i, ox, oy);
       // 축구: 움직이고 있으면 뛰는 자세로 그린다. **시뮬이 정해야** 예측·보간과 어긋나지 않는다
-      if (s.soccer) p.moving = (tx !== ox || ty !== oy) ? 6 : Math.max(0, (p.moving | 0) - 1);
+      if (s.soccer) p.moving = (p.x !== ox || p.y !== oy) ? 6 : Math.max(0, (p.moving | 0) - 1);
     }
     if (p.invul > 0) p.invul--;
     if (p.flash > 0) p.flash--;
