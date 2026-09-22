@@ -12,7 +12,7 @@ import { setInnerBack } from '../../state/back.js';
 import { DEBUG_TRY_SKIN, tryOf, setTry } from '../../state/tryskin.js';
 import { SOCCER_SKINS, SOCCER_SET, PREV_IMG, PREV_FW, PREV_FH, PREV_COLS, PREV_ROWS_N,
   PREV_LINES, GUN_SKINS, GUN_SET, GUN_PREV_IMG, GUN_PREV_FW, GUN_PREV_FH, GUN_PREV_COLS,
-  GUN_PREV_ROWS_N, GUN_PREV_LINES, MELEE_SKINS, MELEE_SET, MEL_PREV_IMG, MEL_PREV_FW,
+  GUN_PREV_ROWS_N, GUN_PREV_LINES, MELEE_SKINS, MELEE_SET, MELEE_ARENAS, ARENA_SET, NOADS, MEL_PREV_IMG, MEL_PREV_FW,
   MEL_PREV_FH, MEL_PREV_COLS, MEL_PREV_ROWS_N, MEL_PREV_LINES } from '../../game/skins.js';
 
 // 종목마다 미리보기 시트가 다르다. 한 곳에 모아 두고 하위 탭으로 고른다.
@@ -116,6 +116,7 @@ export default function Shop({ onBack }){
     gun: t('shop.sub.gun'), melee: t('shop.sub.melee'), soccer: t('shop.sub.soccer')
   };
   void worn;   // 눌렀을 때 다시 그리려고 둔다
+  const arenaName = k => t(k);
   const skinName = {
     'skin.no1': t('skin.no1'), 'skin.no2': t('skin.no2'), 'skin.no3': t('skin.no3'),
     'skin.no4': t('skin.no4'), 'skin.no5': t('skin.no5'), 'skin.set': t('skin.set')
@@ -132,7 +133,10 @@ export default function Shop({ onBack }){
       <div className="shop-tabs">
         {TABS.map(k => (
           <button key={k} className={'shop-btn' + (tab === k ? ' on' : '')}
-                  onClick={() => setTab(k)}>{label[k]}</button>
+                  onClick={() => {
+                    setTab(k); setAt(0);
+                    const el = swipe.current; if (el) el.scrollTo({ left: 0, behavior: 'auto' });
+                  }}>{label[k]}</button>
         ))}
       </div>
 
@@ -172,7 +176,7 @@ export default function Shop({ onBack }){
                   <SkinPreview sh={SHEETS[sub]} row={s2.row} h={H_ITEM} />
                   <div className="shop-card-foot">
                     <span className="nm">{skinName[s2.key]}</span>
-                    <span className="pr">{s2.price.toLocaleString()}원</span>
+                    <span className="pr">{t('shop.price', { p: s2.price.toLocaleString() })}</span>
                     {DEBUG_TRY_SKIN ? (
                       <button className={'shop-btn' + (tryOf(sub) === s2.id ? ' on' : '')}
                               onClick={() => setWorn(setTry(sub, s2.id))}>
@@ -207,7 +211,73 @@ export default function Shop({ onBack }){
               </div>
               <div className="shop-card-foot">
                 <span className="nm">{skinName[GOODS[sub].set.key]}</span>
-                <span className="pr">{GOODS[sub].set.price.toLocaleString()}원</span>
+                <span className="pr">{t('shop.price', { p: GOODS[sub].set.price.toLocaleString() })}</span>
+                <button className="shop-btn" disabled>{t('shop.soon')}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : tab === 'arena' ? (
+        // [stated] **칼전 아레나 5종** — 스킨과 같은 틀: 한 장씩 넘겨 보고, 아래에 5종 세트
+        <div className="shop-wrap">
+          <button className="shop-arrow l arena" disabled={at === 0} onClick={() => goTo(at - 1)}>‹</button>
+          <button className="shop-arrow r arena" disabled={at === MELEE_ARENAS.length - 1}
+                  onClick={() => goTo(at + 1)}>›</button>
+          <div className="shop-swipe" ref={swipe}
+               onScroll={e => {
+                 const w = e.currentTarget.clientWidth || 1;
+                 setAt(Math.round(e.currentTarget.scrollLeft / w));
+               }}>
+            {MELEE_ARENAS.map(a => (
+              <div key={a.id} className="shop-card">
+                <div className="shop-card-in">
+                  <i className="arena-prev" style={{ backgroundImage: `url(${a.img})` }} />
+                  <div className="shop-card-foot">
+                    <span className="nm">{arenaName(a.key)}</span>
+                    <span className="pr">{t('shop.price', { p: a.price.toLocaleString() })}</span>
+                    {DEBUG_TRY_SKIN ? (
+                      <button className={'shop-btn' + (tryOf('arena') === a.id ? ' on' : '')}
+                              onClick={() => setWorn(setTry('arena', a.id))}>
+                        {tryOf('arena') === a.id ? t('shop.wearing') : t('shop.wear')}
+                      </button>
+                    ) : (
+                      <button className="shop-btn" disabled>{t('shop.soon')}</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="shop-dots">
+            {MELEE_ARENAS.map((a, i) => (
+              <i key={a.id} className={i === at ? 'on' : ''} onClick={() => goTo(i)} />
+            ))}
+          </div>
+          {/* 5종 세트 — 한 줄에 다섯 장 */}
+          <div className="shop-set">
+            <div className="shop-card-in">
+              <div className="arena-set">
+                {MELEE_ARENAS.map(a => (
+                  <i key={a.id} className="arena-mini" style={{ backgroundImage: `url(${a.img})` }} />
+                ))}
+              </div>
+              <div className="shop-card-foot">
+                <span className="nm">{arenaName(ARENA_SET.key)}</span>
+                <span className="pr">{t('shop.price', { p: ARENA_SET.price.toLocaleString() })}</span>
+                <button className="shop-btn" disabled>{t('shop.soon')}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : tab === 'noads' ? (
+        // [stated] **광고 제거 4,900원** — 결제가 붙기 전이라 보여주기만 한다
+        <div className="shop-wrap">
+          <div className="shop-set">
+            <div className="shop-card-in">
+              <i className="noads-icon" style={{ backgroundImage: `url(${NOADS.img})` }} />
+              <div className="shop-card-foot">
+                <span className="nm">{t(NOADS.key)}</span>
+                <span className="pr">{t('shop.price', { p: NOADS.price.toLocaleString() })}</span>
                 <button className="shop-btn" disabled>{t('shop.soon')}</button>
               </div>
             </div>

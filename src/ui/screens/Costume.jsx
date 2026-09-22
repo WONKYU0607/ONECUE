@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import { setInnerBack } from '../../state/back.js';
 import { getColor, setColor, avatarPos } from '../../state/profile.js';
 import { tryOf, setTry, ownsSkin } from '../../state/tryskin.js';
-import { GUN_SKINS, MELEE_SKINS, SOCCER_SKINS,
+import { GUN_SKINS, MELEE_SKINS, SOCCER_SKINS, MELEE_ARENAS,
   GUN_PREV_IMG, GUN_PREV_FW, GUN_PREV_FH, GUN_PREV_COLS, GUN_PREV_ROWS_N,
   MEL_PREV_IMG, MEL_PREV_FW, MEL_PREV_FH, MEL_PREV_COLS, MEL_PREV_ROWS_N,
   PREV_IMG, PREV_FW, PREV_FH, PREV_COLS, PREV_ROWS_N } from '../../game/skins.js';
@@ -108,6 +108,29 @@ export default function Costume({ onBack }){
           </div>
         );
       })}
+      {/* [stated] **아레나(칼전)** — 스킨과 같은 방식: 그림 · 안 가진 건 실루엣 · 장착/해제 · 가진 것 앞으로 */}
+      <div className="cost-sec">
+        <span className="cost-h">{t('cost.arena')}</span>
+        <div className="cost-row">
+          {[...MELEE_ARENAS].sort((x, y) =>
+            (ownsSkin('arena', y.id) ? 1 : 0) - (ownsSkin('arena', x.id) ? 1 : 0) || x.id - y.id
+          ).map(a => {
+            const owned = ownsSkin('arena', a.id);
+            const wearing = tryOf('arena') === a.id;
+            return (
+              <div key={a.id} className={'cost-item' + (wearing ? ' on' : '') + (owned ? '' : ' lock')}>
+                <i className="cost-arena" style={{ backgroundImage: `url(${a.img})` }} />
+                {owned && (
+                  <button className={'cost-eq' + (wearing ? ' off' : '')}
+                          onClick={() => { setTry('arena', a.id); bump(x => x + 1); }}>
+                    {wearing ? t('cost.off') : t('cost.on')}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

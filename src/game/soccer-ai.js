@@ -200,18 +200,26 @@ export function createSoccerAI(slot, level = 1){
 
     // ── 태클 ─────────────────────────────────────────────────────
     // **매 틱 본다.** 계획할 때만 보면 상대가 잡는 순간과 어긋나 영영 안 들어간다
-    let tkl = 0;
+    let tkl = 0, aim = null;
     if (foeHas && (me.tklCool | 0) === 0 && (me.tkl | 0) === 0 && now - lastTkl >= L.tklGap){
       const o = s.p[own];
       const d = Math.min(d2(cx, cy, o.x + half(PWf), o.y + half(PHf)), d2(cx, cy, b.x, b.y));
-      if (d <= TACKLE_RANGE * TACKLE_RANGE){ tkl = 1; lastTkl = now; }
+      if (d <= TACKLE_RANGE * TACKLE_RANGE){
+        tkl = 1; lastTkl = now;
+        // [stated] **봇이 사람 바로 옆에 붙어 12번 태클하고도 못 뺏었다 (6판에 1판).**
+        // 줄을 맞추려고 옆으로 살짝 움직였다 멈추면 방향이 옆으로 굳어, 사람이 위에 있어도
+        // **옆으로 미끄러져 빗나갔다.** 태클은 보는 방향으로 나간다 →
+        // 그 틱에 **상대 쪽 축으로** 이동 입력을 같이 준다. 시뮬은 이동(방향)을 먼저, 태클을 나중에 처리한다
+        const tx = o.x + half(PWf) - cx, ty = o.y + half(PHf) - cy;
+        aim = Math.abs(ty) >= Math.abs(tx) ? [0, ty < 0 ? -1 : 1] : [tx < 0 ? -1 : 1, 0];
+      }
     }
 
     // 미끄러지는 동안에는 방향 입력이 의미 없다
     if ((me.tkl | 0) > 0 && (me.tkl | 0) < TACKLE_TICKS) return { dx: 0, dy: 0, fire, fch, tkl: 0 };
 
     // 대각선은 벡터 길이로 맞춘다 (축별로 그냥 주면 1.41배 빨라진다)
-    const [ux, uy] = dir;
+    const [ux, uy] = aim || dir;
     const len = Math.sqrt(ux * ux + uy * uy) || 1;
     // 사람이 스틱을 끝까지 민 것과 같은 크기. 실제 속도는 시뮬이 `stepCap` 으로 자른다
     const cap = 4 * FP;

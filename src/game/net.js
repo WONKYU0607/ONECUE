@@ -368,6 +368,8 @@ export const RENDER_BUF = 2;   // 상대를 확정 기록보다 이만큼 뒤에
 const HOLD_INPUT = 12;
 // 예측이 확정보다 앞설 수 있는 최대 틱
 const PRED_MAX = 12;
+// 확정이 이만큼(1초) 넘게 밀리면 재생하지 않고 최신 스냅샷으로 건너뛴다
+const JUMP_TICKS = 60;
 const CATCHUP_SKIP = 60;
 
 export class Client {
@@ -553,6 +555,21 @@ export class Client {
     }
   }
   applyFrames(){
+    // [stated] **한쪽 화면을 안 보고 있으면(백그라운드·화면 꺼짐) 브라우저가 화면 갱신을 멈춘다.**
+    // 다시 보이면 밀린 몇십 초를 한 프레임에 8틱씩 **빨리 감기로 재생**했다 —
+    // "상대가 끊기며 빨라 보인다", "20초 차이 난다", "렉이 심해 안 움직인다" 가 전부 이것.
+    // → 밀린 게 1초를 넘으면 재생하지 말고 **최신 스냅샷으로 바로 건너뛴다** (스냅샷은 0.5초마다 온다)
+    const sn0 = this.pendingSnap;
+    if (sn0 && sn0.tick - this.s.tick > JUMP_TICKS){
+      this.s = normalizeState(cloneState(sn0.st));
+      this.pendingSnap = null;
+      for (const k of [...this.frames.keys()]) if (k <= sn0.tick) this.frames.delete(k);
+      while (this.sent.length && this.sent[0].tick <= this.s.tick) this.sent.shift();
+      // 화면 보정값도 새로 잡는다 — 안 그러면 옛 위치에서 새 위치로 미끄러져 간다
+      this.rx = null; this.ry = null; this.rb = null; this.hist = []; this.rt = null;
+      this.mhist = []; this.mrt = null;
+      this.jumps = (this.jumps | 0) + 1;
+    }
     let guard = 0;
     while (guard++ < 8){
       const f = this.frames.get(this.s.tick + 1);

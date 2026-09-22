@@ -1,0 +1,74 @@
+<!doctype html>
+<html><head><meta charset="UTF-8"><title>e2e game probe</title></head>
+<body>
+<!-- 실제 서버에 붙어 **게임 루프(game.js 와 같은 순서)** 를 돌리고 수치를 적는다 -->
+<script type="module">
+import { connectAndWait, startRoom, onGo, getConnection } from '/src/net/connection.js';
+import { Client } from '/src/game/net.js';
+import { SELF, setArena, stepCap, FP, PH_PLAY, TICK_MS } from '/src/game/config.js';
+const E = window.E2E = { entered: null, code: null, go: false, err: null, rep: null };
+const q = new URLSearchParams(location.search);
+const LAT = +(q.get('lat') || 0), JIT = +(q.get('jit') || 0);   // 편도 지연·흔들림(ms)
+onGo(() => { E.go = true; setTimeout(runGame, 50); });
+window.start = (mode, code) => {
+  connectAndWait({ mode, code, n: 2, soccer: true,
+    onCode: c => { E.code = c; E.entered = 'code'; },
+    onJoined: () => { E.entered = 'joined'; } })
+    .catch(e => { E.err = (e && e.message) || 'err'; });
+};
+window.startRoom = startRoom;
+function runGame(){
+  const conn = getConnection();
+  const tr = conn.transport;
+  SELF.slot = conn.slot; SELF.n = 2;
+  setArena(2, false, false, true);
+  const client = new Client(tr, [conn.slot]);
+  // 지연 흉내 — 보내는 것과 받는 것 둘 다
+  const d = () => Math.max(0, LAT + (Math.random() * 2 - 1) * JIT);
+  if (LAT || JIT){
+    const send = tr.clientSend.bind(tr);
+    tr.clientSend = m => setTimeout(() => send(m), d());
+    const recv = tr.toClient;
+    tr.toClient = m => setTimeout(() => recv(m), d());
+  }
+  const me = conn.slot, foe = 1 - me;
+  const sp = stepCap();
+  let f = 0, last = performance.now(), nextRd = 0;
+  const lagS = [], foeStep = [], meStep = [];
+  let prevFoe = null, prevMe = null, playF = 0;
+  function loop(now){
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (client.s.phase !== PH_PLAY && now >= nextRd){ client.setReady(me); client.setGo(me); nextRd = now + 250; }
+    const ang = f / 40 + me * 2;
+    client.input(me, Math.round(Math.cos(ang) * sp), Math.round(Math.sin(ang) * sp), 0);
+    client.ping(now); client.sendInputs(now);
+    client.applyFrames(); client.predict();
+    client.updateRender(client.alpha(now), dt);
+    if (client.s.phase === PH_PLAY){
+      playF++;
+      lagS.push(client.estServerTick(now) - client.s.tick);   // 확정이 서버보다 몇 틱 뒤인가
+      const fx = client.rx[foe], fy = client.ry[foe], mx = client.rx[me], my = client.ry[me];
+      if (prevFoe && fx !== undefined) foeStep.push(Math.hypot(fx - prevFoe[0], fy - prevFoe[1]) / FP);
+      if (prevMe && mx !== undefined) meStep.push(Math.hypot(mx - prevMe[0], my - prevMe[1]) / FP);
+      prevFoe = [fx, fy]; prevMe = [mx, my];
+    }
+    f++;
+    if (playF < 900) requestAnimationFrame(loop);
+    else {
+      const avg = a => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length);
+      const real = sp / FP;                                          // 한 틱에 최대 이동(px)
+      E.rep = {
+        slot: me, delay: client.delay, rtt: Math.round(client.rtt),
+        lagAvg: +avg(lagS).toFixed(1), lagMax: Math.max(...lagS),
+        foeAvg: +avg(foeStep).toFixed(2), meAvg: +avg(meStep).toFixed(2), real: +real.toFixed(2),
+        foeJumps: foeStep.filter(x => x > real * 2.5).length,
+        foeStill: foeStep.filter(x => x < 0.05).length,
+        foeBig: foeStep.filter(x => x > 3).length, foeMaxStep: +Math.max(...foeStep).toFixed(1),
+        behind1s: lagS.filter(x => x > 60).length, jumps: client.jumps | 0,
+        frames: playF };
+    }
+  }
+  requestAnimationFrame(loop);
+}
+window.READY = true;
+</script></body></html>

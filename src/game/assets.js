@@ -1,3 +1,4 @@
+import { tryOf } from '../state/tryskin.js';
 // 자산을 한 번만 로드해서 공유한다. 진입창에서 미리 받아두면
 // 게임 화면에 들어갈 때 배경이 늦게 뜨는 일이 없다.
 export const ASSET_SRC = {
@@ -18,6 +19,12 @@ export const ASSET_SRC = {
   gunskin:    'assets/gun-skins.webp',
   // [stated] 칼전 스킨. 칸 270x108 (기본 242x99 보다 넓다 — 칼빛·날개 때문)
   melskin:    'assets/melee-skins.webp',
+  // [stated] 칼전 아레나 스킨 — 각자 자기 것만 보인다 (그림만 바꾸고 벽은 기존 그대로)
+  marena1:    'assets/marena-egypt.webp',
+  marena2:    'assets/marena-knight.webp',
+  marena3:    'assets/marena-ice.webp',
+  marena4:    'assets/marena-hell.webp',
+  marena5:    'assets/marena-necro.webp',
   melee:      'assets/melee.webp',    // 칼전 캐릭터 4색 x 4자세
   characters: 'assets/characters.png',
   items:      'assets/items.webp',
@@ -89,7 +96,9 @@ export function warmUp(keys){
 
 /** 이 판에 필요한 그림 이름들 */
 export function keysFor({ melee, soccer, n = 2 } = {}){
-  const arena = soccer ? 'arena4' : (melee ? 'arena3' : (n > 2 ? 'arena2' : 'arena'));
+  // 칼전은 **장착한 아레나**가 있으면 그 그림을 받는다 (안 쓰는 네 장은 안 받는다)
+  const ma = melee && !soccer ? tryOf('arena') : 0;
+  const arena = soccer ? 'arena4' : (melee ? (ma > 0 ? 'marena' + ma : 'arena3') : (n > 2 ? 'arena2' : 'arena'));
   const who = soccer ? 'soccer' : (melee ? 'melee' : 'characters');
   // 칼전이면 칼전 스킨, 총격전이면 총격전 스킨을 같이 받는다
   const sk = melee ? 'melskin' : 'gunskin';

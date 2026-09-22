@@ -88,3 +88,23 @@ export const MEL_PREV_IMG = 'assets/melee-preview.webp';
 export const MEL_PREV_FW = 300, MEL_PREV_FH = 220, MEL_PREV_COLS = 4, MEL_PREV_ROWS_N = 5;
 // [stated] 4칸을 한 줄에 놓으면 좁은 폰에서 넘친다(418 > 308) → **2칸씩 두 줄**
 export const MEL_PREV_LINES = [[0, 1], [2, 3]];
+
+// ── 칼전 아레나 ────────────────────────────────────────────────
+// [stated] 칼전 경기장 5종. 각 990원 / 5종 세트 4,900원.
+// [stated] **각자 자기 것만 보인다** — 경기장 그림만 바꾸고 벽·판정은 기존과 똑같다(A3).
+// 그림은 원본(900x1749)이 기존(540x933)보다 길쭉해서 **비율을 지켜 높이에 맞추고
+// 양옆 빈 곳은 바깥 벽을 살짝 늘려 채웠다** (바닥 쪽은 안 늘림)
+export const MELEE_ARENAS = [
+  { id: 1, key: 'arena.no1', img: 'assets/marena-egypt.webp',  asset: 'marena1', sku: 'arena_melee_1', price: 990 },
+  { id: 2, key: 'arena.no2', img: 'assets/marena-knight.webp', asset: 'marena2', sku: 'arena_melee_2', price: 990 },
+  { id: 3, key: 'arena.no3', img: 'assets/marena-ice.webp',    asset: 'marena3', sku: 'arena_melee_3', price: 990 },
+  { id: 4, key: 'arena.no4', img: 'assets/marena-hell.webp',   asset: 'marena4', sku: 'arena_melee_4', price: 990 },
+  { id: 5, key: 'arena.no5', img: 'assets/marena-necro.webp',  asset: 'marena5', sku: 'arena_melee_5', price: 990 }
+];
+export const ARENA_SET = { id: 'set_arena', key: 'arena.set', sku: 'arena_melee_set', price: 4900,
+  grants: [1, 2, 3, 4, 5] };
+
+// ── 광고 제거 ─────────────────────────────────────────────────
+// [stated] 4,900원. 결제·광고가 붙기 전이라 지금은 보여주기만 한다
+export const NOADS = { id: 'noads', key: 'shop.noadsName', sku: 'no_ads', price: 4900,
+  img: 'assets/noads.webp' };

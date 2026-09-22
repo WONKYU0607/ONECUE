@@ -227,8 +227,13 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
       } else if (m.t === 'joinfail'){
         settled = true;
         transport.close();
-        reject(new Error(m.reason === 'full' ? t('err.roomFull')
-          : m.reason === 'kicked' ? t('room.kickedMsg') : t('err.noRoom')));
+        // [stated] **강퇴당한 방에 다시 들어가려 하면 "진입할 수 없습니다" 만.**
+        // 화면이 구분할 수 있게 표시(`code`)를 달아 보낸다
+        if (m.reason === 'kicked'){
+          const e = new Error(t('room.noEntry')); e.code = 'kicked'; reject(e);
+        } else {
+          reject(new Error(m.reason === 'full' ? t('err.roomFull') : t('err.noRoom')));
+        }
       } else if (m.t === 'queued'){
         onStage?.('waiting', m.ahead);
       } else if (m.t === 'vs'){

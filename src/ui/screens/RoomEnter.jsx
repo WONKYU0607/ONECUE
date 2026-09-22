@@ -14,6 +14,7 @@ export default function RoomEnter({ session, onCancel, onEntered }){
   const goneRef = useRef(false);
   const go = () => { if (goneRef.current) return; goneRef.current = true; onEntered(); };
   const [err, setErr] = useState('');
+  const [blocked, setBlocked] = useState(false);   // 강퇴당한 방에 다시 들어가려 함
   const [sec, setSec] = useState(0);
   const alive = useRef(true);
 
@@ -40,12 +41,23 @@ export default function RoomEnter({ session, onCancel, onEntered }){
         if (c && c.watching) SELF.watching = true;
         go();                                  // 코드로 들어온 경우는 여기서 로비로
       })
-      .catch(e => { if (alive.current){ setErr(e?.message || ''); } });
+      .catch(e => { if (alive.current){ setErr(e?.message || ''); setBlocked(e?.code === 'kicked'); } });
 
     return () => { alive.current = false; clearInterval(iv); };
   }, [onEntered, session]);
 
   const cancel = () => { disconnect(); onCancel(); };
+
+  // [stated] **강퇴당한 방에 다시 들어가려 할 때는 "진입할 수 없습니다" 만** —
+  // "연결할 수 없다"·서버 주소·초는 연결 문제처럼 보여서 뺀다
+  if (blocked) return (
+    <div className="screen center match">
+      <p className="match-msg">{t('room.noEntry')}</p>
+      <button className="menu-btn small" onClick={cancel}>
+        <span className="t">{t('common.cancel')}</span>
+      </button>
+    </div>
+  );
 
   return (
     <div className="screen center match">

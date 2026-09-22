@@ -16,7 +16,7 @@ let cur = null;
 
 function load(){
   if (cur) return cur;
-  cur = { gun: 0, melee: 0, soccer: 0 };
+  cur = { gun: 0, melee: 0, soccer: 0, arena: 0 };   // arena = 칼전 아레나
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) cur = { ...cur, ...JSON.parse(raw) };

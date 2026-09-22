@@ -98,7 +98,8 @@ try {
     await E(B, 'window.E2E.err = null; window.E2E.entered = null');
     await E(B, `start('join', '${code}', ${n})`);
     assert(await until(B, 'window.E2E.err !== null'), '  강퇴당한 사람은 같은 화면에서 다시 못 들어온다');
-    assert(await E(B, 'window.E2E.err === window.E2E.kickedText'), '  "방장이 내보냈다" 로 알린다');
+    assert(await E(B, 'window.E2E.errCode === "kicked" && window.E2E.err === window.E2E.noEntry'),
+      '  "진입할 수 없습니다" 로 알린다');
 
     // 다른 사람이 들어와 시작 (1대1만 — 2대2는 네 명이 있어야 시작된다)
     if (n === 2){

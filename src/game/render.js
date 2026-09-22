@@ -11,7 +11,7 @@ import { makeRoller, BALL_R, GOAL_SEQ, GOAL_HOLD, GOAL_SCORE, KICK_FX_TICKS } fr
 import { RS, computeLayout, stickGeom, shieldBtn, tackleBtn } from './layout.js';
 import { resultFor } from './ui-state.js';
 import { GUN_FW, GUN_FH, MSK_FW, MSK_FH } from './skins.js';
-import { tryForArena } from '../state/tryskin.js';
+import { tryForArena, tryOf } from '../state/tryskin.js';
 import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
 import { t, getLang } from '../i18n/index.js';
@@ -90,7 +90,15 @@ export function createRenderer(canvas){
   const ballImg = getImage('ball');         // 축구공
   const kickImg = getImage('kickfx');       // 슛 충격 연출
   const roll = makeRoller();                // 공 굴림 각도 (그리기 전용)
-  const bgOf = () => getImage(ARENA.bg);   // 아레나에 따라 배경이 달라진다
+  // 아레나에 따라 배경이 달라진다.
+  // [stated] **칼전은 장착한 아레나 스킨으로.** 각자 자기 것만 보인다 — 그림만 바꾸고 벽은 그대로
+  const bgOf = () => {
+    if (ARENA.bg === 'arena3'){
+      const ma = tryOf('arena');
+      if (ma > 0){ const im = getImage('marena' + ma); if (isReady(im)) return im; }
+    }
+    return getImage(ARENA.bg);
+  };
   const boom = getImage('explosion');
 
   // [stated] **칼전 초반이 유독 끊긴다.** 맞을 때 `ctx.filter` 로 하얗게 만들었는데

@@ -1079,3 +1079,16 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .kick-row{display:flex;gap:8px}
 .kick-row .room-btn{flex:1 1 0;min-width:0}
 .room-btn.kick-yes{color:#fff;background:rgba(150,40,40,.85);border-color:#f08a80}
+
+/* ── 아레나(칼전) · 광고 제거 ─────────────────────────────────────
+   [stated] 아레나는 스킨과 같은 틀. 그림 비율은 540:933 */
+.arena-prev{display:block;width:108px;height:187px;flex:0 0 auto;
+  background:center/cover no-repeat;border:1px solid rgba(110,170,220,.35);border-radius:2px}
+.arena-set{display:flex;gap:6px;justify-content:center;min-width:0}
+.arena-mini{display:block;flex:0 0 auto;width:44px;height:76px;
+  background:center/cover no-repeat;border:1px solid rgba(110,170,220,.3);border-radius:2px}
+.shop-arrow.arena{top:130px}
+.noads-icon{display:block;width:108px;height:128px;background:center/contain no-repeat}
+/* 코스튬 아레나 칸 */
+.cost-arena{display:block;width:40px;height:69px;background:center/cover no-repeat}
+.cost-item.lock .cost-arena{filter:brightness(0) saturate(0);opacity:.45}
