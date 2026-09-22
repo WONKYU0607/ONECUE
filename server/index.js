@@ -401,6 +401,23 @@ class Room {
     return true;
   }
 
+  /** [stated] **결과 화면에서 [방으로]** — 판 끝남(OVER) 을 로비(READY)로 되돌린다. 시작은 안 한다.
+   *  안 하면 서버가 판 끝난 상태에 머물러 **강퇴·시작이 안 먹었다** (둘 다 로비 상태를 요구한다).
+   *  **준비 시간이 저절로 흐르지 않게** `seen` 을 지운다 — 한 판 뒤엔 다들 이미 들어왔던 표시가
+   *  남아 있어, 그대로 두면 로비에서 준비 시간이 흘러 판이 저절로 시작된다 */
+  toLobby(){
+    const st = this.server.s;
+    if (st.phase !== PH_OVER) return false;
+    resetForNextRound(st);
+    for (const x of this.seats) if (x.ws) x.ws.seen = false;
+    st.hold = true;
+    this.settled = false;
+    this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+    this.sendLobby();
+    this.sendRoom();
+    return true;
+  }
+
   /**
    * [stated] **방장이 종목을 바꾼다.** 인원수는 그대로라 자리·팀·색이 안 흔들린다.
    * (인원수까지 바꾸려면 자리를 다시 짜야 해서 따로 손봐야 한다)
@@ -1130,6 +1147,16 @@ wss.on('connection', (ws, req) => {
       room.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
       return;
     }
+    // **검사 전용** — 판을 바로 끝낸다. `E2E_DEBUG=1` 로 띄운 서버에서만 먹는다 (Render 에는 없다).
+    // "한 판 뒤 방으로 돌아와서" 를 검사하려면 판이 끝나야 하는데, 끝까지 치르면 너무 오래 걸린다
+    if (m.t === '__end' && ws.room && process.env.E2E_DEBUG === '1'){
+      const st = ws.room.server.s;
+      if (st.phase === PH_PLAY || st.phase === PH_READY){ st.over = true; st.phase = PH_OVER; st.winner = 1; }
+      ws.room.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+      return;
+    }
+    // [stated] **누구든 결과 화면에서 [방으로]** — 판 끝난 방을 로비로 되돌린다 (한 번만 먹는다)
+    if (m.t === 'toroom' && ws.room){ ws.room.toLobby(); return; }
     if (m.t === 'again' && ws.room){
       const room = ws.room;
       room.ensureHost();

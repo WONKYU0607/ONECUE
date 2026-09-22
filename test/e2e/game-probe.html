@@ -35,7 +35,7 @@ function runGame(){
   const sp = stepCap();
   let f = 0, last = performance.now(), nextRd = 0;
   const lagS = [], foeStep = [], meStep = [];
-  let prevFoe = null, prevMe = null, playF = 0;
+  let prevFoe = null, prevMe = null, playF = 0, prevTick = -1, ff = 0;
   function loop(now){
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
     if (client.s.phase !== PH_PLAY && now >= nextRd){ client.setReady(me); client.setGo(me); nextRd = now + 250; }
@@ -46,6 +46,8 @@ function runGame(){
     client.updateRender(client.alpha(now), dt);
     if (client.s.phase === PH_PLAY){
       playF++;
+      if (prevTick >= 0 && client.s.tick - prevTick >= 4) ff++;   // 한 프레임에 4틱 넘게 = 빨리 감기
+      prevTick = client.s.tick;
       lagS.push(client.estServerTick(now) - client.s.tick);   // 확정이 서버보다 몇 틱 뒤인가
       const fx = client.rx[foe], fy = client.ry[foe], mx = client.rx[me], my = client.ry[me];
       if (prevFoe && fx !== undefined) foeStep.push(Math.hypot(fx - prevFoe[0], fy - prevFoe[1]) / FP);
@@ -64,7 +66,7 @@ function runGame(){
         foeJumps: foeStep.filter(x => x > real * 2.5).length,
         foeStill: foeStep.filter(x => x < 0.05).length,
         foeBig: foeStep.filter(x => x > 3).length, foeMaxStep: +Math.max(...foeStep).toFixed(1),
-        behind1s: lagS.filter(x => x > 60).length, jumps: client.jumps | 0,
+        behind1s: lagS.filter(x => x > 60).length, jumps: client.jumps | 0, ff,
         frames: playF };
     }
   }

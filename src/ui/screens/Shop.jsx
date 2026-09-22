@@ -44,6 +44,8 @@ import { t } from '../../i18n/index.js';
 
 // **문구 열쇠를 이어붙이지 말 것** — 변수를 더해 만들면 번역 검사가 못 찾는다
 export const TABS = ['arena', 'skin', 'noads', 'item'];
+// 아레나 종목 탭 — 칼전이 먼저 (칼전만 만들었다)
+const ARENA_SUBS = ['melee', 'gun'];
 export const SKIN_SUBS = ['gun', 'melee', 'soccer'];
 
 /** 상점 미리보기 — 전용 고해상도 시트에서 잘라 두 줄로.
@@ -91,6 +93,8 @@ export default function Shop({ onBack }){
   const [tab, setTab] = useState(TABS[0]);
   // [stated] 스킨 탭을 열면 **총격전**부터 보인다
   const [sub, setSub] = useState('gun');
+  // [stated] **아레나도 종목 탭** — 칼전만 만들었으니 칼전이 먼저
+  const [asub, setAsub] = useState('melee');
   // [stated] 몇 번째인지 보이게 **점 다섯 개**, 그리고 **양옆 화살표**로도 넘긴다
   const [at, setAt] = useState(0);
   // [stated] 디버그: 실제 필드에서 입어볼 수 있게. 출시 전 `DEBUG_TRY_SKIN` 을 false 로
@@ -217,7 +221,20 @@ export default function Shop({ onBack }){
             </div>
           </div>
         </div>
-      ) : tab === 'arena' ? (
+      ) : tab === 'arena' ? (<>
+        <div className="shop-tabs sub">
+          {ARENA_SUBS.map(k => (
+            <button key={k} className={'shop-btn' + (asub === k ? ' on' : '')}
+                    onClick={() => {
+                      setAsub(k); setAt(0);
+                      const el = swipe.current; if (el) el.scrollTo({ left: 0, behavior: 'auto' });
+                    }}>{subLabel[k]}</button>
+          ))}
+        </div>
+        {asub !== 'melee' ? (
+          // 총격전 아레나는 아직 없다
+          <div className="shop-list"><p className="shop-empty">{t('shop.empty')}</p></div>
+        ) : (
         // [stated] **칼전 아레나 5종** — 스킨과 같은 틀: 한 장씩 넘겨 보고, 아래에 5종 세트
         <div className="shop-wrap">
           <button className="shop-arrow l arena" disabled={at === 0} onClick={() => goTo(at - 1)}>‹</button>
@@ -269,7 +286,8 @@ export default function Shop({ onBack }){
             </div>
           </div>
         </div>
-      ) : tab === 'noads' ? (
+        )}
+      </>) : tab === 'noads' ? (
         // [stated] **광고 제거 4,900원** — 결제가 붙기 전이라 보여주기만 한다
         <div className="shop-wrap">
           <div className="shop-set">

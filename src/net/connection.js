@@ -10,7 +10,7 @@ const getUid = () => myUid;
 
 // 서버 연결은 화면 전환보다 오래 살아야 한다 (매칭 화면 -> 게임 화면).
 // 그래서 React 밖 모듈에 두고, 게임을 나갈 때만 끊는다.
-const BASE = import.meta.env.VITE_SERVER_URL || 'ws://localhost:8080';
+const BASE = (import.meta.env && import.meta.env.VITE_SERVER_URL) || 'ws://localhost:8080';
 const HTTP_URL = BASE.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
 
 const TRIES = 8;          // 무료 서버가 깨어나는 데 50초 이상 걸린다
@@ -167,6 +167,15 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
       // [stated] **빠른 매칭에서 VS 화면이 안 떴다** — 이 알림이 매칭 순간에도 발동해
       // 화면을 바로 게임으로 넘겨버렸다. **접속이 끝난 뒤**(= 로비에 있을 때)만 쓴다
       if (m.t === 'go' && (settled || lobby)){ try { goWatch?.(); } catch { /* 무시 */ } }
+      // [stated] **칼전을 시작하면 잠깐 총격전 맵이 보였다.** 게임은 `SELF.melee/soccer` 로
+      // 경기장을 정하는데, 이 값을 방에 처음 들어올 때만 정해서 로비에서 방장이 종목을 바꿔도
+      // 그대로였다 → 첫 상태가 오기 전까지 **옛 종목 맵**을 그렸다. 방 상태가 올 때마다 맞춘다
+      if (m.t === 'roomst' || m.t === 'mode'){
+        if (m.n) SELF.n = m.n | 0;
+        if ('melee' in m) SELF.melee = !!m.melee;
+        if ('soccer' in m) SELF.soccer = !!m.soccer;
+        if ('ffa' in m) SELF.ffa = !!m.ffa;
+      }
       // [stated] **강퇴당했다** — 자동 재접속을 꺼야 한다. 안 끄면 끊기자마자 같은 방으로 다시 붙는다
       if (m.t === 'kicked'){
         transport.auto = false;
@@ -266,6 +275,12 @@ export function onRoom(fn){ roomWatch = fn; }
 let goWatch = null;
 /** 방장이 시작을 누르면 모두 이걸 받는다 */
 export function onGo(fn){ goWatch = fn; }
+
+/** [stated] **결과 화면에서 [방으로]** — 서버도 "판 끝남" 에서 로비로 되돌린다.
+ *  안 알리면 서버가 판 끝난 상태에 머물러 강퇴·시작이 안 먹는다 */
+export function backToLobby(){
+  tell({ t: 'toroom' });
+}
 
 /** [stated] **강퇴당하면 불린다** — 홈으로 보내고 알린다 */
 let kickWatch = null;

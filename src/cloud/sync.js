@@ -3,7 +3,7 @@
 // **Firebase는 나중에 받아온다.** 같이 묶으면 gzip 88KB → 255KB로 3배가 되어
 // 게임 시작 전에 그걸 다 기다려야 한다. 게임은 기기 저장으로 바로 돌고,
 // 로그인·동기화는 뒤에서 조용히 붙는다
-import { snapshot, hydrate, setSaveHook } from '../state/tickets.js';
+import { snapshot, hydrate, setSaveHook, recordOf } from '../state/tickets.js';
 import { nickSnapshot, hydrateNick, setNickSaveHook } from '../state/profile.js';
 import { setUid } from '../net/connection.js';
 
@@ -91,13 +91,27 @@ export async function mergeFrom(oldUid){
  *
  *  → **판이 끝나면 구름 값으로 다시 맞춘다.** 결과 화면은 클라 계산으로 바로 보여주고(반응 유지),
  *  뒤에서 조용히 덮는다. 서버 쓰기가 조금 늦으므로 **잠깐 기다렸다가 한 번 더** 시도한다 */
-export async function resyncAfterMatch(){
-  for (const wait of [900, 2200]){
+// 시험에서 구름 대신 가짜를 끼운다
+export function __setCloud(m){ mod = m; }
+const total = r => r ? (r.w | 0) + (r.l | 0) + (r.d | 0) : 0;
+export async function resyncAfterMatch(kind, waits = [900, 1500, 2500, 4000]){
+  // [stated] **서버가 이번 판을 쓴 걸 확인한 뒤에만 덮는다.** 예전엔 0.9초에 받아온 값이
+  // 무엇이든 덮고 멈췄다 — 서버가 아직 안 썼으면 **판 전 점수로 되돌려 놓고** 다시 안 봤다.
+  // 이번 판은 기기 전적에 이미 한 판 더해져 있으니, **구름 전적 판수가 그만큼 됐을 때** 덮는다
+  const want = kind ? total(recordOf(kind)) : 0;
+  for (const wait of waits){
     await new Promise(r => setTimeout(r, wait));
-    try { if (await resyncAccount()) return true; }
-    catch { /* 망이 끊겨도 게임은 돌아가야 한다 */ }
+    try {
+      const m = await load();
+      setUid(await m.uid());
+      const v = await m.pull();
+      if (!v) continue;
+      if (kind && total(v.record && v.record[kind]) < want) continue;   // 아직 안 씀 — 기다린다
+      hydrate(v); hydrateNick(v);
+      return true;
+    } catch { /* 망이 끊겨도 게임은 돌아가야 한다 */ }
   }
-  return false;
+  return false;   // 끝내 확인 못 하면 기기 값을 그대로 둔다 (옛 값으로 되돌리지 않는다)
 }
 
 export async function resyncAccount(){

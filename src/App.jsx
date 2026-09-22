@@ -21,7 +21,7 @@ import { onLangChange, t } from './i18n/index.js';
 import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
-import { playAgain, setRoomMode, getRoom, onRoom, onGo, onKicked } from './net/connection.js';
+import { playAgain, setRoomMode, getRoom, onRoom, onGo, onKicked, backToLobby } from './net/connection.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -37,6 +37,8 @@ export default function App(){
   const [, bumpLang] = useState(0);
   useEffect(() => onLangChange(() => bumpLang(v => v + 1)), []);
   const [screen, setScreen] = useState('splash');   // splash|login|home|ai|practice|pvp|matching|game|result|ranks|friends
+  const screenRef = useRef(screen);   // 콜백 안에서 지금 화면을 읽으려고
+  screenRef.current = screen;
   const [rankKind, setRankKind] = useState('gun');  // 순위표에서 먼저 볼 종목
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
@@ -237,9 +239,11 @@ export default function App(){
     setSummary(summary || null);
     // [stated] **프로필 점수와 순위표 점수가 달랐다.** 위 계산은 결과 화면을 바로 보여주기 위한
     // 기기 값이고, **구름에는 서버가 쓴다.** 둘이 어긋난 채로 쌓이지 않게 **끝나고 다시 맞춘다**
-    if (session?.kind === 'pvp')
-      import('./cloud/sync.js').then(m => m.resyncAfterMatch && m.resyncAfterMatch())
+    if (session?.kind === 'pvp'){
+      const kindNow = isSoccer ? 'soccer' : (summary?.melee ? 'melee' : 'gun');
+      import('./cloud/sync.js').then(m => m.resyncAfterMatch && m.resyncAfterMatch(kindNow))
         .catch(() => {});
+    }
     // AI 모드에서 이기면 다음 단계가 열린다
     // 모드별로 따로 기록한다 (1대1을 깼다고 3대3까지 열리면 안 된다)
     if (session?.kind === 'ai') recordResult(session.stage, r, modeKey(session.n || 2, !!session.melee));
@@ -249,8 +253,12 @@ export default function App(){
   const backToRoom = useCallback(() => {
     setResult(null);
     // **방으로 들어온 경우에만** 방으로 돌아간다 (빠른 매칭은 방이 없다)
-    if (session?.mode === 'create' || session?.mode === 'join') setScreen('room');
-    else goHome();
+    if (session?.mode === 'create' || session?.mode === 'join'){
+      // [stated] **한 판 뒤 방으로 돌아와 강퇴하니 안 먹었다.** 내 화면만 로비로 바뀌고
+      // 서버는 "판 끝남" 에 머물러 있었다 (강퇴·시작 모두 로비 상태를 요구한다) → 서버도 로비로
+      backToLobby();
+      setScreen('room');
+    } else goHome();
   }, [goHome, session]);
   const again     = useCallback(() => {
     setResult(null);
@@ -280,12 +288,17 @@ export default function App(){
   }, []);
   // [stated] **방장이 종목을 바꾸면** 세션을 갈아끼운다 — 인원수는 그대로라 자리는 안 흔들린다
   const onMode    = useCallback(m => {
-    setResult(null);
     setSession(sn => (sn ? { ...sn, melee: !!m.melee, ffa: !!m.ffa, soccer: !!m.soccer,
                             n: m.n || sn.n,
                             // 인원이 줄어 자리에서 밀려났으면 관전으로 바뀐다
                             watching: SELF.watching || sn.watching } : sn));
-    setScreen('game');
+    // [stated] **로비에서 종목만 눌렀는데 경기가 시작됐다.** 이건 원래 결과 화면에서 방장이
+    // 종목을 골라 새 판을 여는 용도인데, 한 판 뒤엔 게임 연결이 살아 있어 로비에서도 불렸다.
+    // → **결과 화면(또는 게임 중)일 때만** 게임으로 넘어간다. 로비에서는 [시작하기] 를 기다린다
+    if (screenRef.current === 'result' || screenRef.current === 'game'){
+      setResult(null);
+      setScreen('game');
+    }
   }, []);
 
   return (

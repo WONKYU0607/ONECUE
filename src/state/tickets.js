@@ -187,7 +187,10 @@ export function hydrate(v){
   if (typeof v.at === 'number' && isFinite(v.at)) cur.at = v.at;
   if (typeof v.ffa === 'number') cur.ffa = Math.max(0, Math.min(FFA_MAX, v.ffa | 0));
   if (typeof v.day === 'string') cur.day = v.day;
-  for (const k of ['gun', 'melee']){
+  // [stated] **축구 점수가 결과 화면과 실제가 따로 놀았다.** 여기서 총·칼만 옮겨서
+  // 기기의 축구 점수는 구름과 **한 번도 안 맞춰졌다** — 결과 화면은 기기에만 쌓인 값에서,
+  // 실제 점수는 서버가 구름 값에서 계산해 처음부터 어긋났다
+  for (const k of ['gun', 'melee', 'soccer']){
     if (v.score && typeof v.score[k] === 'number') cur.score[k] = Math.max(0, v.score[k] | 0);
     if (v.streak && typeof v.streak[k] === 'number') cur.streak[k] = Math.max(0, v.streak[k] | 0);
     if (v.record && v.record[k]) cur.record[k] = { w: v.record[k].w | 0, l: v.record[k].l | 0, d: v.record[k].d | 0 };

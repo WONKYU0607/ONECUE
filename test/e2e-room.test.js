@@ -41,7 +41,7 @@ async function up(url, ms){
   return false;
 }
 
-run(['server/index.js'], { PORT: String(SPORT) });
+run(['server/index.js'], { PORT: String(SPORT), E2E_DEBUG: '1' });
 if (!(await up(`http://127.0.0.1:${SPORT}/health`, 15000))){ cleanup(); skip('게임 서버가 안 뜸'); }
 run(['node_modules/vite/bin/vite.js', '--port', String(VPORT), '--host', '127.0.0.1', '--strictPort'],
     { VITE_SERVER_URL: `ws://127.0.0.1:${SPORT}` });
@@ -110,7 +110,30 @@ try {
       await E(A, 'act.startRoom()');
       assert(await until(A, 'window.E2E.go === true'), '  방장이 시작하면 방장 화면이 게임으로 간다');
       assert(await until(C, 'window.E2E.go === true'), '  입장자 화면도 게임으로 간다');
+
+      // [stated] **한 판 뒤 방으로 돌아와 강퇴하니 안 먹었다** — 판을 끝내고 [방으로], **바로** 강퇴
+      console.log('한 판 끝나고 방으로 돌아온 뒤');
+      await E(A, 'act.endNow()'); await wait(500);
+      await E(A, 'act.backToLobby()'); await E(C, 'act.backToLobby()'); await wait(500);
+      const cSlot = await E(A, '(window.E2E.room.names).flat().find(x => x.slot !== window.E2E.room.mySlot).slot');
+      await E(A, `act.kickPlayer(${cSlot})`);
+      assert(await until(C, 'window.E2E.kicked === true'), '  한 판 뒤에도 강퇴가 먹는다');
+      assert(await until(A, '(window.E2E.room.names).flat().length === 1'), '  자리가 빈다');
       await C.ctx.close();
+
+      // 새 사람이 들어온 로비에서 방장이 종목을 바꾼다
+      const D = await device();
+      await E(D, `start('join', '${code}', ${n})`);
+      assert(await until(D, 'window.E2E.entered === "joined"', 6000), '  새 사람이 로비로 들어온다');
+      await E(A, 'window.E2E.go = false');
+      await E(A, 'act.setRoomMode({ melee: true, ffa: false, soccer: false, n: 2 })'); await wait(700);
+      // [stated] **칼전 전에 총격전 맵이 잠깐 보였다** — 로비에서 바꾼 종목이 바로 반영돼야 한다
+      assert(await E(D, 'window.SELF.melee === true'), '  로비에서 바꾼 종목(칼전)이 입장자에게 바로 반영된다');
+      assert(await E(A, 'window.SELF.melee === true'), '  방장에게도 반영된다');
+      // [stated] **로비에서 종목만 눌러도 경기가 시작됐다**
+      assert(await E(A, 'window.E2E.go === false') && await E(D, 'window.E2E.go === false'),
+        '  종목만 바꿔서는 시작 신호가 안 온다');
+      await D.ctx.close();
     }
     await A.ctx.close(); await B.ctx.close();
   }

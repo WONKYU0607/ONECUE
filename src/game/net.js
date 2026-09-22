@@ -370,6 +370,8 @@ const HOLD_INPUT = 12;
 const PRED_MAX = 12;
 // 확정이 이만큼(1초) 넘게 밀리면 재생하지 않고 최신 스냅샷으로 건너뛴다
 const JUMP_TICKS = 60;
+// 화면 갱신이 이만큼 멈췄다 돌아오면(백그라운드) 밀린 양과 상관없이 건너뛴다
+const PAUSE_MS = 250;
 const CATCHUP_SKIP = 60;
 
 export class Client {
@@ -560,7 +562,14 @@ export class Client {
     // "상대가 끊기며 빨라 보인다", "20초 차이 난다", "렉이 심해 안 움직인다" 가 전부 이것.
     // → 밀린 게 1초를 넘으면 재생하지 말고 **최신 스냅샷으로 바로 건너뛴다** (스냅샷은 0.5초마다 온다)
     const sn0 = this.pendingSnap;
-    if (sn0 && sn0.tick - this.s.tick > JUMP_TICKS){
+    // [stated] **1초 미만으로 밀려도 끊겨 보였다.** 짧게 안 보다 돌아오면(알림 확인, 잠깐 다른 창)
+    // 밀린 게 1초가 안 돼 위 조건에 안 걸리고 빨리 감기로 재생됐다.
+    // → **화면이 멈췄다 돌아온 것**(직전 호출 뒤 0.25초 넘게 지남)을 알아채면 밀린 양과 상관없이 건너뛴다.
+    // 평소엔 프레임마다 불려서(16ms) 이 조건에 안 걸린다
+    const nowA = CLOCK.now();
+    const paused = this.lastApply > 0 && nowA - this.lastApply > PAUSE_MS;
+    this.lastApply = nowA;
+    if (sn0 && (sn0.tick - this.s.tick > JUMP_TICKS || (paused && sn0.tick > this.s.tick + 2))){
       this.s = normalizeState(cloneState(sn0.st));
       this.pendingSnap = null;
       for (const k of [...this.frames.keys()]) if (k <= sn0.tick) this.frames.delete(k);

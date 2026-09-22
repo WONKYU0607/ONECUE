@@ -79,6 +79,12 @@ try {
     assert(b.behind1s === 0, `  다시 본 뒤 1초 넘게 밀린 프레임이 없다 (${b.behind1s})`);
     assert(b.lagMax < 40, `  다시 본 뒤에도 뒤처짐이 작다 (${b.lagMax}틱)`);
   }
+  console.log('입장자 화면을 0.8초만 가렸다가 다시 볼 때 (1초 미만 — 예전엔 빨리 감기로 재생)');
+  {
+    const [, b] = await match(70, 40, 0.8);
+    assert(b.jumps >= 1, `  짧아도 재생하지 않고 건너뛴다 (${b.jumps}번)`);
+    assert(b.lagMax < 40, `  다시 본 뒤 뒤처짐이 작다 (${b.lagMax}틱)`);
+  }
   console.log('e2e-game.test.js 통과');
 } finally {
   await browser.close().catch(() => {});
