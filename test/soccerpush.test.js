@@ -77,6 +77,26 @@ console.log('2대2 — 앞뒤로 끼어도 옆으로는 빠져나간다');
   assert(s.p[0].x > x0 + 8 * FP, `  옆으로 ${((s.p[0].x - x0)/FP).toFixed(1)}px 빠져나갔다`);
 }
 
+// [stated] **밀기를 넣었더니 태클이 안 먹었다.** 사람은 상대 쪽으로 스틱을 밀면서 태클하는데
+// 그 이동이 상대를 계속 밀어내 몸이 안 겹쳤다. 봇은 스틱을 안 밀고 태클해서 **봇 검사로는 안 보였다**
+// → 사람처럼 **스틱을 상대 쪽으로 민 채** 태클한다. 상대가 가만히 있을 때·걸어갈 때 둘 다
+console.log('사람처럼 스틱을 밀면서 태클해도 걸린다 (4방향 x 상대 가만히/걸어감)');
+for (const mv of [false, true]) for (const d of ['up', 'down', 'left', 'right']){
+  const s = field();
+  const pw = PW() / FP, ph = PH() / FP, cx = 88, cy = 160;
+  put(s.p[1], cx, cy); s.ballOwner = 1; s.freeT = 0; s.p[1].face = 0;
+  const off = { up: [0, -(ph + 1)], down: [0, ph + 1], left: [-(pw + 1), 0], right: [pw + 1, 0] }[d];
+  put(s.p[0], cx + off[0], cy + off[1]);
+  const tdx = -Math.sign(off[0]) * sp, tdy = -Math.sign(off[1]) * sp;
+  step(s, [{ ...NOIN, dx: tdx, dy: tdy }, { ...NOIN }]);                 // 붙으면서 상대 쪽을 본다
+  let hit = false;
+  for (let t = 0; t < 40 && !hit; t++){
+    step(s, [{ ...NOIN, dx: tdx, dy: tdy, tkl: t === 0 ? 1 : 0 }, { ...NOIN, ...(mv ? { dy: -sp } : {}) }]);
+    hit = (s.p[1].stun | 0) > 0 || s.ballOwner !== 1;
+  }
+  assert(hit, `  ${d} 에서 태클 · 상대 ${mv ? '걸어감' : '가만히'} → 걸림`);
+}
+
 console.log('결정론 — 같은 입력이면 같은 결과');
 {
   const go = () => { const s = field(4);

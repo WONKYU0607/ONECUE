@@ -1,0 +1,60 @@
+<!doctype html>
+<html><head><meta charset="UTF-8"><title>e2e contact probe</title></head>
+<body>
+<!-- 실제 서버 + 게임 루프(game.js 순서)로 **밀기·태클**을 사람처럼 조작해 본다 -->
+<script type="module">
+import { connectAndWait, startRoom, onGo, getConnection } from '/src/net/connection.js';
+import { Client } from '/src/game/net.js';
+import { SELF, setArena, FP, PH_PLAY } from '/src/game/config.js';
+const E = window.E2E = { entered: null, code: null, rep: null, err: null };
+onGo(() => setTimeout(runGame, 50));
+window.start = (mode, code) => {
+  connectAndWait({ mode, code, n: 2, soccer: true,
+    onCode: c => { E.code = c; E.entered = 'code'; }, onJoined: () => { E.entered = 'joined'; } })
+    .catch(e => { E.err = (e && e.message) || 'err'; });
+};
+window.startRoom = startRoom;
+const host = new URLSearchParams(location.search).get('host') === '1';
+function runGame(){
+  const conn = getConnection(), tr = conn.transport;
+  SELF.slot = conn.slot; SELF.n = 2; SELF.soccer = true;
+  setArena(2, false, false, true);
+  const client = new Client(tr, [conn.slot]);
+  const me = conn.slot, A = host ? me : 1 - me, B = 1 - A;   // A = 방장(미는 쪽), B = 공 가진 쪽
+  let f = 0, nextRd = 0, placed = -1, last = performance.now();
+  const log = { pushB0: null, pushB1: null, passed: false, minGap: 1e9, tackled: false, tkFrame: -1 };
+  function loop(now){
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (client.s.phase !== PH_PLAY && now >= nextRd){ client.setReady(me); client.setGo(me); nextRd = now + 250; }
+    const s = client.s;
+    if (s.phase === PH_PLAY){
+      if (placed < 0 && host){
+        // 방장이 둘을 세운다: A 는 아래(y200), B 는 위(y180)에 공을 갖고
+        tr.clientSend({ t: '__place', at: [{ slot: A, x: 88, y: 200, face: 0 }, { slot: B, x: 88, y: 180, face: 0 }], owner: B });
+        placed = f;
+      }
+      if (placed < 0 && !host) placed = f;
+      const k = f - placed;
+      // 40프레임 뒤부터: A 가 위(B 쪽)로 걸어간다 = 민다. 100프레임째 스틱을 민 채 태클
+      if (me === A && k >= 40) client.input(me, 0, -99);
+      if (me === A && k === 100) client.tackle(me);
+      if (k === 40){ log.pushB0 = s.p[B].y / FP; }
+      if (k === 99){ log.pushB1 = s.p[B].y / FP; }
+      if (k >= 40 && k < 160){
+        const g = (s.p[A].y - s.p[B].y) / FP;          // A 가 B 보다 아래 있어야(+) 통과 안 한 것
+        log.minGap = Math.min(log.minGap, g);
+        if (g < 0) log.passed = true;
+        if (k >= 100 && !log.tackled && ((s.p[B].stun | 0) > 0 || s.ballOwner !== B)){ log.tackled = true; log.tkFrame = k; }
+      }
+      if (k >= 170 && !E.rep) E.rep = { me, role: me === A ? '미는 쪽' : '공 가진 쪽', ...log,
+        pushed: log.pushB0 != null && log.pushB1 != null ? +(log.pushB0 - log.pushB1).toFixed(1) : null };
+    }
+    client.ping(now); client.sendInputs(now); client.applyFrames(); client.predict();
+    client.updateRender(client.alpha(now), dt);
+    f++;
+    if (!E.rep) requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+window.READY = true;
+</script></body></html>

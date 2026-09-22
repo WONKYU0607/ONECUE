@@ -1155,6 +1155,18 @@ wss.on('connection', (ws, req) => {
       ws.room.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
       return;
     }
+    // **검사 전용** — 선수를 정한 자리에 세운다(공 주인까지). `E2E_DEBUG=1` 일 때만
+    if (m.t === '__place' && ws.room && process.env.E2E_DEBUG === '1'){
+      const st = ws.room.server.s;
+      for (const q of (m.at || [])){
+        const pl = st.p[q.slot | 0]; if (!pl) continue;
+        pl.x = Math.round(q.x * 256); pl.y = Math.round(q.y * 256);
+        if (typeof q.face === 'number') pl.face = q.face;
+      }
+      if (typeof m.owner === 'number'){ st.ballOwner = m.owner; st.freeT = 0; }
+      ws.room.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+      return;
+    }
     // [stated] **누구든 결과 화면에서 [방으로]** — 판 끝난 방을 로비로 되돌린다 (한 번만 먹는다)
     if (m.t === 'toroom' && ws.room){ ws.room.toLobby(); return; }
     if (m.t === 'again' && ws.room){

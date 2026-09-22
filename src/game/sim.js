@@ -547,10 +547,15 @@ export function canThrow(s, slot, k){
  */
 function pushOthers(s, i, ox, oy){
   const p = s.p[i];
+  // [stated] **밀기를 넣었더니 태클이 안 먹었다.** 태클은 몸이 겹쳐야 걸리는데, 사람은 상대 쪽으로
+  // 스틱을 밀면서 태클해서 그 이동이 **매 틱 상대를 밀어내** 영영 안 겹쳤다(8방향 실측 0/8).
+  // → **미끄러지는 동안은 밀지도 밀리지도 않는다.** 미끄러지는 몸은 태클 판정이 맡는다
+  if ((p.tkl | 0) > 0) return;
   for (let j = 0; j < s.n; j++){
     if (j === i) continue;
     const o = s.p[j];
     if (o.hp <= 0 || (s.off && s.off[j])) continue;
+    if ((o.tkl | 0) > 0) continue;
     if (!overlap(p.x, p.y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
     const mdx = p.x - ox, mdy = p.y - oy;
     if (Math.abs(mdx) >= Math.abs(mdy)){
