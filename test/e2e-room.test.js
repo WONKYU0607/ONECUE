@@ -126,6 +126,9 @@ try {
       await E(D, `start('join', '${code}', ${n})`);
       assert(await until(D, 'window.E2E.entered === "joined"', 6000), '  새 사람이 로비로 들어온다');
       await E(A, 'window.E2E.go = false');
+      // [stated] 한 판 하고 온 상태를 흉내 낸다 — 서버에 "게임 화면에 들어옴" 표시가 켜져 있으면
+      // 종목을 바꿀 때 **준비 시간이 그냥 흘러 판이 저절로 시작**됐다
+      await E(A, 'act.seenNow()'); await E(D, 'act.seenNow()'); await wait(300);
       await E(A, 'act.setRoomMode({ melee: true, ffa: false, soccer: false, n: 2 })'); await wait(700);
       // [stated] **칼전 전에 총격전 맵이 잠깐 보였다** — 로비에서 바꾼 종목이 바로 반영돼야 한다
       assert(await E(D, 'window.SELF.melee === true'), '  로비에서 바꾼 종목(칼전)이 입장자에게 바로 반영된다');
@@ -133,6 +136,14 @@ try {
       // [stated] **로비에서 종목만 눌러도 경기가 시작됐다**
       assert(await E(A, 'window.E2E.go === false') && await E(D, 'window.E2E.go === false'),
         '  종목만 바꿔서는 시작 신호가 안 온다');
+      // [stated] **종목만 바꿨는데 판이 저절로 시작됐다** — 저절로 시작되는 것은 알림이 없고
+      // **서버 상태가 전투로 넘어가는 것**이라, 서버를 직접 본다 (0=준비, 2=전투)
+      await wait(5000);
+      const ph = await (await fetch(`http://127.0.0.1:${SPORT}/health`)).json()
+        .then(j => (j.rooms && j.rooms[0] ? j.rooms[0].phase : -1));
+      assert(ph === 0, `  5초를 더 기다려도 준비 단계 그대로 (서버 단계 ${ph})`);
+      assert(await E(A, 'window.E2E.go === false') && await E(D, 'window.E2E.go === false'),
+        '  시작 신호도 안 온다');
       await D.ctx.close();
     }
     await A.ctx.close(); await B.ctx.close();

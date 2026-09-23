@@ -54,7 +54,7 @@ try {
     }
     const j = await (await fetch(`http://127.0.0.1:${SP}/health`)).json();
     assert(j.rooms && j.rooms[0] && j.rooms[0].phase === 2, `  ${round}판: 전투까지 들어갔다`);
-    A.send(JSON.stringify({ t: '__end' })); await wait(900);
+    A.send(JSON.stringify({ t: '__end', win: 0 })); await wait(1200);
     got.push({ a: await scoreOf(A, 'userA'), b: await scoreOf(A, 'userB') });
     A.send(JSON.stringify({ t: 'toroom' })); B.send(JSON.stringify({ t: 'toroom' })); await wait(600);
   }

@@ -97,16 +97,18 @@ for (const mv of [false, true]) for (const d of ['up', 'down', 'left', 'right'])
   assert(hit, `  ${d} 에서 태클 · 상대 ${mv ? '걸어감' : '가만히'} → 걸림`);
 }
 
-// [stated] **태클로 넘어진 상대는 그 자리에서 안 밀린다**
-console.log('넘어진 상대는 안 밀린다 (그리고 통과도 안 된다)');
+// [stated] **태클로 넘어진 상대는 그 자리에서 안 밀린다.**
+// 벽처럼 막아도 봤는데 [stated] **태클한 사람이 넘어진 상대 옆에서 잠시 멈춰서** →
+// 밀지도 막지도 않는다 (누워 있는 몸은 지나간다)
+console.log('넘어진 상대는 안 밀린다 (막지도 않는다)');
 {
   const s = field();
   put(s.p[1], 88, 180); s.p[1].stun = 60;
   put(s.p[0], 88, 200);
-  const y1 = s.p[1].y;
+  const y1 = s.p[1].y, y0 = s.p[0].y;
   run(s, 60, () => [{ ...NOIN, dy: -sp }, { ...NOIN }]);
   assert(s.p[1].y === y1, `  제자리에 있다 (${((y1 - s.p[1].y) / FP).toFixed(1)}px 밀림)`);
-  assert(s.p[0].y > s.p[1].y, '  넘어진 사람을 통과하지 않는다');
+  assert(s.p[0].y < y0 - 10 * FP, `  태클한 사람이 안 멈춘다 (${((y0 - s.p[0].y) / FP).toFixed(1)}px 나아감)`);
 }
 
 console.log('결정론 — 같은 입력이면 같은 결과');

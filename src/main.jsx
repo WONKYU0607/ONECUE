@@ -44,8 +44,13 @@ import('./net/connection.js').then(m => m.wakeServer(20000)).catch(() => {});
 // 익명 로그인 + 구름 기록 내려받기. **첫 화면을 막지 않는다** —
 // Firebase는 따로 받아오고, 실패해도 기기 저장으로 게임이 돌아간다
 setTimeout(() => { startSync().catch(() => {}); }, 0);
+// **검사 전용 — 개발 서버에서만.** StrictMode 는 화면을 두 번 붙였다 뗀다.
+// 그러면 접속도 두 번 열려 **서버가 "한 명 나갔다"로 보고 방을 끝낸다** —
+// 화면 흐름 검사에서는 끈다. `import.meta.env.DEV` 라 빌드에는 안 들어간다
+const e2e = import.meta.env.DEV && new URLSearchParams(location.search).get('e2e') === '1';
 createRoot(document.getElementById('root')).render(
+  e2e ? <App /> : (
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>)
 );

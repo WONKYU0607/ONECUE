@@ -166,7 +166,11 @@ export function createGame(canvas, opts = {}){
       }
     };
     const inner = client.onMsg.bind(client);
+    // [stated] **여기서 `always` 를 날려먹고 있었다.** `Client` 가 `toClient = m => { always(m); onMsg(m) }`
+    // 로 걸어둔 것을 이 줄이 통째로 덮어써서, **한 번 게임에 들어갔다 나오면**
+    // 방 상태·다시하기·종목 알림이 앱에 영영 안 갔다 (방 화면이 옛 정보에 멈췄다)
     online.toClient = m => {
+      online.always?.(m);
       if (m.t === 'peer') onLink({ peer: m.state, grace: m.grace });
       inner(m);
     };

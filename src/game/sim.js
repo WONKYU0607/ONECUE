@@ -556,12 +556,10 @@ function pushOthers(s, i, ox, oy){
     const o = s.p[j];
     if (o.hp <= 0 || (s.off && s.off[j])) continue;
     if ((o.tkl | 0) > 0) continue;
-    // [stated] **태클로 넘어진 사람은 그 자리에서 안 밀린다.** 대신 **벽처럼 막는다** —
-    // 이미 겹쳐 있었으면(태클 직후) 빠져나갈 수 있게 막지 않는다
-    if ((o.stun | 0) > 0){
-      if (!overlap(ox, oy, PWf, PHf, o.x, o.y, PWf, PHf)){ p.x = ox; p.y = oy; }
-      continue;
-    }
+    // [stated] **태클로 넘어진 사람은 그 자리에서 안 밀린다.**
+    // 벽처럼 막아도 봤는데 [stated] **태클한 사람이 넘어진 상대 옆에서 잠시 멈췄다** →
+    // 밀지도 막지도 않는다. 누워 있는 몸은 지나갈 수 있다
+    if ((o.stun | 0) > 0) continue;
     if (!overlap(p.x, p.y, PWf, PHf, o.x, o.y, PWf, PHf)) continue;
     const mdx = p.x - ox, mdy = p.y - oy;
     if (Math.abs(mdx) >= Math.abs(mdy)){

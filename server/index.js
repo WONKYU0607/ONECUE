@@ -469,6 +469,10 @@ class Room {
     st.nick = fit(keepNick, ''); st.color = fit(keepColor, 0); st.off = fit(keepOff, false);
     st.rdy = readyLimit(this.melee, this.soccer);
     this.settled = false;
+    // [stated] **종목만 바꿨는데 판이 저절로 시작됐다** — 한 판 뒤엔 다들 "게임 화면에 들어옴"
+    // 표시가 남아 있어 준비 시간이 그냥 흘렀다. 새 상태를 차릴 때 그 표시를 지운다
+    for (const x of this.seats) if (x.ws) x.ws.seen = false;
+    this.server.s.hold = true;
     this.primed = false;                  // 종목이 바뀌면 점수를 다시 읽는다
     this.send({ t: 'mode', melee: this.melee, ffa: this.ffa, soccer: this.soccer, n: this.n });
     this.sendRoom();
@@ -1157,9 +1161,15 @@ wss.on('connection', (ws, req) => {
     // **검사 전용** — 판을 바로 끝낸다. `E2E_DEBUG=1` 로 띄운 서버에서만 먹는다 (Render 에는 없다).
     // "한 판 뒤 방으로 돌아와서" 를 검사하려면 판이 끝나야 하는데, 끝까지 치르면 너무 오래 걸린다
     if (m.t === '__end' && ws.room && process.env.E2E_DEBUG === '1'){
+      // **시계를 1틱만 남긴다** — 판이 시뮬에서 정상적으로 끝나 클라도 똑같이 따라온다.
+      // (상태를 직접 바꿔 스냅샷만 보내면 클라가 채택하지 않아 결과 화면이 안 떴다)
       const st = ws.room.server.s;
-      if (st.phase === PH_PLAY || st.phase === PH_READY){ st.over = true; st.phase = PH_OVER; st.winner = 1; }
-      ws.room.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+      if (st.phase === PH_READY){ st.rdy = 1; }
+      // `win` 을 주면 **그 팀이 이기게** 상대 체력을 0 으로 (시계만 줄이면 무승부라 점수가 안 움직인다)
+      if (typeof m.win === 'number'){
+        const wt = teamOf(m.win | 0, st.n);
+        for (let i = 0; i < st.n; i++) if (teamOf(i, st.n) !== wt) st.p[i].hp = 0;
+      } else st.clock = 1;
       return;
     }
     // **검사 전용** — 저장된 점수를 돌려준다. `E2E_DEBUG=1` 일 때만

@@ -21,7 +21,8 @@ import { onLangChange, t } from './i18n/index.js';
 import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
-import { playAgain, setRoomMode, getRoom, onRoom, onGo, onKicked, backToLobby } from './net/connection.js';
+import { playAgain, setRoomMode, getRoom, onRoom, onGo, onKicked, backToLobby,
+         onAgainMsg, onModeMsg } from './net/connection.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -31,14 +32,20 @@ import { warmUp, keysFor } from './game/assets.js';
 
 // 화면 전환은 여기 한 곳에서만 한다.
 // GameCanvas는 'game'일 때만 마운트되므로, 화면을 벗어나면 게임 루프·소켓이 자동으로 정리된다.
+// **검사 전용 — 개발 서버에서만.** 앱은 켜자마자 구글 로그인을 요구하는데 검사 환경은
+// 구글 서버로 못 나간다. `import.meta.env.DEV` 라 **빌드에는 아예 안 들어간다**
+function e2eSkipLogin(){
+  return !!(import.meta.env && import.meta.env.DEV
+    && typeof location !== 'undefined'
+    && new URLSearchParams(location.search).get('e2e') === '1');
+}
+
 export default function App(){
   // **언어가 바뀌면 화면을 통째로 다시 그린다.** 문구가 여기저기 흩어져 있어
   // 각자 구독하게 하면 빠뜨리는 곳이 생긴다
   const [, bumpLang] = useState(0);
   useEffect(() => onLangChange(() => bumpLang(v => v + 1)), []);
   const [screen, setScreen] = useState('splash');   // splash|login|home|ai|practice|pvp|matching|game|result|ranks|friends
-  const screenRef = useRef(screen);   // 콜백 안에서 지금 화면을 읽으려고
-  screenRef.current = screen;
   const [rankKind, setRankKind] = useState('gun');  // 순위표에서 먼저 볼 종목
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
@@ -50,13 +57,16 @@ export default function App(){
     onRoom(r => setRoom(r));
     onGo(() => setScreen('game'));
     // [stated] **강퇴당하면 홈으로 보내고 알린다**
+    // [stated] **화면과 상관없이** 받는다 (결과 화면에서도)
+    onAgainMsg(() => { setResult(null); setScreen('game'); });
+    onModeMsg(m => onMode(m));
     onKicked(() => {
       disconnect();
       setRoom(null);
       setKickedNote(true);
       setScreen('home');
     });
-    return () => { onRoom(null); onGo(null); onKicked(null); };
+    return () => { onRoom(null); onGo(null); onKicked(null); onAgainMsg(null); onModeMsg(null); };
   }, []);
   const [summary, setSummary] = useState(null);   // 결과 창에 띄울 한 판 요약
   const [score, setScore] = useState(null);       // 이번 판 점수 변화 (PVP만)
@@ -287,18 +297,14 @@ export default function App(){
     setScreen('game');
   }, []);
   // [stated] **방장이 종목을 바꾸면** 세션을 갈아끼운다 — 인원수는 그대로라 자리는 안 흔들린다
+  // [stated] **종목·인원이 바뀌어도 화면은 안 바꾼다.** 예전엔 여기서 게임으로 넘겨서,
+  // 로비에서 종목만 눌러도 경기가 시작되고 결과 화면의 상대만 게임으로 끌려갔다.
+  // 새 판은 **[시작하기]·[다시 하기]** 로만 시작한다
   const onMode    = useCallback(m => {
     setSession(sn => (sn ? { ...sn, melee: !!m.melee, ffa: !!m.ffa, soccer: !!m.soccer,
                             n: m.n || sn.n,
                             // 인원이 줄어 자리에서 밀려났으면 관전으로 바뀐다
                             watching: SELF.watching || sn.watching } : sn));
-    // [stated] **로비에서 종목만 눌렀는데 경기가 시작됐다.** 이건 원래 결과 화면에서 방장이
-    // 종목을 골라 새 판을 여는 용도인데, 한 판 뒤엔 게임 연결이 살아 있어 로비에서도 불렸다.
-    // → **결과 화면(또는 게임 중)일 때만** 게임으로 넘어간다. 로비에서는 [시작하기] 를 기다린다
-    if (screenRef.current === 'result' || screenRef.current === 'game'){
-      setResult(null);
-      setScreen('game');
-    }
   }, []);
 
   return (
@@ -308,6 +314,7 @@ export default function App(){
       {screen === 'splash'   && <Splash onDone={() => {
         // **첫 탭에서 소리를 연다.** 브라우저는 사용자가 만지기 전엔 소리를 못 낸다
         unlockAudio(); preloadSfx();
+        if (e2eSkipLogin()){ goHome(); goHomeFirst(); return; }   // 검사 전용(개발 서버)
         setScreen('login');
       }} />}
       {screen === 'login'    && <Login onDone={() => { goHome(); goHomeFirst(); }} />}

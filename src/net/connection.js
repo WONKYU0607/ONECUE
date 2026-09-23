@@ -176,6 +176,14 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
         if ('soccer' in m) SELF.soccer = !!m.soccer;
         if ('ffa' in m) SELF.ffa = !!m.ffa;
       }
+      // [stated] **결과 화면에서 [다시 하기]·종목 변경이 엉망이었다** — 이 알림들이
+      // **게임 화면이 떠 있을 때만** 앱에 전달돼서, 결과 화면에 있는 사람은 못 받거나
+      // 한쪽만 게임으로 들어갔다. 화면과 상관없이 여기서 받는다
+      if (m.t === 'again'){ try { againWatch?.(); } catch { /* 무시 */ } }
+      if (m.t === 'mode'){
+        try { modeWatch?.({ melee: !!m.melee, ffa: !!m.ffa, soccer: !!m.soccer, n: m.n | 0 }); }
+        catch { /* 무시 */ }
+      }
       // [stated] **강퇴당했다** — 자동 재접속을 꺼야 한다. 안 끄면 끊기자마자 같은 방으로 다시 붙는다
       if (m.t === 'kicked'){
         transport.auto = false;
@@ -281,6 +289,19 @@ export function onGo(fn){ goWatch = fn; }
 export function backToLobby(){
   tell({ t: 'toroom' });
 }
+
+// **검사 전용 — 개발 서버에서만.** 화면 흐름 검사에서 판을 끝내는 신호를 보내려고 연다.
+// `import.meta.env.DEV` 라 빌드에는 안 들어간다
+if (import.meta.env && import.meta.env.DEV && typeof window !== 'undefined'){
+  window.__e2eSend = m => tell(m);
+}
+
+/** [stated] **방장이 다시 시작했다** — 화면과 상관없이 불린다 */
+let againWatch = null;
+export function onAgainMsg(fn){ againWatch = fn; }
+/** [stated] **종목·인원이 바뀌었다** — 화면과 상관없이 불린다. **화면을 바꾸지는 않는다** */
+let modeWatch = null;
+export function onModeMsg(fn){ modeWatch = fn; }
 
 /** [stated] **강퇴당하면 불린다** — 홈으로 보내고 알린다 */
 let kickWatch = null;

@@ -15,7 +15,10 @@ onGo(() => { E.go = true; });
 onKicked(() => { E.kicked = true; });
 window.act = { pickTeam, startRoom, kickPlayer, backToLobby, setRoomMode,
   // 검사 전용: 판을 바로 끝낸다 (E2E_DEBUG 서버에서만 먹는다)
-  endNow: () => { const c = getConnection(); c && c.transport.clientSend({ t: '__end' }); } };
+  endNow: () => { const c = getConnection(); c && c.transport.clientSend({ t: '__end' }); },
+  // 검사용: 게임 화면에 들어와 입력을 보내는 상태를 흉내 낸다 (서버의 `seen` 표시가 켜진다)
+  seenNow: () => { const c = getConnection(); if (!c) return;
+    c.transport.clientSend({ t: 'in', tick: 999999, ready: 1, go: 1 }); } };
 window.SELF = SELF;
 window.start = (mode, code, n) => {
   connectAndWait({ mode, code, n,
