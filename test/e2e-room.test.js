@@ -150,6 +150,36 @@ try {
   }
   // [stated] **앱을 껐다 켜면 접속 아이디가 바뀌어 강퇴가 뚫렸다** — 계정(uid)으로 막는다.
   // 브라우저 쪽은 여기서 로그인을 못 하므로 소켓으로 계정을 실어 본다
+  // [stated] **관전하기로 들어와도 강퇴할 수 있어야 한다**
+  console.log('관전자도 강퇴한다');
+  {
+    const WebSocket = (await import('ws')).default;
+    const U = `ws://127.0.0.1:${SPORT}/?`;
+    const sock = q => new Promise(res => {
+      const w = new WebSocket(U + q); w.last = {}; w.got = [];
+      w.on('message', d => { const m = JSON.parse(d); w.last[m.t] = m; w.got.push(m.t); });
+      w.on('close', () => { w.closed = true; });
+      w.on('open', () => res(w));
+    });
+    const host = await sock('sid=hw-1&uid=hostW&nick=h&mode=create&n=2');
+    await wait(400);
+    const code = host.last.room.code;
+    const p2 = await sock(`sid=pw-2&uid=p2W&nick=p2&mode=join&code=${code}`);
+    await wait(300);
+    const eye = await sock(`sid=ew-3&uid=eyeW&nick=eye&mode=join&code=${code}`);   // 자리가 차서 관전
+    await wait(600);
+    const wl = () => (host.last.roomst.watchList || []).map(w => w.nick).join(',');
+    assert(wl() === 'eye', `  관전자가 방장 화면에 보인다 (${wl()})`);
+    const wid = host.last.roomst.watchList[0].wid;
+    host.send(JSON.stringify({ t: 'kickWatch', wid })); await wait(600);
+    assert(eye.got.includes('kicked') && eye.closed, '  관전자가 강퇴돼 연결이 끊긴다');
+    assert(wl() === '', `  목록에서도 빠진다 (${wl()})`);
+    const back = await sock(`sid=ew-4&uid=eyeW&nick=eye&mode=join&code=${code}`);   // 같은 계정
+    await wait(500);
+    assert(back.last.joinfail && back.last.joinfail.reason === 'kicked', '  같은 계정은 다시 못 들어온다');
+    host.close(); p2.close(); back.close();
+  }
+
   console.log('강퇴당한 계정은 앱을 다시 켜도 못 들어온다');
   {
     const WebSocket = (await import('ws')).default;

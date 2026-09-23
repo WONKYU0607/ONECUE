@@ -233,6 +233,7 @@ export default {
   'pvp.enter': '입장',
   'err.noServer': '서버에 연결할 수 없다',
   'err.noRoom': '없는 방 코드다',
+  'err.watchFull': '관전 인원이 찼습니다 (최대 10명)',
   'err.roomFull': '이미 꽉 찬 방이다',
   'err.lost': '연결이 끊겼다',
   'err.version': '서버 버전이 다르다 (서버 {a} / 앱 {b}) — 서버 재배포 필요',

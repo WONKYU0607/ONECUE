@@ -158,7 +158,7 @@ export function createRenderer(canvas){
   let uiH = 86, totalH = H + uiH, scale = 1;
 
   function resize(innerW, innerH){
-    const L = computeLayout(innerW, innerH);
+    const L = computeLayout(innerW, innerH, SELF.watching);
     uiH = L.uiH; totalH = L.totalH; scale = L.scale;
     canvas.width  = W * RS;
     canvas.height = Math.round(totalH * RS);
@@ -645,6 +645,8 @@ export function createRenderer(canvas){
       }
     }
 
+    // [stated] **관전자에게는 조이스틱을 안 그린다** — 조작이 없으니 그림만 남는다
+    if (SELF.watching) return;
     const g = stickGeom(uiH);
     circle(g.cx, g.cy, g.r, 'rgba(255,255,255,0.045)', 'rgba(255,255,255,0.18)', 0.8);
     circle(g.cx, g.cy, g.r * 0.60, null, 'rgba(255,255,255,0.08)', 0.5);
@@ -1214,10 +1216,14 @@ export function createRenderer(canvas){
     drawReadyTimer(s);
     if (j) drawJuice(j);
     ctx.restore();
-    drawPanel(s, stick);
-    if (left) drawPalette(s, uiH, left, drag);
-    if (extra.ammo) drawThrowPad(s, uiH, extra.ammo, extra.charge);
-    if (ARENA.melee) drawShieldBtn(s, uiH, extra.kickCharge || 0);
+    // [stated] **관전자에게는 조작 UI 를 안 그린다** — 조이스틱·아이템칸·버튼이 그대로 떠 있었다.
+    // 점수·체력바(패널)는 봐야 하므로 남긴다
+    if (!SELF.watching){
+      drawPanel(s, stick);
+      if (left) drawPalette(s, uiH, left, drag);
+      if (extra.ammo) drawThrowPad(s, uiH, extra.ammo, extra.charge);
+      if (ARENA.melee) drawShieldBtn(s, uiH, extra.kickCharge || 0);
+    } else drawPanel(s, { on: 0, nx: 0, ny: 0 });   // 점수·체력바만 (스틱은 drawPanel 안에서 걸러진다)
     drawBlind(s, extra.softFlash);
     if (SHOW_HUD){
       ctx.font = '700 ' + (8*RS) + 'px ' + GF; ctx.textAlign = 'left';

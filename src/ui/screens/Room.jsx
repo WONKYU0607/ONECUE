@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { t } from '../../i18n/index.js';
 import InviteFriends from '../InviteFriends.jsx';
 import { getColor } from '../../state/profile.js';
-import { pickTeam, unpickTeam, setRoomMode, startRoom, watchRoom, kickPlayer } from '../../net/connection.js';
+import { pickTeam, unpickTeam, setRoomMode, startRoom, watchRoom, kickPlayer, kickWatcher } from '../../net/connection.js';
 
 /** 종목 고르기 — 인원수에 따라 못 고르는 것이 있다 */
 const MODES = [
@@ -94,9 +94,16 @@ export default function Room({ room, onLeave }){
           </div>
           <div className="watch-list">
             {/* [stated] 없으면 **그냥 비운다** — '(없음)' 을 띄우지 않는다 */}
+            {/* [stated] **관전자도 강퇴할 수 있다** — 방장에게만 보인다 */}
             {watchList.map((w, i) => (
               <span key={i} className={'seat' + (w.slot === mySlot ? ' me' : '')}>
-                {w.nick || t('match.teamAnon')}
+                <span className="seat-nm">{w.nick || t('match.teamAnon')}</span>
+                {host && (
+                  <button className="kick-btn"
+                          onClick={() => setKickWho({ wid: w.wid, nick: w.nick || t('match.teamAnon') })}>
+                    {t('room.kick')}
+                  </button>
+                )}
               </span>
             ))}
           </div>
@@ -149,7 +156,11 @@ export default function Room({ room, onLeave }){
             <div className="kick-row">
               <button className="room-btn" onClick={() => setKickWho(null)}>{t('common.no')}</button>
               <button className="room-btn kick-yes"
-                      onClick={() => { kickPlayer(kickWho.slot); setKickWho(null); }}>{t('common.yes')}</button>
+                      onClick={() => {
+                        if (kickWho.wid != null) kickWatcher(kickWho.wid);   // 관전자
+                        else kickPlayer(kickWho.slot);                        // 자리에 앉은 사람
+                        setKickWho(null);
+                      }}>{t('common.yes')}</button>
             </div>
           </div>
         </div>

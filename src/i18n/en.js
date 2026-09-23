@@ -233,6 +233,7 @@ export default {
   'pvp.enter': 'Join',
   'err.noServer': 'Cannot reach the server',
   'err.noRoom': 'No such room code',
+  'err.watchFull': 'Spectator slots are full (max 10)',
   'err.roomFull': 'That room is full',
   'err.lost': 'Connection lost',
   'err.version': 'Server version mismatch (server {a} / app {b}) — redeploy the server',

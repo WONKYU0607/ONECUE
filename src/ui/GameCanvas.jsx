@@ -240,7 +240,7 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
       )}
 
       {/* 1단계. **다 놓으면 저절로 넘어가므로** 이 버튼은 덜 놓고 건너뛸 때만 쓴다 */}
-      {placing && !ready.cnt?.meDone && (
+      {!SELF.watching && placing && !ready.cnt?.meDone && (
         <button className="panelbtn place ui-overlay" style={boxStyle}
                 onClick={() => gameRef.current?.ready()}>
           {t('ready.placeDone')}
@@ -251,7 +251,7 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
           예전엔 내가 누르는 순간 이 버튼만 먼저 사라지고 신청 버튼은 나중에 없어져
           따로따로 없어지는 것처럼 보였다. 눌러도 남겨두되 눌린 표시만 하고,
           카운트다운이 시작되면(=`placing` 이 꺼지면) 다 같이 사라진다 */}
-      {placing && ready.cnt?.meDone && (
+      {!SELF.watching && placing && ready.cnt?.meDone && (
         <button className={'panelbtn place go ui-overlay' + (ready.me ? ' done' : '')}
                 disabled={ready.me}
                 style={soccer ? soccerReadyStyle() : boxStyle}

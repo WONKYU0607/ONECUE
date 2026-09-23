@@ -12,6 +12,7 @@ import * as store from './store.js';
 import { forfeit, setOff, resetForNextRound, newState } from '../src/game/sim.js';
 
 const PORT = process.env.PORT || 8080;
+const WATCH_MAX = 10;   // [stated] 방 하나에 관전 최대 10명 (관전자마다 보내는 양이 늘어난다)
 const TICK_MS = 1000 / 60;
 const EMPTY_ROOM_TTL = 30_000;   // 둘 다 나간 방을 정리하기까지
 const GRACE_MS = 10_000;         // 끊긴 사람을 기다리는 시간. 판이 1~2분이라 30초는 너무 길었다
@@ -68,6 +69,7 @@ class Room {
     this.kickedUid = new Set();
     this.waitingList = [];      // 아직 팀을 안 고른 사람들
     this.watchers = new Set();  // [stated] 관전자 — 자리 없이 보기만 한다. 인원 제한 없음
+    this.wid = 0;               // 관전자 강퇴용 방 안 번호 (sid 를 밖으로 내보내지 않으려고)
     // 팀을 고르기 전에는 자리가 없어서 sid를 남길 데가 없다.
     // 그 상태로 끊기면 방장이 새 방·새 코드를 받아 나머지가 옛 방에 갇힌다.
     // 그래서 **방에 들어온 순간부터** sid를 여기 적어두고 유예 시간 동안 지킨다
@@ -226,6 +228,10 @@ class Room {
     if (!st.over || this.settled) return;
     this.settled = true;
     if (!store.isOn()) return;
+    // [stated] **친구방(코드 방)은 점수를 올리지 않는다** — 아는 사람끼리 짜고 하면
+    // 순위를 얼마든지 만들 수 있다. 승패는 그 자리에서 보이고, **기록은 남기지 않는다**.
+    // 빠른 매칭(코드 없는 방)만 점수·전적에 반영한다
+    if (this.code) return;
     const kind = st.soccer ? 'soccer' : (st.melee ? 'melee' : 'gun');
     const rows = [];
     for (let i = 0; i < this.n; i++){
@@ -338,7 +344,7 @@ class Room {
     });
     const watchList = [];
     for (const w of this.watchers) if (w.readyState === 1)
-      watchList.push({ slot: -1, nick: (w.nick || '').trim() });
+      watchList.push({ slot: -1, wid: (w.wid = w.wid || ++this.wid), nick: (w.nick || '').trim() });
     const base = { t: 'roomst', code: this.code, n: this.n,
                    melee: this.melee, ffa: this.ffa, soccer: this.soccer,
                    names, watchList };
@@ -617,6 +623,23 @@ class Room {
     this.server.s.color[slot] = slot;        // 색을 다시 고를 수 있게
     this.send({ t: 'peer', slot, state: 'left' });
     if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
+  }
+
+  /** [stated] **관전자도 강퇴한다** — 자리가 없으니 목록에서 빼고 연결을 끊는다.
+   *  다시 못 들어오게 접속 아이디·계정을 강퇴 목록에 넣는 것은 자리 강퇴와 같다 */
+  kickWatcher(wid){
+    for (const w of this.watchers){
+      if (w.wid !== (wid | 0)) continue;
+      this.kicked.add(w.sid);
+      if (w.uid) this.kickedUid.add(w.uid);
+      this.watchers.delete(w);
+      try { w.send(JSON.stringify({ t: 'kicked' })); } catch { /* 무시 */ }
+      w.room = null; w.kicked = true;
+      try { w.close(); } catch { /* 무시 */ }
+      this.sendRoom();
+      return true;
+    }
+    return false;
   }
 
   /** [stated] **방장이 강퇴한다.** 로비(시작 전)에서만 — 판 중에 빼면 판이 깨진다.
@@ -964,14 +987,20 @@ wss.on('connection', (ws, req) => {
       ws.send(JSON.stringify({ t: 'joinfail', reason: 'kicked' })); ws.close(); return;
     }
     ws.room = room;
-    // [stated] **자리가 다 차면 관전으로 들어온다.** 인원 제한 없음, 조작 없이 보기만 한다
+    // [stated] **자리가 다 차면 관전으로 들어온다.** 조작 없이 보기만 한다.
+    // [stated] **관전은 최대 10명** — 관전자 한 명당 서버가 매 틱 화면 데이터를 하나 더 보낸다
     if (room.full){
+      if (room.watchers.size >= WATCH_MAX){
+        ws.send(JSON.stringify({ t: 'joinfail', reason: 'watchFull' })); ws.close(); return;
+      }
       room.watchers.add(ws);
       ws.slot = -1; ws.watching = true;
       ws.send(JSON.stringify({ t: 'watch', code: room.code, n: room.n,
                                melee: room.melee, ffa: room.ffa, soccer: room.soccer }));
       ws.send(JSON.stringify({ t: 's', tick: room.server.s.tick,
                                st: JSON.parse(JSON.stringify(room.server.s)) }));
+      // [stated] **관전자가 들어와도 방장 화면 목록이 그대로였다** — 방 상태를 안 보냈다
+      room.sendRoom();
       console.log(`관전 입장: ${code} (room ${room.id}, ${room.watchers.size}명)`);
       return;
     }
@@ -1136,6 +1165,14 @@ wss.on('connection', (ws, req) => {
       return;
     }
     // [stated] **방장이 강퇴한다** — 방장인지는 서버가 본다 (클라 말을 믿지 않는다)
+    // [stated] **관전자도 강퇴한다**
+    if (m.t === 'kickWatch' && ws.room){
+      const room = ws.room;
+      room.ensureHost();
+      if (ws.sid !== room.hostSid){ ws.send(JSON.stringify({ t: 'nothost' })); return; }
+      if (room.kickWatcher(m.wid)) console.log(`관전 강퇴: room ${room.id} wid ${m.wid | 0}`);
+      return;
+    }
     if (m.t === 'kick' && ws.room){
       const room = ws.room;
       room.ensureHost();

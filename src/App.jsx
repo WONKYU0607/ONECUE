@@ -233,7 +233,10 @@ export default function App(){
     // 그 값이 비면 아래 총격전 갈래로 새어 나간다.
     // `session.soccer` 는 결과 화면도 쓰는 확실한 값이라 **둘 중 하나만 켜져 있어도 축구**로 본다
     const isSoccer = !!(summary?.state?.soccer || session?.soccer);
-    if (session?.kind === 'pvp' && summary?.state && isSoccer){
+    // [stated] **친구방(방 만들기·코드 입장)은 점수를 올리지 않는다** — 짜고 하면 순위를 만들 수 있다.
+    // 승패는 결과 화면에 그대로 보이고, 점수·전적만 안 건드린다 (서버도 똑같이 막는다)
+    const friendly = session?.mode === 'create' || session?.mode === 'join';
+    if (!friendly && session?.kind === 'pvp' && summary?.state && isSoccer){
       // [stated] **축구는 점수 계산이 다르다** — 이기면 골x100x연승, 지면 골x50.
       // 순위표·티어 없이 0점에서 시작하고 1대1·2대2 구분도 없다
       const st = summary.state;
@@ -244,7 +247,7 @@ export default function App(){
       const delta = soccerDelta(r, goals, streakOf('soccer'));
       const moved = recordMatch('soccer', r, delta, { local: true });
       sc = { delta, ...moved, kind: 'soccer' };
-    } else if (session?.kind === 'pvp' && summary?.state){
+    } else if (!friendly && session?.kind === 'pvp' && summary?.state){
       const kind = summary.melee ? 'melee' : 'gun';
       const d = scoreDelta(summary.state, SELF.slot, {
         streak: streakOf(kind) + (r === 'win' ? 1 : 0),
@@ -259,7 +262,7 @@ export default function App(){
     setSummary(summary || null);
     // [stated] **프로필 점수와 순위표 점수가 달랐다.** 위 계산은 결과 화면을 바로 보여주기 위한
     // 기기 값이고, **구름에는 서버가 쓴다.** 둘이 어긋난 채로 쌓이지 않게 **끝나고 다시 맞춘다**
-    if (session?.kind === 'pvp'){
+    if (session?.kind === 'pvp' && !friendly){
       const kindNow = isSoccer ? 'soccer' : (summary?.melee ? 'melee' : 'gun');
       import('./cloud/sync.js').then(m => m.resyncAfterMatch && m.resyncAfterMatch(kindNow))
         .catch(() => {});

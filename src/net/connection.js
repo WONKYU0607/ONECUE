@@ -251,7 +251,8 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
         if (m.reason === 'kicked'){
           const e = new Error(t('room.noEntry')); e.code = 'kicked'; reject(e);
         } else {
-          reject(new Error(m.reason === 'full' ? t('err.roomFull') : t('err.noRoom')));
+          reject(new Error(m.reason === 'full' ? t('err.roomFull')
+            : m.reason === 'watchFull' ? t('err.watchFull') : t('err.noRoom')));
         }
       } else if (m.t === 'queued'){
         onStage?.('waiting', m.ahead);
@@ -322,6 +323,10 @@ export function onKicked(fn){ kickWatch = fn; }
 /** [stated] **방장이 강퇴한다** — 방장 확인·대상 확인은 서버가 한다 */
 export function kickPlayer(slot){
   tell({ t: 'kick', slot });
+}
+/** [stated] **관전자도 강퇴한다** — 방 안에서만 쓰는 번호(`wid`)로 지목한다 */
+export function kickWatcher(wid){
+  tell({ t: 'kickWatch', wid });
 }
 
 /** [stated] **방장이 판을 시작한다** */

@@ -13,8 +13,11 @@ export const UI_MIN = UI_TOP + UI_ROW + UI_PAD_MIN;   // 86
 export const UI_MAX = 130;
 
 // 아레나 높이는 고정, 화면에서 남는 세로를 UI 패널이 흡수한다
-export function computeLayout(innerW, innerH){
-  const uiH = Math.max(UI_MIN, Math.min(UI_MAX, innerH / innerW * W - H));
+export function computeLayout(innerW, innerH, watching){
+  // [stated] **관전자는 조작 UI 가 없다** → 아래 띠를 점수·체력바만큼만 남기고
+  // 남는 자리를 경기장이 쓴다 (경기장이 더 크게 보인다)
+  const uiH = watching ? UI_TOP + 6
+    : Math.max(UI_MIN, Math.min(UI_MAX, innerH / innerW * W - H));
   const totalH = H + uiH;
   const scale = Math.min(innerW / W, innerH / totalH);
   return { uiH, totalH, scale };
