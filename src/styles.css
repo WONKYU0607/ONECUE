@@ -1092,3 +1092,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* 코스튬 아레나 칸 */
 .cost-arena{display:block;width:40px;height:69px;background:center/cover no-repeat}
 .cost-item.lock .cost-arena{filter:brightness(0) saturate(0);opacity:.45}
+
+/* [stated] 결과 화면 — 아무것도 안 누르면 5초 뒤 로비로. 버튼 밑에 남은 시간 */
+.res-auto{margin:6px 0 0;text-align:center;font:700 12px/1.4 var(--gf);color:#9fb0c8}

@@ -25,7 +25,22 @@ function name(r, sum){
   return same.length > 1 ? `${base}${idx}` : base;
 }
 
-export default function Result({ result, summary, score, session, host, onAgain, onMode, onRoom, onNext, onHome }){
+export default function Result({ result, summary, score, session, host, waiting, paused,
+                                onAgain, onMode, onRoom, onNext, onHome }){
+  // [stated] **결과 화면에서 아무것도 안 누르면 다음 판을 못 한다** → 5초 뒤 저절로 로비로.
+  // 다시 하기 신청을 받았거나(수락 창) 상대 응답을 기다리는 동안에는 **세지 않는다**
+  // **`session.online` 은 앱 어디에서도 안 채우는 옛 값이다** — PVP 판인지로 본다
+  const auto = session?.kind === 'pvp';
+  const [left, setLeft] = useState(5);
+  useEffect(() => {
+    if (!auto || paused || waiting) return undefined;
+    const id = setInterval(() => setLeft(v => (v > 0 ? v - 1 : 0)), 1000);
+    return () => clearInterval(id);
+  }, [auto, paused, waiting]);
+  // **화면 전환은 그리는 도중이 아니라 따로** 부른다 (그리는 중에 부르면 React 가 경고한다)
+  useEffect(() => {
+    if (auto && left === 0 && !paused && !waiting) (onRoom || onHome)?.();
+  }, [auto, left, paused, waiting, onRoom, onHome]);
   // 빠른 매칭이면 티켓이 남아야 다시 찾을 수 있다. 그 밖(방·AI·연습)은 늘 가능
   const canAgain = session?.mode !== 'queue'
     || (session?.soccer ? socLeft() > 0 : leftFor(!!session?.ffa) > 0);
@@ -159,16 +174,22 @@ export default function Result({ result, summary, score, session, host, onAgain,
         {/* 관전자는 자리가 없으므로 다시 하기도 없다 */}
         {/* [stated] **티켓이 없으면 버튼을 아예 안 그린다** — '티켓 없음' 을 띄워봐야
             누를 수도 없는 자리만 차지한다 */}
-        {(!session?.online || (host && !session?.watching)) && canAgain && (
+        {/* [stated] 신청해 놓고 기다리는 중 */}
+        {waiting && <p className="res-wait">{t('again.wait')}</p>}
+        {!waiting && (!session?.online || (host && !session?.watching)) && canAgain && (
           <button className="menu-btn primary" onClick={onAgain}>
             <span className="t">{t('res.again')}</span>
           </button>
         )}
         {/* [stated] **판이 끝나면 방으로 돌아온다** — 종목·인원은 로비에서 고른다 */}
-        {onRoom && (
+        {!waiting && onRoom && (
           <button className="menu-btn primary" onClick={onRoom}>
             <span className="t">{t('res.toRoom')}</span>
           </button>
+        )}
+        {/* [stated] 버튼 밑에 남은 시간 */}
+        {auto && !waiting && !paused && (
+          <p className="res-auto">{t('res.autoBack', { s: left })}</p>
         )}
         {!onRoom && (<>
         {/* [stated] **방장은 종목도 바꿀 수 있다** — 인원수는 그대로라 자리가 안 흔들린다.

@@ -1191,6 +1191,37 @@ wss.on('connection', (ws, req) => {
     }
     // [stated] **누구든 결과 화면에서 [방으로]** — 판 끝난 방을 로비로 되돌린다 (한 번만 먹는다)
     if (m.t === 'toroom' && ws.room){ ws.room.toLobby(); return; }
+    // [stated] **다시 하기는 묻고 시작한다** — 신청하면 나머지에게 "OO님이 신청했습니다" 가 뜬다.
+    // 전원이 수락하면 새 판, 한 명이라도 거절하면 **모두 로비로**
+    if (m.t === 'againAsk' && ws.room){
+      const room = ws.room;
+      if (room.server.s.phase !== PH_OVER) return;
+      room.againBy = ws.slot;
+      room.againOk = new Set([ws.slot]);                  // 신청한 사람은 수락한 셈
+      const nick = (room.server.s.nick && room.server.s.nick[ws.slot]) || '';
+      for (const st2 of room.seats)
+        if (st2.ws && st2.ws !== ws && st2.ws.readyState === 1)
+          st2.ws.send(JSON.stringify({ t: 'againAsk', from: nick, by: ws.slot }));
+      return;
+    }
+    if (m.t === 'againOk' && ws.room){
+      const room = ws.room;
+      if (room.againBy == null) return;
+      room.againOk.add(ws.slot);
+      const need = room.seats.filter(x => x.ws && x.ws.readyState === 1 && !x.bot).map(x => x.ws.slot);
+      if (need.every(sl => room.againOk.has(sl))){        // 전원 수락 → 새 판
+        room.againBy = null; room.againOk = null;
+        room.again();
+      }
+      return;
+    }
+    if (m.t === 'againNo' && ws.room){
+      const room = ws.room;
+      room.againBy = null; room.againOk = null;
+      room.send({ t: 'againNo' });                        // 모두 로비로
+      room.toLobby();
+      return;
+    }
     if (m.t === 'again' && ws.room){
       const room = ws.room;
       room.ensureHost();

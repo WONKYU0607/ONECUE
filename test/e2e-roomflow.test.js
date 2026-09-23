@@ -110,14 +110,31 @@ try {
   console.log('판이 끝나면 둘 다 결과 화면');
   assert(await endMatch(), '  결과 화면까지 온다');
 
-  // [stated] **다시 하기 누르니 방장 화면은 그대로고 상대만 게임으로 갔다**
-  console.log('[다시 하기] — 둘 다 새 판으로');
-  await tap(A, '다시 하기'); await wait(4000);
-  assert(await where(A) === 'game', '  방장도 게임으로 간다');
-  assert(await where(B) === 'game', '  상대도 게임으로 간다');
+  // [stated] **다시 하기는 묻고 시작한다** — 신청 → 상대에게 수락 창 → 예면 새 판
+  console.log('[다시 하기] — 상대에게 묻고, 수락하면 둘 다 새 판으로');
+  await tap(A, '다시 하기'); await wait(1500);
+  assert(await B.evaluate(() => /수락하시겠습니까/.test(document.body.innerText)),
+    '  상대에게 수락 창이 뜬다');
+  assert(await A.evaluate(() => /기다리는 중/.test(document.body.innerText)),
+    '  신청한 쪽은 기다린다 (혼자 게임으로 안 간다)');
+  assert(await where(A) !== 'game', '  수락 전에는 새 판이 안 열린다');
+  await tap(B, '예'); await wait(4000);
+  assert(await where(A) === 'game', '  수락하면 방장도 게임으로');
+  assert(await where(B) === 'game', '  수락한 쪽도 게임으로');
+
+  console.log('[다시 하기] 를 거절하면 둘 다 로비로');
+  assert(await endMatch(), '  두 번째 판도 결과 화면까지 온다');
+  const t1 = await tap(A, '다시 하기'); await wait(1200);
+  const askShown = await B.evaluate(() => /수락하시겠습니까/.test(document.body.innerText));
+  const t2 = await tap(B, '아니오'); await wait(2500);
+  console.log(`   신청눌림 ${t1} 수락창 ${askShown} 아니오눌림 ${t2}`);
+  assert(await where(A) === 'room' && await where(B) === 'room', '  거절하면 둘 다 로비');
 
   console.log('[방으로] — 둘 다 로비로');
-  assert(await endMatch(), '  두 번째 판도 결과 화면까지 온다');
+  await A.evaluate(() => { const b = [...document.querySelectorAll('button')]
+    .find(x => (x.textContent || '').includes('시작') && !x.disabled && x.offsetParent !== null); b && b.click(); });
+  await wait(3000);
+  assert(await endMatch(), '  한 판 더 치르고 결과 화면');
   await tap(A, '방으로'); await tap(B, '방으로'); await wait(2500);
   assert(await where(A) === 'room' && await where(B) === 'room', '  둘 다 로비');
 
@@ -145,6 +162,15 @@ try {
 
   console.log('그 판도 끝내고 결과 화면까지');
   assert(await endMatch(), '  결과 화면까지 온다');
+  // [stated] **결과 화면에서 아무것도 안 누르면 다음 판을 못 한다** → 5초 뒤 저절로 로비로
+  console.log('결과 화면에서 가만히 두면 5초 뒤 로비로');
+  await A.evaluate(() => { const b = [...document.querySelectorAll('button')]
+    .find(x => (x.textContent || '').includes('시작') && !x.disabled && x.offsetParent !== null); b && b.click(); });
+  await wait(3000);
+  assert(await endMatch(), '  다시 결과 화면까지 온다');
+  assert(await A.evaluate(() => /초 뒤 로비로/.test(document.body.innerText)), '  남은 시간이 보인다');
+  await wait(6500);
+  assert(await where(A) === 'room' && await where(B) === 'room', '  아무것도 안 눌러도 둘 다 로비로 돌아온다');
   console.log('e2e-roomflow.test.js 통과');
 } finally {
   await b.close().catch(() => {});

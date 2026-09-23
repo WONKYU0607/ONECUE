@@ -42,3 +42,16 @@ for (const k of ['dx', 'dy', 'fire', 'fch', 'tkl'])
 // [stated] **`fch` 를 참/거짓으로 뭉개면 안 된다** — 0~100 값이라 슛 세기가 망가진다
 assert(!/fch:\s*\w+\.fch\s*\?/.test(blk), '  fch 를 참/거짓으로 뭉개지 않는다');
 console.log('botinput.test.js 통과');
+
+// [stated] **준비완료를 누르지도 않았는데 눌렸다** — 입력이 늦을 때 이어 쓰는 값에
+// `ready:1, go:1` 이 섞여 있었다. 이어 쓰는 것은 **움직임뿐**이어야 한다
+console.log('입력이 늦어 이어 쓸 때 준비완료가 켜지지 않는다');
+{
+  const src2 = (await import('fs')).readFileSync('src/game/net.js', 'utf8');
+  const i = src2.indexOf('heldMiss[i]');
+  // **주석은 빼고 본다** — 주석에 적힌 예시 문구까지 코드로 잡으면 안 된다
+  const blk2 = src2.slice(i, i + 900).split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+  assert(!/ready:\s*1/.test(blk2) && !/go:\s*1/.test(blk2),
+    '  이어 쓰는 입력에 준비·시작이 안 들어간다');
+  assert(/dx:\s*L\.dx/.test(blk2) && /dy:\s*L\.dy/.test(blk2), '  움직임만 이어 쓴다');
+}

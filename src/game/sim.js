@@ -545,6 +545,8 @@ export function canThrow(s, slot, k){
  *  - 2대2 에서 둘 사이에 끼어도 **옆으로는** 빠져나간다(옆으로 움직이면 옆으로 민다)
  *  전부 정수라 서버·클라가 똑같이 계산한다
  */
+// [stated] **너무 잘 밀린다 → 30% 무겁게.** 밀 때 나아가는 비율 50% → 35%
+const PUSH_GO = 35;
 function pushOthers(s, i, ox, oy){
   const p = s.p[i];
   // [stated] **밀기를 넣었더니 태클이 안 먹었다.** 태클은 몸이 겹쳐야 걸리는데, 사람은 상대 쪽으로
@@ -564,7 +566,7 @@ function pushOthers(s, i, ox, oy){
     const mdx = p.x - ox, mdy = p.y - oy;
     if (Math.abs(mdx) >= Math.abs(mdy)){
       const dir = mdx > 0 ? 1 : -1;
-      p.x = ox + ((mdx / 2) | 0);                                  // 버티는 만큼 반만 나아간다
+      p.x = ox + ((mdx * PUSH_GO / 100) | 0);                       // 버티는 만큼만 나아간다
       const need = dir > 0 ? (p.x + PWf) - o.x : (o.x + PWf) - p.x;
       if (need <= 0) continue;
       const wi = wallIdx(o.y);
@@ -575,7 +577,7 @@ function pushOthers(s, i, ox, oy){
       if (moved < need) p.x -= dir * (need - moved);                // 못 민 만큼 나도 멈춘다
     } else {
       const dir = mdy > 0 ? 1 : -1;
-      p.y = oy + ((mdy / 2) | 0);
+      p.y = oy + ((mdy * PUSH_GO / 100) | 0);
       const need = dir > 0 ? (p.y + PHf) - o.y : (o.y + PHf) - p.y;
       if (need <= 0) continue;
       const tj = teamOf(j, s.n);

@@ -37,7 +37,7 @@ console.log('가만히 선 수비수에게 걸어가면 민다 (통과하지 않
   assert(sep(s.p[0], s.p[1]), '  몸이 겹쳐 있지 않다');
 }
 
-console.log('미는 동안은 반 속도');
+console.log('미는 동안은 35% 속도 (너무 잘 밀린다고 해서 30% 무겁게)');
 {
   const a = field(); put(a.p[0], 88, 200); put(a.p[1], 88, 120);   // 멀리 — 안 부딪힘
   const b = field(); put(b.p[0], 88, 200); put(b.p[1], 88, 191);   // 바로 앞 — 밀면서 간다
@@ -45,7 +45,7 @@ console.log('미는 동안은 반 속도');
   run(a, 30, () => [{ ...NOIN, dy: -sp }, { ...NOIN }]);
   run(b, 30, () => [{ ...NOIN, dy: -sp }, { ...NOIN }]);
   const free = (y0 - a.p[0].y) / FP, push = (y0 - b.p[0].y) / FP;
-  assert(push > free * 0.35 && push < free * 0.7, `  빈 길 ${free.toFixed(1)}px / 밀면서 ${push.toFixed(1)}px`);
+  assert(push > free * 0.2 && push < free * 0.5, `  빈 길 ${free.toFixed(1)}px / 밀면서 ${push.toFixed(1)}px`);
 }
 
 console.log('마주 보고 밀면 힘겨루기 — 둘 다 못 지나간다');

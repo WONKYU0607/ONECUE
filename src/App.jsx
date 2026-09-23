@@ -22,7 +22,7 @@ import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js
 import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
 import { playAgain, setRoomMode, getRoom, onRoom, onGo, onKicked, backToLobby,
-         onAgainMsg, onModeMsg } from './net/connection.js';
+         onAgainMsg, onModeMsg, askAgain, answerAgain, onAgainAsk, onAgainNo } from './net/connection.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -53,12 +53,21 @@ export default function App(){
   // [stated] **방(로비)** — 소켓으로 흘러오는 방 상태를 그대로 담는다
   const [room, setRoom] = useState(null);
   const [kickedNote, setKickedNote] = useState(false);   // 강퇴 알림
+  // [stated] **다시 하기는 묻고 시작한다** — 신청 받은 사람에게 뜨는 창 / 신청한 사람의 대기 표시
+  const [againAsk, setAgainAsk] = useState(null);        // { from }
+  const [againWait, setAgainWait] = useState(false);
   useEffect(() => {
     onRoom(r => setRoom(r));
     onGo(() => setScreen('game'));
     // [stated] **강퇴당하면 홈으로 보내고 알린다**
     // [stated] **화면과 상관없이** 받는다 (결과 화면에서도)
-    onAgainMsg(() => { setResult(null); setScreen('game'); });
+    onAgainMsg(() => { setAgainAsk(null); setAgainWait(false); setResult(null); setScreen('game'); });
+    onAgainAsk(from => setAgainAsk({ from }));
+    onAgainNo(() => {                      // 누군가 거절 → 모두 로비로
+      // **방이 있는지는 서버가 준 방 상태로 본다** — 콜백이 들고 있는 `session` 은 옛 값일 수 있다
+      setAgainAsk(null); setAgainWait(false); setResult(null);
+      setScreen(getRoom() ? 'room' : 'home');
+    });
     onModeMsg(m => onMode(m));
     onKicked(() => {
       disconnect();
@@ -66,7 +75,8 @@ export default function App(){
       setKickedNote(true);
       setScreen('home');
     });
-    return () => { onRoom(null); onGo(null); onKicked(null); onAgainMsg(null); onModeMsg(null); };
+    return () => { onRoom(null); onGo(null); onKicked(null); onAgainMsg(null); onModeMsg(null);
+      onAgainAsk(null); onAgainNo(null); };
   }, []);
   const [summary, setSummary] = useState(null);   // 결과 창에 띄울 한 판 요약
   const [score, setScore] = useState(null);       // 이번 판 점수 변화 (PVP만)
@@ -280,10 +290,11 @@ export default function App(){
       setScreen('matching');                 // 처음부터 다시 찾는다
       return;
     }
-    // 방: 서버에 알려 같은 사람들로 새 판 (방장만 가능)
+    // [stated] **방에서는 묻고 시작한다** — 예전엔 누르는 순간 모두 게임으로 끌려갔다.
+    // 신청만 보내고 **상대가 수락하면** 서버가 새 판을 차린다
     if (session?.mode === 'create' || session?.mode === 'join'){
-      playAgain();
-      setScreen('game');
+      askAgain();
+      setAgainWait(true);
       return;
     }
     setScreen('game');                        // AI·연습은 그냥 다시
@@ -339,9 +350,27 @@ export default function App(){
       {screen === 'room'     && <Room room={room || getRoom()} onLeave={() => setAskRoom(true)} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome}
                                           onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} onTuto={goHome} />}
-      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} onAgain={again} onMode={setRoomMode} onRoom={(session?.mode === 'create' || session?.mode === 'join') ? backToRoom : null}
+      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost}
+                                       waiting={againWait} paused={!!againAsk}
+                                       onAgain={again} onMode={setRoomMode} onRoom={(session?.mode === 'create' || session?.mode === 'join') ? backToRoom : null}
         onNext={(session?.kind === 'ai' && result === 'win' && (session.stage || 1) < 30) ? nextStage : null} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto} />}
+      {/* [stated] **다시 하기 신청을 받았다** — 예: 그 판 다시, 아니오: 모두 로비로 */}
+      {againAsk && (
+        <div className="modal-back">
+          <div className="kick-ask">
+            <p>{againAsk.from ? t('again.ask', { nick: againAsk.from }) : t('again.askAnon')}</p>
+            <div className="kick-row">
+              <button className="room-btn" onClick={() => { setAgainAsk(null); answerAgain(false); }}>
+                {t('common.no')}
+              </button>
+              <button className="room-btn kick-yes" onClick={() => { setAgainAsk(null); answerAgain(true); }}>
+                {t('common.yes')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {kickedNote && (
         <div className="modal-back" onClick={() => setKickedNote(false)}>
           <div className="kick-ask"><p>{t('room.kickedMsg')}</p>

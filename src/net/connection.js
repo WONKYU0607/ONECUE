@@ -180,6 +180,8 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
       // **게임 화면이 떠 있을 때만** 앱에 전달돼서, 결과 화면에 있는 사람은 못 받거나
       // 한쪽만 게임으로 들어갔다. 화면과 상관없이 여기서 받는다
       if (m.t === 'again'){ try { againWatch?.(); } catch { /* 무시 */ } }
+      if (m.t === 'againAsk'){ try { askWatch?.(m.from || ''); } catch { /* 무시 */ } }
+      if (m.t === 'againNo'){ try { noWatch?.(); } catch { /* 무시 */ } }
       if (m.t === 'mode'){
         try { modeWatch?.({ melee: !!m.melee, ffa: !!m.ffa, soccer: !!m.soccer, n: m.n | 0 }); }
         catch { /* 무시 */ }
@@ -273,6 +275,9 @@ const line = () => (conn ? conn.transport : pending);
 const tell = msg => { const t = line(); if (t) t.clientSend(msg); };
 
 export function playAgain(){ tell({ t: 'again' }); }
+/** [stated] **다시 하기는 묻고 시작한다** — 신청 / 수락 / 거절 */
+export function askAgain(){ tell({ t: 'againAsk' }); }
+export function answerAgain(ok){ tell({ t: ok ? 'againOk' : 'againNo' }); }
 
 // [stated] **로비 화면이 쓰는 방 상태.** 소켓으로 흘러오는 것을 여기 담아 두고,
 // 화면은 `getRoom()` 으로 읽는다. 바뀌면 `onRoom` 으로 알린다
@@ -295,6 +300,13 @@ export function backToLobby(){
 if (import.meta.env && import.meta.env.DEV && typeof window !== 'undefined'){
   window.__e2eSend = m => tell(m);
 }
+
+/** [stated] **다른 사람이 다시 하기를 신청했다** — 수락을 묻는 창을 띄운다 */
+let askWatch = null;
+export function onAgainAsk(fn){ askWatch = fn; }
+/** [stated] **누군가 거절했다** — 모두 로비로 */
+let noWatch = null;
+export function onAgainNo(fn){ noWatch = fn; }
 
 /** [stated] **방장이 다시 시작했다** — 화면과 상관없이 불린다 */
 let againWatch = null;

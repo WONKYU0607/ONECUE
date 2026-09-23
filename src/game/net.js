@@ -260,9 +260,12 @@ export class Server {
       const inp = Array.from({ length: this.n }, (_, i) => {
         if (f[i]){ this.heldIn[i] = f[i]; this.heldMiss[i] = 0; return f[i]; }
         if ((this.heldMiss[i] = (this.heldMiss[i] | 0) + 1) <= HOLD_INPUT && this.heldIn[i]){
-          // 한 번만 쓰는 것(놓기·던지기 같은 것)은 빼고 **움직임만** 이어 쓴다
+          // [stated] **준비완료를 누르지도 않았는데 눌렸다** — 여기서 이어 쓰는 입력에
+          // `ready:1, go:1` 을 같이 넣었다(봇 입력 모양을 그대로 베꼈다). 입력이 한 번만 늦어도
+          // 서버가 준비완료로 처리했다. → **움직임만** 이어 쓴다.
+          // 한 번만 쓰는 것(준비·놓기·던지기)은 절대 이어 쓰지 않는다
           const L = this.heldIn[i];
-          return { ...NOIN, dx: L.dx | 0, dy: L.dy | 0, ready: 1, go: 1 };
+          return { ...NOIN, dx: L.dx | 0, dy: L.dy | 0 };
         }
         return NOIN;
       });

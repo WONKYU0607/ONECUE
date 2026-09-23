@@ -149,8 +149,11 @@ console.log('다시 하기가 갈래마다 다르다');
   const app = fs.readFileSync('src/App.jsx', 'utf8');
   assert(/session\?\.mode === 'queue'[\s\S]{0,200}setScreen\('matching'\)/.test(app),
     '  빠른 매칭은 처음부터 다시 찾는다');
-  assert(/'create' \|\| session\?\.mode === 'join'[\s\S]{0,120}playAgain\(\)/.test(app),
-    '  방에서만 같은 사람들로 새 판');
+  // [stated] **다시 하기는 묻고 시작한다** — 방에서는 신청만 보내고 상대가 수락해야 새 판이 열린다
+  assert(/'create' \|\| session\?\.mode === 'join'[\s\S]{0,240}askAgain\(\)/.test(app),
+    '  방에서는 신청부터 보낸다');
+  assert(/onAgainAsk\(/.test(app) && /answerAgain\(/.test(app),
+    '  수락/거절 창이 배선돼 있다');
   const res = fs.readFileSync('src/ui/screens/Result.jsx', 'utf8');
   assert(/canAgain/.test(res), '  티켓이 없으면 다시 하기를 막는다');
 }
