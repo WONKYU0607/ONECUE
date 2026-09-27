@@ -25,22 +25,25 @@ function name(r, sum){
   return same.length > 1 ? `${base}${idx}` : base;
 }
 
-export default function Result({ result, summary, score, session, host, waiting, paused,
+export default function Result({ result, summary, score, session, host, waiting, paused, onAuto,
                                 onAgain, onMode, onRoom, onNext, onHome }){
   // [stated] **결과 화면에서 아무것도 안 누르면 다음 판을 못 한다** → 5초 뒤 저절로 로비로.
   // 다시 하기 신청을 받았거나(수락 창) 상대 응답을 기다리는 동안에는 **세지 않는다**
   // **`session.online` 은 앱 어디에서도 안 채우는 옛 값이다** — PVP 판인지로 본다
   const auto = session?.kind === 'pvp';
   const [left, setLeft] = useState(5);
+  // [stated] **수락 창이 떠 있어도 5초는 센다** — 예전엔 창이 뜨면 세는 걸 멈춰서,
+  // 상대가 답을 안 하면 신청한 쪽이 영영 기다렸다. 다 되면 **거절과 같게** 처리한다.
+  // 신청해 놓고 기다리는 동안(`waiting`)만 멈춘다 — 상대의 5초가 대신 흐른다
   useEffect(() => {
-    if (!auto || paused || waiting) return undefined;
+    if (!auto || waiting) return undefined;
     const id = setInterval(() => setLeft(v => (v > 0 ? v - 1 : 0)), 1000);
     return () => clearInterval(id);
-  }, [auto, paused, waiting]);
+  }, [auto, waiting]);
   // **화면 전환은 그리는 도중이 아니라 따로** 부른다 (그리는 중에 부르면 React 가 경고한다)
   useEffect(() => {
-    if (auto && left === 0 && !paused && !waiting) (onRoom || onHome)?.();
-  }, [auto, left, paused, waiting, onRoom, onHome]);
+    if (auto && left === 0 && !waiting) onAuto?.();
+  }, [auto, left, waiting, onAuto]);
   // 빠른 매칭이면 티켓이 남아야 다시 찾을 수 있다. 그 밖(방·AI·연습)은 늘 가능
   const canAgain = session?.mode !== 'queue'
     || (session?.soccer ? socLeft() > 0 : leftFor(!!session?.ffa) > 0);
@@ -188,7 +191,7 @@ export default function Result({ result, summary, score, session, host, waiting,
           </button>
         )}
         {/* [stated] 버튼 밑에 남은 시간 */}
-        {auto && !waiting && !paused && (
+        {auto && !waiting && (
           <p className="res-auto">{t('res.autoBack', { s: left })}</p>
         )}
         {!onRoom && (<>

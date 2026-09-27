@@ -270,8 +270,14 @@ export default function App(){
     // AI 모드에서 이기면 다음 단계가 열린다
     // 모드별로 따로 기록한다 (1대1을 깼다고 3대3까지 열리면 안 된다)
     if (session?.kind === 'ai') recordResult(session.stage, r, modeKey(session.n || 2, !!session.melee));
+    // [stated] **관전자는 판이 끝나면 로비로** — 결과 화면은 선수의 것이다
+    if (SELF.watching){
+      setResult(null);
+      if (getRoom()){ backToLobby(); setScreen('room'); } else goHome();
+      return;
+    }
     setResult(r); setIsHost(!!host); setScreen('result');
-  }, [session]);
+  }, [session, goHome]);
   // [stated] **판이 끝나면 방으로 돌아온다** — 친구방이면 로비 화면으로
   const backToRoom = useCallback(() => {
     setResult(null);
@@ -355,6 +361,11 @@ export default function App(){
                                           onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} onTuto={goHome} />}
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost}
                                        waiting={againWait} paused={!!againAsk}
+                                       onAuto={() => {
+                                         // [stated] **5초가 지나면 결판난다** — 수락 창이 떠 있으면 거절과 같게
+                                         if (againAsk){ setAgainAsk(null); answerAgain(false); return; }
+                                         (getRoom() ? backToRoom : goHome)();
+                                       }}
                                        onAgain={again} onMode={setRoomMode} onRoom={(session?.mode === 'create' || session?.mode === 'join') ? backToRoom : null}
         onNext={(session?.kind === 'ai' && result === 'win' && (session.stage || 1) < 30) ? nextStage : null} onHome={goHome} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto} />}

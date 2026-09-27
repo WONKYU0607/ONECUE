@@ -4,6 +4,10 @@
 // 게임 시작 전에 그걸 다 기다려야 한다. 게임은 기기 저장으로 바로 돌고,
 // 로그인·동기화는 뒤에서 조용히 붙는다
 import { snapshot, hydrate, setSaveHook, recordOf } from '../state/tickets.js';
+import { setOwned } from '../state/tryskin.js';
+
+// 구름의 보유 목록을 기기에 옮긴다 (없으면 빈 목록 — 산 게 없다는 뜻)
+function hydrateOwn(v){ try { setOwned(v && v.own); } catch { /* 무시 */ } }
 import { nickSnapshot, hydrateNick, setNickSaveHook } from '../state/profile.js';
 import { setUid } from '../net/connection.js';
 
@@ -32,6 +36,7 @@ export async function startSync(){
   const v = await m.pull();
   if (!v) { save(); return false; }        // 처음이면 지금 기기 값을 올려둔다
   const a = hydrate(v), b = hydrateNick(v);
+  hydrateOwn(v);   // [stated] 스킨 보유는 **구름이 갖는다** — 기기는 사본만 받는다
   // **구름 문서에 이름이 비어 있으면 채워 넣는다.**
   // 규칙이 클라의 이름 쓰기를 막은 뒤로, 서버가 점수를 먼저 써서 만들어진 문서는
   // 이름이 영영 안 들어간다 → 순위표 목록에 빈칸으로 뜬다. 서버를 거쳐 한 번 채운다
@@ -107,7 +112,7 @@ export async function resyncAfterMatch(kind, waits = [900, 1500, 2500, 4000]){
       const v = await m.pull();
       if (!v) continue;
       if (kind && total(v.record && v.record[kind]) < want) continue;   // 아직 안 씀 — 기다린다
-      hydrate(v); hydrateNick(v);
+      hydrate(v); hydrateNick(v); hydrateOwn(v);
       return true;
     } catch { /* 망이 끊겨도 게임은 돌아가야 한다 */ }
   }
@@ -120,6 +125,7 @@ export async function resyncAccount(){
   const v = await m.pull();
   if (!v){ save(); return false; }      // 그 계정에 기록이 없으면 지금 값을 올려둔다
   const a = hydrate(v), b = hydrateNick(v);
+  hydrateOwn(v);   // [stated] 스킨 보유는 **구름이 갖는다** — 기기는 사본만 받는다
   if (!v.nick) fillNick();
   return a || b;
 }

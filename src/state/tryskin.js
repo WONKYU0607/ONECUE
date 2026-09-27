@@ -42,6 +42,28 @@ export function setTry(kind, id){
 }
 
 /** 그 스킨을 가지고 있는가 */
+/** [stated] **보유는 구름(서버)이 갖는다.** 기기 저장은 **읽기용 사본**일 뿐이다 —
+ *  기기 저장만 보면 폰을 바꿨을 때 산 게 사라지고, 저장을 고쳐 공짜로 다 가질 수도 있다.
+ *  구름에는 **서버(Admin)만** 쓴다 — 보안 규칙이 클라의 쓰기 항목을 목록으로 막고 있다.
+ *  `DEBUG_TRY_SKIN` 일 때는 입어본 것(기기 전용)도 합쳐 둔다 — 결제 붙이기 전 시험용 */
+export function mergeOwned(cloudOwn, localOwn, debug){
+  const out = {};
+  for (const k of ['gun', 'melee', 'soccer', 'arena']){
+    const fromCloud = Array.isArray(cloudOwn && cloudOwn[k]) ? cloudOwn[k].map(v => v | 0) : [];
+    // 출시(디버그 꺼짐)에서는 **구름 값으로 갈아끼운다** — 기기에 적힌 건 아무 효력이 없다
+    const local = debug && Array.isArray(localOwn && localOwn[k]) ? localOwn[k].map(v => v | 0) : [];
+    out[k] = [...new Set([...fromCloud, ...local])].sort((a2, b2) => a2 - b2);
+  }
+  return out;
+}
+
+export function setOwned(cloudOwn){
+  const c = load();
+  const next = mergeOwned(cloudOwn, c.own, DEBUG_TRY_SKIN);
+  c.own = next;                                   // 캐시도 같이 (안 그러면 다음에 읽어도 옛 값)
+  try { localStorage.setItem(KEY, JSON.stringify(c)); } catch { /* 무시 */ }
+}
+
 export function ownsSkin(kind, id){
   const c = load();
   return !!(c.own && c.own[kind] && c.own[kind].includes(id | 0));

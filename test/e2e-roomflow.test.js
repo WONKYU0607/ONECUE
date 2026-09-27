@@ -122,8 +122,20 @@ try {
   assert(await where(A) === 'game', '  수락하면 방장도 게임으로');
   assert(await where(B) === 'game', '  수락한 쪽도 게임으로');
 
+  // [stated] **상대가 답을 안 하면?** 결과 화면의 5초가 그대로 흘러 거절과 같게 처리된다
+  console.log('[다시 하기] 를 신청하고 아무도 답하지 않으면 5초 뒤 둘 다 로비로');
+  assert(await endMatch(), '  결과 화면까지 온다');
+  await tap(A, '다시 하기'); await wait(1200);
+  assert(await B.evaluate(() => /수락하시겠습니까/.test(document.body.innerText)), '  수락 창이 떠 있다');
+  await wait(7000);                                    // 아무도 안 누른다
+  assert(await where(A) === 'room' && await where(B) === 'room', '  가만히 둬도 둘 다 로비');
+
   console.log('[다시 하기] 를 거절하면 둘 다 로비로');
-  assert(await endMatch(), '  두 번째 판도 결과 화면까지 온다');
+  // 앞 단계에서 로비로 왔으니 한 판 더 치르고 결과 화면을 만든다
+  await A.evaluate(() => { const b = [...document.querySelectorAll('button')]
+    .find(x => (x.textContent || '').includes('시작') && !x.disabled && x.offsetParent !== null); b && b.click(); });
+  await wait(3000);
+  assert(await endMatch(), '  한 판 더 치르고 결과 화면');
   const t1 = await tap(A, '다시 하기'); await wait(1200);
   const askShown = await B.evaluate(() => /수락하시겠습니까/.test(document.body.innerText));
   const t2 = await tap(B, '아니오'); await wait(2500);
@@ -134,7 +146,7 @@ try {
   await A.evaluate(() => { const b = [...document.querySelectorAll('button')]
     .find(x => (x.textContent || '').includes('시작') && !x.disabled && x.offsetParent !== null); b && b.click(); });
   await wait(3000);
-  assert(await endMatch(), '  한 판 더 치르고 결과 화면');
+  assert(await endMatch(), '  또 한 판 치르고 결과 화면');
   await tap(A, '방으로'); await tap(B, '방으로'); await wait(2500);
   assert(await where(A) === 'room' && await where(B) === 'room', '  둘 다 로비');
 

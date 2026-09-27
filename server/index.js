@@ -412,6 +412,15 @@ class Room {
     return true;
   }
 
+  /** [stated] **다시 하기 신청을 받아줄 사람이 없어졌다** — 나가거나 끊기면 거절로 친다.
+   *  안 그러면 신청한 사람이 "응답을 기다리는 중" 에서 안 빠져나온다 */
+  dropAgainAsk(){
+    if (this.againBy == null) return;
+    this.againBy = null; this.againOk = null;
+    this.send({ t: 'againNo' });
+    this.toLobby();
+  }
+
   /** [stated] **결과 화면에서 [방으로]** — 판 끝남(OVER) 을 로비(READY)로 되돌린다. 시작은 안 한다.
    *  안 하면 서버가 판 끝난 상태에 머물러 **강퇴·시작이 안 먹었다** (둘 다 로비 상태를 요구한다).
    *  **준비 시간이 저절로 흐르지 않게** `seen` 을 지운다 — 한 판 뒤엔 다들 이미 들어왔던 표시가
@@ -1267,6 +1276,7 @@ wss.on('connection', (ws, req) => {
       return;
     }
     if (m.t === 'bye'){
+      if (ws.room) ws.room.dropAgainAsk();
       // 관전자는 자리가 없으므로 목록에서만 뺀다
       if (ws.room && ws.watching){ ws.room.watchers.delete(ws); ws.close(); return; }
       if (ws.room && ws.slot >= 0) ws.room.quit(ws.slot);
@@ -1287,6 +1297,8 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
+    // [stated] **다시 하기 신청 중에 상대가 끊기면** 신청한 사람이 계속 기다린다 → 거절로 친다
+    if (ws.room && !ws.watching) ws.room.dropAgainAsk();
     if (ws.room && ws.watching) ws.room.watchers.delete(ws);
     if (ws.uid){
       const n = (online.get(ws.uid) || 1) - 1;
