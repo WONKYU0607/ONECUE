@@ -45,7 +45,8 @@ async function ask(params, ms = 8000){
 /** 지금 상태 — `{ coin, d, w, m, mail, own, bought, buy }` */
 export const fetchQuest = () => ask({ act: 'read' });
 /** 그 기간에서 받을 수 있는 걸 전부 받는다 */
-export const claimQuest = p => ask({ act: 'claim', p });
+/** 보상 받기. `id` 가 퀘스트 번호면 그 하나, `'all'` 이면 전부완료 보너스, 없으면 전부 */
+export const claimQuest = (p, id = '') => ask({ act: 'claim', p, id });
 /** 우편함에서 받는다. `id` 없이 부르면 전부 */
 export const claimMail = (id = '') => ask({ act: 'mail', id });
 /** 코인으로 스킨을 산다 */

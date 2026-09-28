@@ -602,7 +602,7 @@ export async function buildRanks(kind = 'gun', top = 30){
 // 보안 규칙이 클라 쓰기를 목록(`nick·tk·at·ffa·day·updatedAt`)으로 막고 있어서
 // `coin`·`qd`·`qw`·`qm`·`mail`·`own` 은 클라가 손댈 수 없다 — 규칙은 안 고쳐도 된다.
 import {
-  PERIODS, questsOf, keyOf, emptyPeriod, doneOf, allDone,
+  PAY, PERIODS, questsOf, keyOf, emptyPeriod, doneOf, allDone,
   claimable, bump as qbump, SKIN_COST, SKIN_FIRST_OFF, TICKET_COST,
   BUY_TK_MAX, BUY_SOC_MAX, PLAY_DAY_MAX, countsOf as questCounts, matchCoin
 } from '../src/state/quests.js';
@@ -746,7 +746,12 @@ export async function addPlayTime(uid, sec){
 }
 
 /** 보상 받기. 그 기간에서 **받을 수 있는 걸 전부** 준다 */
-export async function claimQuest(uid, p){
+/** 퀘스트 보상 받기.
+ *  [stated] **퀘스트마다 [받기] 버튼**이 붙는다 → `id` 로 하나만 받는다.
+ *    `id` 가 퀘스트 번호면 그 하나, `'all'` 이면 전부완료 보너스,
+ *    안 주면 예전처럼 받을 수 있는 것을 **전부** (기간 넘김·검사에서 쓴다)
+ *  받을 자격은 **서버가 판정한다** — 화면이 보내는 값은 믿지 않는다 */
+export async function claimQuest(uid, p, id = ''){
   if (!isOn() || !uid || !PERIODS.includes(p)) return { ok: false };
   try {
     return await withDoc(uid, async (tx, dbx) => {
@@ -756,11 +761,21 @@ export async function claimQuest(uid, p){
       const now = Date.now();
       const { per, mail } = rollAll(v, now);
       const cur = per[p];
-      const coin = claimable(p, cur);
-      if (!coin) return { ok: false, why: 'none' };
       const got = new Set(cur.got || []);
-      for (const q of questsOf(p)) if (doneOf(q, cur.v)) got.add(q.id);
-      if (allDone(p, cur)) got.add('all');
+      let coin = 0;
+      if (id === 'all'){
+        if (!allDone(p, cur) || got.has('all')) return { ok: false, why: 'none' };
+        coin = PAY[p].all; got.add('all');
+      } else if (id){
+        const q = questsOf(p).find(x => x.id === id);
+        if (!q || !doneOf(q, cur.v) || got.has(q.id)) return { ok: false, why: 'none' };
+        coin = PAY[p].each; got.add(q.id);
+      } else {
+        coin = claimable(p, cur);
+        if (!coin) return { ok: false, why: 'none' };
+        for (const q of questsOf(p)) if (doneOf(q, cur.v)) got.add(q.id);
+        if (allDone(p, cur)) got.add('all');
+      }
       cur.got = [...got];
       const box = [...(Array.isArray(v.mail) ? v.mail : []), ...mail].slice(-MAIL_KEEP);
       const coinNow = (v.coin | 0) + coin;

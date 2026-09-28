@@ -111,15 +111,38 @@ try {
 
   console.log('퀘스트 화면 — 일일 6 · 주간 8 · 월간 7');
   await tap(A, '퀘스트'); await wait(1800);
-  const rows = () => A.evaluate(() => document.querySelectorAll('.q-row').length);
+  // [stated] **전부 완료 보상**도 같은 `.q-row` 로 목록 맨 밑에 붙는다 → 퀘스트만 따로 센다
+  const rows = () => A.evaluate(() => document.querySelectorAll('.q-row:not(.q-bonus)').length);
   assert(await rows() === 6, `  일일 6줄 (${await rows()})`);
   await tap(A, '주간'); await wait(500);
   assert(await rows() === 8, `  주간 8줄 (${await rows()})`);
   await tap(A, '월간'); await wait(500);
   assert(await rows() === 7, `  월간 7줄 (${await rows()})`);
   await tap(A, '일일'); await wait(500);
-  assert(await A.evaluate(() => /받을 보상이 없습니다/.test(document.body.innerText)),
-    '  받을 게 없으면 버튼이 꺼져 있다');
+
+  // [stated] 퀘스트마다 [받기] · 맨 밑에 전부 완료 보상 한 줄
+  console.log('퀘스트마다 받기 버튼 · 맨 밑에 전부 완료 보상');
+  const shape = await A.evaluate(() => {
+    const q = [...document.querySelectorAll('.q-row')];
+    const bonus = document.querySelector('.q-row.q-bonus');
+    const last = q[q.length - 1];
+    return {
+      gets: document.querySelectorAll('.q-row .q-get').length,
+      allDisabled: [...document.querySelectorAll('.q-row .q-get')].every(b => b.disabled),
+      bonusLast: !!bonus && bonus === last,
+      bonusText: bonus ? bonus.innerText.replace(/\s+/g, ' ') : '',
+      // 아래 한 방 버튼과 점선 상자는 없어졌다
+      noBottom: !document.querySelector('.q-wrap > .menu-btn') && !document.querySelector('.q-all'),
+      barFlex: getComputedStyle(document.querySelector('.q-bar')).flexGrow
+    };
+  });
+  assert(shape.gets === 7, `  일일 6줄 + 보상 1줄 = 받기 7개 (${shape.gets})`);
+  assert(shape.allDisabled, '  받을 게 없으면 받기가 전부 꺼져 있다');
+  assert(shape.bonusLast, '  전부 완료 보상이 **맨 마지막 줄**이다');
+  assert(/모두 완료 보상/.test(shape.bonusText) && /\+200/.test(shape.bonusText),
+    `  보상 줄에 이름과 +200 (${shape.bonusText})`);
+  assert(shape.noBottom, '  아래 "N 코인 받기" 버튼과 점선 상자가 없다');
+  assert(shape.barFlex === '0.7', `  진행바가 30% 줄었다 (flex-grow ${shape.barFlex})`);
 
   // [stated] 접속 시간은 **화면이 보일 때만** 센다. 클라가 1분마다 보내므로 여기서는
   // 서버에 직접 넣어 **화면이 그 값을 받아 그리는지**만 본다
@@ -165,15 +188,39 @@ try {
   const coinOf = () => A.evaluate(() =>
     +((document.querySelector('.coin-tag') || document.querySelector('.pbar .pcoin'))?.innerText || '0')
       .replace(/[^0-9]/g, ''));
+  // **두 줄 이상 받을 수 있게 만들어 놓고 누른다** — 한 줄만 받을 수 있으면
+  // "하나만 받기"와 "전부 받기"가 같은 값이라 검사가 헛돈다 (실제로 그래서 못 잡았다)
+  for (let i = 0; i < 3; i++) await api('&act=time&sec=300');   // 접속 시간 10분 채우기
+  await reopen(A);
+  await tap(A, '퀘스트'); await wait(1800);
+  const canN = () => A.evaluate(() =>
+    [...document.querySelectorAll('.q-row .q-get')].filter(b => !b.disabled).length);
+  assert(await canN() >= 2, `  받을 수 있는 줄이 둘 이상이다 (${await canN()})`);
+
   const before = await coinOf();
+  // [stated] **퀘스트 줄마다 [받기]** — 켜져 있는 첫 줄을 누른다
   const hit = await A.evaluate(() => {
-    const b = [...document.querySelectorAll('.menu-btn')].find(x => /코인 받기/.test(x.innerText));
-    if (!b || b.disabled) return false; b.click(); return true;
+    const row = [...document.querySelectorAll('.q-row')].find(r => {
+      const b = r.querySelector('.q-get');
+      return b && !b.disabled;
+    });
+    if (!row) return null;
+    const nm = row.innerText.replace(/\s+/g, ' ');
+    row.querySelector('.q-get').click();
+    return nm;
   });
-  assert(hit, '  [코인 받기] 를 누를 수 있다');
+  assert(hit, '  다 채운 퀘스트의 [받기] 를 누를 수 있다');
   await wait(2000);
   const after = await coinOf();
-  assert(after > before, `  코인이 늘었다 (${before} → ${after})`);
+  assert(after === before + 100, `  그 줄 몫 100 만 들어온다 (${before} → ${after} · "${hit}")`);
+  // **한 번 받은 줄은 다시 못 받는다**
+  const again = await A.evaluate(() => {
+    const r = [...document.querySelectorAll('.q-row')].find(x => /받음/.test(x.innerText));
+    return r ? !!r.querySelector('.q-get:disabled') : false;
+  });
+  assert(again, '  받은 줄은 [받음] 으로 꺼진다');
+  // **나머지 줄은 그대로 남아 있어야 한다** — 한 번에 다 받아 버리면 안 된다
+  assert(await canN() >= 1, `  다른 줄은 아직 받을 수 있다 (${await canN()})`);
 
   console.log('우편함 화면이 열린다');
   await tap(A, '‹'); await wait(1500);

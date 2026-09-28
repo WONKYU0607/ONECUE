@@ -386,7 +386,11 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .pcell.ptk b{color:#8fd8ff}
 /* [stated] 코인은 티켓 옆. 금화 그림으로 티켓과 구분한다.
    그림 주소는 main.jsx 가 넣는다 — CSS 에 직접 적으면 `assets/assets/…` 를 찾는다 */
-.pcell.pcoin{flex:0 0 auto}
+/* [stated] **코인이 몇만·몇십만이 돼도 담기게** 칸을 미리 넓혀 둔다.
+   실제 브라우저(393px 폰)에서 재 보니 "999,999" 가 35px, 그림 14u + 사이 3u + 안여백 10u 라
+   60u 면 여섯 자리가 들어간다. 티켓 충전 시계가 도는 최악의 경우에도
+   `.pcell` 이 줄어들며(flex-shrink) 상단바를 안 넘는다 */
+.pcell.pcoin{flex:0 1 auto;min-width:calc(60 * var(--u))}
 .pcell.pcoin b{color:#ffd873}
 .coin-ico{flex:0 0 auto;image-rendering:pixelated;
   width:calc(var(--h-tierSz,13) * var(--u));height:calc(var(--h-tierSz,13) * var(--u));
@@ -1151,38 +1155,35 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   white-space:nowrap;overflow:hidden}
 /* FitText 가 줄여 담는다 — 감싼 칸이 `nowrap` 이라야 넘친 걸 재서 줄일 수 있다 */
 .q-nm > span{display:block;transform-origin:left center;white-space:nowrap}
-.q-bar{flex:1;min-width:0;position:relative;height:16px;border-radius:4px;
+/* [stated] **진행바를 30% 줄이고** 그만큼을 오른쪽 [받기] 에 준다 (예전 flex:1 → 0.7) */
+.q-bar{flex:0.7;min-width:0;position:relative;height:16px;border-radius:4px;
   background:rgba(0,0,0,.45);overflow:hidden}
 .q-bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(#5fd0ff,#2f8fd0)}
 .q-bar span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font:700 10px/1 var(--gf);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.9)}
-.q-pay{flex:0 0 auto;min-width:42px;text-align:right;font:700 12px/1 var(--gf);color:#ffd873}
-.q-all{margin:8px 0;padding:6px 9px;border-radius:7px;text-align:center;flex:0 0 auto;
-  background:rgba(12,16,26,.6);border:1px dashed rgba(200,162,78,.5);
-  font:700 12px/1.3 var(--gf);color:#9fb0c8;white-space:nowrap;overflow:hidden}
-.q-all > span{display:block;transform-origin:center;white-space:nowrap}
-.q-all.on{border-style:solid;border-color:#c8a24e;color:#ffd873}
+.q-pay{flex:0 0 auto;min-width:36px;text-align:right;font:700 12px/1 var(--gf);color:#ffd873}
+/* [stated] **퀘스트마다 [받기]** — 맨 오른쪽. 아래의 "N 코인 받기" 한 방 버튼은 없앴다 */
+.q-get{flex:0 0 auto;min-width:46px;padding:5px 8px;border-radius:6px;cursor:pointer;
+  background:linear-gradient(#2f6ea8,#1b4472);border:1px solid #5a96c8;
+  font:700 11px/1 var(--gf);color:#eaf4ff}
+.q-get:disabled{cursor:default;opacity:.45;background:rgba(12,16,26,.7);border-color:rgba(120,140,170,.3);
+  color:#8ea0b8}
+/* [stated] **전부 완료 보상**은 목록 마지막 줄로. 점선이 아니라 **실선** */
+.q-row.q-bonus{border-color:#c8a24e;background:rgba(26,20,10,.72)}
+.q-row.q-bonus .q-nm{color:#ffd873;flex:1}
 .q-wrap > .menu-btn{flex:0 0 auto}
 /* [stated] 재화 칸 — 코인으로 티켓 사기. 한 줄에 하나씩 쌓는다 */
 .shop-list.money{display:flex;flex-direction:column;gap:10px;padding:10px 8px}
-/* `.shop-card-in` 이 **세로 배치**라 그대로 쓰면 그림이 폭 0 으로 찌그러진다 → 가로로 돌린다 */
-.money-row{position:relative;width:100%;flex-direction:row;align-items:center;
-  gap:12px;padding:12px 12px 12px 10px}
-/* [stated] 이름·값·버튼을 **줄을 나눠** 세로로 쌓는다 — 한 줄에 몰면 이름이 긴
-   축구 티켓에서 값이 아래로 접혀 줄 높이가 제각각이 됐다 */
-.money-row .shop-card-foot{flex:1 1 auto;min-width:0;flex-wrap:nowrap;
-  flex-direction:column;align-items:flex-start;gap:7px}
-.money-nm{display:flex;align-items:baseline;gap:8px;min-width:0}
-.money-row .shop-card-foot .nm,
-.money-row .shop-card-foot .pr{font-size:14px;white-space:nowrap}
+/* `.shop-card-in` 이 **세로 배치**라 그대로 쓰면 그림이 폭 0 으로 찌그러진다 → 가로로 돌린다.
+   [stated] 한 줄에 그림 · 이름 · 값 · 맨 오른쪽 [구매] */
+.money-row{width:100%;flex-direction:row;align-items:center;gap:10px;padding:12px 12px 12px 10px}
+.money-nm{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:8px;
+  white-space:nowrap;overflow:hidden}
+.money-row .nm,
+.money-row .pr{font-size:14px;white-space:nowrap}
 .money-row .tk-ico{flex:0 0 auto;width:46px;height:34px}
 .money-row .tk-ico.soc{width:70px}
-/* [stated] 남은 장수는 **글씨 줄에 겹치면 안 된다** — 이름이 긴 축구 티켓에서 가격과 포개졌다.
-   자리를 따로 잡고, 글씨가 거기까지 못 오게 오른쪽을 비워 둔다 */
-.money-row{padding-right:76px}
-.money-left{position:absolute;right:10px;top:50%;transform:translateY(-50%);
-  width:60px;text-align:right;
-  font:700 11px/1.3 var(--gf);color:#9fb0c8}
+.money-row .shop-btn{flex:0 0 auto;margin-left:auto}
 
 /* 상점 — 코인 잔액과 안내 문구 한 줄 */
 .shop-note{display:flex;align-items:center;gap:8px;margin:4px 0 6px;min-width:0}

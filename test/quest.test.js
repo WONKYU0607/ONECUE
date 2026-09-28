@@ -114,6 +114,42 @@ console.log('보상은 한 번만 받는다');
   assert(r.coin === 300, `  코인이 쌓인다 (${r.coin})`);
 }
 
+// [stated] "퀘스트마다 받기 버튼을 만들어" → 하나씩 받는다.
+// **받을 자격은 서버가 판정한다** — 화면이 아무 번호나 보내도 안 채운 건 못 받는다
+console.log('퀘스트 하나씩 받기');
+{
+  at('2026-09-22T05:00:00Z');
+  const U = 't.one';
+  await S.bumpQuest(U, { kind: 'gun', res: 'win' });      // d.play3(1/3) · d.win · d.gun 을 건드림
+  const coin = async () => (await S.readQuest(U)).coin;
+
+  const bad = await S.claimQuest(U, 'd', 'd.play3');      // 1/3 이라 아직 못 받는다
+  assert(!bad.ok && bad.why === 'none', `  안 채운 건 못 받는다 (${JSON.stringify(bad)})`);
+  assert(await coin() === 0, '  못 받았으면 코인도 그대로');
+
+  const one = await S.claimQuest(U, 'd', 'd.win');
+  assert(one.ok && one.coin === Q.PAY.d.each, `  한 줄 몫만 받는다 (${one.coin})`);
+  assert(await coin() === Q.PAY.d.each, `  그만큼만 늘었다 (${await coin()})`);
+  assert(!(await S.claimQuest(U, 'd', 'd.win')).ok, '  같은 줄을 또 받을 수 없다');
+
+  assert(!(await S.claimQuest(U, 'd', '없는퀘스트')).ok, '  없는 번호는 못 받는다');
+  assert(!(await S.claimQuest(U, 'd', 'all')).ok, '  다 못 채웠으면 전부완료 보상도 못 받는다');
+
+  // 남은 것까지 채우고 전부완료 보상을 받는다
+  await S.bumpQuest(U, { kind: 'gun', res: 'win' });
+  await S.bumpQuest(U, { kind: 'gun', res: 'win' });      // play3 채움
+  await S.bumpQuest(U, { kind: 'melee', res: 'lose' });
+  await S.bumpQuest(U, { kind: 'soccer', res: 'lose' });
+  await S.addPlayTime(U, 300); await S.addPlayTime(U, 300);
+  const all = await S.claimQuest(U, 'd', 'all');
+  assert(all.ok && all.coin === Q.PAY.d.all, `  전부완료 보상 ${Q.PAY.d.all} (${all.coin})`);
+  assert(!(await S.claimQuest(U, 'd', 'all')).ok, '  전부완료 보상도 한 번만');
+  // 낱개는 아직 남아 있다 — 보너스만 받았지 줄마다 받은 건 아니다
+  const rest = await S.claimQuest(U, 'd');
+  assert(rest.ok && rest.coin === Q.PAY.d.each * 5,
+    `  안 받은 다섯 줄이 남아 있다 (${rest.coin})`);
+}
+
 // [stated] 안 받은 보상은 시간이 지나면 **우편함으로**
 console.log('기간이 지나면 안 받은 보상이 우편함으로');
 {

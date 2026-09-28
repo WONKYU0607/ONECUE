@@ -442,17 +442,15 @@ export default function Shop({ onBack }){
         <div className="shop-wrap">
           <div className="shop-list money">
             {[[false, 'shop.tkName', ''], [true, 'shop.tkSoc', ' soc']].map(([soc, key, cls]) => (
+              // 한 줄: 그림 · 이름 · 값 · 맨 오른쪽 [구매]
               <div key={key} className="shop-card-in money-row">
                 <i className={"tk-ico" + cls} />
-                <div className="shop-card-foot">
-                  <span className="money-nm">
-                    <span className="nm">{t(key)}</span>
-                    <span className="pr">{t('shop.coinPrice', { p: TICKET_COST.toLocaleString() })}</span>
-                  </span>
-                  <button className="shop-btn" disabled={busy || tkLeft(soc) <= 0}
-                          onClick={() => takeTicket(soc)}>{t('shop.coinBuy')}</button>
-                </div>
-                <span className="money-left">{t('shop.tkLeft', { n: tkLeft(soc) })}</span>
+                <span className="money-nm">
+                  <span className="nm">{t(key)}</span>
+                  <span className="pr">{t('shop.coinPrice', { p: TICKET_COST.toLocaleString() })}</span>
+                </span>
+                <button className="shop-btn" disabled={busy || tkLeft(soc) <= 0}
+                        onClick={() => takeTicket(soc)}>{t('shop.coinBuy')}</button>
               </div>
             ))}
           </div>

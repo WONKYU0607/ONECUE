@@ -758,7 +758,8 @@ const http = createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     store.uidFromToken(q.get('token')).then(async me => {
       if (!me) return { ok: false, auth: true };
-      if (act === 'claim') return store.claimQuest(me, q.get('p') || 'd');
+      // [stated] 퀘스트마다 [받기] — `id` 가 오면 그 하나만, `'all'` 이면 전부완료 보너스
+      if (act === 'claim') return store.claimQuest(me, q.get('p') || 'd', q.get('id') || '');
       if (act === 'mail')  return store.claimMail(me, q.get('id') || '');
       if (act === 'time')  return { ok: await store.addPlayTime(me, +q.get('sec') || 0) };
       if (act === 'buy'){
