@@ -27,7 +27,17 @@ let uid = null;
 let ready = null;              // 로그인 완료를 기다리는 약속 (여러 번 불러도 하나만)
 const waiters = [];
 
-export const getUid = () => uid;
+// **검사 전용 — 개발 서버에서만.** 검사에서는 로그인을 건너뛰므로 계정이 없다.
+// 계정이 없으면 서버가 퀘스트·점수를 건너뛰어 **화면 검사가 아무것도 못 본다**.
+// `import.meta.env.DEV` 라 빌드에는 아예 안 들어간다
+function e2eUid(){
+  if (!(import.meta.env && import.meta.env.DEV)) return '';
+  if (typeof location === 'undefined') return '';
+  const q = new URLSearchParams(location.search);
+  // `u` 로 화면마다 다른 계정을 준다 — 둘이 같은 계정이면 한 방에 못 앉는다
+  return q.get('e2e') === '1' ? 'e2e-user' + (q.get('u') || '') : '';
+}
+export const getUid = () => uid || e2eUid();
 
 /** **이미 로그인돼 있으면 그 계정을 쓴다. 없으면 그냥 없는 채로 둔다.**
  *
@@ -53,7 +63,11 @@ export function signIn(){
 }
 
 // 로그인될 때까지 기다렸다가 uid를 준다 (없으면 null)
-export const whenSignedIn = () => (uid ? Promise.resolve(uid) : signIn());
+export const whenSignedIn = () =>
+  (uid ? Promise.resolve(uid)
+       // **검사 전용** — 검사에서는 구글 로그인을 못 하므로 여기서 계정을 준다.
+       // 이게 없으면 서버가 계정 없는 사람으로 보고 **점수·퀘스트를 통째로 건너뛴다**
+       : (e2eUid() ? Promise.resolve(e2eUid()) : signIn()));
 
 // ── 구글 로그인 ───────────────────────────────────────────────────
 // [stated] 익명 계정을 **구글 계정으로 승격(link)** 한다 — 지금 점수·닉네임이 그대로 따라간다.

@@ -11,15 +11,14 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import { createRequire } from 'module';
 import { assert } from './harness.js';
+import { findChrome } from './chrome.js';
 import { fileURLToPath } from 'url';
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 const skip = why => { console.log('e2e-game.test.js 건너뜀 — ' + why); process.exit(0); };
 let puppeteer;
 try { puppeteer = createRequire(import.meta.url)('puppeteer-core'); } catch { skip('puppeteer-core 없음'); }
-const CHROME = [process.env.PUPPETEER_EXECUTABLE_PATH,
-  '/home/claude/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome']
-  .find(p => p && fs.existsSync(p));
+const CHROME = findChrome();
 if (!CHROME) skip('크롬 없음 (PUPPETEER_EXECUTABLE_PATH 로 지정 가능)');
 
 const SP = 8831, VP = 5331;

@@ -44,7 +44,7 @@ const SKIN_SHEET = {
             ax: 23, aw: 33,  by: 51,  bh: 45,  vh: 92 },
   melee:  { src: 'assets/melee-skins.webp',  cw: 270, ch: 131, cols: 8,  rows: 5, still: 0,
             ax: 66, aw: 130, by: 129, bh: 92,  vh: 92 },
-  gun:    { src: 'assets/gun-skins.webp',    cw: 80,  ch: 60,  cols: 4,  rows: 5, still: 0,
+  gun:    { src: 'assets/gun-skins.webp',    cw: 80,  ch: 60,  cols: 4,  rows: 8, still: 0,
             ax: 9,  aw: 61,  by: 59,  bh: 48,  vh: 100 }
 };
 // 기본 캐릭터가 화면에서 차지하던 몸통 크기 (92 x 몸통 / 칸높이)

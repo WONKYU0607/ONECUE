@@ -42,7 +42,8 @@ export function makeFakeCanvas(){
     clearRect(...a){ check('clearRect', a); },
     fillText(t, ...a){ check('fillText', a); },
     strokeText(t, ...a){ check('strokeText', a); },
-    drawImage(img, ...a){ check('drawImage', a); },
+    // 어느 그림을 그렸는지도 남긴다 — 아레나 배경 조각만 골라 보려면 필요하다
+    drawImage(img, ...a){ check('drawImage', a); calls[calls.length - 1].img = img; },
     measureText(){ return { width: 10 }; }
   };
   const canvas = {

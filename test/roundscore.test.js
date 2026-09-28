@@ -87,8 +87,13 @@ try {
       if ((j.rooms || []).some(r => r.code === H.code && r.phase === 2)) break;
     }
     H.send(JSON.stringify({ t: '__end', win: 0 })); await wait(1200);
-    assert(await scoreOf(H, 'friendA') === null && await scoreOf(H, 'friendB') === null,
-      '  친구방 판은 점수에 안 쌓인다');
+    // **문서가 아예 없는지로 보면 안 된다** — 퀘스트는 친구방도 인정해서 같은 문서에 쌓인다.
+    // 점수 항목(`gun`·`sgun`)이 안 써졌는지를 본다
+    const a2 = await scoreOf(H, 'friendA'), b2 = await scoreOf(H, 'friendB');
+    const noScore = v => !v || (v.gun === undefined && v.sgun === undefined);
+    assert(noScore(a2) && noScore(b2),
+      `  친구방 판은 점수에 안 쌓인다 (${JSON.stringify(a2)})`);
+    assert(a2 && a2.qd, '  대신 퀘스트는 쌓인다 (친구방도 인정)');
     H.close(); G.close();
   }
   console.log('roundscore.test.js 통과');

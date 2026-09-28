@@ -1,0 +1,94 @@
+<!doctype html>
+<!-- 자산 주소가 `assets/...` 상대경로라, 이 껍데기가 `/test/e2e/` 에 있으면 404 가 난다.
+     `base` 를 뿌리로 잡아 실제 앱과 같은 자리에서 받게 한다 -->
+<html><head><meta charset="UTF-8"><base href="/"><title>e2e arena skin probe</title></head>
+<body>
+<!-- **서로 다른 아레나 스킨으로 실제 한 판.** 두 화면이 각자 다른 아레나를 쓰는 동안
+     시뮬 상태(체크섬·버프 칸·차원문 칸·체력)가 틱마다 같은지 잰다.
+     그림은 각자 자기 것이 나오고, 판은 같아야 한다 -->
+<script type="module">
+import { connectAndWait, startRoom, onGo, getConnection } from '/src/net/connection.js';
+import { Client } from '/src/game/net.js';
+import { SELF, setArena, PH_PLAY, FP, cellX, cellY, GRID_CW, GRID_CH, PWf, PHf } from '/src/game/config.js';
+import { checksum } from '/src/game/sim.js';
+import { createRenderer } from '/src/game/render.js';
+import { setTry, tryOf } from '/src/state/tryskin.js';
+import { warmUp, keysFor, getImage, isReady } from '/src/game/assets.js';
+const q = new URLSearchParams(location.search);
+const host = q.get('host') === '1';
+const skin = +(q.get('arena') || 0);
+if (skin) setTry('arena', skin);                 // 아레나 스킨 — 내 화면에만 보인다
+const E = window.E2E = { entered: null, code: null, rep: null, err: null, arena: tryOf('arena') };
+onGo(() => setTimeout(runGame, 50));
+window.start = (mode, code) => { connectAndWait({ mode, code, n: 2, melee: true,
+  onCode: c => { E.code = c; E.entered = 'code'; }, onJoined: () => { E.entered = 'joined'; } })
+  .catch(e => { E.err = (e && e.message) || 'err'; }); };
+window.startRoom = startRoom;
+async function runGame(){
+  await warmUp(keysFor({ melee: true, n: 2 }));
+  await new Promise(r => setTimeout(r, 600));
+  // 아레나 그림이 실제로 올라왔는지 — 이게 없으면 9조각도 안 그려져 검사가 헛돈다
+  E.bgReady = isReady(getImage(skin ? 'marena' + skin : 'arena3'));
+  const conn = getConnection(), tr = conn.transport;
+  SELF.slot = conn.slot; SELF.n = 2; SELF.melee = true;
+  setArena(2, true, false, false);
+  const cv = document.createElement('canvas'); cv.width = 540; cv.height = 1200;
+  cv.style.cssText = 'position:fixed;left:0;top:0;width:393px';
+  document.body.appendChild(cv);
+  const view = createRenderer(cv); view.resize(393, 760);
+  const client = new Client(tr, [conn.slot]);
+  let f = 0, nextRd = 0, last = performance.now();
+  // 틱마다 한 줄씩. 두 화면이 같은 틱에서 같은 값을 적어야 한다
+  const rows = {};
+  function loop(now){
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (client.s.phase !== PH_PLAY && now >= nextRd){ client.setReady(SELF.slot); client.setGo(SELF.slot); nextRd = now + 250; }
+    const s = client.s;
+    if (s.phase === PH_PLAY){
+      // **서버가 내려준 상태만** 적는다 (예측분은 화면마다 다를 수 있다)
+      rows[s.tick] = [
+        checksum(s),
+        s.buffs.map(b => b.k + '/' + b.c + ',' + b.r).join('|'),
+        s.portals.map(g => g.c + ',' + g.r).join('|'),
+        s.p.map(p => p.x + ',' + p.y + ',' + p.hp).join(';'),
+        // 누가 어떤 버프를 몇 틱 남기고 있는지 — **먹은 시점**이 여기서 드러난다
+        s.bf.map(v => v.join(',')).join(';'),
+        // 누가 몇 번 차원문을 밟고 있는지 — **탄 시점**이 여기서 드러난다
+        s.onPort.join(',')
+      ].join(' # ');
+      if (Object.keys(rows).length >= 480 && !E.rep){
+        // `desync` 는 **내가 직접 돌린 시뮬**이 서버 값과 어긋난 횟수다.
+        // 스킨이 판정에 새어 들어가면 서버(스킨을 모름)와 갈려 여기가 올라간다
+        E.rep = { slot: SELF.slot, arena: tryOf('arena'), rows,
+                  ticks: Object.keys(rows).length, desync: client.desync | 0 };
+      }
+    }
+    // **버프·차원문 쪽으로 걸어간다.** 가만 두면 한 판 내내 아무것도 안 먹어서
+    // "먹는 시점이 같은가" 를 볼 수가 없다. 호스트는 버프를, 상대는 차원문을 노린다
+    {
+      const me = client.s.p[SELF.slot];
+      const mx = me.x + (PWf >> 1), my = me.y + (PHf >> 1);
+      const want = host ? (client.s.buffs[0] || client.s.portals[0])
+                        : (client.s.portals[0] || client.s.buffs[0]);
+      let vx, vy;
+      if (want){
+        const gx = Math.round((cellX(want.c) + GRID_CW / 2) * FP);
+        const gy = Math.round((cellY(want.r) + GRID_CH / 2) * FP);
+        const dx = gx - mx, dy = gy - my, len = Math.hypot(dx, dy) || 1;
+        vx = dx / len * 1.4; vy = dy / len * 1.4;
+      } else {
+        vx = Math.sin(f / 9) * (host ? 1.4 : -1.4); vy = Math.cos(f / 13) * 1.4;
+      }
+      client.input(SELF.slot, vx, vy, 0);
+    }
+    client.ping(now); client.sendInputs(now); client.applyFrames(); client.predict();
+    client.updateRender(client.alpha(now), dt);
+    try { view.draw(client.pred || client.s, '', 0, client, { on: 0, nx: 0, ny: 0 }, null, 0, true, {}); }
+    catch (e){ if (!E.drawErr) E.drawErr = String(e).slice(0, 160); }
+    f++;
+    if (!E.rep) requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+window.READY = true;
+</script></body></html>

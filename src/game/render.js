@@ -10,7 +10,7 @@ import {
 import { makeRoller, BALL_R, GOAL_SEQ, GOAL_HOLD, GOAL_SCORE, KICK_FX_TICKS } from './ball.js';
 import { RS, computeLayout, stickGeom, shieldBtn, tackleBtn } from './layout.js';
 import { resultFor } from './ui-state.js';
-import { GUN_FW, GUN_FH, MSK_FW, MSK_FH } from './skins.js';
+import { GUN_FW, GUN_FH, MSK_FW, MSK_FH, arenaFloorOf } from './skins.js';
 import { tryForArena, tryOf } from '../state/tryskin.js';
 import { getImage, isReady } from './assets.js';
 import { paletteSlots, throwSlots } from './layout.js';
@@ -92,13 +92,47 @@ export function createRenderer(canvas){
   const roll = makeRoller();                // 공 굴림 각도 (그리기 전용)
   // 아레나에 따라 배경이 달라진다.
   // [stated] **칼전은 장착한 아레나 스킨으로.** 각자 자기 것만 보인다 — 그림만 바꾸고 벽은 그대로
+  // 그림과 **그 그림의 이름**을 같이 돌려준다 — 이름으로 바닥 사각형을 찾는다
   const bgOf = () => {
     if (ARENA.bg === 'arena3'){
       const ma = tryOf('arena');
-      if (ma > 0){ const im = getImage('marena' + ma); if (isReady(im)) return im; }
+      if (ma > 0){
+        const key = 'marena' + ma;
+        const im = getImage(key);
+        if (isReady(im)) return [im, key];
+      }
     }
-    return getImage(ARENA.bg);
+    return [getImage(ARENA.bg), ARENA.bg];
   };
+
+  // [stated] 아레나 그림마다 바닥 자리가 달라 **버프·차원문이 돌 테두리 위에 뜨는** 일이 있었다.
+  // 그림을 9조각으로 나눠 **가운데(바닥)만 게임 격자에 맞추고** 테두리는 폭만 바꾼다.
+  // 잘려 나가는 장식이 없다.
+  //
+  // **그리기만 바뀐다.** 벽·이동·버프 칸은 시뮬이 쥐고 있어 서로 다른 아레나를 써도 판은 같다.
+  // 바닥 사각형이 없는 그림(총격전·축구)은 예전처럼 통째로 늘인다.
+  function drawArenaBg(bg, key){
+    const f = arenaFloorOf(key);
+    if (!f){ ctx.drawImage(bg, 0, 0, W * RS, H * RS); return; }
+    // 값은 540x933 기준으로 쟀다. 그림이 그보다 크면 같은 비율로 키운다
+    const iw = bg.naturalWidth || bg.width, ih = bg.naturalHeight || bg.height;
+    const kx = iw / 540, ky = ih / 933;
+    const sx = [0, f[0] * kx, f[1] * kx, iw];
+    const sy = [0, f[2] * ky, f[3] * ky, ih];
+    // 받는 자리는 **지금 아레나의 격자**에서 가져온다 (값을 두 군데 적지 않는다)
+    const gx1 = ARENA.x0 + ARENA.cw * ARENA.cols, gy1 = ARENA.y0 + ARENA.ch * ARENA.rows;
+    // 조각 사이가 1px 벌어지지 않게 **자른 자리를 먼저 반올림**하고 폭은 그 차로 잡는다
+    const dx = [0, Math.round(ARENA.x0 * RS), Math.round(gx1 * RS), Math.round(W * RS)];
+    const dy = [0, Math.round(ARENA.y0 * RS), Math.round(gy1 * RS), Math.round(H * RS)];
+    for (let i = 0; i < 3; i++){
+      for (let j = 0; j < 3; j++){
+        const sw = sx[i + 1] - sx[i], sh = sy[j + 1] - sy[j];
+        const dw = dx[i + 1] - dx[i], dh = dy[j + 1] - dy[j];
+        if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) continue;
+        ctx.drawImage(bg, sx[i], sy[j], sw, sh, dx[i], dy[j], dw, dh);
+      }
+    }
+  }
   const boom = getImage('explosion');
 
   // [stated] **칼전 초반이 유독 끊긴다.** 맞을 때 `ctx.filter` 로 하얗게 만들었는데
@@ -347,7 +381,8 @@ export function createRenderer(canvas){
       // 그릴 크기도 그 비율만큼 넓힌다 — **몸통 크기는 같게 맞춰 뒀으므로** 캐릭터가 커지지 않는다.
       // 넘치는 만큼은 좌우·위로 고르게 나눠 캐릭터 자리가 안 밀리게 한다
       const gsk = skin | 0;
-      if (gsk > 0 && isReady(gunSkinImg) && gsk <= 5){
+      // [stated] 코인 스킨 3종이 붙어 8번까지 있다 (시트도 8줄)
+      if (gsk > 0 && isReady(gunSkinImg) && gsk <= 8){
         const gw = Math.round(dw * GUN_FW / FW), gh = Math.round(dh * GUN_FH / FH);
         const gi = (hit ? 2 : 0) + (mineSide ? 1 : 0);
         // 스킨도 미리 줄여둔다 (칼전과 같은 이유)
@@ -1104,8 +1139,8 @@ export function createRenderer(canvas){
     const sh = j ? j.offset() : { x: 0, y: 0 };
     ctx.save();
     ctx.translate(Math.round(sh.x * RS), Math.round(sh.y * RS));   // 아레나만 흔든다
-    const bg = bgOf();
-    if (isReady(bg)) ctx.drawImage(bg, 0, 0, W * RS, H * RS);
+    const [bg, bgKey] = bgOf();
+    if (isReady(bg)) drawArenaBg(bg, bgKey);
     else px(0, 0, W, H, COL.bg);
 
     // [stated] 골 연출: 2초 골대 안 → 2초 `GOAL!` → 2초 스코어

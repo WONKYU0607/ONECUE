@@ -9,7 +9,10 @@
 // [stated] 상품은 아래로 쌓지 않고 **옆으로 넘겨서** 본다 — 한 칸이 커졌기 때문
 import { useState, useEffect, useRef } from 'react';
 import { setInnerBack } from '../../state/back.js';
-import { DEBUG_TRY_SKIN, tryOf, setTry } from '../../state/tryskin.js';
+import { DEBUG_TRY_SKIN, tryOf, setTry, ownsSkin } from '../../state/tryskin.js';
+import { coinSkinsOf, coinArenasOf } from '../../game/skins.js';
+import { buySkin, refreshCoin, coinNow, onCoin } from '../../state/questclient.js';
+import { SKIN_COST, SKIN_FIRST_OFF } from '../../state/quests.js';
 import { SOCCER_SKINS, SOCCER_SET, PREV_IMG, PREV_FW, PREV_FH, PREV_COLS, PREV_ROWS_N,
   PREV_LINES, GUN_SKINS, GUN_SET, GUN_PREV_IMG, GUN_PREV_FW, GUN_PREV_FH, GUN_PREV_COLS,
   GUN_PREV_ROWS_N, GUN_PREV_LINES, MELEE_SKINS, MELEE_SET, MELEE_ARENAS, ARENA_SET, NOADS, MEL_PREV_IMG, MEL_PREV_FW,
@@ -43,7 +46,13 @@ const GOODS = {
 import { t } from '../../i18n/index.js';
 
 // **문구 열쇠를 이어붙이지 말 것** — 변수를 더해 만들면 번역 검사가 못 찾는다
-export const TABS = ['arena', 'skin', 'noads', 'item'];
+//
+// [stated] **코인으로 사는 것과 현금으로 사는 것을 가른다.** 맨 위에 한 줄을 더 두고,
+// 그 아래 갈래는 어느 쪽이냐에 따라 달라진다 — **코인 쪽에는 광고 제거가 없다**
+export const PAYS = ['coin', 'cash'];
+export const TABS_COIN = ['arena', 'skin', 'money'];
+export const TABS_CASH = ['arena', 'skin', 'noads', 'money'];
+export const tabsOf = pay => (pay === 'coin' ? TABS_COIN : TABS_CASH);
 // 아레나 종목 탭 — 칼전이 먼저 (칼전만 만들었다)
 const ARENA_SUBS = ['melee', 'gun'];
 export const SKIN_SUBS = ['gun', 'melee', 'soccer'];
@@ -90,22 +99,57 @@ function SkinCell({ sh, row, col, h }){
 }
 
 export default function Shop({ onBack }){
-  const [tab, setTab] = useState(TABS[0]);
+  // [stated] **코인 / 일반** — 맨 위 한 줄. 코인 쪽부터 보인다
+  const [pay, setPay] = useState('coin');
+  const [tab, setTab] = useState(TABS_COIN[0]);
   // [stated] 스킨 탭을 열면 **총격전**부터 보인다
   const [sub, setSub] = useState('gun');
   // [stated] **아레나도 종목 탭** — 칼전만 만들었으니 칼전이 먼저
   const [asub, setAsub] = useState('melee');
   // [stated] 몇 번째인지 보이게 **점 다섯 개**, 그리고 **양옆 화살표**로도 넘긴다
   const [at, setAt] = useState(0);
+  // [stated] **코인으로 사기** — 잔액은 서버가 쥔다. 사고 나면 다시 받아 와 맞춘다
+  const [coin, setCoinUi] = useState(coinNow());
+  const [busy, setBusy] = useState(false);
+  const [bought, setBought] = useState(0);
+  const [note, setNote] = useState('');
+  useEffect(() => {
+    const off = onCoin(c => setCoinUi(c));
+    refreshCoin().then(r => { if (r && r.ok) setBought(r.bought | 0); }).catch(() => {});
+    return off;
+  }, []);
+  // [stated] **첫 구매만 50% 할인**
+  const costNow = () => (bought === 0 ? Math.round(SKIN_COST * (100 - SKIN_FIRST_OFF) / 100) : SKIN_COST);
+  const take = async (kind, id) => {
+    if (busy) return;
+    setBusy(true); setNote('');
+    const r = await buySkin(kind, id);
+    setNote(t(r && r.ok ? 'shop.bought' : (r && r.why === 'poor' ? 'shop.poor' : 'q.fail')));
+    const back2 = await refreshCoin();
+    if (back2 && back2.ok) setBought(back2.bought | 0);
+    setBusy(false);
+  };
   // [stated] 디버그: 실제 필드에서 입어볼 수 있게. 출시 전 `DEBUG_TRY_SKIN` 을 false 로
   const [worn, setWorn] = useState(0);
   const swipe = useRef(null);
+  // **지금 보고 있는 목록의 길이**로 잘라야 한다. 예전엔 축구 목록 길이로 잘랐는데
+  // 세 종목이 다 5종이라 티가 안 났다 — 총격전에 코인 3종이 붙자 6번부터 안 넘어갔다
+  // 지금 화면에 깔린 상품 목록. 코인 쪽과 일반 쪽이 아예 다른 목록이다
+  const skinList = () => (pay === 'coin' ? coinSkinsOf(sub) : (GOODS[sub] ? GOODS[sub].list : []));
+  const arenaList = () => (pay === 'coin' ? coinArenasOf(asub) : (asub === 'melee' ? MELEE_ARENAS : []));
+  const nowList = () => (tab === 'arena' ? arenaList() : skinList());
   const goTo = i => {
     const el = swipe.current;
     if (!el) return;
-    const n = Math.max(0, Math.min(SOCCER_SKINS.length - 1, i));
+    const n = Math.max(0, Math.min(Math.max(0, nowList().length - 1), i));
     el.scrollTo({ left: n * el.clientWidth, behavior: 'smooth' });
     setAt(n);
+  };
+  // 탭·갈래를 옮기면 늘 첫 상품부터. 화면도 실제로 되감아야 한다
+  const rewind = () => {
+    setAt(0);
+    const el = swipe.current;
+    if (el) el.scrollTo({ left: 0, behavior: 'auto' });
   };
 
   setInnerBack(() => false);
@@ -114,16 +158,25 @@ export default function Shop({ onBack }){
   // **번역은 그릴 때 부른다** — 최상단에서 부르면 언어가 정해지기 전에 굳는다
   const label = {
     arena: t('shop.tab.arena'), skin: t('shop.tab.skin'),
-    noads: t('shop.tab.noads'), item: t('shop.tab.item')
+    noads: t('shop.tab.noads'), money: t('shop.tab.money')
   };
+  const payLabel = { coin: t('shop.pay.coin'), cash: t('shop.pay.cash') };
   const subLabel = {
     gun: t('shop.sub.gun'), melee: t('shop.sub.melee'), soccer: t('shop.sub.soccer')
   };
   void worn;   // 눌렀을 때 다시 그리려고 둔다
   const arenaName = k => t(k);
+  // [stated] 종목마다 이름이 다르다 — 총격전·칼전은 **제 이름**, 축구는 번호.
+  // (예전엔 셋이 `skin.no1` 을 같이 썼다 — 총격전에 이름을 붙이면 칼전·축구까지 따라 바뀐다)
   const skinName = {
     'skin.no1': t('skin.no1'), 'skin.no2': t('skin.no2'), 'skin.no3': t('skin.no3'),
-    'skin.no4': t('skin.no4'), 'skin.no5': t('skin.no5'), 'skin.set': t('skin.set')
+    'skin.no4': t('skin.no4'), 'skin.no5': t('skin.no5'),
+    'skin.gun1': t('skin.gun1'), 'skin.gun2': t('skin.gun2'), 'skin.gun3': t('skin.gun3'),
+    'skin.gun4': t('skin.gun4'), 'skin.gun5': t('skin.gun5'), 'skin.gun6': t('skin.gun6'),
+    'skin.gun7': t('skin.gun7'), 'skin.gun8': t('skin.gun8'),
+    'skin.mel1': t('skin.mel1'), 'skin.mel2': t('skin.mel2'), 'skin.mel3': t('skin.mel3'),
+    'skin.mel4': t('skin.mel4'), 'skin.mel5': t('skin.mel5'),
+    'skin.set': t('skin.set')
   };
 
   return (
@@ -134,38 +187,54 @@ export default function Shop({ onBack }){
         <button className="shop-btn" onClick={onBack}>{t('common.back')}</button>
       </div>
 
-      <div className="shop-tabs">
-        {TABS.map(k => (
-          <button key={k} className={'shop-btn' + (tab === k ? ' on' : '')}
+      {/* [stated] **코인 / 일반** — 맨 위. 어느 쪽이냐에 따라 아래 갈래가 달라진다 */}
+      <div className="shop-tabs pay">
+        {PAYS.map(k => (
+          <button key={k} className={'shop-btn' + (pay === k ? ' on' : '')}
                   onClick={() => {
-                    setTab(k); setAt(0);
-                    const el = swipe.current; if (el) el.scrollTo({ left: 0, behavior: 'auto' });
-                  }}>{label[k]}</button>
+                    setPay(k);
+                    // 광고 제거는 일반 쪽에만 있다 — 코인으로 옮기면 그 갈래가 사라지므로 되돌린다
+                    if (!tabsOf(k).includes(tab)) setTab(tabsOf(k)[0]);
+                    setNote(''); rewind();
+                  }}>{payLabel[k]}</button>
+        ))}
+      </div>
+
+      <div className="shop-tabs">
+        {tabsOf(pay).map(k => (
+          <button key={k} className={'shop-btn' + (tab === k ? ' on' : '')}
+                  onClick={() => { setTab(k); setNote(''); rewind(); }}>{label[k]}</button>
         ))}
       </div>
 
       {tab === 'skin' && (
         <div className="shop-tabs sub">
           {SKIN_SUBS.map(k => (
+            // [stated] **탭을 옮기면 늘 첫 상품부터.** `at` 만 0 으로 두면
+            // 화면은 그대로라 3번을 보다 넘어가면 3번이 나왔다 — 실제로 되감아야 한다
             <button key={k} className={'shop-btn' + (sub === k ? ' on' : '')}
-                    onClick={() => {
-                      // [stated] **탭을 옮기면 늘 첫 상품부터.** `at` 만 0 으로 두면
-                      // 화면은 그대로라 3번을 보다 넘어가면 3번이 나왔다 — 실제로 되감아야 한다
-                      setSub(k); setAt(0);
-                      const el = swipe.current;
-                      if (el) el.scrollTo({ left: 0, behavior: 'auto' });
-                    }}>{subLabel[k]}</button>
+                    onClick={() => { setSub(k); rewind(); }}>{subLabel[k]}</button>
           ))}
         </div>
       )}
 
-      {tab === 'skin' && GOODS[sub] ? (
+      {/* [stated] 코인 쪽에서는 **잔액을 늘 보여준다**. 스킨 칸에서는 첫 구매 할인도 같이 */}
+      {pay === 'coin' && (
+        <div className="shop-note">
+          <span className="coin-tag">{coin.toLocaleString()}</span>
+          <span className="tx">{note || (tab === 'skin' ? t('shop.first50') : '')}</span>
+        </div>
+      )}
+
+      {tab === 'skin' && !skinList().length ? (
+        <div className="shop-list"><p className="shop-empty">{t('shop.empty')}</p></div>
+      ) : tab === 'skin' ? (
         // 옆으로 넘겨 본다. 한 상품이 화면 하나를 채운다
         <div className="shop-wrap">
           {/* 양옆 화살표 — 눌러도 넘어간다 */}
           <button className="shop-arrow l" disabled={at === 0}
                   onClick={() => goTo(at - 1)}>‹</button>
-          <button className="shop-arrow r" disabled={at === GOODS[sub].list.length - 1}
+          <button className="shop-arrow r" disabled={at >= skinList().length - 1}
                   onClick={() => goTo(at + 1)}>›</button>
 
           <div className="shop-swipe" ref={swipe}
@@ -173,15 +242,26 @@ export default function Shop({ onBack }){
                  const w = e.currentTarget.clientWidth || 1;
                  setAt(Math.round(e.currentTarget.scrollLeft / w));
                }}>
-            {GOODS[sub].list.map(s2 => (
+            {skinList().map(s2 => (
               <div key={s2.id} className="shop-card">
                 {/* [stated] 한 상품을 묶는 **얇은 테두리** */}
                 <div className="shop-card-in">
                   <SkinPreview sh={SHEETS[sub]} row={s2.row} h={H_ITEM} />
                   <div className="shop-card-foot">
                     <span className="nm">{skinName[s2.key]}</span>
-                    <span className="pr">{t('shop.price', { p: s2.price.toLocaleString() })}</span>
-                    {DEBUG_TRY_SKIN ? (
+                    <span className="pr">{s2.coin
+                      ? t('shop.coinPrice', { p: costNow().toLocaleString() })
+                      : t('shop.price', { p: s2.price.toLocaleString() })}</span>
+                    {s2.coin ? (
+                      // [stated] **코인으로 사는 스킨.** 사면 서버가 소유에 넣는다
+                      ownsSkin(sub, s2.id)
+                        ? <button className={'shop-btn' + (tryOf(sub) === s2.id ? ' on' : '')}
+                                  onClick={() => setWorn(setTry(sub, s2.id))}>
+                            {tryOf(sub) === s2.id ? t('shop.wearing') : t('shop.wear')}
+                          </button>
+                        : <button className="shop-btn" disabled={busy}
+                                  onClick={() => take(sub, s2.id)}>{t('shop.coinBuy')}</button>
+                    ) : DEBUG_TRY_SKIN ? (
                       <button className={'shop-btn' + (tryOf(sub) === s2.id ? ' on' : '')}
                               onClick={() => setWorn(setTry(sub, s2.id))}>
                         {tryOf(sub) === s2.id ? t('shop.wearing') : t('shop.wear')}
@@ -195,15 +275,18 @@ export default function Shop({ onBack }){
             ))}
           </div>
 
-          {/* 몇 번째인지 */}
+          {/* 몇 번째인지. **코인 스킨까지 세야 한다** — 결제분만 세면 점이 모자라
+              뒤쪽 상품에서 아무 점도 안 켜진다 */}
           <div className="shop-dots">
-            {GOODS[sub].list.map((s2, i) => (
+            {skinList().map((s2, i) => (
               <i key={s2.id} className={i === at ? 'on' : ''} onClick={() => goTo(i)} />
             ))}
           </div>
 
           {/* [stated] **5종을 한 번에 사는 세트.** 하나뿐이라 넘기지 않는다.
-              정면만, 윗줄 2개 · 아랫줄 3개 */}
+              정면만, 윗줄 2개 · 아랫줄 3개.
+              **코인 쪽에는 세트가 없다** — 세트는 결제 상품이다 */}
+          {pay === 'cash' && GOODS[sub] && (
           <div className="shop-set">
             <div className="shop-card-in">
               <div className="skin-prev">
@@ -220,39 +303,47 @@ export default function Shop({ onBack }){
               </div>
             </div>
           </div>
+          )}
         </div>
       ) : tab === 'arena' ? (<>
         <div className="shop-tabs sub">
           {ARENA_SUBS.map(k => (
             <button key={k} className={'shop-btn' + (asub === k ? ' on' : '')}
-                    onClick={() => {
-                      setAsub(k); setAt(0);
-                      const el = swipe.current; if (el) el.scrollTo({ left: 0, behavior: 'auto' });
-                    }}>{subLabel[k]}</button>
+                    onClick={() => { setAsub(k); rewind(); }}>{subLabel[k]}</button>
           ))}
         </div>
-        {asub !== 'melee' ? (
-          // 총격전 아레나는 아직 없다
+        {!arenaList().length ? (
+          // 총격전 아레나는 아직 없다. 코인 아레나도 그림이 오면 채운다
           <div className="shop-list"><p className="shop-empty">{t('shop.empty')}</p></div>
         ) : (
         // [stated] **칼전 아레나 5종** — 스킨과 같은 틀: 한 장씩 넘겨 보고, 아래에 5종 세트
         <div className="shop-wrap">
           <button className="shop-arrow l arena" disabled={at === 0} onClick={() => goTo(at - 1)}>‹</button>
-          <button className="shop-arrow r arena" disabled={at === MELEE_ARENAS.length - 1}
+          <button className="shop-arrow r arena" disabled={at >= arenaList().length - 1}
                   onClick={() => goTo(at + 1)}>›</button>
           <div className="shop-swipe" ref={swipe}
                onScroll={e => {
                  const w = e.currentTarget.clientWidth || 1;
                  setAt(Math.round(e.currentTarget.scrollLeft / w));
                }}>
-            {MELEE_ARENAS.map(a => (
+            {arenaList().map(a => (
               <div key={a.id} className="shop-card">
                 <div className="shop-card-in">
                   <i className="arena-prev" style={{ backgroundImage: `url(${a.img})` }} />
                   <div className="shop-card-foot">
                     <span className="nm">{arenaName(a.key)}</span>
-                    <span className="pr">{t('shop.price', { p: a.price.toLocaleString() })}</span>
-                    {DEBUG_TRY_SKIN ? (
+                    <span className="pr">{a.coin
+                      ? t('shop.coinPrice', { p: costNow().toLocaleString() })
+                      : t('shop.price', { p: a.price.toLocaleString() })}</span>
+                    {a.coin ? (
+                      ownsSkin('arena', a.id)
+                        ? <button className={'shop-btn' + (tryOf('arena') === a.id ? ' on' : '')}
+                                  onClick={() => setWorn(setTry('arena', a.id))}>
+                            {tryOf('arena') === a.id ? t('shop.wearing') : t('shop.wear')}
+                          </button>
+                        : <button className="shop-btn" disabled={busy}
+                                  onClick={() => take('arena', a.id)}>{t('shop.coinBuy')}</button>
+                    ) : DEBUG_TRY_SKIN ? (
                       <button className={'shop-btn' + (tryOf('arena') === a.id ? ' on' : '')}
                               onClick={() => setWorn(setTry('arena', a.id))}>
                         {tryOf('arena') === a.id ? t('shop.wearing') : t('shop.wear')}
@@ -266,11 +357,12 @@ export default function Shop({ onBack }){
             ))}
           </div>
           <div className="shop-dots">
-            {MELEE_ARENAS.map((a, i) => (
+            {arenaList().map((a, i) => (
               <i key={a.id} className={i === at ? 'on' : ''} onClick={() => goTo(i)} />
             ))}
           </div>
-          {/* 5종 세트 — 한 줄에 다섯 장 */}
+          {/* 5종 세트 — 한 줄에 다섯 장. **코인 쪽에는 세트가 없다** */}
+          {pay === 'cash' && (
           <div className="shop-set">
             <div className="shop-card-in">
               <div className="arena-set">
@@ -285,6 +377,7 @@ export default function Shop({ onBack }){
               </div>
             </div>
           </div>
+          )}
         </div>
         )}
       </>) : tab === 'noads' ? (

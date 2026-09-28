@@ -231,8 +231,11 @@ class Room {
     // [stated] **친구방(코드 방)은 점수를 올리지 않는다** — 아는 사람끼리 짜고 하면
     // 순위를 얼마든지 만들 수 있다. 승패는 그 자리에서 보이고, **기록은 남기지 않는다**.
     // 빠른 매칭(코드 없는 방)만 점수·전적에 반영한다
-    if (this.code) return;
     const kind = st.soccer ? 'soccer' : (st.melee ? 'melee' : 'gun');
+    // [stated] **퀘스트는 친구방도 인정한다** — 점수만 동결이다.
+    // 점수 계산(`if (this.code) return`)보다 **먼저** 해야 친구방에서도 쌓인다
+    this.bumpQuests(kind);
+    if (this.code) return;
     const rows = [];
     for (let i = 0; i < this.n; i++){
       const seat = this.seats[i];
@@ -273,6 +276,23 @@ class Room {
     store.writeResults(rows)
       .then(ok => { if (ok) store.queueRanks(kind); })
       .catch(() => {});
+  }
+
+  /** [stated] 판이 끝나면 **퀘스트 진행도**를 올린다 (친구방 포함).
+   *  이기고 지는 것만 알면 되므로 점수 계산과 따로 둔다 — 점수는 빠른 매칭에서만 돈다.
+   *  연승은 서버가 `sall` 로 통합해서 센다 */
+  bumpQuests(kind){
+    const st = this.server.s;
+    for (let i = 0; i < this.n; i++){
+      const seat = this.seats[i];
+      if (!seat || !seat.uid) continue;
+      const team = teamOf(i, st.n);
+      const goals = st.soccer ? ((st.score && st.score[team]) | 0) : 0;
+      // `winner` 는 **팀+1**, 0 이면 무승부. 개인전은 이긴 자리+1 이라 같은 식으로 맞는다
+      const me = st.ffa ? i + 1 : team + 1;
+      const res = (st.winner | 0) === 0 ? 'draw' : ((st.winner | 0) === me ? 'win' : 'lose');
+      store.bumpQuest(seat.uid, { kind, res, goals }).catch(() => {});
+    }
   }
 
   // 상대 팀 평균 점수. **봇은 내 점수와 같다고 본다** —
@@ -725,6 +745,29 @@ const http = createServer((req, res) => {
       .then(me => (me ? store.readTickets(me) : null))
       .then(v => res.end(JSON.stringify(v ? { ok: true, ...v } : { ok: false })))
       .catch(() => res.end(JSON.stringify({ ok: false })));
+    return;
+  }
+
+  // [stated] **퀘스트·우편함·구매.** 전부 쓰기라 **증표(token)로 본인 확인**을 한다 —
+  // uid 만 받으면 남의 코인을 쓰거나 남의 보상을 받아갈 수 있다
+  if (req.url && req.url.startsWith('/quest')){
+    const q = new URL(req.url, 'http://x').searchParams;
+    const act = q.get('act') || 'read';
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    store.uidFromToken(q.get('token')).then(async me => {
+      if (!me) return { ok: false, auth: true };
+      if (act === 'claim') return store.claimQuest(me, q.get('p') || 'd');
+      if (act === 'mail')  return store.claimMail(me, q.get('id') || '');
+      if (act === 'time')  return { ok: await store.addPlayTime(me, +q.get('sec') || 0) };
+      if (act === 'buy'){
+        if (q.get('what') === 'ticket') return store.buyTicket(me, q.get('soccer') === '1');
+        return store.buySkin(me, q.get('kind') || '', +q.get('id') || 0);
+      }
+      const v = await store.readQuest(me);
+      return v ? { ok: true, ...v } : { ok: false };
+    })
+      .then(r => res.end(JSON.stringify(r)))
+      .catch(() => res.end(JSON.stringify({ ok: false, err: true })));
     return;
   }
 

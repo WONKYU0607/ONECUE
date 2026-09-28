@@ -33,8 +33,9 @@ const num = k => {
 
 console.log('시트 칸 크기가 코드 상수와 맞는가');
 const CASES = [
-  ['총격전 게임',   'public/assets/gun-skins.webp',    'GUN_FW',      'GUN_FH',      4, 5],
-  ['총격전 미리보기','public/assets/gun-preview.webp',  'GUN_PREV_FW', 'GUN_PREV_FH', 4, 5],
+  // [stated] 총격전만 **8줄** — 결제 5종 뒤에 코인 3종을 이어 붙였다
+  ['총격전 게임',   'public/assets/gun-skins.webp',    'GUN_FW',      'GUN_FH',      4, 8],
+  ['총격전 미리보기','public/assets/gun-preview.webp',  'GUN_PREV_FW', 'GUN_PREV_FH', 4, 8],
   ['칼전 게임',     'public/assets/melee-skins.webp',  'MSK_FW',      'MSK_FH',      8, 5],
   ['칼전 미리보기', 'public/assets/melee-preview.webp','MEL_PREV_FW', 'MEL_PREV_FH', 4, 5],
   ['축구 게임',     'public/assets/soccer-skins.webp', 'SKIN_FW',     'SKIN_FH',    13, 5],

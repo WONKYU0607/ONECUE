@@ -25,6 +25,10 @@ export const ASSET_SRC = {
   marena3:    'assets/marena-ice.webp',
   marena4:    'assets/marena-hell.webp',
   marena5:    'assets/marena-necro.webp',
+  // [stated] 코인으로 사는 아레나 3종
+  marena6:    'assets/marena-forest.webp',
+  marena7:    'assets/marena-sea.webp',
+  marena8:    'assets/marena-autumn.webp',
   melee:      'assets/melee.webp',    // 칼전 캐릭터 4색 x 4자세
   characters: 'assets/characters.png',
   items:      'assets/items.webp',

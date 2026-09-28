@@ -34,6 +34,9 @@ export const isOn = () => !!db || !!FAKE;
 /** 로그인 증표 확인. **uid 를 그냥 믿으면 남의 이름을 바꿔버릴 수 있다** —
  *  이름 바꾸기처럼 쓰기가 일어나는 곳은 반드시 이걸로 본인인지 확인한다 */
 export async function uidFromToken(idToken){
+  // **검사 전용** — 가짜 저장소로 돌 때는 구글에 물어볼 수 없다.
+  // `E2E_FAKE_STORE=1` 일 때만 증표를 그대로 uid 로 쓴다 (Render 에는 그 설정이 없다)
+  if (FAKE) return idToken ? String(idToken).slice(0, 64) : null;
   if (!db || !idToken) return null;
   try { return (await getAuth().verifyIdToken(String(idToken))).uid || null; }
   catch { return null; }
@@ -554,5 +557,272 @@ export async function buildRanks(kind = 'gun', top = 30){
   } catch (e){
     console.log('[store] 순위표 실패', e && e.code);
     return false;
+  }
+}
+
+// ══ 코인 · 퀘스트 · 우편함 ═══════════════════════════════════════
+// [stated] 퀘스트로 코인을 모아 스킨을 산다.
+//
+// **전부 서버가 쥔다.** 기기에 두면 저장을 고쳐서 무한이 된다.
+// 보안 규칙이 클라 쓰기를 목록(`nick·tk·at·ffa·day·updatedAt`)으로 막고 있어서
+// `coin`·`qd`·`qw`·`qm`·`mail`·`own` 은 클라가 손댈 수 없다 — 규칙은 안 고쳐도 된다.
+import {
+  PERIODS, questsOf, keyOf, emptyPeriod, doneOf, allDone,
+  claimable, bump as qbump, SKIN_COST, SKIN_FIRST_OFF, TICKET_COST,
+  BUY_TK_MAX, BUY_SOC_MAX, PLAY_DAY_MAX, countsOf as questCounts
+} from '../src/state/quests.js';
+
+// **검사 전용** — `E2E_FAKE_STORE=1` 이면 파이어스토어 없이 같은 코드를 돌린다.
+// 트랜잭션 흉내: 문서를 꺼내 주고, 쓰면 합쳐 넣는다 (한 번에 한 사람만 쓰므로 충분하다)
+const fakeDoc = uid => (FAKE.get(uid) || {});
+async function withDoc(uid, fn){
+  if (FAKE){
+    const v = fakeDoc(uid);
+    let out;
+    const tx = { get: async () => ({ exists: true, data: () => v }),
+                 set: (_r, patch) => { FAKE.set(uid, { ...fakeDoc(uid), ...patch }); } };
+    out = await fn(tx, { doc: () => null });
+    return out;
+  }
+  return db.runTransaction(tx => fn(tx, db));
+}
+
+const MAIL_KEEP = 30;                 // 우편함은 최근 것만 남긴다 (문서가 커지면 읽기가 무거워진다)
+const QF = { d: 'qd', w: 'qw', m: 'qm' };
+
+/** 문서에서 한 기간을 꺼낸다. 모양이 깨져 있어도 빈 칸으로 돌려준다 */
+function perOf(v, p, now){
+  const raw = v && v[QF[p]];
+  const ok = raw && typeof raw === 'object' && typeof raw.key === 'string';
+  const cur = ok ? { key: raw.key, v: raw.v || {}, got: Array.isArray(raw.got) ? raw.got : [],
+                     full: !!raw.full } : emptyPeriod(p, now);
+  return cur;
+}
+
+/** **기간이 지났으면 새 칸으로 갈고, 안 받은 보상은 우편함으로 보낸다.**
+ *  [stated] 안 받은 보상은 시간이 지나면 우편함으로 — 따로 도는 일감 없이
+ *  다음에 들어올 때 여기서 처리한다 */
+function rollAll(v, now){
+  const out = {}; const mail = [];
+  let changed = false;
+  for (const p of PERIODS){
+    const cur = perOf(v, p, now);
+    const key = keyOf(p, now);
+    if (cur.key === key){ out[p] = cur; continue; }
+    const left = claimable(p, cur);
+    if (left > 0) mail.push({ id: p + ':' + cur.key, p, coin: left, at: now });
+    out[p] = emptyPeriod(p, now);
+    changed = true;
+  }
+  return { per: out, mail, changed };
+}
+
+/** 지금 상태를 읽는다. 읽으면서 기간 정리도 한다 */
+export async function readQuest(uid){
+  if (!isOn() || !uid) return null;
+  try {
+    return await withDoc(uid, async (tx, dbx) => {
+      const ref = dbx && dbx.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const v = d.exists ? d.data() : {};
+      const now = Date.now();
+      const { per, mail, changed } = rollAll(v, now);
+      const box = [...(Array.isArray(v.mail) ? v.mail : []), ...mail].slice(-MAIL_KEEP);
+      if (changed){
+        tx.set(ref, { qd: per.d, qw: per.w, qm: per.m, mail: box }, { merge: true });
+      }
+      return {
+        coin: v.coin | 0,
+        d: per.d, w: per.w, m: per.m,
+        mail: box,
+        bought: v.bought | 0,
+        own: v.own || {},
+        buy: v.buy && v.buy.day === dayKey() ? v.buy : { day: dayKey(), tk: 0, soc: 0 }
+      };
+    });
+  } catch (e){
+    console.log('[store] 퀘스트 읽기 실패', e && e.code);
+    return null;
+  }
+}
+
+/** 한 판의 결과로 진행도를 올린다. `m` 은 `{ kind, res, goals }`.
+ *  [stated] **친구방도 인정한다** — 점수는 동결이지만 퀘스트는 쳐준다.
+ *  [stated] **연승은 종목 상관없이 통합**이라 여기서 따로 센다(`sall`) —
+ *  기존 `streak` 은 종목별이라 그대로 쓰면 종목을 바꿀 때마다 끊긴다 */
+export async function bumpQuest(uid, m){
+  if (!isOn() || !uid || !m) return false;
+  try {
+    await withDoc(uid, async (tx, dbx) => {
+      const ref = dbx && dbx.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const v = d.exists ? d.data() : {};
+      const now = Date.now();
+      const { per, mail } = rollAll(v, now);
+      const sall = m.res === 'win' ? (v.sall | 0) + 1 : 0;
+      const counts = questCounts({ ...m, streak: sall });
+      for (const p of PERIODS)
+        for (const [name, by] of Object.entries(counts)) qbump(per[p], p, name, by);
+      // **일일을 전부 채운 날은 주간이 1 오른다** (주간 8번 "일일 퀘스트 4회 완료").
+      // `full` 표시로 한 번만 센다 — 안 그러면 이후 판마다 계속 올라간다
+      if (!per.d.full && allDone('d', per.d)){ per.d.full = true; qbump(per.w, 'w', 'dDone', 1); }
+      if (!per.w.full && allDone('w', per.w)){ per.w.full = true; qbump(per.m, 'm', 'wDone', 1); }
+      const box = [...(Array.isArray(v.mail) ? v.mail : []), ...mail].slice(-MAIL_KEEP);
+      tx.set(ref, { qd: per.d, qw: per.w, qm: per.m, mail: box, sall }, { merge: true });
+    });
+    return true;
+  } catch (e){
+    console.log('[store] 퀘스트 갱신 실패', e && e.code);
+    return false;
+  }
+}
+
+/** [stated] 게임 누적 접속 시간 — 클라가 **화면이 보일 때만** 세어 보낸다.
+ *  **하루 상한으로 자른다** — 안 자르면 큰 값을 보내 한 번에 채울 수 있다 */
+export async function addPlayTime(uid, sec){
+  const add = Math.max(0, Math.min(300, sec | 0));      // 한 번에 5분까지만
+  if (!isOn() || !uid || !add) return false;
+  try {
+    await withDoc(uid, async (tx, dbx) => {
+      const ref = dbx && dbx.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const v = d.exists ? d.data() : {};
+      const now = Date.now();
+      const today = dayKey();
+      const had = (v.sec && v.sec.day === today) ? (v.sec.n | 0) : 0;
+      const room = Math.max(0, PLAY_DAY_MAX - had);
+      const give = Math.min(add, room);
+      if (!give) return;
+      const { per, mail } = rollAll(v, now);
+      // 시간 퀘스트는 **쌓이는 값**이라 초를 그대로 더한다
+      for (const p of PERIODS)
+        for (const q of questsOf(p))
+          if (q.time) per[p].v[q.id] = Math.min(q.goal, (per[p].v[q.id] | 0) + give);
+      const box = [...(Array.isArray(v.mail) ? v.mail : []), ...mail].slice(-MAIL_KEEP);
+      if (!per.d.full && allDone('d', per.d)){ per.d.full = true; qbump(per.w, 'w', 'dDone', 1); }
+      tx.set(ref, { qd: per.d, qw: per.w, qm: per.m, mail: box,
+                    sec: { day: today, n: had + give } }, { merge: true });
+    });
+    return true;
+  } catch (e){
+    console.log('[store] 접속 시간 실패', e && e.code);
+    return false;
+  }
+}
+
+/** 보상 받기. 그 기간에서 **받을 수 있는 걸 전부** 준다 */
+export async function claimQuest(uid, p){
+  if (!isOn() || !uid || !PERIODS.includes(p)) return { ok: false };
+  try {
+    return await withDoc(uid, async (tx, dbx) => {
+      const ref = dbx && dbx.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const v = d.exists ? d.data() : {};
+      const now = Date.now();
+      const { per, mail } = rollAll(v, now);
+      const cur = per[p];
+      const coin = claimable(p, cur);
+      if (!coin) return { ok: false, why: 'none' };
+      const got = new Set(cur.got || []);
+      for (const q of questsOf(p)) if (doneOf(q, cur.v)) got.add(q.id);
+      if (allDone(p, cur)) got.add('all');
+      cur.got = [...got];
+      const box = [...(Array.isArray(v.mail) ? v.mail : []), ...mail].slice(-MAIL_KEEP);
+      const coinNow = (v.coin | 0) + coin;
+      tx.set(ref, { coin: coinNow, qd: per.d, qw: per.w, qm: per.m, mail: box }, { merge: true });
+      return { ok: true, coin, total: coinNow };
+    });
+  } catch (e){
+    console.log('[store] 보상 받기 실패', e && e.code);
+    return { ok: false, why: 'err' };
+  }
+}
+
+/** 우편함에서 받기. `id` 를 안 주면 **전부** 받는다 */
+export async function claimMail(uid, id){
+  if (!isOn() || !uid) return { ok: false };
+  try {
+    return await withDoc(uid, async (tx, dbx) => {
+      const ref = dbx && dbx.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const v = d.exists ? d.data() : {};
+      const box = Array.isArray(v.mail) ? v.mail : [];
+      const take = id ? box.filter(m => m.id === id) : box;
+      if (!take.length) return { ok: false, why: 'none' };
+      const coin = take.reduce((s, m) => s + (m.coin | 0), 0);
+      const rest = id ? box.filter(m => m.id !== id) : [];
+      const coinNow = (v.coin | 0) + coin;
+      tx.set(ref, { coin: coinNow, mail: rest }, { merge: true });
+      return { ok: true, coin, total: coinNow, mail: rest };
+    });
+  } catch (e){
+    console.log('[store] 우편 받기 실패', e && e.code);
+    return { ok: false, why: 'err' };
+  }
+}
+
+/** [stated] **코인으로 스킨을 산다.** 차감과 지급이 **한 트랜잭션**이어야 한다 —
+ *  따로 하면 코인만 빠지고 스킨은 안 들어오는 일이 난다.
+ *  [stated] **첫 구매만 50% 할인** */
+export async function buySkin(uid, kind, id){
+  // [stated] 아레나도 코인으로 판다 — 소유는 스킨과 같은 자리(`own.arena`)에 쌓인다
+  const k = ['gun', 'melee', 'soccer', 'arena'].includes(kind) ? kind : null;
+  const n = id | 0;
+  if (!isOn() || !uid || !k || n <= 0) return { ok: false, why: 'bad' };
+  try {
+    return await withDoc(uid, async (tx, dbx) => {
+      const ref = dbx && dbx.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const v = d.exists ? d.data() : {};
+      const own = v.own && typeof v.own === 'object' ? v.own : {};
+      const mine = Array.isArray(own[k]) ? own[k].map(x => x | 0) : [];
+      if (mine.includes(n)) return { ok: false, why: 'have' };
+      const first = (v.bought | 0) === 0;
+      const cost = first ? Math.round(SKIN_COST * (100 - SKIN_FIRST_OFF) / 100) : SKIN_COST;
+      const coin = v.coin | 0;
+      if (coin < cost) return { ok: false, why: 'poor', cost, coin };
+      const nextOwn = { ...own, [k]: [...mine, n].sort((a, b) => a - b) };
+      tx.set(ref, { coin: coin - cost, own: nextOwn, bought: (v.bought | 0) + 1 }, { merge: true });
+      return { ok: true, cost, first, total: coin - cost, own: nextOwn };
+    });
+  } catch (e){
+    console.log('[store] 스킨 구매 실패', e && e.code);
+    return { ok: false, why: 'err' };
+  }
+}
+
+/** [stated] **코인으로 티켓을 산다.** 하루 상한이 있다 (일반 3장·축구 2장) */
+export async function buyTicket(uid, soccer){
+  if (!isOn() || !uid) return { ok: false, why: 'bad' };
+  try {
+    return await withDoc(uid, async (tx, dbx) => {
+      const ref = dbx && dbx.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const v = d.exists ? d.data() : {};
+      const today = dayKey();
+      const buy = (v.buy && v.buy.day === today) ? v.buy : { day: today, tk: 0, soc: 0 };
+      const used = soccer ? (buy.soc | 0) : (buy.tk | 0);
+      const cap = soccer ? BUY_SOC_MAX : BUY_TK_MAX;
+      if (used >= cap) return { ok: false, why: 'capped' };
+      const coin = v.coin | 0;
+      if (coin < TICKET_COST) return { ok: false, why: 'poor', cost: TICKET_COST, coin };
+      const now = Date.now();
+      const patch = { coin: coin - TICKET_COST,
+                      buy: { ...buy, [soccer ? 'soc' : 'tk']: used + 1 } };
+      if (soccer){
+        const soc = (v.socDay === today) ? (v.soc | 0) : SOC_MAX;
+        patch.soc = Math.min(SOC_MAX, soc + 1); patch.socDay = today;
+      } else {
+        const g = grown(v, now);
+        // **꽉 차 있으면 더 못 담는다** — 사고도 안 늘면 억울하므로 미리 막는다
+        if (g.tk >= TICKET_MAX) return { ok: false, why: 'full' };
+        patch.tk = g.tk + 1; patch.at = g.at; patch.ffa = g.ffa; patch.day = g.day;
+      }
+      tx.set(ref, patch, { merge: true });
+      return { ok: true, cost: TICKET_COST, total: coin - TICKET_COST };
+    });
+  } catch (e){
+    console.log('[store] 티켓 구매 실패', e && e.code);
+    return { ok: false, why: 'err' };
   }
 }

@@ -938,6 +938,11 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   text-shadow:0 0 10px rgba(110,200,255,.75), 0 2px 3px rgba(0,0,0,.8)}
 .shop-tabs.sub{padding-bottom:6px}
 .shop-tabs.sub .shop-btn{font-size:11px}
+/* [stated] 맨 윗줄 — **코인 / 일반**. 갈래 탭과 구분되게 둘만 두고 금색으로 켠다 */
+.shop-tabs.pay{padding-bottom:4px}
+.shop-tabs.pay .shop-btn{font-size:13px;letter-spacing:1px}
+.shop-tabs.pay .shop-btn.on{color:#ffd873;
+  text-shadow:0 0 10px rgba(240,200,110,.75), 0 2px 3px rgba(0,0,0,.8)}
 
 /* [stated] 상품을 감싸는 네모 상자를 없앤다. 그림과 값만 보이게 */
 .shop-wrap{position:relative;width:100%;flex:1 1 auto;min-width:0;min-height:0;
@@ -1095,3 +1100,63 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 
 /* [stated] 결과 화면 — 아무것도 안 누르면 5초 뒤 로비로. 버튼 밑에 남은 시간 */
 .res-auto{margin:6px 0 0;text-align:center;font:700 12px/1.4 var(--gf);color:#9fb0c8}
+
+/* ── 퀘스트 · 우편함 · 코인 ─────────────────────────────────── */
+/* [stated] 코인은 홈에서 바로 보인다. 안 받은 우편이 있으면 점이 붙는다 */
+.coin-row{display:flex;gap:6px;align-items:center;margin:6px 0 0}
+.coin-row .room-btn{flex:1;min-width:0}
+.coin-tag{display:inline-flex;align-items:center;gap:4px;padding:0 8px;height:26px;
+  border:1px solid #c8a24e;border-radius:6px;background:rgba(40,32,10,.86);
+  font:700 13px/1 var(--gf);color:#ffd873;white-space:nowrap}
+.coin-tag::before{content:'';width:12px;height:12px;border-radius:50%;
+  background:radial-gradient(circle at 35% 32%,#ffe9a8,#e8b13c 62%,#a9781d);flex:0 0 auto}
+.coin-tag.big{height:30px;font-size:15px}
+/* 안 받은 우편 표시 */
+.room-btn.dot{position:relative}
+.room-btn.dot::after{content:'';position:absolute;top:3px;right:3px;width:8px;height:8px;
+  border-radius:50%;background:#ff5a4e;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+
+/* 머리줄은 다른 목록 화면과 같은 `bar-top` 을 쓴다. 제목 앞에만 아이콘이 붙는다 */
+.q-wrap{flex:1 1 auto;min-width:0;min-height:0;gap:0;padding:8px 0 10px}
+.q-tabs{display:flex;gap:6px;margin:0 0 8px}
+.q-tabs .room-btn{flex:1;min-width:0}
+/* [stated] 주간 8줄이 폰에서 넘친다 → 목록만 따로 굴린다 */
+.q-list{display:flex;flex-direction:column;gap:6px;
+  flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.q-row{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;
+  background:rgba(12,16,26,.72);border:1px solid rgba(120,140,170,.26);flex:0 0 auto}
+.q-row.done{border-color:#4ec9f0}
+.q-row.got{opacity:.55}
+.q-nm{flex:1.2;min-width:0;font:700 12px/1.3 var(--gf);color:#e8e8f0;
+  white-space:nowrap;overflow:hidden}
+/* FitText 가 줄여 담는다 — 감싼 칸이 `nowrap` 이라야 넘친 걸 재서 줄일 수 있다 */
+.q-nm > span{display:block;transform-origin:left center;white-space:nowrap}
+.q-bar{flex:1;min-width:0;position:relative;height:16px;border-radius:4px;
+  background:rgba(0,0,0,.45);overflow:hidden}
+.q-bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(#5fd0ff,#2f8fd0)}
+.q-bar span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font:700 10px/1 var(--gf);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.9)}
+.q-pay{flex:0 0 auto;min-width:42px;text-align:right;font:700 12px/1 var(--gf);color:#ffd873}
+.q-all{margin:8px 0;padding:6px 9px;border-radius:7px;text-align:center;flex:0 0 auto;
+  background:rgba(12,16,26,.6);border:1px dashed rgba(200,162,78,.5);
+  font:700 12px/1.3 var(--gf);color:#9fb0c8;white-space:nowrap;overflow:hidden}
+.q-all > span{display:block;transform-origin:center;white-space:nowrap}
+.q-all.on{border-style:solid;border-color:#c8a24e;color:#ffd873}
+.q-wrap > .menu-btn{flex:0 0 auto}
+/* 상점 — 코인 잔액과 안내 문구 한 줄 */
+.shop-note{display:flex;align-items:center;gap:8px;margin:4px 0 6px;min-width:0}
+.shop-note .tx{flex:1;min-width:0;font:700 11px/1.3 var(--gf);color:#9fb0c8;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* [stated] 퀘스트·우편함 아이콘 (마젠타 배경을 지우고 뽑았다).
+   그림 주소는 main.jsx 가 넣는다 — CSS 에 직접 적으면 `assets/assets/…` 를 찾는다 */
+.room-btn.ic{display:flex;align-items:center;justify-content:center;gap:5px}
+.room-btn.ic::before{content:'';width:18px;height:18px;flex:0 0 auto;
+  background:var(--icq) center/contain no-repeat;image-rendering:pixelated}
+.room-btn.ic.q::before{--icq:var(--icquest)}
+.room-btn.ic.m::before{--icq:var(--icmail)}
+/* 제목 앞 아이콘. `<i>` 는 그냥 두면 인라인이라 크기가 안 먹는다 → `inline-block` */
+.bar-top .title.ic{display:inline-flex;align-items:center;gap:7px;letter-spacing:2px}
+.head-ic{display:inline-block;width:22px;height:22px;flex:0 0 auto;image-rendering:pixelated;
+  background:var(--icq) center/contain no-repeat}
+.head-ic.q{--icq:var(--icquest)}
+.head-ic.m{--icq:var(--icmail)}

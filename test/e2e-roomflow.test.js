@@ -14,14 +14,13 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import { createRequire } from 'module';
 import { assert } from './harness.js';
+import { findChrome } from './chrome.js';
 import { fileURLToPath } from 'url';
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const skip = why => { console.log('e2e-roomflow.test.js 건너뜀 — ' + why); process.exit(0); };
 let puppeteer;
 try { puppeteer = createRequire(import.meta.url)('puppeteer-core'); } catch { skip('puppeteer-core 없음'); }
-const CHROME = [process.env.PUPPETEER_EXECUTABLE_PATH,
-  '/home/claude/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome']
-  .find(p => p && fs.existsSync(p));
+const CHROME = findChrome();
 if (!CHROME) skip('크롬 없음');
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const SP=8921, VP=5431;
@@ -38,7 +37,7 @@ for (let i = 0; i < 40; i++){
   try { if ((await fetch(`http://127.0.0.1:${VP}/src/main.jsx`)).ok) break; } catch { /* 아직 */ }
   await wait(500);
 }
-const b=await puppeteer.launch({executablePath:'/home/claude/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',args:['--no-sandbox']});
+const b=await puppeteer.launch({executablePath: CHROME,args:['--no-sandbox']});
 const dev=async(try2)=>{ const c=await b.createBrowserContext(); const p=await c.newPage();
   await p.setViewport({width:393,height:760,deviceScaleFactor:1,isMobile:true,hasTouch:true});
   p.on('pageerror',e=>console.log('ERR',e.message.slice(0,140)));

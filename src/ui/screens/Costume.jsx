@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import { setInnerBack } from '../../state/back.js';
 import { getColor, setColor, avatarPos } from '../../state/profile.js';
 import { tryOf, setTry, ownsSkin } from '../../state/tryskin.js';
-import { GUN_SKINS, MELEE_SKINS, SOCCER_SKINS, MELEE_ARENAS,
+import { GUN_SKINS, MELEE_SKINS, SOCCER_SKINS, MELEE_ARENAS, coinSkinsOf, coinArenasOf,
   GUN_PREV_IMG, GUN_PREV_FW, GUN_PREV_FH, GUN_PREV_COLS, GUN_PREV_ROWS_N,
   MEL_PREV_IMG, MEL_PREV_FW, MEL_PREV_FH, MEL_PREV_COLS, MEL_PREV_ROWS_N,
   PREV_IMG, PREV_FW, PREV_FH, PREV_COLS, PREV_ROWS_N } from '../../game/skins.js';
@@ -84,7 +84,8 @@ export default function Costume({ onBack }){
             <div className="cost-row">
               {/* [stated] **보유한 것을 앞으로.** 안 가진 실루엣을 헤치고 넘길 필요가 없게.
                   같은 무리 안에서는 원래 번호 순서를 지킨다 */}
-              {[...sh.list].sort((x, y) =>
+              {/* [stated] **코인으로 산 스킨도 여기서 장착**한다 — 결제 스킨과 같은 줄에 둔다 */}
+              {[...sh.list, ...coinSkinsOf(kind)].sort((x, y) =>
                 (ownsSkin(kind, y.id) ? 1 : 0) - (ownsSkin(kind, x.id) ? 1 : 0) || x.id - y.id
               ).map(s => {
                 const owned = ownsSkin(kind, s.id);
@@ -112,7 +113,8 @@ export default function Costume({ onBack }){
       <div className="cost-sec">
         <span className="cost-h">{t('cost.arena')}</span>
         <div className="cost-row">
-          {[...MELEE_ARENAS].sort((x, y) =>
+          {/* [stated] **코인으로 산 아레나도 여기서 장착**한다 — 결제 아레나와 같은 줄에 */}
+          {[...MELEE_ARENAS, ...coinArenasOf('melee')].sort((x, y) =>
             (ownsSkin('arena', y.id) ? 1 : 0) - (ownsSkin('arena', x.id) ? 1 : 0) || x.id - y.id
           ).map(a => {
             const owned = ownsSkin('arena', a.id);

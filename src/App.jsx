@@ -7,6 +7,8 @@ import PvpMenu from './ui/screens/PvpMenu.jsx';
 import RankBoard from './ui/screens/RankBoard.jsx';
 import Login from './ui/screens/Login.jsx';
 import Friends from './ui/screens/Friends.jsx';
+import Quests from './ui/screens/Quests.jsx';
+import Mailbox from './ui/screens/Mailbox.jsx';
 import Shop from './ui/screens/Shop.jsx';
 import Costume from './ui/screens/Costume.jsx';
 import QuickMatch from './ui/screens/QuickMatch.jsx';
@@ -21,6 +23,7 @@ import { onLangChange, t } from './i18n/index.js';
 import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
+import { startPlayClock } from './state/questclient.js';
 import { playAgain, setRoomMode, getRoom, onRoom, onGo, onKicked, backToLobby,
          onAgainMsg, onModeMsg, askAgain, answerAgain, onAgainAsk, onAgainNo } from './net/connection.js';
 import { scoreDelta } from './game/score.js';
@@ -154,7 +157,7 @@ export default function App(){
       // [stated] **하단바 뒤로가기는 말 안 해도 넣어야 하는 기본**이다.
       // 새 화면을 만들 때 여기 목록에 넣지 않으면 앱이 그냥 닫힌다
       if (screen === 'result' || screen === 'ai' || screen === 'practice' || screen === 'pvp'
-          || screen === 'shop' || screen === 'costume'){
+          || screen === 'shop' || screen === 'costume' || screen === 'quests' || screen === 'mail'){
         goHome(); return true;
       }
       // [stated] 홈에서도 **종료 확인 창**이 떠야 한다.
@@ -334,6 +337,7 @@ export default function App(){
       {screen === 'splash'   && <Splash onDone={() => {
         // **첫 탭에서 소리를 연다.** 브라우저는 사용자가 만지기 전엔 소리를 못 낸다
         unlockAudio(); preloadSfx();
+        startPlayClock();   // [stated] 게임 누적 접속 시간 — 화면이 보일 때만 센다
         if (e2eSkipLogin()){ goHome(); goHomeFirst(); return; }   // 검사 전용(개발 서버)
         setScreen('login');
       }} />}
@@ -343,10 +347,14 @@ export default function App(){
                                      onRanks={k => { setRankKind(k); setScreen('ranks'); }}
                                      onJoin={beginPvp}
                                      onFriends={() => setScreen('friends')}
+                                     onQuests={() => setScreen('quests')}
+                                     onMail={() => setScreen('mail')}
                                      onShop={() => setScreen('shop')}
                                      onCostume={() => setScreen('costume')} />}
       {screen === 'ranks'    && <RankBoard kind={rankKind} onBack={goHome} />}
       {screen === 'friends'  && <Friends onBack={goHome} />}
+      {screen === 'quests'   && <Quests onBack={goHome} />}
+      {screen === 'mail'     && <Mailbox onBack={goHome} />}
       {screen === 'shop'     && <Shop onBack={goHome} />}
       {screen === 'costume'  && <Costume onBack={goHome} />}
       {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} />}

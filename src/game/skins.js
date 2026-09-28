@@ -46,11 +46,11 @@ export const SOCCER_SET = {
 // **몸통 크기는 기본과 같게** 맞췄으므로(가운데 세로 띠 기준 48px) 화면에서 캐릭터가 커지지 않는다.
 // 칸 순서: 0 앞 · 1 뒤 · 2 피격앞 · 3 피격뒤 (기본 시트의 앞/뒤/피격 구성과 같다)
 export const GUN_SKINS = [
-  { id: 1, row: 0, key: 'skin.no1', sku: 'skin_gun_1', price: 990 },
-  { id: 2, row: 1, key: 'skin.no2', sku: 'skin_gun_2', price: 990 },
-  { id: 3, row: 2, key: 'skin.no3', sku: 'skin_gun_3', price: 990 },
-  { id: 4, row: 3, key: 'skin.no4', sku: 'skin_gun_4', price: 990 },
-  { id: 5, row: 4, key: 'skin.no5', sku: 'skin_gun_5', price: 990 }
+  { id: 1, row: 0, key: 'skin.gun1', sku: 'skin_gun_1', price: 990 },
+  { id: 2, row: 1, key: 'skin.gun2', sku: 'skin_gun_2', price: 990 },
+  { id: 3, row: 2, key: 'skin.gun3', sku: 'skin_gun_3', price: 990 },
+  { id: 4, row: 3, key: 'skin.gun4', sku: 'skin_gun_4', price: 990 },
+  { id: 5, row: 4, key: 'skin.gun5', sku: 'skin_gun_5', price: 990 }
 ];
 export const GUN_SET = {
   id: 'set_gun', key: 'skin.set', sku: 'skin_gun_set', price: 3900,
@@ -61,7 +61,8 @@ export const GUN_SET = {
 export const GUN_FW = 80, GUN_FH = 60;
 // 상점 전용 미리보기 (원본에서 크게 다시 뽑았다)
 export const GUN_PREV_IMG = 'assets/gun-preview.webp';
-export const GUN_PREV_FW = 240, GUN_PREV_FH = 186, GUN_PREV_COLS = 4, GUN_PREV_ROWS_N = 5;
+// [stated] 코인 스킨 3종이 붙어 **8줄**이 됐다 (결제 5 + 코인 3)
+export const GUN_PREV_FW = 240, GUN_PREV_FH = 186, GUN_PREV_COLS = 4, GUN_PREV_ROWS_N = 8;
 // [stated] 미리보기는 네 자세를 **두 줄**로 (앞·뒤 / 피격앞·피격뒤)
 export const GUN_PREV_LINES = [[0, 1], [2, 3]];
 
@@ -71,11 +72,11 @@ export const GUN_PREV_LINES = [[0, 1], [2, 3]];
 //                            4 좌대기 5 좌공격 6 우대기 7 우공격
 // 칸 270x108 (기본 242x99 보다 넓다 — 칼빛·날개 때문). 몸통은 기본과 같게 맞췄다
 export const MELEE_SKINS = [
-  { id: 1, row: 0, key: 'skin.no1', sku: 'skin_melee_1', price: 990 },
-  { id: 2, row: 1, key: 'skin.no2', sku: 'skin_melee_2', price: 990 },
-  { id: 3, row: 2, key: 'skin.no3', sku: 'skin_melee_3', price: 990 },
-  { id: 4, row: 3, key: 'skin.no4', sku: 'skin_melee_4', price: 990 },
-  { id: 5, row: 4, key: 'skin.no5', sku: 'skin_melee_5', price: 990 }
+  { id: 1, row: 0, key: 'skin.mel1', sku: 'skin_melee_1', price: 990 },
+  { id: 2, row: 1, key: 'skin.mel2', sku: 'skin_melee_2', price: 990 },
+  { id: 3, row: 2, key: 'skin.mel3', sku: 'skin_melee_3', price: 990 },
+  { id: 4, row: 3, key: 'skin.mel4', sku: 'skin_melee_4', price: 990 },
+  { id: 5, row: 4, key: 'skin.mel5', sku: 'skin_melee_5', price: 990 }
 ];
 export const MELEE_SET = {
   id: 'set_melee', key: 'skin.set', sku: 'skin_melee_set', price: 3900,
@@ -104,7 +105,65 @@ export const MELEE_ARENAS = [
 export const ARENA_SET = { id: 'set_arena', key: 'arena.set', sku: 'arena_melee_set', price: 4900,
   grants: [1, 2, 3, 4, 5] };
 
+// [stated] **아레나 그림마다 바닥이 있는 자리가 다르다.** 기본(`arena3`)만 격자에 맞고
+// 나머지는 바닥이 좁아, 격자 바깥 줄에 버프·차원문이 뜨면 **돌 테두리 위에 얹혀** 보였다.
+// 칼전에는 버프(4초마다)와 차원문(7초마다)이 뜨고 둘 다 칸 번호로 자리를 잡는다.
+//
+// → 배경을 **9조각**으로 그린다(`border-image` 와 같은 방식). 가운데(바닥)만 게임 격자에
+//   맞춰 늘이고, 테두리는 폭만 바뀐다. 잘려 나가는 장식이 없다.
+//
+// **그리기만 바뀐다.** 벽·이동 한계·버프가 뜨는 칸은 전부 시뮬이 쥐고 있어서
+// 서로 다른 아레나를 써도 판은 똑같이 돌아간다 (`arenafair.test.js` 가 이걸 못박는다).
+//
+// 값은 **그림 540x933 기준** `[왼쪽, 오른쪽, 위, 아래]` 로, 그림에서 직접 재서 넣었다.
+// 여기 없는 그림(총격전·축구 아레나)은 예전처럼 통째로 늘여 그린다.
+export const ARENA_FLOOR = {
+  arena3:  [ 80, 458,  68, 875],   // 기본 — 원래 격자와 같다 (9조각이 아무 일도 안 한다)
+  marena1: [113, 428, 120, 800],   // 이집트
+  marena2: [ 90, 450,  95, 845],   // 기사
+  marena3: [ 95, 445, 100, 840],   // 얼음
+  marena4: [ 95, 445, 105, 835],   // 지옥
+  marena5: [ 92, 448, 100, 835],   // 네크로
+  marena6: [108, 432, 128, 795],   // 숲
+  marena7: [110, 430, 125, 795],   // 바다
+  marena8: [110, 430, 128, 795]    // 가을
+};
+/** 그림 이름에 맞는 바닥 사각형. 없으면 `null` (통째로 늘여 그린다) */
+export const arenaFloorOf = key => ARENA_FLOOR[key] || null;
+
 // ── 광고 제거 ─────────────────────────────────────────────────
 // [stated] 4,900원. 결제·광고가 붙기 전이라 지금은 보여주기만 한다
 export const NOADS = { id: 'noads', key: 'shop.noadsName', sku: 'no_ads', price: 4900,
   img: 'assets/noads.webp' };
+
+// ── [stated] 코인으로 사는 스킨 ────────────────────────────────
+// **종목당 3종.** 퀘스트로 모은 코인으로만 산다 — 결제 상품(위의 5종)과 **겹치지 않게**
+// 따로 둔다. 겹치면 돈 주고 살 이유가 없어진다.
+//
+// 원화가 오면 각 시트에 **3줄을 덧붙이고**(5줄 → 8줄) 여기에 `id` 6·7·8 로 채운다.
+// `row` 는 그 시트의 줄 번호(5·6·7), `coin: true` 가 상점에 "코인으로 사기" 를 그리게 한다.
+export const COIN_SKINS = {
+  // [stated] 총격전 3종. 시트 6·7번째 줄이 아니라 **줄 번호 5·6·7**(0부터)이다.
+  // 시트는 결제 5줄 뒤에 그대로 이어 붙였다 — 칸 규격(80x60)·키(48)·발 위치(y59)는 같다
+  gun: [
+    { id: 6, row: 5, key: 'skin.gun6', coin: true },
+    { id: 7, row: 6, key: 'skin.gun7', coin: true },
+    { id: 8, row: 7, key: 'skin.gun8', coin: true }
+  ],
+  melee: [],
+  soccer: []
+};
+export const coinSkinsOf = k => COIN_SKINS[k] || [];
+
+// [stated] 코인으로 사는 **아레나 3종**. 결제 아레나(위의 5종)와 겹치지 않게 따로 둔다.
+// 값은 스킨과 같은 `SKIN_COST`(첫 구매 50% 할인) — 서버가 판정하므로 여기 적지 않는다.
+// 그림은 `ARENA_FLOOR` 값을 잴 때와 **같은 방식**으로 540x933 에 맞춰 저장했다
+export const COIN_ARENAS = {
+  melee: [
+    { id: 6, key: 'arena.no6', img: 'assets/marena-forest.webp', asset: 'marena6', coin: true },
+    { id: 7, key: 'arena.no7', img: 'assets/marena-sea.webp',    asset: 'marena7', coin: true },
+    { id: 8, key: 'arena.no8', img: 'assets/marena-autumn.webp', asset: 'marena8', coin: true }
+  ],
+  gun: []
+};
+export const coinArenasOf = k => COIN_ARENAS[k] || [];
