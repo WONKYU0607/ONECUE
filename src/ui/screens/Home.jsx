@@ -14,12 +14,9 @@ export default function Home({ onPvp, onAi, onPractice, onSettings, onRanks, onJ
       {/* [stated] 상단바 **바로 밑에** 순위표 두 칸 */}
       <RankCards onOpen={onRanks} />
 
-      {/* [stated] **순위표 밑에 코스튬 칸.** 겉모습(색·스킨)을 한곳에서 고른다 */}
-      <button className="cost-entry" onClick={onCostume}>{t('cost.title')}</button>
-
-      {/* [stated] 퀘스트·우편함. **코인 잔액을 여기 띄운다** — 홈에서 바로 보여야
-          "오늘 뭘 하면 되는지" 가 눈에 들어온다. 안 받은 우편이 있으면 점이 붙는다 */}
-      <CoinRow onQuests={onQuests} onMail={onMail} />
+      {/* [stated] **순위표 밑에 한 줄** — 퀘스트 · 우편함 · 코스튬. 셋이 같은 모습이다.
+          코인 잔액은 상단바 티켓 옆으로 옮겼다 */}
+      <CoinRow onQuests={onQuests} onMail={onMail} onCostume={onCostume} />
 
       {/* 받은 방 초대 — 홈에는 소켓이 없어서 문서를 주기적으로 본다 */}
       <InviteBanner onJoin={onJoin} />

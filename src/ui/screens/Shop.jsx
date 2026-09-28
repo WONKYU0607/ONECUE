@@ -9,7 +9,7 @@
 // [stated] 상품은 아래로 쌓지 않고 **옆으로 넘겨서** 본다 — 한 칸이 커졌기 때문
 import { useState, useEffect, useRef } from 'react';
 import { setInnerBack } from '../../state/back.js';
-import { DEBUG_TRY_SKIN, tryOf, setTry, ownsSkin } from '../../state/tryskin.js';
+import { DEBUG_TRY_SKIN, tryOf, setTry } from '../../state/tryskin.js';
 import { coinSkinsOf, coinArenasOf } from '../../game/skins.js';
 import { buySkin, refreshCoin, coinNow, onCoin } from '../../state/questclient.js';
 import { SKIN_COST, SKIN_FIRST_OFF } from '../../state/quests.js';
@@ -113,11 +113,18 @@ export default function Shop({ onBack }){
   const [busy, setBusy] = useState(false);
   const [bought, setBought] = useState(0);
   const [note, setNote] = useState('');
+  // [stated] **코인 상품의 '샀는가' 는 서버가 답한다.** 기기 쪽 `ownsSkin` 은 입어보기만 해도
+  // 보유로 쳐서(디버그), 입어보는 순간 사기 버튼이 사라졌다
+  const [own, setOwn] = useState(null);
   useEffect(() => {
     const off = onCoin(c => setCoinUi(c));
-    refreshCoin().then(r => { if (r && r.ok) setBought(r.bought | 0); }).catch(() => {});
+    refreshCoin().then(r => { if (r && r.ok){ setBought(r.bought | 0); setOwn(r.own || {}); } })
+      .catch(() => {});
     return off;
   }, []);
+  /** 서버 기준 보유 여부 */
+  const hasIt = (kind, id) =>
+    !!(own && Array.isArray(own[kind]) && own[kind].includes(id | 0));
   // [stated] **첫 구매만 50% 할인**
   const costNow = () => (bought === 0 ? Math.round(SKIN_COST * (100 - SKIN_FIRST_OFF) / 100) : SKIN_COST);
   const take = async (kind, id) => {
@@ -126,7 +133,7 @@ export default function Shop({ onBack }){
     const r = await buySkin(kind, id);
     setNote(t(r && r.ok ? 'shop.bought' : (r && r.why === 'poor' ? 'shop.poor' : 'q.fail')));
     const back2 = await refreshCoin();
-    if (back2 && back2.ok) setBought(back2.bought | 0);
+    if (back2 && back2.ok){ setBought(back2.bought | 0); setOwn(back2.own || {}); }
     setBusy(false);
   };
   // [stated] 디버그: 실제 필드에서 입어볼 수 있게. 출시 전 `DEBUG_TRY_SKIN` 을 false 로
@@ -253,14 +260,21 @@ export default function Shop({ onBack }){
                       ? t('shop.coinPrice', { p: costNow().toLocaleString() })
                       : t('shop.price', { p: s2.price.toLocaleString() })}</span>
                     {s2.coin ? (
-                      // [stated] **코인으로 사는 스킨.** 사면 서버가 소유에 넣는다
-                      ownsSkin(sub, s2.id)
-                        ? <button className={'shop-btn' + (tryOf(sub) === s2.id ? ' on' : '')}
+                      // [stated] **코인으로 사는 스킨.** 사면 서버가 소유에 넣는다.
+                      // [stated] 아직 안 샀어도 **입어는 볼 수 있게** — 결제 스킨과 같다.
+                      // 사기 버튼은 그대로 둔다(결제와 달리 코인 구매는 실제로 된다)
+                      <>
+                        {(hasIt(sub, s2.id) || DEBUG_TRY_SKIN) && (
+                          <button className={'shop-btn' + (tryOf(sub) === s2.id ? ' on' : '')}
                                   onClick={() => setWorn(setTry(sub, s2.id))}>
                             {tryOf(sub) === s2.id ? t('shop.wearing') : t('shop.wear')}
                           </button>
-                        : <button className="shop-btn" disabled={busy}
+                        )}
+                        {!hasIt(sub, s2.id) && (
+                          <button className="shop-btn" disabled={busy}
                                   onClick={() => take(sub, s2.id)}>{t('shop.coinBuy')}</button>
+                        )}
+                      </>
                     ) : DEBUG_TRY_SKIN ? (
                       <button className={'shop-btn' + (tryOf(sub) === s2.id ? ' on' : '')}
                               onClick={() => setWorn(setTry(sub, s2.id))}>
@@ -336,13 +350,19 @@ export default function Shop({ onBack }){
                       ? t('shop.coinPrice', { p: costNow().toLocaleString() })
                       : t('shop.price', { p: a.price.toLocaleString() })}</span>
                     {a.coin ? (
-                      ownsSkin('arena', a.id)
-                        ? <button className={'shop-btn' + (tryOf('arena') === a.id ? ' on' : '')}
+                      // 스킨과 같다 — 안 샀어도 입어는 볼 수 있고, 사기 버튼도 남는다
+                      <>
+                        {(hasIt('arena', a.id) || DEBUG_TRY_SKIN) && (
+                          <button className={'shop-btn' + (tryOf('arena') === a.id ? ' on' : '')}
                                   onClick={() => setWorn(setTry('arena', a.id))}>
                             {tryOf('arena') === a.id ? t('shop.wearing') : t('shop.wear')}
                           </button>
-                        : <button className="shop-btn" disabled={busy}
+                        )}
+                        {!hasIt('arena', a.id) && (
+                          <button className="shop-btn" disabled={busy}
                                   onClick={() => take('arena', a.id)}>{t('shop.coinBuy')}</button>
+                        )}
+                      </>
                     ) : DEBUG_TRY_SKIN ? (
                       <button className={'shop-btn' + (tryOf('arena') === a.id ? ' on' : '')}
                               onClick={() => setWorn(setTry('arena', a.id))}>

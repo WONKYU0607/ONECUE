@@ -5,6 +5,7 @@ import { getNick, avatarPos } from '../state/profile.js';
 import { scoreOf, ticketsLeft, nextTicketIn, fmtLeft } from '../state/tickets.js';
 import { fitBar } from '../state/homeLayout.js';
 import { getSettings, setSetting } from '../state/settings.js';
+import { coinNow, onCoin, refreshCoin } from '../state/questclient.js';
 import { playMusic, stopMusic, unlockAudio } from '../game/audio.js';
 import { t } from '../i18n/index.js';
 
@@ -34,6 +35,14 @@ export default function PlayerBar({ onSettings, onFriends }){
       .catch(() => {});
     return () => { live = false; };
   }, []);
+  // [stated] 코인 잔액. 서버가 쥔 값이라 화면을 켤 때 받아 오고, 바뀌면 다시 그린다
+  const [coin, setCoin] = useState(coinNow());
+  useEffect(() => {
+    const off = onCoin(c => setCoin(c));
+    refreshCoin().catch(() => {});   // 서버가 자고 있어도 화면은 떠야 한다
+    return off;
+  }, []);
+
   const wait = nextTicketIn();
   // [stated] 상단바에 뜨는 **기본 티켓은 5개.** 예전엔 일반 5 + 개인전 3 을 더해
   // 8 로 떠서, 성격이 다른 두 주머니가 한 숫자로 섞여 보였다.
@@ -62,6 +71,12 @@ export default function PlayerBar({ onSettings, onFriends }){
           <span className="tk-ico" />
           <b>{total}</b>
           {wait > 0 && <><i className="sep" /><span className="ptime">{fmtLeft(wait)}</span></>}
+        </span>
+
+        {/* [stated] **코인은 티켓 옆 빈자리에.** 예전엔 홈 가운데에 따로 떠 있었다 */}
+        <span className="pcell pcoin">
+          <i className="coin-ico" />
+          <b>{coin.toLocaleString()}</b>
         </span>
 
         {/* 오른쪽 빈 자리에 붙인다. 예전엔 상단바 아래에 따로 떠 있었다 */}

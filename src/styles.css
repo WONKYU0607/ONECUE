@@ -384,6 +384,13 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .pcell b{font-family:var(--gf);font-weight:900;font-size:calc(var(--h-valSz,10) * var(--u));
   color:#ffe9a8;margin-left:auto;flex:0 0 auto;white-space:nowrap;padding-right:1px}
 .pcell.ptk b{color:#8fd8ff}
+/* [stated] 코인은 티켓 옆. 금화 그림으로 티켓과 구분한다.
+   그림 주소는 main.jsx 가 넣는다 — CSS 에 직접 적으면 `assets/assets/…` 를 찾는다 */
+.pcell.pcoin{flex:0 0 auto}
+.pcell.pcoin b{color:#ffd873}
+.coin-ico{flex:0 0 auto;image-rendering:pixelated;
+  width:calc(var(--h-tierSz,13) * var(--u));height:calc(var(--h-tierSz,13) * var(--u));
+  background:var(--iccoin) center/contain no-repeat}
 /* 프로필은 두 줄 높이. 캐릭터 시트 0번(파랑 앞모습) */
 .prof-btn{flex:0 0 auto;cursor:pointer;gap:calc(var(--h-padX,5) * var(--u));background:rgba(16,24,40,.9)}
 /* [stated] 프로필 사진이 가로로 늘어나 보이던 것을 고쳤다.
@@ -934,15 +941,15 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   border-style:solid;border-width:9px 10px;
   border-color:#1b2b3a;                    /* 틀 이미지를 못 받았을 때의 모습 */
   border-image:var(--frame) 86 fill stretch}
-.shop-tabs .shop-btn.on{color:#fff;
-  text-shadow:0 0 10px rgba(110,200,255,.75), 0 2px 3px rgba(0,0,0,.8)}
+/* [stated] **켜진 탭은 금색.** 흰색은 안 켜진 칸과 구분이 잘 안 됐다 —
+   갈래(코인·일반)·종류(아레나·스킨·재화)·종목(총격전·칼전·축구) 세 줄 모두 같다 */
+.shop-tabs .shop-btn.on{color:#ffd873;
+  text-shadow:0 0 10px rgba(240,200,110,.75), 0 2px 3px rgba(0,0,0,.8)}
 .shop-tabs.sub{padding-bottom:6px}
 .shop-tabs.sub .shop-btn{font-size:11px}
-/* [stated] 맨 윗줄 — **코인 / 일반**. 갈래 탭과 구분되게 둘만 두고 금색으로 켠다 */
+/* 맨 윗줄 — 코인 / 일반. 둘뿐이라 글씨를 조금 키운다 */
 .shop-tabs.pay{padding-bottom:4px}
 .shop-tabs.pay .shop-btn{font-size:13px;letter-spacing:1px}
-.shop-tabs.pay .shop-btn.on{color:#ffd873;
-  text-shadow:0 0 10px rgba(240,200,110,.75), 0 2px 3px rgba(0,0,0,.8)}
 
 /* [stated] 상품을 감싸는 네모 상자를 없앤다. 그림과 값만 보이게 */
 .shop-wrap{position:relative;width:100%;flex:1 1 auto;min-width:0;min-height:0;
@@ -1014,10 +1021,15 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
    글씨는 PVP 버튼처럼 **찐한 흰색**, 테두리는 눈에 띄게 */
 /* 순위표가 화면 위에 **절대 위치로 떠 있어서** 코스튬 칸도 같은 방식으로 그 밑에 붙인다.
    왼쪽 끝에 맞추면 **총격전 순위표 바로 밑**이 된다 */
-.cost-entry{position:absolute;z-index:24;
+/* [stated] **퀘스트 · 우편함 · 코스튬 한 줄.** 셋이 순위표 밑에 나란히, 불빛도 같다.
+   순위표가 화면 위에 절대 위치로 떠 있어서 이 줄도 같은 방식으로 그 밑에 붙인다 */
+.home-row{position:absolute;z-index:24;display:flex;
   left:calc(var(--h-barX,0) * var(--u));
+  right:calc(var(--h-barX,0) * var(--u));
   top:calc((var(--h-barY,2) + var(--h-rowH,20) + 3) * var(--u) + 46px);
-  width:calc((100% - var(--h-barX,0) * var(--u) * 2 - var(--h-boxGap,3) * var(--u) * 2) / 3);
+  gap:calc(var(--h-boxGap,3) * var(--u))}
+.cost-entry{position:relative;flex:1 1 0;min-width:0;
+  display:flex;align-items:center;justify-content:center;gap:5px;
   padding:5px 0;
   font:900 13px/1 var(--gf);color:#fff;letter-spacing:1px;
   -webkit-text-stroke:0.5px rgba(255,255,255,.5);
@@ -1025,6 +1037,14 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   background:rgba(20,40,66,.95);
   border:1px solid #7fd2ff;border-radius:3px;
   box-shadow:0 0 8px rgba(110,200,255,.35) inset;cursor:pointer}
+/* 퀘스트·우편함은 글씨 앞에 그림을 단다 */
+.cost-entry.ic::before{content:'';width:16px;height:16px;flex:0 0 auto;
+  background:var(--icq) center/contain no-repeat;image-rendering:pixelated}
+.cost-entry.ic.q::before{--icq:var(--icquest)}
+.cost-entry.ic.m::before{--icq:var(--icmail)}
+/* 안 받은 우편 표시 */
+.cost-entry.dot::after{content:'';position:absolute;top:2px;right:2px;width:7px;height:7px;
+  border-radius:50%;background:#ff5a4e;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
 
 .screen.list.cost{align-items:stretch;overflow-y:auto}
 .cost-sec{width:100%;min-width:0;padding:6px 10px 10px}
@@ -1108,8 +1128,8 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .coin-tag{display:inline-flex;align-items:center;gap:4px;padding:0 8px;height:26px;
   border:1px solid #c8a24e;border-radius:6px;background:rgba(40,32,10,.86);
   font:700 13px/1 var(--gf);color:#ffd873;white-space:nowrap}
-.coin-tag::before{content:'';width:12px;height:12px;border-radius:50%;
-  background:radial-gradient(circle at 35% 32%,#ffe9a8,#e8b13c 62%,#a9781d);flex:0 0 auto}
+.coin-tag::before{content:'';width:15px;height:15px;flex:0 0 auto;image-rendering:pixelated;
+  background:var(--iccoin) center/contain no-repeat}
 .coin-tag.big{height:30px;font-size:15px}
 /* 안 받은 우편 표시 */
 .room-btn.dot{position:relative}

@@ -61,8 +61,10 @@ console.log('클라가 이름을 직접 못 바꾼다');
 {
   // 규칙이 열려 있으면 선점을 건너뛰고 남과 같은 이름을 쓸 수 있다
   const rules = fs.readFileSync('firestore.rules', 'utf8');
-  const m = rules.match(/affectedKeys\(\)\s*\.hasAny\(\[([^\]]*)\]\)/);
-  assert(m && /'nick'/.test(m[1]), '  규칙이 players.nick 고치기를 막는다');
+  // 규칙은 **고쳐도 되는 것만** 적는 방식이다 — 거기 `nick` 이 없어야 막힌 것이다
+  const m = rules.match(/affectedKeys\(\)\s*\.hasOnly\(\[([^\]]*)\]\)/);
+  assert(m, '  고칠 수 있는 항목을 목록으로 못박았다');
+  assert(!/'nick'/.test(m[1]), '  규칙이 players.nick 고치기를 막는다');
   assert(/match \/nicks\/\{key\} \{\s*allow read, write: if false;/.test(rules),
     '  선점표는 클라가 읽지도 쓰지도 못한다');
 }

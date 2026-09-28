@@ -18,11 +18,12 @@ const rules = fs.readFileSync('firestore.rules', 'utf8');
 
 console.log('규칙이 클라 쓰기를 막는다');
 {
-  // 이게 열려 있으면 서버로 옮긴 의미가 없다
-  const m = rules.match(/affectedKeys\(\)\s*\.hasAny\(\[([^\]]*)\]\)/);
-  assert(m, '  고칠 때 막는 목록이 있다');
-  for (const k of ['tk', 'at', 'ffa', 'day'])
-    assert(m[1].includes(`'${k}'`), `  ${k} 를 클라가 못 고친다`);
+  // 이게 열려 있으면 서버로 옮긴 의미가 없다.
+  // 규칙은 **고쳐도 되는 것만** 적는 방식이라, 티켓 항목이 거기 없어야 막힌 것이다
+  const m = rules.match(/affectedKeys\(\)\s*\.hasOnly\(\[([^\]]*)\]\)/);
+  assert(m, '  고칠 수 있는 항목을 목록으로 못박았다');
+  for (const k of ['tk', 'at', 'ffa', 'day', 'soc', 'socDay', 'buy'])
+    assert(!m[1].includes(`'${k}'`), `  ${k} 를 클라가 못 고친다`);
   // 만들 때도 값을 실어 보낼 수 없어야 한다
   const mk = rules.match(/function mine\(d\)\{([\s\S]*?)\n {4}\}/);
   assert(mk && !/'tk'/.test(mk[1]), '  만들 때도 티켓을 못 담는다');

@@ -101,7 +101,11 @@ try {
   assert(await where(A) === 'home', '  홈까지 온다');
 
   console.log('홈에 퀘스트·우편함 칸이 있다');
-  assert(await A.evaluate(() => !!document.querySelector('.coin-row')), '  코인 줄이 보인다');
+  // [stated] 퀘스트·우편함·코스튬이 **한 줄에 셋**, 코인 잔액은 **상단바 티켓 옆**
+  assert(await A.evaluate(() => document.querySelectorAll('.home-row .cost-entry').length === 3),
+    '  퀘스트·우편함·코스튬 세 칸이 한 줄에 있다');
+  assert(await A.evaluate(() => !!document.querySelector('.pbar .pcoin')),
+    '  코인이 상단바 티켓 옆에 있다');
   assert(await A.evaluate(() => /퀘스트/.test(document.body.innerText)), '  퀘스트 버튼');
   assert(await A.evaluate(() => /우편함/.test(document.body.innerText)), '  우편함 버튼');
 
@@ -157,7 +161,10 @@ try {
   console.log('보상을 받으면 코인이 는다');
   await reopen(A);
   await tap(A, '퀘스트'); await wait(1800);
-  const coinOf = () => A.evaluate(() => +(document.querySelector('.coin-tag')?.innerText || '0').replace(/[^0-9]/g, ''));
+  // 퀘스트 화면 머리의 잔액(`.coin-tag`)을 본다. 홈에서는 상단바(`.pcoin`)에 뜬다
+  const coinOf = () => A.evaluate(() =>
+    +((document.querySelector('.coin-tag') || document.querySelector('.pbar .pcoin'))?.innerText || '0')
+      .replace(/[^0-9]/g, ''));
   const before = await coinOf();
   const hit = await A.evaluate(() => {
     const b = [...document.querySelectorAll('.menu-btn')].find(x => /코인 받기/.test(x.innerText));

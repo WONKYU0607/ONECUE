@@ -21,7 +21,8 @@ import './styles.css';
 // **묶인 CSS 가 `assets/` 안에 있어** `assets/assets/…` 를 찾았다.
 // 다른 그림처럼 여기서 절대 주소로 만들어 넣는다
 for (const [name, file] of [['--tiers', 'tiers.webp'], ['--ticket', 'ticket.webp'], ['--panel', 'panel.webp'], ['--chars', 'characters.png'], ['--tksoc', 'ticket-soccer.webp'],
-  ['--icquest', 'ic-quest.webp'], ['--icmail', 'ic-mail.webp']]){
+  ['--icquest', 'ic-quest.webp'], ['--icmail', 'ic-mail.webp'],
+  ['--iccoin', 'ic-coin.webp']]){
   const u = new URL('assets/' + file, document.baseURI).href;
   document.documentElement.style.setProperty(name, `url("${u}")`);
 }

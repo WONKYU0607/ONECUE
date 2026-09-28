@@ -89,10 +89,23 @@ console.log('보안 규칙');
   // 정의만 있고 안 쓰면 소용없다. **update 규칙이 실제로 부르는지** 본다
   const upd = r.slice(r.indexOf('allow update'), r.indexOf('allow delete'));
   assert(/keepsScore\(\)/.test(upd), '고칠 때 점수 보호를 실제로 검사한다');
-  // [stated] 이름이 유일해야 해서(친구를 이름으로 찾는다) **닉네임도 여기 들어간다**.
+  // [stated] 이름이 유일해야 해서(친구를 이름으로 찾는다) **닉네임도 서버가 쥔다**.
   // [stated] **티켓도 서버가 쥔다** — 기기에 두면 저장소를 고쳐 무한히 놀 수 있다
-  assert(/hasAny\(\['score','streak','record','nick','tk','at','ffa','day'\]\)/.test(r),
-    '막는 항목이 명시돼 있다');
+  //
+  // **막을 것을 적는 방식(hasAny)에서 허용할 것만 적는 방식(hasOnly)으로 뒤집었다.**
+  // 막을 목록은 서버 항목이 늘 때마다 고쳐야 하는데, 실제로 코인·퀘스트·우편함·보유를
+  // 만들고 목록을 안 고쳐 **클라가 코인을 마음대로 쓸 수 있는 상태**가 됐었다
+  const keeps = r.slice(r.indexOf('function keepsScore'), r.indexOf('match /players/{uid}'));
+  const allow = keeps.match(/affectedKeys\(\)\s*\.hasOnly\(\[([^\]]*)\]\)/);
+  assert(allow, '고칠 수 있는 항목을 목록으로 못박았다');
+  assert(!/hasAny/.test(keeps), '막을 것을 적는 방식(hasAny)을 안 쓴다 — 빠뜨리기 쉽다');
+  // **서버가 쥔 것이 하나라도 허용 목록에 들어가면 안 된다.**
+  // `server/store.js` 가 players 문서에 실제로 쓰는 항목을 전부 적는다
+  const SERVER_ONLY = ['score','streak','record','nick','tk','at','ffa','day',
+                       'soc','socDay','coin','qd','qw','qm','mail','sall','sec',
+                       'own','bought','buy','uid','bot'];
+  for (const k of SERVER_ONLY)
+    assert(!allow[1].includes(`'${k}'`), `클라가 ${k} 를 못 고친다`);
   const mineFn = r.slice(r.indexOf('function mine'), r.indexOf('function keepsScore'));
   assert(!/'score'|'streak'|'record'|'tk'|'ffa'/.test(mineFn),
     '클라가 만들 때도 점수·티켓을 못 담는다');
