@@ -152,6 +152,7 @@ export async function writeResults(rows){
       d[kind] = Math.max(0, r.score | 0);
       d['s' + kind] = Math.max(0, r.streak | 0);
       d.n = (d.n | 0) + 1;
+      if (!r.bot) d.coin = (d.coin | 0) + matchCoin(r.result, r.streak);
       FAKE.set(r.uid, d);
     }
     return true;
@@ -162,14 +163,19 @@ export async function writeResults(rows){
     for (const r of rows){
       // **축구를 빠뜨리면 총격전 점수에 쌓인다** — 클라에서 이미 한 번 겪었다
       const kind = r.kind === 'melee' ? 'melee' : (r.kind === 'soccer' ? 'soccer' : 'gun');
-      batch.set(db.doc('players/' + r.uid), {
+      const patch = {
         score: { [kind]: Math.max(0, r.score | 0) },
         streak: { [kind]: Math.max(0, r.streak | 0) },
         record: { [kind]: { w: FieldValue.increment(r.result === 'win' ? 1 : 0),
                             l: FieldValue.increment(r.result === 'lose' ? 1 : 0),
                             d: FieldValue.increment(r.result === 'draw' ? 1 : 0) } },
         updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true });
+      };
+      // [stated] **판이 끝나면 코인.** 이 함수는 **빠른 매칭에서만** 불린다(친구방은
+      // 점수를 안 써서 여기까지 안 온다) → 짜고 하는 벌이를 막는 자리가 이미 같다.
+      // 봇은 안 준다 — 쓸 데가 없고 쓰기만 늘어난다
+      if (!r.bot) patch.coin = FieldValue.increment(matchCoin(r.result, r.streak));
+      batch.set(db.doc('players/' + r.uid), patch, { merge: true });
     }
     await batch.commit();
     return true;
@@ -337,8 +343,19 @@ const dayKey = () => new Date().toISOString().slice(0, 10);
  *  없는 `tk` 를 `| 0` 으로 **0 으로 읽었다.** 충전 기준 시각(`at`)도 없어 매번 "지금"이 돼
  *  **영영 차지도 않았다.** → 항목이 없으면 0 이 아니라 **처음 값(가득)** 으로 본다.
  *  (점수는 `?? 1000` 으로 이미 그렇게 읽고 있었다) */
+/** 오늘 남은 축구 티켓. 날이 바뀌면 **기본 3장까지 채워 준다** —
+ *  [stated] 코인으로 산 티켓은 기본 장수 위에 얹으므로, 자정에 3장으로 **깎으면 안 된다**.
+ *  그래서 `= SOC_MAX` 가 아니라 `max(SOC_MAX, 들고 있던 수)` 다 */
+export function socOf(v, today = dayKey()){
+  const had = (v && v.soc | 0) || 0;
+  return (v && v.socDay === today) ? Math.max(0, had) : Math.max(SOC_MAX, had);
+}
+
 export function grown(v, now){
-  let tk = (v && typeof v.tk === 'number') ? Math.max(0, Math.min(TICKET_MAX, v.tk | 0)) : TICKET_MAX;
+  // [stated] **코인으로 산 티켓은 기본 5장 위에 얹는다** — 돈을 낸 것이라 깎지 않는다.
+  // 그래서 위쪽 한계를 두지 않는다. **시간 충전은 기본 5장까지만** 하고,
+  // 5장 이상 들고 있으면 시계는 멈춰 있다 (다 써서 5장 밑으로 내려가면 다시 돈다)
+  let tk = (v && typeof v.tk === 'number') ? Math.max(0, v.tk | 0) : TICKET_MAX;
   let at = (v && typeof v.at === 'number' && isFinite(v.at)) ? v.at : now;
   let ffa = (v && typeof v.ffa === 'number') ? Math.max(0, Math.min(FFA_MAX, v.ffa | 0)) : FFA_MAX;
   const day = (v && v.day) || '';
@@ -362,7 +379,9 @@ export async function readTickets(uid){
     const now = Date.now();
     const v = d.exists ? d.data() : null;
     const g = grown(v || { tk: TICKET_MAX, at: now, ffa: FFA_MAX, day: dayKey() }, now);
-    return { ...g, max: TICKET_MAX, ffaMax: FFA_MAX };
+    // 축구 티켓도 같이 준다 — 코인으로 사면 기본 3장 위에 얹히므로
+    // 화면이 서버 값을 안 받으면 **산 게 안 보인다**
+    return { ...g, soc: socOf(v || {}), max: TICKET_MAX, ffaMax: FFA_MAX, socMax: SOC_MAX };
   } catch (e){
     console.log('[store] 티켓 읽기 실패', e && e.code);
     return null;
@@ -378,15 +397,16 @@ export async function readTickets(uid){
  * 클라가 축구 티켓을 따로 깎아 **둘 다 빠졌다**.
  */
 export async function spendSoccer(uid){
-  if (!db || !uid) return { ok: false, off: true };
+  if (!isOn() || !uid) return { ok: false, off: true };
   try {
-    return await db.runTransaction(async tx => {
-      const ref = db.doc('players/' + uid);
+    // `withDoc` 은 **가짜 저장소에서도 돈다** — 여기가 안 돌면 "축구 티켓을 쓰고 나서
+    // 코인으로 다시 산다" 를 검사가 확인할 수 없다 (일반 티켓과 같은 이유)
+    return await withDoc(uid, async (tx, dbx) => {
+      const ref = dbx && dbx.doc('players/' + uid);
       const d = await tx.get(ref);
       const v = d.exists ? d.data() : {};
       const today = dayKey();
-      // 날짜가 바뀌면 하루치가 다시 찬다
-      const soc = (v.socDay === today) ? (v.soc | 0) : SOC_MAX;
+      const soc = socOf(v, today);                  // 날짜가 바뀌면 기본 3장까지 채워진다
       if (soc <= 0) return { ok: false, why: 'noSoccer' };
       tx.set(ref, { soc: soc - 1, socDay: today }, { merge: true });
       return { ok: true, soc: soc - 1 };
@@ -398,8 +418,23 @@ export async function spendSoccer(uid){
 }
 
 export async function spendTicket(uid, ffa){
-  if (!db || !uid) return { ok: false, off: true };
+  if (!isOn() || !uid) return { ok: false, off: true };
   try {
+    // **검사용 가짜 저장소에서도 돌아야 한다** — 여기가 안 돌면 "티켓을 쓰고 나서
+    // 코인으로 다시 산다" 를 실제로 확인할 수 없다. 규칙은 아래 진짜 길과 같다
+    if (FAKE){
+      return await withDoc(uid, async tx => {
+        const d = await tx.get(null);
+        const now = Date.now();
+        const g = grown(d.data() || { tk: TICKET_MAX, at: now, ffa: FFA_MAX, day: dayKey() }, now);
+        if (g.tk <= 0) return { ok: false, why: 'noTicket', ...g };
+        if (ffa && g.ffa <= 0) return { ok: false, why: 'noFfa', ...g };
+        const next = { tk: g.tk - 1, at: g.at, ffa: ffa ? g.ffa - 1 : g.ffa, day: g.day };
+        if (g.tk >= TICKET_MAX) next.at = now;
+        tx.set(null, next);
+        return { ok: true, ...next };
+      });
+    }
     return await db.runTransaction(async tx => {
       const ref = db.doc('players/' + uid);
       const d = await tx.get(ref);
@@ -569,7 +604,7 @@ export async function buildRanks(kind = 'gun', top = 30){
 import {
   PERIODS, questsOf, keyOf, emptyPeriod, doneOf, allDone,
   claimable, bump as qbump, SKIN_COST, SKIN_FIRST_OFF, TICKET_COST,
-  BUY_TK_MAX, BUY_SOC_MAX, PLAY_DAY_MAX, countsOf as questCounts
+  BUY_TK_MAX, BUY_SOC_MAX, PLAY_DAY_MAX, countsOf as questCounts, matchCoin
 } from '../src/state/quests.js';
 
 // **검사 전용** — `E2E_FAKE_STORE=1` 이면 파이어스토어 없이 같은 코드를 돌린다.
@@ -809,13 +844,14 @@ export async function buyTicket(uid, soccer){
       const now = Date.now();
       const patch = { coin: coin - TICKET_COST,
                       buy: { ...buy, [soccer ? 'soc' : 'tk']: used + 1 } };
+      // [stated] **꽉 차 있어도 산다 — 기본 장수 위에 얹는다.** 돈을 낸 것이니 버릴 이유가 없다.
+      // 예전엔 `min(상한, 남은+1)` 이라 꽉 찬 상태로 사면 **코인만 나가고 안 늘었다**.
+      // 하루 상한(`BUY_*_MAX`) 이 여전히 장수를 묶으므로 무한정 쌓이지는 않는다
       if (soccer){
-        const soc = (v.socDay === today) ? (v.soc | 0) : SOC_MAX;
-        patch.soc = Math.min(SOC_MAX, soc + 1); patch.socDay = today;
+        patch.soc = socOf(v, today) + 1; patch.socDay = today;
       } else {
         const g = grown(v, now);
-        // **꽉 차 있으면 더 못 담는다** — 사고도 안 늘면 억울하므로 미리 막는다
-        if (g.tk >= TICKET_MAX) return { ok: false, why: 'full' };
+        // `g.at` 은 5장 이상이면 `now` 다 — 시계는 **기본 5장 밑으로 내려갈 때** 다시 돈다
         patch.tk = g.tk + 1; patch.at = g.at; patch.ffa = g.ffa; patch.day = g.day;
       }
       tx.set(ref, patch, { merge: true });

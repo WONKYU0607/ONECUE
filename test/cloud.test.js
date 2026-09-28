@@ -46,8 +46,14 @@ console.log('이상한 값은 걸러낸다');
   assert(T.hydrate(null) === false, 'null은 무시');
   assert(T.hydrate('x') === false, '문자열도 무시');
   assert(P.hydrateNick({ nick: '   ' }) === false, '빈 이름은 무시');
+  // [stated] **코인으로 산 티켓은 기본 5장 위에 얹힌다** — 그래서 위쪽으로 자르지 않는다.
+  // `tk` 는 서버만 쓸 수 있으므로(규칙이 막는다) 큰 값이 와도 그게 진짜다.
+  // 대신 **음수는 걸러내고**, 충전이 5장을 넘겨 채우지 않는 것으로 상한을 지킨다
   T.hydrate({ tk: 999, ffa: -5, score: { gun: -100 } });
-  assert(T.ticketsLeft() <= 5, `티켓 상한 (${T.ticketsLeft()})`);
+  assert(T.ticketsLeft() === 999, `산 티켓은 안 깎는다 (${T.ticketsLeft()})`);
+  T.hydrate({ tk: -3 });
+  assert(T.ticketsLeft() === 0, `티켓 하한 (${T.ticketsLeft()})`);
+  T.hydrate({ ffa: -5 });
   assert(T.ffaLeft() >= 0, `개인전 하한 (${T.ffaLeft()})`);
   assert(T.scoreOf('gun') >= 0, `점수 하한 (${T.scoreOf('gun')})`);
   // 없는 항목은 기기 값을 그대로 둔다

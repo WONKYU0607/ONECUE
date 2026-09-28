@@ -1163,6 +1163,27 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .q-all > span{display:block;transform-origin:center;white-space:nowrap}
 .q-all.on{border-style:solid;border-color:#c8a24e;color:#ffd873}
 .q-wrap > .menu-btn{flex:0 0 auto}
+/* [stated] 재화 칸 — 코인으로 티켓 사기. 한 줄에 하나씩 쌓는다 */
+.shop-list.money{display:flex;flex-direction:column;gap:10px;padding:10px 8px}
+/* `.shop-card-in` 이 **세로 배치**라 그대로 쓰면 그림이 폭 0 으로 찌그러진다 → 가로로 돌린다 */
+.money-row{position:relative;width:100%;flex-direction:row;align-items:center;
+  gap:12px;padding:12px 12px 12px 10px}
+/* [stated] 이름·값·버튼을 **줄을 나눠** 세로로 쌓는다 — 한 줄에 몰면 이름이 긴
+   축구 티켓에서 값이 아래로 접혀 줄 높이가 제각각이 됐다 */
+.money-row .shop-card-foot{flex:1 1 auto;min-width:0;flex-wrap:nowrap;
+  flex-direction:column;align-items:flex-start;gap:7px}
+.money-nm{display:flex;align-items:baseline;gap:8px;min-width:0}
+.money-row .shop-card-foot .nm,
+.money-row .shop-card-foot .pr{font-size:14px;white-space:nowrap}
+.money-row .tk-ico{flex:0 0 auto;width:46px;height:34px}
+.money-row .tk-ico.soc{width:70px}
+/* [stated] 남은 장수는 **글씨 줄에 겹치면 안 된다** — 이름이 긴 축구 티켓에서 가격과 포개졌다.
+   자리를 따로 잡고, 글씨가 거기까지 못 오게 오른쪽을 비워 둔다 */
+.money-row{padding-right:76px}
+.money-left{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  width:60px;text-align:right;
+  font:700 11px/1.3 var(--gf);color:#9fb0c8}
+
 /* 상점 — 코인 잔액과 안내 문구 한 줄 */
 .shop-note{display:flex;align-items:center;gap:8px;margin:4px 0 6px;min-width:0}
 .shop-note .tx{flex:1;min-width:0;font:700 11px/1.3 var(--gf);color:#9fb0c8;

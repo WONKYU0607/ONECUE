@@ -21,7 +21,8 @@ const SHEETS = {
   gun:    { img: GUN_PREV_IMG, fw: GUN_PREV_FW, fh: GUN_PREV_FH, cols: GUN_PREV_COLS,
             rows: GUN_PREV_ROWS_N, chH: 162, chW: 229, chY: 22, pad: 6, list: GUN_SKINS },
   melee:  { img: MEL_PREV_IMG, fw: MEL_PREV_FW, fh: MEL_PREV_FH, cols: MEL_PREV_COLS,
-            rows: MEL_PREV_ROWS_N, chH: 176, chW: 222, chY: 17, pad: 6, list: MELEE_SKINS },
+            // 상점과 **같은 값이어야 한다** — 222 로는 새 5종의 앞모습이 잘린다(황소 투사 22px)
+            rows: MEL_PREV_ROWS_N, chH: 176, chW: 232, chY: 17, pad: 6, list: MELEE_SKINS },
   soccer: { img: PREV_IMG, fw: PREV_FW, fh: PREV_FH, cols: PREV_COLS,
             rows: PREV_ROWS_N, chH: 150, chW: 103, chY: 26, pad: 14, list: SOCCER_SKINS }
 };

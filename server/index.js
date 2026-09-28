@@ -253,7 +253,7 @@ class Room {
         rows.push({
           uid: seat.uid, kind, result: win ? 'win' : 'lose',
           score: Math.max(0, before.score + delta),
-          streak
+          streak, bot: !!seat.bot
         });
         continue;
       }
@@ -269,7 +269,9 @@ class Room {
       rows.push({
         uid: seat.uid, kind, result: res,
         score: Math.max(0, before.score + d.delta),      // [stated] 하한 0
-        streak: res === 'win' ? before.streak + 1 : 0
+        streak: res === 'win' ? before.streak + 1 : 0,
+        // 봇에게는 코인을 주지 않는다 (`writeResults` 가 본다)
+        bot: !!seat.bot
       });
     }
     if (!rows.length) return;

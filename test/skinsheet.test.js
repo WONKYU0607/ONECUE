@@ -36,8 +36,9 @@ const CASES = [
   // [stated] 총격전만 **8줄** — 결제 5종 뒤에 코인 3종을 이어 붙였다
   ['총격전 게임',   'public/assets/gun-skins.webp',    'GUN_FW',      'GUN_FH',      4, 8],
   ['총격전 미리보기','public/assets/gun-preview.webp',  'GUN_PREV_FW', 'GUN_PREV_FH', 4, 8],
-  ['칼전 게임',     'public/assets/melee-skins.webp',  'MSK_FW',      'MSK_FH',      8, 5],
-  ['칼전 미리보기', 'public/assets/melee-preview.webp','MEL_PREV_FW', 'MEL_PREV_FH', 4, 5],
+  // [stated] 칼전은 **10줄** — 코인 5종(옛 그림, 줄 0~4) + 결제 5종(새 그림, 줄 5~9)
+  ['칼전 게임',     'public/assets/melee-skins.webp',  'MSK_FW',      'MSK_FH',      8, 10],
+  ['칼전 미리보기', 'public/assets/melee-preview.webp','MEL_PREV_FW', 'MEL_PREV_FH', 4, 10],
   ['축구 게임',     'public/assets/soccer-skins.webp', 'SKIN_FW',     'SKIN_FH',    13, 5],
   ['축구 미리보기', 'public/assets/skin-preview.webp', 'PREV_FW',     'PREV_FH',     8, 5]
 ];

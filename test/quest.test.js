@@ -165,14 +165,20 @@ console.log('티켓도 코인으로 산다 — 하루 상한이 있다');
 {
   at('2026-10-05T05:00:00Z');
   const U = 't.buy';                                      // 위에서 코인을 모아둔 사람
+  // [stated] **꽉 차 있어도 산다 — 기본 장수 위에 얹는다.** 막는 것은 하루 상한뿐이다
   let ok = 0;
   for (let i = 0; i < 5; i++){ const r = await S.buyTicket(U, true); if (r.ok) ok++; }
   assert(ok === Q.BUY_SOC_MAX, `  축구 티켓은 하루 ${Q.BUY_SOC_MAX}장까지 (${ok}장 샀다)`);
+  assert(S.socOf(S.fakeGet(U)) === S.SOC_MAX + Q.BUY_SOC_MAX,
+    `  산 만큼 얹힌다 (${S.socOf(S.fakeGet(U))})`);
   const over = await S.buyTicket(U, true);
   assert(!over.ok && over.why === 'capped', '  넘으면 막힌다');
   at('2026-10-06T05:00:00Z');                             // 다음 날
   const next = await S.buyTicket(U, true);
   assert(next.ok, '  날이 바뀌면 다시 살 수 있다');
+  // 자정이 지나도 **어제 산 것이 안 깎인다**
+  assert(S.socOf(S.fakeGet(U)) === S.SOC_MAX + Q.BUY_SOC_MAX + 1,
+    `  어제 산 것 위에 또 얹힌다 (${S.socOf(S.fakeGet(U))})`);
 }
 
 // [stated] 접속 시간은 화면이 보일 때만 센다 — **하루 상한**이 없으면 큰 값을 보내 채울 수 있다

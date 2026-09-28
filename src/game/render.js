@@ -323,7 +323,7 @@ export function createRenderer(canvas){
       // [stated] **스킨을 장착하면 그 모습으로 싸운다.** 칸이 기본보다 넓으므로 그릴 크기도
       // 그 비율만큼 넓힌다 — 몸통은 같게 맞춰 뒀으니 캐릭터가 커지지 않는다
       const msk = skin | 0;
-      if (msk > 0 && isReady(melSkinImg) && msk <= 5){
+      if (msk > 0 && isReady(melSkinImg) && msk <= 10){   // [stated] 칼전 10종 (코인 5 + 결제 5)
         const mw = fwp * MSK_FW / MELEE_FW, mh = fhp * MSK_FH / MELEE_FH;
         // [stated] **스킨도 미리 줄여둔다.** 기본 시트만 `sheetAt` 을 쓰고 스킨은 매 프레임
         // 270x131 을 12px 로 줄이고 있었다 — 스킨을 입으면 렉이 나던 이유.

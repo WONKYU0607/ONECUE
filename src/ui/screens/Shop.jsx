@@ -11,8 +11,8 @@ import { useState, useEffect, useRef } from 'react';
 import { setInnerBack } from '../../state/back.js';
 import { DEBUG_TRY_SKIN, tryOf, setTry } from '../../state/tryskin.js';
 import { coinSkinsOf, coinArenasOf } from '../../game/skins.js';
-import { buySkin, refreshCoin, coinNow, onCoin } from '../../state/questclient.js';
-import { SKIN_COST, SKIN_FIRST_OFF } from '../../state/quests.js';
+import { buySkin, buyTicket, refreshCoin, coinNow, onCoin } from '../../state/questclient.js';
+import { SKIN_COST, SKIN_FIRST_OFF, TICKET_COST, BUY_TK_MAX, BUY_SOC_MAX } from '../../state/quests.js';
 import { SOCCER_SKINS, SOCCER_SET, PREV_IMG, PREV_FW, PREV_FH, PREV_COLS, PREV_ROWS_N,
   PREV_LINES, GUN_SKINS, GUN_SET, GUN_PREV_IMG, GUN_PREV_FW, GUN_PREV_FH, GUN_PREV_COLS,
   GUN_PREV_ROWS_N, GUN_PREV_LINES, MELEE_SKINS, MELEE_SET, MELEE_ARENAS, ARENA_SET, NOADS, MEL_PREV_IMG, MEL_PREV_FW,
@@ -32,7 +32,9 @@ const SHEETS = {
   gun:    { img: GUN_PREV_IMG, fw: GUN_PREV_FW, fh: GUN_PREV_FH, cols: GUN_PREV_COLS,
             rows: GUN_PREV_ROWS_N, lines: GUN_PREV_LINES, chH: 162, chW: 229, chY: 22, pad: 6 },
   melee:  { img: MEL_PREV_IMG, fw: MEL_PREV_FW, fh: MEL_PREV_FH, cols: MEL_PREV_COLS,
-            rows: MEL_PREV_ROWS_N, lines: MEL_PREV_LINES, chH: 176, chW: 222, chY: 17, pad: 6 }
+            // [stated] 새 5종은 망토·뿔이 넓어 222 로는 **앞모습이 22px 잘렸다**(황소 투사).
+            // 시트 전체가 x33~265 안에 들어가므로 창을 232 로 넓혔다 (창 x31~269)
+            rows: MEL_PREV_ROWS_N, lines: MEL_PREV_LINES, chH: 176, chW: 232, chY: 17, pad: 6 }
 };
 // 화면에 그릴 캐릭터 키 (px). 개별 상품과 세트를 각각 하나로 통일한다
 // [stated] **상품이 커서 화면에 안 담긴다** (브라우저 주소창까지 있으면 더 짧다) → 줄인다
@@ -116,12 +118,31 @@ export default function Shop({ onBack }){
   // [stated] **코인 상품의 '샀는가' 는 서버가 답한다.** 기기 쪽 `ownsSkin` 은 입어보기만 해도
   // 보유로 쳐서(디버그), 입어보는 순간 사기 버튼이 사라졌다
   const [own, setOwn] = useState(null);
+  // [stated] 티켓은 **하루에 몇 장까지만** 살 수 있다. 서버가 오늘 몇 장 샀는지 알려 준다
+  const [buy, setBuy] = useState(null);
   useEffect(() => {
     const off = onCoin(c => setCoinUi(c));
-    refreshCoin().then(r => { if (r && r.ok){ setBought(r.bought | 0); setOwn(r.own || {}); } })
-      .catch(() => {});
+    refreshCoin().then(r => {
+      if (r && r.ok){ setBought(r.bought | 0); setOwn(r.own || {}); setBuy(r.buy || {}); }
+    }).catch(() => {});
     return off;
   }, []);
+  /** 오늘 더 살 수 있는 장수 */
+  const tkLeft = soc => Math.max(0,
+    (soc ? BUY_SOC_MAX : BUY_TK_MAX) - ((buy && (soc ? buy.soc : buy.tk)) | 0));
+  const takeTicket = async soc => {
+    if (busy) return;
+    setBusy(true); setNote('');
+    const r = await buyTicket(soc);
+    // [stated] 꽉 차 있어도 **얹어서** 사지므로 `full` 은 이제 서버가 안 돌려준다.
+    // 막는 것은 하루 상한(`capped`)과 코인 부족(`poor`) 둘뿐이다
+    setNote(t(r && r.ok ? 'shop.bought'
+      : (r && r.why === 'poor' ? 'shop.poor'
+      : (r && r.why === 'capped' ? 'shop.capped' : 'q.fail'))));
+    const back2 = await refreshCoin();
+    if (back2 && back2.ok){ setBought(back2.bought | 0); setOwn(back2.own || {}); setBuy(back2.buy || {}); }
+    setBusy(false);
+  };
   /** 서버 기준 보유 여부 */
   const hasIt = (kind, id) =>
     !!(own && Array.isArray(own[kind]) && own[kind].includes(id | 0));
@@ -133,7 +154,7 @@ export default function Shop({ onBack }){
     const r = await buySkin(kind, id);
     setNote(t(r && r.ok ? 'shop.bought' : (r && r.why === 'poor' ? 'shop.poor' : 'q.fail')));
     const back2 = await refreshCoin();
-    if (back2 && back2.ok){ setBought(back2.bought | 0); setOwn(back2.own || {}); }
+    if (back2 && back2.ok){ setBought(back2.bought | 0); setOwn(back2.own || {}); setBuy(back2.buy || {}); }
     setBusy(false);
   };
   // [stated] 디버그: 실제 필드에서 입어볼 수 있게. 출시 전 `DEBUG_TRY_SKIN` 을 false 로
@@ -182,7 +203,9 @@ export default function Shop({ onBack }){
     'skin.gun4': t('skin.gun4'), 'skin.gun5': t('skin.gun5'), 'skin.gun6': t('skin.gun6'),
     'skin.gun7': t('skin.gun7'), 'skin.gun8': t('skin.gun8'),
     'skin.mel1': t('skin.mel1'), 'skin.mel2': t('skin.mel2'), 'skin.mel3': t('skin.mel3'),
-    'skin.mel4': t('skin.mel4'), 'skin.mel5': t('skin.mel5'),
+    'skin.mel4': t('skin.mel4'), 'skin.mel5': t('skin.mel5'), 'skin.mel6': t('skin.mel6'),
+    'skin.mel7': t('skin.mel7'), 'skin.mel8': t('skin.mel8'), 'skin.mel9': t('skin.mel9'),
+    'skin.mel10': t('skin.mel10'),
     'skin.set': t('skin.set')
   };
 
@@ -412,6 +435,26 @@ export default function Shop({ onBack }){
                 <button className="shop-btn" disabled>{t('shop.soon')}</button>
               </div>
             </div>
+          </div>
+        </div>
+      ) : tab === 'money' && pay === 'coin' ? (
+        // [stated] **재화 — 코인으로 티켓 사기.** 일반·축구 각 한 장씩, 하루 상한이 있다
+        <div className="shop-wrap">
+          <div className="shop-list money">
+            {[[false, 'shop.tkName', ''], [true, 'shop.tkSoc', ' soc']].map(([soc, key, cls]) => (
+              <div key={key} className="shop-card-in money-row">
+                <i className={"tk-ico" + cls} />
+                <div className="shop-card-foot">
+                  <span className="money-nm">
+                    <span className="nm">{t(key)}</span>
+                    <span className="pr">{t('shop.coinPrice', { p: TICKET_COST.toLocaleString() })}</span>
+                  </span>
+                  <button className="shop-btn" disabled={busy || tkLeft(soc) <= 0}
+                          onClick={() => takeTicket(soc)}>{t('shop.coinBuy')}</button>
+                </div>
+                <span className="money-left">{t('shop.tkLeft', { n: tkLeft(soc) })}</span>
+              </div>
+            ))}
           </div>
         </div>
       ) : (

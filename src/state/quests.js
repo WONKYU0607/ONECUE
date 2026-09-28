@@ -20,6 +20,22 @@ export const TICKET_COST = 500;      // [stated] 티켓 한 장
 export const BUY_TK_MAX = 3;         // 하루에 코인으로 살 수 있는 일반 티켓
 export const BUY_SOC_MAX = 2;        // 하루에 코인으로 살 수 있는 축구 티켓
 
+// [stated] **판이 끝나면 코인을 준다.** 이기면 100, 지면 50.
+// [stated] **연승이면 더 준다** — 2연승 1.2배, 3연승 1.3배 … 한 판 늘 때마다 0.1배씩.
+//   1연승 100 · 2연승 120 · 3연승 130 · 5연승 150 · 10연승 200. **상한은 두지 않는다**
+// [stated] **빠른 매칭만.** 친구방(코드 방)은 짜고 할 수 있어 주지 않는다 —
+//   점수를 동결하는 것과 같은 이유다. 서버가 점수를 쓰는 자리에서 같이 준다
+// 무승부는 못 이긴 것이므로 패배와 같은 50
+export const WIN_COIN = 100;
+export const LOSE_COIN = 50;
+/** 연승 배수. 1연승은 1.0, 2연승부터 `1 + 연승 x 0.1` */
+export const streakMul = streak => (streak >= 2 ? 1 + streak * 0.1 : 1);
+/** 한 판에서 받는 코인. `res` 는 'win' | 'lose' | 'draw', `streak` 은 **그 판까지의 연승** */
+export function matchCoin(res, streak = 0){
+  if (res !== 'win') return LOSE_COIN;
+  return Math.round(WIN_COIN * streakMul(streak | 0));
+}
+
 // [stated] 게임 누적 접속 시간 — **화면이 보일 때만** 센다.
 // 하루에 인정하는 상한을 둔다: 안 두면 시간을 조작해 크게 보낼 수 있다
 export const PLAY_DAY_MAX = 4 * 60 * 60;   // 하루 4시간까지만 인정 (초)

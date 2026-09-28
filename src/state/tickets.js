@@ -42,11 +42,14 @@ function read(){
     m.score = { ...empty().score, ...(v.score || {}) };
     m.streak = { ...empty().streak, ...(v.streak || {}) };
     m.record = { ...empty().record, ...(v.record || {}) };
-    m.tk = Math.max(0, Math.min(TICKET_MAX, m.tk | 0));
+    // [stated] **코인으로 산 티켓은 기본 장수 위에 얹힌다** — 위쪽 한계를 두면 깎여 버린다.
+    // 충전·자정 초기화가 **기본 장수까지만** 채우는 것으로 상한을 지킨다
+    m.tk = Math.max(0, m.tk | 0);
     m.ffa = Math.max(0, Math.min(FFA_MAX, m.ffa | 0));
-    m.soc = Math.max(0, Math.min(SOC_MAX, m.soc == null ? SOC_MAX : m.soc | 0));
+    m.soc = Math.max(0, m.soc == null ? SOC_MAX : m.soc | 0);
     if (typeof m.at !== 'number' || !isFinite(m.at)) m.at = Date.now();
-    if (m.day !== today()){ m.day = today(); m.ffa = FFA_MAX; m.soc = SOC_MAX; }   // 자정에 개인전·축구 초기화
+    // 자정에 개인전·축구 초기화. 축구는 **기본 3장까지 채우기만** 한다 (산 것을 깎지 않게)
+    if (m.day !== today()){ m.day = today(); m.ffa = FFA_MAX; m.soc = Math.max(SOC_MAX, m.soc); }
     return m;
   } catch { return empty(); }
 }
@@ -65,6 +68,8 @@ function save(){
 
 // 지난 시간만큼 채운다. **꽉 차 있으면 시계를 지금으로 당긴다** —
 // 안 그러면 오래 안 하다 들어왔을 때 쓰자마자 여러 장이 한꺼번에 들어온다
+// [stated] **시계는 기본 5장에서만 돈다.** 코인으로 산 티켓을 얹어 5장 이상이면
+// 멈춰 있고, 다 써서 5장 밑으로 내려가면 다시 돈다. 충전도 5장까지만 한다
 function regen(now = Date.now()){
   if (cur.tk >= TICKET_MAX){ cur.at = now; return; }
   const gained = Math.floor((now - cur.at) / REGEN_MS);
@@ -109,8 +114,10 @@ export function useSoccer(){
 /** 서버가 알려준 값으로 기기 사본을 맞춘다. **서버 값이 진짜다** */
 export function syncTickets(v){
   if (!v || typeof v.tk !== 'number') return false;
-  cur.tk = Math.max(0, Math.min(TICKET_MAX, v.tk | 0));
+  cur.tk = Math.max(0, v.tk | 0);                        // 산 티켓이 얹혀 있으면 5장을 넘는다
   cur.ffa = Math.max(0, Math.min(FFA_MAX, v.ffa | 0));
+  // 축구 티켓도 서버 값으로 맞춘다 — 안 맞추면 **코인으로 산 게 화면에 안 보인다**
+  if (typeof v.soc === 'number') cur.soc = Math.max(0, v.soc | 0);
   if (typeof v.at === 'number' && isFinite(v.at)) cur.at = v.at;
   if (v.day) cur.day = v.day;
   saveLocalOnly();
@@ -183,10 +190,13 @@ export function snapshot(){
 // 구름에서 받은 값으로 덮는다. **없는 항목은 기기 값을 그대로 둔다**
 export function hydrate(v){
   if (!v || typeof v !== 'object') return false;
-  if (typeof v.tk === 'number') cur.tk = Math.max(0, Math.min(TICKET_MAX, v.tk | 0));
+  if (typeof v.tk === 'number') cur.tk = Math.max(0, v.tk | 0);      // 산 티켓은 5장을 넘는다
   if (typeof v.at === 'number' && isFinite(v.at)) cur.at = v.at;
   if (typeof v.ffa === 'number') cur.ffa = Math.max(0, Math.min(FFA_MAX, v.ffa | 0));
   if (typeof v.day === 'string') cur.day = v.day;
+  // 축구 티켓 — 날이 지났으면 **기본 3장까지 채우기만** 한다 (`server/store.js` 의 `socOf` 와 같은 규칙)
+  if (typeof v.soc === 'number')
+    cur.soc = v.socDay === today() ? Math.max(0, v.soc | 0) : Math.max(SOC_MAX, v.soc | 0);
   // [stated] **축구 점수가 결과 화면과 실제가 따로 놀았다.** 여기서 총·칼만 옮겨서
   // 기기의 축구 점수는 구름과 **한 번도 안 맞춰졌다** — 결과 화면은 기기에만 쌓인 값에서,
   // 실제 점수는 서버가 구름 값에서 계산해 처음부터 어긋났다

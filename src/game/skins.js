@@ -67,26 +67,28 @@ export const GUN_PREV_FW = 240, GUN_PREV_FH = 186, GUN_PREV_COLS = 4, GUN_PREV_R
 export const GUN_PREV_LINES = [[0, 1], [2, 3]];
 
 // ── 칼전 스킨 ─────────────────────────────────────────────────
-// [stated] 5종. 개별 990원 / 5종 세트 3,900원 — 총격전·축구와 같은 방식.
-// 칸 순서는 기본 시트와 같다: 0 정면대기 1 정면공격 2 뒷대기 3 뒷공격
-//                            4 좌대기 5 좌공격 6 우대기 7 우공격
-// 칸 270x108 (기본 242x99 보다 넓다 — 칼빛·날개 때문). 몸통은 기본과 같게 맞췄다
+// [stated] **10종.** 칸 순서는 기본 시트와 같다:
+//   0 정면대기 1 정면공격 2 뒷대기 3 뒷공격 4 좌대기 5 좌공격 6 우대기 7 우공격
+// 칸 270x131. 몸통은 기본과 같게 맞췄다 (앞뒤 92px · 옆 96px, 발끝이 칸 바닥)
+//
+// [stated] **옛 5종(줄 0~4)은 코인으로, 새 5종(줄 5~9)은 결제로.**
+// 새로 그린 쪽이 그림이 좋아 결제 상품을 그쪽으로 옮겼다 — `COIN_SKINS.melee` 를 볼 것
 export const MELEE_SKINS = [
-  { id: 1, row: 0, key: 'skin.mel1', sku: 'skin_melee_1', price: 990 },
-  { id: 2, row: 1, key: 'skin.mel2', sku: 'skin_melee_2', price: 990 },
-  { id: 3, row: 2, key: 'skin.mel3', sku: 'skin_melee_3', price: 990 },
-  { id: 4, row: 3, key: 'skin.mel4', sku: 'skin_melee_4', price: 990 },
-  { id: 5, row: 4, key: 'skin.mel5', sku: 'skin_melee_5', price: 990 }
+  { id: 6,  row: 5, key: 'skin.mel6',  sku: 'skin_melee_6',  price: 990 },
+  { id: 7,  row: 6, key: 'skin.mel7',  sku: 'skin_melee_7',  price: 990 },
+  { id: 8,  row: 7, key: 'skin.mel8',  sku: 'skin_melee_8',  price: 990 },
+  { id: 9,  row: 8, key: 'skin.mel9',  sku: 'skin_melee_9',  price: 990 },
+  { id: 10, row: 9, key: 'skin.mel10', sku: 'skin_melee_10', price: 990 }
 ];
 export const MELEE_SET = {
   id: 'set_melee', key: 'skin.set', sku: 'skin_melee_set', price: 3900,
-  grants: [1, 2, 3, 4, 5],
-  lines: [[0, 1], [2, 3, 4]]
+  grants: [6, 7, 8, 9, 10],
+  lines: [[5, 6], [7, 8, 9]]
 };
 export const MSK_FW = 270, MSK_FH = 131;
 export const MEL_PREV_IMG = 'assets/melee-preview.webp';
 // 미리보기 시트에는 **대기 4자세만** 담았다 (공격은 칼빛이 커서 뺐다) → 4칸
-export const MEL_PREV_FW = 300, MEL_PREV_FH = 220, MEL_PREV_COLS = 4, MEL_PREV_ROWS_N = 5;
+export const MEL_PREV_FW = 300, MEL_PREV_FH = 220, MEL_PREV_COLS = 4, MEL_PREV_ROWS_N = 10;
 // [stated] 4칸을 한 줄에 놓으면 좁은 폰에서 넘친다(418 > 308) → **2칸씩 두 줄**
 export const MEL_PREV_LINES = [[0, 1], [2, 3]];
 
@@ -150,7 +152,15 @@ export const COIN_SKINS = {
     { id: 7, row: 6, key: 'skin.gun7', coin: true },
     { id: 8, row: 7, key: 'skin.gun8', coin: true }
   ],
-  melee: [],
+  // [stated] 칼전은 **옛 5종을 코인으로 돌렸다** — 줄 0~4, 번호도 그대로 1~5.
+  // 결제 상품은 새로 그린 줄 5~9(위 `MELEE_SKINS`)로 옮겼다
+  melee: [
+    { id: 1, row: 0, key: 'skin.mel1', coin: true },
+    { id: 2, row: 1, key: 'skin.mel2', coin: true },
+    { id: 3, row: 2, key: 'skin.mel3', coin: true },
+    { id: 4, row: 3, key: 'skin.mel4', coin: true },
+    { id: 5, row: 4, key: 'skin.mel5', coin: true }
+  ],
   soccer: []
 };
 export const coinSkinsOf = k => COIN_SKINS[k] || [];

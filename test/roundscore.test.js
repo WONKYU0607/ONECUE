@@ -68,6 +68,12 @@ try {
   assert(got[1].b.gun !== got[0].b.gun,
     `  진 쪽도 이어서 깎인다 (1판 ${got[0].b.gun} → 2판 ${got[1].b.gun})`);
   assert(got[1].a.sgun === 2, `  연승이 쌓인다 (${got[1].a.sgun})`);
+
+  // [stated] **판이 끝나면 코인.** 이기면 100(연승이면 더), 지면 50.
+  // 1판 이김 100 + 2판 2연승 120 = 220, 진 쪽은 50 + 50 = 100
+  console.log('빠른 매칭은 코인을 준다');
+  assert(got[1].a.coin === 220, `  이긴 쪽 100 + 120(2연승) = 220 (${got[1].a.coin})`);
+  assert(got[1].b.coin === 100, `  진 쪽 50 + 50 = 100 (${got[1].b.coin})`);
   A.close(); B.close();
 
   // [stated] **친구방은 점수가 동결된다**
@@ -94,6 +100,11 @@ try {
     assert(noScore(a2) && noScore(b2),
       `  친구방 판은 점수에 안 쌓인다 (${JSON.stringify(a2)})`);
     assert(a2 && a2.qd, '  대신 퀘스트는 쌓인다 (친구방도 인정)');
+    // [stated] **친구방은 코인도 안 준다** — 짜고 하면 무한히 벌 수 있다.
+    // 코인은 점수를 쓰는 자리에서 같이 주므로, 점수가 동결되면 코인도 같이 멈춘다
+    const noCoin = v => !v || !(v.coin | 0);
+    assert(noCoin(a2) && noCoin(b2),
+      `  친구방 판은 코인을 안 준다 (${JSON.stringify(a2 && a2.coin)} / ${JSON.stringify(b2 && b2.coin)})`);
     H.close(); G.close();
   }
   console.log('roundscore.test.js 통과');
