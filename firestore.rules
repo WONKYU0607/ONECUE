@@ -1,0 +1,73 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 클라이언트가 만들 때 담을 수 있는 항목. 서버가 쥔 값은 하나도 없다.
+    // 함수는 반드시 service 안에 있어야 한다 (밖에 두면 문법 오류로 게시가 안 된다)
+    function mine(d){
+      return d.keys().hasOnly(['nick','color','updatedAt'])
+        && (!('nick' in d) || (d.nick is string && d.nick.size() <= 16));
+    }
+    // 고칠 때: **클라가 고쳐도 되는 것만** 적는다 (허용 목록).
+    //
+    // 예전에는 '막을 것'을 적었는데(hasAny), 서버 항목을 새로 만들 때마다 그 목록에
+    // 적어 넣어야 했다. 실제로 코인·퀘스트·우편함·보유를 만들고 목록을 안 고쳐
+    // **클라가 코인을 마음대로 쓸 수 있는 상태**가 됐다. 그래서 뒤집는다 —
+    // 새 항목은 적지 않는 한 기본이 잠김이다.
+    //
+    // 클라가 실제로 올리는 것은 `{nick, color}` + `updatedAt` 뿐이고(`sync.js` 의 gather),
+    // `nick` 은 선점표(`nicks/`)를 같이 고쳐야 해서 서버만 쓴다.
+    // 값이 그대로면 affectedKeys 에 안 들어오므로, 바꾸려 할 때만 걸린다
+    function keepsScore(){
+      return request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['color','updatedAt']);
+    }
+
+    match /players/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow create: if request.auth != null && request.auth.uid == uid
+                    && mine(request.resource.data);
+
+      allow update: if request.auth != null && request.auth.uid == uid
+                    && keepsScore();
+
+      allow delete: if false;
+    }
+
+    // 친구 목록·받은 신청·보낸 신청·방 초대. 읽기만 되고 쓰기는 서버만
+    match /players/{uid}/friends/{other} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /players/{uid}/reqIn/{other} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /players/{uid}/reqOut/{other} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /players/{uid}/invites/{from} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // 닉네임 선점표. 읽지도 쓰지도 못한다
+    match /nicks/{key} {
+      allow read, write: if false;
+    }
+
+    // 순위표는 누구나 읽고, 쓰는 건 게임 서버(Admin SDK)만
+    match /ranks/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 나머지는 전부 막는다
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

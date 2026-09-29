@@ -22,7 +22,12 @@ import './styles.css';
 // 다른 그림처럼 여기서 절대 주소로 만들어 넣는다
 for (const [name, file] of [['--tiers', 'tiers.webp'], ['--ticket', 'ticket.webp'], ['--panel', 'panel.webp'], ['--chars', 'characters.png'], ['--tksoc', 'ticket-soccer.webp'],
   ['--icquest', 'ic-quest.webp'], ['--icmail', 'ic-mail.webp'],
-  ['--iccoin', 'ic-coin.webp']]){
+  ['--iccoin', 'ic-coin.webp'], ['--hbpvp', 'home-pvp.webp'],
+  ['--hbgun', 'home-gun.webp'], ['--hbmelee', 'home-melee.webp'], ['--hbsoccer', 'home-soccer.webp'],
+  ['--plqbig', 'plaque-big.webp'], ['--plqsmall', 'plaque-small.webp'],
+  ['--icai', 'ic-home-ai.webp'], ['--icprac', 'ic-home-prac.webp'], ['--icshop', 'ic-home-shop.webp'], ['--icfriend', 'ic-home-friend.webp'],
+  ['--hbfriend', 'home-friend.webp'],
+  ['--hbai', 'home-ai.webp'], ['--hbprac', 'home-prac.webp'], ['--hbshop', 'home-shop.webp']]){
   const u = new URL('assets/' + file, document.baseURI).href;
   document.documentElement.style.setProperty(name, `url("${u}")`);
 }

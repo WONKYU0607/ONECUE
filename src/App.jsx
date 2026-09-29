@@ -167,7 +167,6 @@ export default function App(){
       return true;
     });
   }, [screen, showSettings, askQuit, askExit, askRoom, goHome]);
-  const startPvp  = useCallback(() => setScreen('pvp'), []);
   const beginPvp  = useCallback(opt => {
     disconnect();
     // kind는 게임 종류(pvp/ai), mode는 접속 방식(queue/create/join).
@@ -342,7 +341,7 @@ export default function App(){
         setScreen('login');
       }} />}
       {screen === 'login'    && <Login onDone={() => { goHome(); goHomeFirst(); }} />}
-      {screen === 'home'     && <Home onPvp={startPvp} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
+      {screen === 'home'     && <Home onStart={beginPvp} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
                                      onSettings={() => setShowSettings(true)}
                                      onRanks={k => { setRankKind(k); setScreen('ranks'); }}
                                      onJoin={beginPvp}

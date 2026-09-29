@@ -33,8 +33,42 @@ function readAll(){
 
 let all = readAll();
 
+// [stated] **AI 단계 기록도 구름에 올린다.** 예전엔 기기에만 있어서 크롬 사이트 데이터를 지우거나
+// 로그아웃·재설치·기기 변경을 하면 4단계까지 깬 게 1단계로 돌아갔다.
+// 올리는 건 `cloud/sync.js` 가 한다 (이 파일은 Firebase 를 모른다)
+let saveHook = null;
+export function setProgressSaveHook(fn){ saveHook = fn; }
+
 function save(){
   try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* 무시 */ }
+  if (saveHook) try { saveHook(); } catch { /* 무시 */ }
+}
+
+// 구름에 올릴 모양. 필드 이름은 `aip` (규칙 허용 목록에 이 이름으로 들어가 있다)
+export const progressSnapshot = () => ({ aip: JSON.parse(JSON.stringify(all)) });
+
+/** 구름 값을 기기에 **합친다** — 덮지 않는다.
+ *  깬 단계는 합집합, 승·패·무는 큰 쪽. 어느 쪽이 최신인지 모르므로 **손해가 없는 쪽**으로.
+ *  기기에만 있던 기록이 있으면 true (→ 부른 쪽이 다시 올린다) */
+export function hydrateProgress(v){
+  const cloud = v && v.aip && typeof v.aip === 'object' ? v.aip : null;
+  if (!cloud) return Object.keys(all).length > 0;
+  let localHadMore = false;
+  for (const [k, m] of Object.entries(cloud)){
+    if (!m || typeof m !== 'object') continue;
+    const c = slot(k);
+    const theirs = Array.isArray(m.cleared) ? m.cleared.filter(n => Number.isInteger(n)) : [];
+    for (const n of theirs) if (!c.cleared.includes(n)) c.cleared.push(n);
+    if (c.cleared.length > theirs.length) localHadMore = true;
+    for (const f of ['wins', 'losses', 'draws']){
+      const t = m[f] | 0;
+      if ((c[f] | 0) > t) localHadMore = true;
+      c[f] = Math.max(c[f] | 0, t);
+    }
+  }
+  for (const k of Object.keys(all)) if (!cloud[k] && all[k].cleared.length) localHadMore = true;
+  try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* 무시 */ }
+  return localHadMore;
 }
 function slot(key){
   if (!all[key]) all[key] = empty();

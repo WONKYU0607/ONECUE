@@ -1053,6 +1053,148 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   right:calc(var(--h-barX,0) * var(--u));
   top:calc((var(--h-barY,2) + var(--h-rowH,20) + 3) * var(--u) + 46px);
   gap:calc(var(--h-boxGap,3) * var(--u))}
+/* ── 홈 칸 틀 (2026-09-29 개편) ─────────────────────────────
+   [stated] 스케치대로 PVP 큰 칸 · AI/연습 두 칸 · 상점 띠. **지금은 틀 크기만** — 그림은 나중에.
+   퀘스트 줄(`.home-row`) 바로 밑부터 붙인다. 칸 높이는 스케치 비율(577 : 430 : 280)로 나눈다.
+   `.home-row` 높이(그림 16 + 여백 10 + 선 2 = 28px)를 더해 그 밑에 붙인다 */
+.home-grid{position:absolute;z-index:23;display:grid;
+  left:calc(var(--h-barX,0) * var(--u));
+  right:calc(var(--h-barX,0) * var(--u));
+  --hg-top:calc((var(--h-barY,2) + var(--h-rowH,20) + 3) * var(--u) + 46px + 28px + 11px);
+  top:var(--hg-top);
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:577fr 430fr 280fr;
+  gap:6px;
+  /* [stated] **옛날 폰(16:9)과 요즘 폰(20:9)의 중간, 18:9 에서 딱 차게.**
+     그보다 긴 폰은 상점 밑이 조금 비고, 짧은 폰은 칸이 세로로 조금 눌린다.
+     키 = 폭 x 1.83 (18:9 폰에서 틀 안에 남는 세로 / 칸 폭 실측). 모자라면 남은 만큼만.
+     `aspect-ratio` + `max-height` 로 하면 **짧은 폰에서 폭까지 같이 줄어** 왼쪽으로 쏠린다 →
+     폭은 그대로 두고 높이만 `min()` 으로 고른다. 폭은 화면 폭(`cqw`)에서 계산한다 */
+  height:min(calc((100cqw + 16px - 2 * var(--h-barX,0) * var(--u)) * 1.83),
+             calc(var(--vh) - 2 * var(--fy) - var(--hg-top) - 6px))}
+/* 칸 폭을 화면 폭(cqw)으로 잴 수 있게 */
+.screen.home{container-type:inline-size}
+.hbox{min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;
+  padding:0;cursor:pointer;color:#fff;
+  background:rgba(20,40,66,.55);border:1px solid #7fd2ff;border-radius:3px}
+/* 반 칸(360 폰에서 145px)에 영어 'Friend Battle' 이 두 줄로 꺾였다 → 한 줄 고정 + 좁은 폰에서 글씨를 줄인다 */
+.hbox .t{font:900 min(18px, 4.4vw)/1 var(--gf);letter-spacing:1.5px;white-space:nowrap;text-shadow:0 2px 3px rgba(0,0,0,.8)}
+.hbox:active{filter:brightness(1.35)}
+.hb-pvp{grid-column:1 / 3}
+/* ── 칸 이름표(팻말) ───────────────────────────────────────
+   [stated] 스케치처럼 금테 팻말 위에 이름. 글씨는 코드로 — 영어판도 같은 그림을 쓴다.
+   글씨 자리는 **팻말 그림의 나무판 위치(실측 %)** 에 맞춘다:
+     큰 팻말  가로 13.1~86.8% / 세로 50.6~86.1%   (원본 1745x619 에서 잰 값)
+     작은 팻말 안쪽 판 가로 3.4~96.4% / 세로 16.4~83.1% (원본 1099x189, 위아래 금테 두께 같음 → 세로 가운데 49.7%)
+   누름을 막지 않는다 — 밑의 칸(버튼)이 눌려야 한다 */
+.plq{position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;z-index:3;
+  background:center/100% 100% no-repeat}
+.plq-big{top:3%;width:72%;aspect-ratio:1745 / 619;background-image:var(--plqbig)}
+.plq-small{top:12px;width:92%;aspect-ratio:1099 / 189;background-image:var(--plqsmall)}
+.plq-t{position:absolute;display:flex;align-items:center;justify-content:center;white-space:nowrap;
+  font-family:var(--gf);font-weight:900;line-height:1;color:transparent;
+  background:linear-gradient(to bottom, #fff7cf 0%, #ffe07a 38%, #f0a92a 62%, #b86a0e 100%);
+  -webkit-background-clip:text;background-clip:text;
+  /* 글씨 테두리. 글씨를 그라데이션으로 칠하면 text-shadow 가 글씨 위에 덮이므로 filter 로 그린다 */
+  filter:drop-shadow(0 0 1px #2a1402) drop-shadow(0 1.5px 0 #2a1402) drop-shadow(0 2px 2px rgba(0,0,0,.6))}
+.plq-big .plq-t{left:13.1%;right:13.2%;top:50.6%;bottom:13.9%;
+  font-size:calc(19 * var(--u));letter-spacing:calc(1.5 * var(--u))}
+.plq-small .plq-t{left:4.2%;right:4%;top:16.4%;bottom:16.9%;
+  font-size:calc(12 * var(--u) * var(--fit, 1));letter-spacing:calc(.5 * var(--u))}
+/* [stated] PVP 세 판 아래 팻말. small 과 같은 그림을 판 폭에 맞춘다.
+   **판 폭의 84%** — 옆 판 팻말과 붙어 보이지 않게 양쪽에 8% 씩 띄운다 */
+.pvp-pane{position:relative}
+.plq-pane{top:auto;bottom:6%;width:84%;background:none}
+/* [stated] **글씨가 팻말보다 커서 위아래를 늘렸다.** 그림을 통째로 늘리면 금테 끝(볼트 달린 부분)까지
+   찌그러지므로 `border-image` 9분할로 **양 끝·위아래 금테는 그대로 두고 가운데만** 늘린다.
+   잘라내는 값은 480x83 파일 기준: 위아래 금테 14 / 왼쪽 끝 35 / 오른쪽 끝 38.
+   그리는 두께: 좌우는 팻말 폭 비율(7.4% / 8%)이라 원래 모양 그대로, 위아래는 3px */
+.plq-pane{aspect-ratio:1099 / 280;
+  border-style:solid;border-width:0;
+  border-image-source:var(--plqsmall);border-image-slice:14 38 14 35 fill;
+  border-image-width:3px 8% 3px 7.4%;border-image-repeat:stretch}
+.plq-pane .plq-t{left:8%;right:8%;top:14%;bottom:14%;
+  /* 짧은 폰(360x640)은 --u 가 작아 8.5px 까지 내려가 안 읽혔다 → 10px 아래로는 안 줄인다 */
+  font-size:calc(max(10px, 10.5 * var(--u)) * var(--fit, 1));letter-spacing:calc(.3 * var(--u))}
+/* [stated] 팻말 옆 아이콘. 스케치처럼 **팻말 왼쪽 끝에 걸치고 팻말보다 크게**.
+   아이콘 폭 = 팻말 높이 x 1.75 = 팻말 폭의 30.1%, 왼쪽 -3% 에서 시작 → 오른쪽 끝이 27.1% */
+.plq-ico{position:absolute;left:-3%;top:50%;height:175%;aspect-ratio:1;transform:translateY(-50%);
+  background:center/contain no-repeat;filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}
+.plq-ico.ai{background-image:var(--icai)}
+.plq-ico.prac{background-image:var(--icprac)}
+.plq-ico.shop{background-image:var(--icshop)}
+.plq-ico.friend{background-image:var(--icfriend)}
+/* [stated] **글씨는 팻말 한가운데.** 아이콘(27.1% 까지)을 피하려고 글씨 자리를 **양쪽 똑같이** 29% 씩 좁힌다.
+   가운데가 50% 에 오도록. 넘치는 긴 이름은 Plaque.jsx 가 --fit 으로 줄인다 */
+.plq-small.has-ico .plq-t{left:29%;right:29%}
+/* 팻말이 칸 위에 있으니 AI·연습·상점·친구 대전 칸은 가운데 정렬 대신 위에 붙는 자리를 쓴다 */
+.hb-ai,.hb-prac,.hb-shop,.hb-friend:not(.open){position:relative}
+
+/* ── 친구 대전 칸 (가운데 줄 왼쪽) ───────────────────────── */
+/* [stated] AI 모드(520x634, 0.82) · 연습 모드 · 상점(520x412, 1.26) 배경. 칸 비율 그대로 그렸다.
+   짧은 폰(16:9)은 위아래가 조금 잘린다 */
+.hb-ai{background:var(--hbai) center/cover no-repeat, rgba(20,40,66,.55)}
+.hb-prac{background:var(--hbprac) center/cover no-repeat, rgba(20,40,66,.55)}
+.hb-shop{background:var(--hbshop) center/cover no-repeat, rgba(20,40,66,.55)}
+/* [stated] 친구 대전 배경(520x635, 칸 비율 0.82 그대로). 짧은 폰은 위아래가 조금 잘린다 */
+.hb-friend{background:var(--hbfriend) center/cover no-repeat, rgba(20,40,66,.55)}
+/* 펼치면 버튼이 그림 위에 올라오므로 그림을 어둡게 깔아 버튼을 읽히게 한다 */
+.hb-friend.open{background:linear-gradient(rgba(6,10,18,.6), rgba(6,10,18,.6)), var(--hbfriend) center/cover no-repeat}
+.hb-friend.open{position:relative;cursor:default;flex-direction:column;padding:6px 8px}
+.hb-friend.open:active{filter:none}
+.fr-back{position:absolute;left:4px;top:4px;width:24px;height:24px;font-size:14px}
+/* 뒤로 버튼 자리만큼 **왼쪽을 비운다**. 위를 비우면 짧은 폰(360x640, 칸 높이 98)에서
+   버튼 둘 + 여백이 안 들어가 뒤로 버튼과 5px 겹쳤다 */
+.fr-col{width:100%;display:flex;flex-direction:column;gap:6px;padding-left:24px}
+.fr-btn{padding:8px 0;cursor:pointer;white-space:nowrap;
+  font:900 13px/1 var(--gf);color:#fff;letter-spacing:.5px;
+  background:rgba(22,64,104,.96);border:1px solid #8fd8ff;border-radius:3px}
+.fr-btn:active{filter:brightness(1.3)}
+.fr-btn.off{opacity:.45;cursor:default}
+.fr-code{flex:0 0 auto;height:30px;width:100%}
+/* 홈 칸 그림. 칸 비율(18:9 이상 1.24)로 그린 그림이라 cover 로 채운다 — 짧은 폰은 위아래가 조금 잘린다 */
+.hb-pvp{background:var(--hbpvp) center/cover no-repeat, rgba(20,40,66,.55)}
+/* ── 홈 PVP 칸: 접힘(세 판) / 펼침(한 종목) ────────────────────────
+   [stated] 판을 누르면 그 판이 칸 전체로 커진다. `clip-path` 로 누른 판 자리에서
+   칸 전체로 벌린다 — 그림 한 장이 옆으로 드러나는 모양 */
+.hb-pvp{position:relative;overflow:hidden;cursor:default}
+.hb-pvp:active{filter:none}
+.pvp-panes{position:absolute;inset:0;display:flex}
+.pvp-pane{flex:1 1 0;min-width:0;padding:0;border:0;background:transparent;cursor:pointer}
+.pvp-pane:active{background:rgba(255,255,255,.12)}
+.pvp-open{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;
+  background:center/cover no-repeat;
+  animation:pvp-grow .26s ease-out both}
+.pvp-open.gun{background-image:var(--hbgun)}
+.pvp-open.melee{background-image:var(--hbmelee)}
+.pvp-open.soccer{background-image:var(--hbsoccer)}
+@keyframes pvp-grow{
+  from{clip-path:inset(0 calc((2 - var(--from)) * 33.333%) 0 calc(var(--from) * 33.333%))}
+  to{clip-path:inset(0 0 0 0)}
+}
+.pvp-close{position:absolute;left:6px;top:6px;z-index:2;width:28px;height:28px;font-size:16px}
+/* 버튼 뒤는 어둡게 — 그림이 복잡해도 글씨가 묻히지 않게 */
+.pvp-ctrl{display:flex;flex-direction:column;gap:6px;padding:28px 8px 8px;
+  background:linear-gradient(to bottom, rgba(6,10,18,0), rgba(6,10,18,.82) 38%);
+  animation:pvp-fade .2s .18s ease-out both}
+@keyframes pvp-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.pvp-sizes{display:flex;gap:5px}
+.pvp-chip{flex:1 1 0;min-width:0;padding:7px 0;cursor:pointer;white-space:nowrap;
+  font:900 13px/1 var(--gf);color:#cfe6f7;letter-spacing:.5px;
+  background:rgba(12,24,40,.88);border:1px solid #3f6f94;border-radius:3px}
+.pvp-chip.on{color:#fff;border-color:#8fd8ff;background:rgba(28,70,112,.95);
+  box-shadow:0 0 0 1px rgba(143,216,255,.35) inset}
+.pvp-start{display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:9px 0;cursor:pointer;color:#fff;
+  background:rgba(22,64,104,.96);border:1px solid #8fd8ff;border-radius:3px}
+.pvp-start .t{font:900 17px/1 var(--gf);letter-spacing:2px;text-shadow:0 2px 3px rgba(0,0,0,.8)}
+.pvp-start .tkn{display:flex;align-items:center;gap:4px;font:900 12px/1 var(--gf);color:#8fd8ff}
+.pvp-start .tkn .tk-ico{flex:0 0 18px;height:12px}
+.pvp-start .tkn .tk-ico.soc{flex:0 0 26px}
+.pvp-start:active{filter:brightness(1.3)}
+.pvp-start.off{opacity:.45;cursor:default}
+@media (prefers-reduced-motion: reduce){ .pvp-open,.pvp-ctrl{animation:none} }
+
 .cost-entry{position:relative;flex:1 1 0;min-width:0;
   display:flex;align-items:center;justify-content:center;gap:5px;
   padding:5px 0;

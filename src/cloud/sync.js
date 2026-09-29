@@ -10,8 +10,12 @@ import { setOwned } from '../state/tryskin.js';
 function hydrateOwn(v){ try { setOwned(v && v.own); } catch { /* 무시 */ } }
 import { nickSnapshot, hydrateNick, setNickSaveHook } from '../state/profile.js';
 import { setUid } from '../net/connection.js';
+import { progressSnapshot, hydrateProgress, setProgressSaveHook } from '../state/progress.js';
 
-const gather = () => ({ ...snapshot(), ...nickSnapshot() });
+// [stated] AI 단계 기록(`aip`)은 **구름 값을 먼저 받아 합친 뒤에만** 올린다.
+// 새 기기·로그아웃 직후엔 기기 기록이 비어 있어서, 받기 전에 올리면 구름의 4단계를 빈 값으로 덮는다
+let aipReady = false;
+const gather = () => ({ ...snapshot(), ...nickSnapshot(), ...(aipReady ? progressSnapshot() : {}) });
 
 let started = false;
 let mod = null;                       // 늦게 받아온 store.js
@@ -33,9 +37,12 @@ export async function startSync(){
   // 기기에 저장될 때마다 구름에도 올린다 (push가 몰아서 보낸다)
   setSaveHook(save);
   setNickSaveHook(save);
+  setProgressSaveHook(save);
   const v = await m.pull();
-  if (!v) { save(); return false; }        // 처음이면 지금 기기 값을 올려둔다
+  if (!v) { aipReady = true; save(); return false; }        // 처음이면 지금 기기 값을 올려둔다
   const a = hydrate(v), b = hydrateNick(v);
+  const more = hydrateProgress(v); aipReady = true;
+  if (more) save();   // 기기에만 있던 AI 기록을 구름에 올린다
   hydrateOwn(v);   // [stated] 스킨 보유는 **구름이 갖는다** — 기기는 사본만 받는다
   // **구름 문서에 이름이 비어 있으면 채워 넣는다.**
   // 규칙이 클라의 이름 쓰기를 막은 뒤로, 서버가 점수를 먼저 써서 만들어진 문서는
@@ -85,6 +92,8 @@ export async function mergeFrom(oldUid){
   // 닉네임은 **옛 계정 것을 쓴다** — 그동안 쓰던 이름이다
   if (theirs.nick) merged.nick = theirs.nick;
   hydrate(merged); hydrateNick(merged);
+  // AI 단계는 두 계정 기록을 **합친다** (hydrateProgress 가 합집합으로 받는다)
+  hydrateProgress(theirs); hydrateProgress(mine); aipReady = true;
   save();
   return true;
 }
@@ -120,11 +129,15 @@ export async function resyncAfterMatch(kind, waits = [900, 1500, 2500, 4000]){
 }
 
 export async function resyncAccount(){
+  // 계정이 바뀌는 중 — 새 계정 값을 받기 전엔 AI 기록을 안 올린다 (옛 계정 기록으로 덮지 않게)
+  aipReady = false;
   const m = await load();
   setUid(await m.uid());
   const v = await m.pull();
-  if (!v){ save(); return false; }      // 그 계정에 기록이 없으면 지금 값을 올려둔다
+  if (!v){ aipReady = true; save(); return false; }      // 그 계정에 기록이 없으면 지금 값을 올려둔다
   const a = hydrate(v), b = hydrateNick(v);
+  const more = hydrateProgress(v); aipReady = true;
+  if (more) save();
   hydrateOwn(v);   // [stated] 스킨 보유는 **구름이 갖는다** — 기기는 사본만 받는다
   if (!v.nick) fillNick();
   return a || b;
