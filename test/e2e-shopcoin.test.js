@@ -144,6 +144,47 @@ try {
     assert(tx.x - head.x <= 12, `  왼쪽에 붙어 있다 (${tx.x - head.x}px)`);
   }
 
+  // [stated] "축구 티켓 300원도 노란색 표시 해놔"
+  // [stated] "한국어도 영어처럼 ₩990 으로 수정해"
+  const YELLOW = 'rgb(255, 211, 77)';
+  const tab = txt => p.evaluate(s => {
+    const el = [...document.querySelectorAll('.shop-tabs .shop-btn')]
+      .find(b2 => (b2.innerText || '').trim() === s);
+    if (!el) return false; el.click(); return true;
+  }, txt);
+  const prices = sel => p.evaluate(s => [...document.querySelectorAll(s)]
+    .map(e => ({ tx: (e.textContent || '').trim(), color: getComputedStyle(e).color })), sel);
+
+  console.log('재화 칸의 값이 노란색이고, 한국어 값도 ₩ 로 보인다');
+  {
+    assert(await openShop(393, 'ko'), '  상점이 열린다');
+    assert(await tab('재화'), '  코인 · 재화 칸을 열었다');
+    await wait(900);
+    const coinRows = await prices('.money-row .pr');
+    assert(coinRows.length === 2, `  줄이 둘이다 (${coinRows.length})`);
+    for (const r of coinRows)
+      assert(r.color === YELLOW, `  노란색이다 — ${r.tx} (${r.color})`);
+
+    assert(await tab('일반'), '  일반 쪽으로 옮겼다');
+    await wait(600);
+    assert(await tab('재화'), '  일반 · 재화 칸을 열었다');
+    await wait(900);
+    const cashRows = await prices('.money-row .pr');
+    assert(cashRows.length === 2, `  줄이 둘이다 (${cashRows.length})`);
+    for (const r of cashRows){
+      assert(r.color === YELLOW, `  노란색이다 — ${r.tx} (${r.color})`);
+      assert(/^₩/.test(r.tx), `  ₩ 로 시작한다 — ${r.tx}`);
+      assert(!/원/.test(r.tx), `  '원' 이 안 붙는다 — ${r.tx}`);
+    }
+
+    // 스킨 값도 같이 바뀌어야 한다 (같은 문구 열쇠를 쓴다)
+    assert(await tab('스킨'), '  일반 · 스킨 칸을 열었다');
+    await p.waitForSelector('.screen.shop .shop-card-foot .pr', { timeout: 10000 });
+    await wait(600);
+    const skin = await prices('.shop-card .shop-card-foot .pr');
+    assert(skin.length > 0 && /^₩/.test(skin[0].tx), `  스킨 값도 ₩ 다 (${skin[0] && skin[0].tx})`);
+  }
+
   console.log('한 벌 사면 문구가 사라진다');
   {
     assert(await openShop(393, 'ko'), '  상점이 열린다');

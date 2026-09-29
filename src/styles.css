@@ -1200,6 +1200,9 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   white-space:nowrap;overflow:hidden}
 .money-row .nm,
 .money-row .pr{font-size:14px;white-space:nowrap}
+/* [stated] **값은 노란색.** 스킨·아레나 칸(`.shop-card-foot .pr`)은 노란데 재화 줄만
+   흰색이라 혼자 튀었다 — 코인·일반 네 줄 모두 같게 한다 */
+.money-row .pr{color:#ffd34d}
 /* [stated] **축구 티켓도 일반 티켓과 같은 크기로** (예전엔 70px 라 혼자 컸다).
    `.tk-ico.soc` 가 `flex-basis` 로 1.55배를 박아 두므로 여기서 **같이 덮어야** 한다 */
 .money-row .tk-ico,

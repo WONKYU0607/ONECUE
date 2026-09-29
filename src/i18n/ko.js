@@ -347,7 +347,7 @@ export default {
   'arena.set': '아레나 5종 세트',
   'shop.noadsName': '광고 제거',
   'cost.arena': '아레나 (칼전)',
-  'shop.price': '{p}원',
+  'shop.price': '₩{p}',
   'shop.tkName': '일반 티켓 1장',
   'shop.tkSoc': '축구 티켓 1장',
   'shop.tkName3': '일반 티켓 3장',

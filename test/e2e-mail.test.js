@@ -110,6 +110,26 @@ try {
       }, label);
       assert(ok, `  [${label}] 를 눌렀다`);
     };
+    // [stated] "우편함에 메일 오면 버튼 오른쪽에 빨간 원으로 알림 뜸?" — 뜬다. 확인한다
+    const dot = () => p.evaluate(() => {
+      const el = document.querySelector('.home-row .cost-entry.m');
+      if (!el) return null;
+      const on = el.classList.contains('dot');
+      const a = getComputedStyle(el, '::after');
+      const r = el.getBoundingClientRect();
+      return { on, bg: a.backgroundColor, w: a.width, right: a.right,
+               round: a.borderTopLeftRadius, box: Math.round(r.width) };
+    });
+    {
+      // 값은 서버에서 받아 오므로 **바로는 안 뜬다** — 붙을 때까지 기다린다
+      let d = null;
+      for (let i = 0; i < 40; i++){ d = await dot(); if (d && d.on) break; await wait(300); }
+      assert(d && d.on, '  우편함 버튼에 빨간 점이 붙는다');
+      assert(d.bg === 'rgb(255, 90, 78)', `  빨간색이다 (${d.bg})`);
+      assert(d.round === '50%', `  동그랗다 (${d.round})`);
+      assert(d.right === '2px', `  버튼 오른쪽 끝이다 (${d.right})`);
+    }
+
     await tap('우편함');
     await p.waitForSelector('.screen.mailbox', { timeout: 20000 });
     await wait(1500);
@@ -137,6 +157,16 @@ try {
     const after = await coinTag();
     assert(after === before + mailCoin, `  위쪽 코인이 올랐다 (${before} → ${after})`);
     assert(/받을 우편이 없습니다/.test(txt), '  받은 줄은 목록에서 사라졌다');
+
+    // 다 받으면 홈의 빨간 점도 사라진다
+    await p.evaluate(() => {
+      const el = [...document.querySelectorAll('.mailbox .icon-btn')][0];
+      if (el) el.click();
+    });
+    await p.waitForSelector('.home-row .cost-entry.m', { timeout: 20000 });
+    await wait(1200);
+    const d2 = await dot();
+    assert(d2 && !d2.on, '  다 받으면 점이 사라진다');
   }
 
   console.log('실패했을 때 알리는 길은 남아 있다');
