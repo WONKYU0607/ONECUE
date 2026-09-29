@@ -53,8 +53,10 @@ export default function SettingsModal({ onClose, onTuto }){
           <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </header>
         {/* [stated] **튜토리얼 다시 하기** — 처음 켤 때만 묻지만 여기서 언제든 다시 */}
-        <button className="menu-btn sm tuto-again" onClick={() => { resetTuto(); onClose?.(); onTuto?.(); }}>
-          <span className="t">{t('tuto.again')}</span>
+        {/* [stated] **금속 틀을 쓰지 않는다** — 설정창 안의 다른 것들(언어 고르기 등)과 같은
+            평범한 버튼으로. 틀은 홈 큰 버튼에만 쓴다 */}
+        <button className="plain-btn tuto-again" onClick={() => { resetTuto(); onClose?.(); onTuto?.(); }}>
+          {t('tuto.again')}
         </button>
         {ROWS.map(k => (
           <div key={k}>

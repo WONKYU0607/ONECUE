@@ -115,8 +115,8 @@ export default function ProfileTab({ onClose, onFriends }){
               <input className="code-input nick-input" value={draft}
                      autoFocus onChange={e => setDraft(clampNick(e.target.value))}
                      onKeyDown={e => e.key === 'Enter' && save()} />
-              <button className="menu-btn primary" disabled={nickBusy} onClick={save}>
-                <span className="t">{t('common.ok')}</span>
+              <button className="plain-btn" disabled={nickBusy} onClick={save}>
+                {t('common.ok')}
               </button>
             </div>
           ) : (
@@ -166,8 +166,8 @@ export default function ProfileTab({ onClose, onFriends }){
             </>
           ) : (
             <>
-              <button className="menu-btn small" disabled={busy} onClick={doLink}>
-                <span className="t">{busy ? t('acc.busy') : t('acc.google')}</span>
+              <button className="plain-btn" disabled={busy} onClick={doLink}>
+                {busy ? t('acc.busy') : t('acc.google')}
               </button>
               <span className="acc-why">{accMsg || t('acc.why')}</span>
             </>
@@ -177,7 +177,8 @@ export default function ProfileTab({ onClose, onFriends }){
         {/* [stated] "색 고르고 **확인** 누르면" — 고르는 순간 이미 저장되고 사진도 바뀐다.
             누르는 즉시 반영해야 고른 게 맞는지 눈으로 보고 닫을 수 있다 */}
         <div className="prof-foot">
-          <button className="menu-btn" onClick={onClose}><span className="t">{t('common.ok')}</span></button>
+          {/* [stated] 금속 틀 대신 평범한 버튼으로 (프로필창 안의 다른 것들과 맞춘다) */}
+          <button className="plain-btn ok" onClick={onClose}>{t('common.ok')}</button>
         </div>
 
         {/* [stated] **로그아웃은 프로필 맨 밑.** 다른 계정으로 바꾸려면 있어야 한다.

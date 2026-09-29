@@ -556,8 +556,17 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .kbprobe .kb-at{color:#789;font-weight:400}
 
 /* [stated] 설정의 '튜토리얼 다시 하기' — 다른 줄과 어울리게 작게 */
-.tuto-again{min-height:32px;padding:4px 10px;margin-bottom:4px}
-.tuto-again .t{font-size:12px}
+/* [stated] **금속 틀을 쓰지 않는 평범한 버튼.** 설정창·프로필창 안에서는 이걸 쓴다 —
+   틀(`.menu-btn`)은 테두리가 15/17px 이라 작은 창 안에서 혼자 튄다 */
+.plain-btn{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;
+  padding:6px 14px;border-radius:3px;
+  font:900 13px/1.2 var(--gf);letter-spacing:1px;color:#cfe4ff;
+  background:rgba(20,34,52,.9);border:1px solid rgba(110,170,220,.5)}
+.plain-btn:active{background:rgba(40,110,180,.9);color:#fff}
+.plain-btn:disabled{opacity:.45;cursor:default}
+/* 프로필창의 [확인] 은 가운데에 조금 크게 */
+.plain-btn.ok{display:block;margin:12px auto 2px;min-width:110px;font-size:15px;padding:8px 20px}
+.tuto-again{margin:8px 0 4px 14px;font-size:12px}
 
 /* [stated] 설정의 음량 바 — 켜고 끄는 줄 바로 아래 */
 .vol-row{display:flex;align-items:center;gap:10px;padding:0 14px 10px 14px}
@@ -1025,7 +1034,9 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
    글씨는 PVP 버튼처럼 **찐한 흰색**, 테두리는 눈에 띄게 */
 /* 순위표가 화면 위에 **절대 위치로 떠 있어서** 코스튬 칸도 같은 방식으로 그 밑에 붙인다.
    왼쪽 끝에 맞추면 **총격전 순위표 바로 밑**이 된다 */
-/* [stated] **퀘스트 · 우편함 · 코스튬 한 줄.** 셋이 순위표 밑에 나란히, 불빛도 같다.
+/* [stated] **퀘스트 · 우편함 · 코스튬 한 줄.** 셋이 순위표 밑에 나란히.
+   [stated] **셋 다 빛 안 나는 박스로** — 예전엔 코스튬만 빛나서 셋을 맞춰 달라고 했는데
+   빛나는 쪽으로 맞췄었다. 빛(글씨 번짐·안쪽 그림자)을 뺀다
    순위표가 화면 위에 절대 위치로 떠 있어서 이 줄도 같은 방식으로 그 밑에 붙인다 */
 .home-row{position:absolute;z-index:24;display:flex;
   left:calc(var(--h-barX,0) * var(--u));
@@ -1036,11 +1047,9 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   display:flex;align-items:center;justify-content:center;gap:5px;
   padding:5px 0;
   font:900 13px/1 var(--gf);color:#fff;letter-spacing:1px;
-  -webkit-text-stroke:0.5px rgba(255,255,255,.5);
-  text-shadow:0 0 8px rgba(110,200,255,.5), 0 2px 3px rgba(0,0,0,.8);
+  text-shadow:0 2px 3px rgba(0,0,0,.8);
   background:rgba(20,40,66,.95);
-  border:1px solid #7fd2ff;border-radius:3px;
-  box-shadow:0 0 8px rgba(110,200,255,.35) inset;cursor:pointer}
+  border:1px solid #7fd2ff;border-radius:3px;cursor:pointer}
 /* 퀘스트·우편함은 글씨 앞에 그림을 단다 */
 .cost-entry.ic::before{content:'';width:16px;height:16px;flex:0 0 auto;
   background:var(--icq) center/contain no-repeat;image-rendering:pixelated}
@@ -1181,8 +1190,10 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   white-space:nowrap;overflow:hidden}
 .money-row .nm,
 .money-row .pr{font-size:14px;white-space:nowrap}
-.money-row .tk-ico{flex:0 0 auto;width:46px;height:34px}
-.money-row .tk-ico.soc{width:70px}
+/* [stated] **축구 티켓도 일반 티켓과 같은 크기로** (예전엔 70px 라 혼자 컸다).
+   `.tk-ico.soc` 가 `flex-basis` 로 1.55배를 박아 두므로 여기서 **같이 덮어야** 한다 */
+.money-row .tk-ico,
+.money-row .tk-ico.soc{flex:0 0 46px;width:46px;height:34px}
 .money-row .shop-btn{flex:0 0 auto;margin-left:auto}
 
 /* 상점 — 코인 잔액과 안내 문구 한 줄 */
