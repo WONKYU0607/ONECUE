@@ -939,7 +939,17 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 
 /* [stated] 상점 머리: 제목 없이 **뒤로 버튼만 우상단에 작게**.
    `.menu-btn` 은 min-height 58px + 금속 틀이라 상점에는 너무 크다 → 틀 없는 작은 버튼 */
-.shop-head{width:100%;display:flex;justify-content:flex-end;padding:5px 8px 2px}
+.shop-head{width:100%;display:flex;align-items:center;gap:7px;
+  justify-content:flex-end;padding:5px 8px 2px}
+/* [stated] **코인은 좌상단, 뒤로는 우상단.** 코스튬 화면도 같은 `.shop-head` 를 쓰는데
+   거기엔 뒤로 버튼만 있다 → `justify-content` 를 그대로 두고 **코인 오른쪽에 남은 자리를 몰아**
+   가른다 (그래야 코스튬 쪽은 지금처럼 뒤로 버튼만 오른쪽에 남는다) */
+.shop-head .coin-tag{flex:0 0 auto;margin-right:auto}
+/* 첫 구매 할인·구매 결과 문구 — **코인 바로 아래 한 줄.**
+   코인 옆에 붙였더니 영어가 360px 폰에서 잘렸다 → 한 줄을 다 쓴다 */
+.shop-first{width:100%;padding:0 8px 3px;
+  font:700 10px/1.3 var(--gf);color:#ffd873;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .shop-btn{flex:0 0 auto;min-width:0;padding:4px 12px;font:900 12px/1.2 var(--gf);
   color:#cfe4ff;background:rgba(20,34,52,.9);border:1px solid rgba(90,140,190,.5);
   border-radius:3px;cursor:pointer}
@@ -1196,10 +1206,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .money-row .tk-ico.soc{flex:0 0 46px;width:46px;height:34px}
 .money-row .shop-btn{flex:0 0 auto;margin-left:auto}
 
-/* 상점 — 코인 잔액과 안내 문구 한 줄 */
-.shop-note{display:flex;align-items:center;gap:8px;margin:4px 0 6px;min-width:0}
-.shop-note .tx{flex:1;min-width:0;font:700 11px/1.3 var(--gf);color:#9fb0c8;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* [stated] 퀘스트·우편함 아이콘 (마젠타 배경을 지우고 뽑았다).
    그림 주소는 main.jsx 가 넣는다 — CSS 에 직접 적으면 `assets/assets/…` 를 찾는다 */
 .room-btn.ic{display:flex;align-items:center;justify-content:center;gap:5px}

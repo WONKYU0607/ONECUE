@@ -30,7 +30,9 @@ export default function Mailbox({ onBack }){
     if (busy) return;
     setBusy(true); setMsg('');
     const r = await claimMail(id);
-    if (r && r.ok){ setMsg(t('q.got', { n: r.coin })); setCoin(r.total, (r.mail || []).length); }
+    // [stated] **"N 코인을 받았습니다" 알림은 안 띄운다.** 위쪽 코인 숫자가 바로 오르고
+    // 받은 줄은 목록에서 사라지므로 그걸로 충분하다. 실패했을 때만 알린다
+    if (r && r.ok) setCoin(r.total, (r.mail || []).length);
     else setMsg(t('q.fail'));
     await load();
   };

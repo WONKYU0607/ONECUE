@@ -15,7 +15,7 @@ import { buySkin, buyTicket, refreshCoin, coinNow, onCoin } from '../../state/qu
 import { SKIN_COST, SKIN_FIRST_OFF, TICKET_COST, BUY_TK_MAX, BUY_SOC_MAX } from '../../state/quests.js';
 import { SOCCER_SKINS, SOCCER_SET, PREV_IMG, PREV_FW, PREV_FH, PREV_COLS, PREV_ROWS_N,
   PREV_LINES, GUN_SKINS, GUN_SET, GUN_PREV_IMG, GUN_PREV_FW, GUN_PREV_FH, GUN_PREV_COLS,
-  GUN_PREV_ROWS_N, GUN_PREV_LINES, MELEE_SKINS, MELEE_SET, MELEE_ARENAS, ARENA_SET, NOADS, MEL_PREV_IMG, MEL_PREV_FW,
+  GUN_PREV_ROWS_N, GUN_PREV_LINES, MELEE_SKINS, MELEE_SET, MELEE_ARENAS, ARENA_SET, NOADS, TICKET_PACKS, MEL_PREV_IMG, MEL_PREV_FW,
   MEL_PREV_FH, MEL_PREV_COLS, MEL_PREV_ROWS_N, MEL_PREV_LINES } from '../../game/skins.js';
 
 // 종목마다 미리보기 시트가 다르다. 한 곳에 모아 두고 하위 탭으로 고른다.
@@ -214,8 +214,18 @@ export default function Shop({ onBack }){
       {/* [stated] 제목은 빼고, 뒤로 버튼을 **우상단에 작게**.
           탭만으로 어느 화면인지 알 수 있어 제목이 자리를 낭비했다 */}
       <div className="shop-head">
+        {/* [stated] **코인은 좌상단.** 예전엔 탭 밑 한가운데 떠 있어서 눈에 안 들어왔다 */}
+        {pay === 'coin' && <span className="coin-tag">{coin.toLocaleString()}</span>}
         <button className="shop-btn" onClick={onBack}>{t('common.back')}</button>
       </div>
+
+      {/* [stated] **첫 구매 50% 할인 문구도 같이 위로**, 그리고 **한 번 사면 사라진다** —
+          `bought` 는 서버가 세는 구매 횟수라 화면을 껐다 켜도 안 되살아난다.
+          코인 **바로 아래 한 줄**로 둔다: 코인 옆에 붙이면 영어(`50% off your first coin
+          purchase`)가 360px 폰에서 잘렸다. 구매 결과(`note`)도 같은 자리에 뜬다 */}
+      {pay === 'coin' && (note || bought === 0) && (
+        <div className="shop-first">{note || t('shop.first50')}</div>
+      )}
 
       {/* [stated] **코인 / 일반** — 맨 위. 어느 쪽이냐에 따라 아래 갈래가 달라진다 */}
       <div className="shop-tabs pay">
@@ -245,14 +255,6 @@ export default function Shop({ onBack }){
             <button key={k} className={'shop-btn' + (sub === k ? ' on' : '')}
                     onClick={() => { setSub(k); rewind(); }}>{subLabel[k]}</button>
           ))}
-        </div>
-      )}
-
-      {/* [stated] 코인 쪽에서는 **잔액을 늘 보여준다**. 스킨 칸에서는 첫 구매 할인도 같이 */}
-      {pay === 'coin' && (
-        <div className="shop-note">
-          <span className="coin-tag">{coin.toLocaleString()}</span>
-          <span className="tx">{note || (tab === 'skin' ? t('shop.first50') : '')}</span>
         </div>
       )}
 
@@ -451,6 +453,23 @@ export default function Shop({ onBack }){
                 </span>
                 <button className="shop-btn" disabled={busy || tkLeft(soc) <= 0}
                         onClick={() => takeTicket(soc)}>{t('shop.coinBuy')}</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : tab === 'money' ? (
+        // [stated] **재화 — 결제로 티켓 묶음 사기.** 3장에 300원.
+        // 결제가 붙기 전이라 광고 제거와 같이 보여주기만 한다
+        <div className="shop-wrap">
+          <div className="shop-list money">
+            {TICKET_PACKS.map(p2 => (
+              <div key={p2.id} className="shop-card-in money-row">
+                <i className={'tk-ico' + (p2.soccer ? ' soc' : '')} />
+                <span className="money-nm">
+                  <span className="nm">{t(p2.key)}</span>
+                  <span className="pr">{t('shop.price', { p: p2.price.toLocaleString() })}</span>
+                </span>
+                <button className="shop-btn" disabled>{t('shop.soon')}</button>
               </div>
             ))}
           </div>
