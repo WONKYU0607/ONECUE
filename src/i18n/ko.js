@@ -350,6 +350,8 @@ export default {
   'shop.price': '{p}원',
   'shop.tkName': '일반 티켓 1장',
   'shop.tkSoc': '축구 티켓 1장',
+  'shop.tkName3': '일반 티켓 3장',
+  'shop.tkSoc3': '축구 티켓 3장',
   'shop.capped': '오늘은 더 살 수 없습니다',
   'shop.soon': '준비 중',
   'cost.on': '장착',

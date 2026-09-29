@@ -350,6 +350,8 @@ export default {
   'shop.price': '₩{p}',
   'shop.tkName': 'Ticket x1',
   'shop.tkSoc': 'Soccer Ticket x1',
+  'shop.tkName3': 'Ticket x3',
+  'shop.tkSoc3': 'Soccer Ticket x3',
   'shop.capped': 'Daily limit reached',
   'shop.soon': 'Coming soon',
   'cost.on': 'Equip',

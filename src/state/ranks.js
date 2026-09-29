@@ -24,6 +24,31 @@ const CACHE_MS = 60 * 1000;
 const cache = { gun: null, melee: null, soccer: null };   // { at, my, list, err }
 const inflight = { gun: null, melee: null, soccer: null };
 
+// [stated] **앱을 껐다 켜면 등수가 '불러오는 중' 으로만 남았다** — 서버가 자고 있으면
+// 영영 안 나온다. 서버가 마지막으로 알려준 **내 등수만** 기기에 적어 두고 켜자마자 보여준다.
+// 상위 30명 목록은 안 적는다 (크고, 화면을 열 때 어차피 다시 받는다).
+// 적어 둔 값은 서버 답이 오면 덮어쓴다 — 값 한 개만 들고 있는다
+const RKEY = 'duel.rank.v1';
+function loadSaved(){
+  try {
+    const v = JSON.parse(localStorage.getItem(RKEY) || 'null');
+    if (!v || typeof v !== 'object') return;
+    for (const k of KINDS){
+      const my = v[k];
+      if (my && typeof my.rank === 'number')
+        cache[k] = { at: 0, my, list: [], err: false, old: true };   // `at:0` 이라 곧 다시 받는다
+    }
+  } catch { /* 무시 */ }
+}
+function saveMine(){
+  try {
+    const out = {};
+    for (const k of KINDS) if (cache[k] && cache[k].my) out[k] = cache[k].my;
+    localStorage.setItem(RKEY, JSON.stringify(out));
+  } catch { /* 무시 */ }
+}
+loadSaved();
+
 const empty = () => ({ my: null, list: [] });
 /** 못 받았다는 표시. `null`(기록 없음)과 구분한다 */
 export const ERR = Object.freeze({ err: true });
@@ -68,9 +93,10 @@ export function loadRank(kindRaw, force = false){
     .then(([my, list]) => {
       const bad = my === ERR;
       const v = { at: Date.now(), my: bad ? null : my, list, err: bad };
-      // **못 받은 값은 오래 붙들지 않는다** — 서버가 깨면 곧 다시 받아야 한다
-      cache[kind] = bad ? null : v;
-      return v;
+      // **못 받았으면 적어 둔 값을 그대로 둔다** — 서버가 자고 있을 뿐인데
+      // 지우면 화면이 '불러오는 중' 으로 되돌아간다
+      if (!bad){ cache[kind] = v; saveMine(); }
+      return bad && cache[kind] ? cache[kind] : v;
     })
     .catch(() => ({ at: Date.now(), ...empty() }))
     .finally(() => { inflight[kind] = null; });

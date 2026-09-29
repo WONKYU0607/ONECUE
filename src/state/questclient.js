@@ -56,10 +56,28 @@ export const buyTicket = (soccer = false) =>
   ask({ act: 'buy', what: 'ticket', soccer: soccer ? '1' : '0' });
 
 // ── 코인 잔액 (화면 여기저기가 본다) ─────────────────────────────
-let coin = 0;
-let mailN = 0;
+//
+// [stated] **앱을 켜면 서버가 자고 있어 코인이 0으로 보였다.** 그러면 게임할 맛이 안 난다.
+// → 서버가 마지막으로 알려준 값을 기기에 적어 두고, 켜자마자 그걸 보여준다.
+//   값 **한 개**만 들고 있다가 서버 답이 오면 덮어쓴다 (기록을 쌓는 게 아니다).
+//   한 번도 받은 적이 없으면 `null` — 화면은 0 대신 '—' 로 그린다.
+// 살 때 판정은 서버가 하므로, 적어 둔 값이 잠깐 틀려도 실제로 더 사지지는 않는다.
+const CKEY = 'duel.coin.v1';
+function readCoin(){
+  try {
+    const v = JSON.parse(localStorage.getItem(CKEY) || 'null');
+    if (!v || typeof v.c !== 'number') return null;
+    return { c: Math.max(0, v.c | 0), m: Math.max(0, v.m | 0) };
+  } catch { return null; }
+}
+const saved = readCoin();
+let coin = saved ? saved.c : 0;
+let mailN = saved ? saved.m : 0;
+/** 서버에게 한 번이라도 받았는가 (기기에 적힌 것 포함). 안 받았으면 화면이 '—' 를 그린다 */
+let known = !!saved;
 const watchers = new Set();
 export const coinNow = () => coin;
+export const coinKnown = () => known;
 export const mailCount = () => mailN;
 /** 잔액이 바뀌면 불린다. 지우려면 돌려받은 함수를 부른다 */
 export function onCoin(fn){ watchers.add(fn); return () => watchers.delete(fn); }
@@ -67,7 +85,10 @@ function tell(){ for (const f of watchers) { try { f(coin, mailN); } catch { /* 
 export function setCoin(v, mail){
   const c = Math.max(0, v | 0);
   const m = mail == null ? mailN : (mail | 0);
-  if (c === coin && m === mailN) return;
+  const first = !known;
+  known = true;
+  try { localStorage.setItem(CKEY, JSON.stringify({ c, m })); } catch { /* 무시 */ }
+  if (c === coin && m === mailN && !first) return;
   coin = c; mailN = m; tell();
 }
 

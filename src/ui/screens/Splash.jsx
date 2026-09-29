@@ -22,6 +22,15 @@ export default function Splash({ onDone }){
   const [ready, setReady] = useState(false);
   const [ko] = useState(isKorean);
 
+  // [stated] **앱을 켜는 순간 서버를 깨우기 시작한다.** 자산 받는 동안 뒤에서 깬다.
+  // 화면을 막지 않는다 — 실패해도 진입에는 아무 영향이 없다.
+  // 묶음을 무겁게 하지 않으려고 늦게 들여온다 (`connection.js` 는 게임 쪽 묶음이다)
+  useEffect(() => {
+    import('../../net/connection.js')
+      .then(m => m.startWaking())
+      .catch(() => { /* 무시 */ });
+  }, []);
+
   useEffect(() => {
     let alive = true;
     const t0 = performance.now();

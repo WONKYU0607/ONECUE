@@ -138,6 +138,13 @@ export const arenaFloorOf = key => ARENA_FLOOR[key] || null;
 export const NOADS = { id: 'noads', key: 'shop.noadsName', sku: 'no_ads', price: 4900,
   img: 'assets/noads.webp' };
 
+// [stated] **결제로 사는 티켓 묶음 — 3장에 300원.** 코인 쪽(한 장 500코인)과 별개 상품이다.
+// 결제가 붙기 전이라 상점에는 보여주기만 한다 (광고 제거와 같다)
+export const TICKET_PACKS = [
+  { id: 'tk3',  key: 'shop.tkName3', sku: 'ticket_3',     price: 300, n: 3, soccer: false },
+  { id: 'soc3', key: 'shop.tkSoc3',  sku: 'ticket_soc_3', price: 300, n: 3, soccer: true }
+];
+
 // ── [stated] 코인으로 사는 스킨 ────────────────────────────────
 // **종목당 3종.** 퀘스트로 모은 코인으로만 산다 — 결제 상품(위의 5종)과 **겹치지 않게**
 // 따로 둔다. 겹치면 돈 주고 살 이유가 없어진다.

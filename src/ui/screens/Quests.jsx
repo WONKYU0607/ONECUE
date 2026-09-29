@@ -20,7 +20,6 @@ export default function Quests({ onBack }){
   const [tab, setTab] = useState('d');
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(true);
-  const [msg, setMsg] = useState('');
   // [stated] 접속 시간은 **창을 보고 있는 동안 초 단위로 올라간다**.
   // 서버에는 1분마다 몰아서 보내므로, 그 사이는 이번에 켠 뒤 쌓인 초를 더해 보여준다
   const [, tickNow] = useState(0);
@@ -48,10 +47,10 @@ export default function Quests({ onBack }){
   // 받을 자격은 서버가 다시 판정한다
   const take = async id => {
     if (busy) return;
-    setBusy(true); setMsg('');
+    setBusy(true);
+    // [stated] **"N 코인을 받았습니다" 알림은 안 띄운다.** 코인 숫자와 [받음] 표시로 충분하다
     const r = await claimQuest(tab, id);
-    if (r && r.ok){ setMsg(t('q.got', { n: r.coin })); setCoin(r.total); }
-    else setMsg(t('q.fail'));
+    if (r && r.ok) setCoin(r.total);
     await load();
   };
 
@@ -74,7 +73,7 @@ export default function Quests({ onBack }){
       <div className="q-tabs">
         {TABS.map(([k, label]) => (
           <button key={k} className={'room-btn' + (tab === k ? ' on' : '')}
-                  onClick={() => { setTab(k); setMsg(''); }}>
+                  onClick={() => setTab(k)}>
             <span className="t">{t(label)}</span>
           </button>
         ))}
@@ -115,7 +114,6 @@ export default function Quests({ onBack }){
         })()}
       </div>
 
-      {msg && <p className="res-wait">{msg}</p>}
       </div>
     </div>
   );

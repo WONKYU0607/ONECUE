@@ -65,10 +65,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 순위표가 잠든 서버에 대고 헛되이 두드리는 대신 여기서 알려주면 한 번에 받는다
 const wakeWaiters = [];
 let awake = false;
-/** 서버가 깨면 한 번 불린다. 이미 깨어 있으면 즉시 부른다 */
+/** 서버가 깨면 한 번 불린다. 이미 깨어 있으면 즉시 부른다.
+ *  **그만 듣겠다는 함수를 돌려준다** — 화면이 사라진 뒤에도 남아 있으면 안 된다 */
 export function onServerAwake(fn){
-  if (awake){ try { fn(); } catch { /* 무시 */ } return; }
+  if (awake){ try { fn(); } catch { /* 무시 */ } return () => {}; }
   wakeWaiters.push(fn);
+  return () => {
+    const i = wakeWaiters.indexOf(fn);
+    if (i >= 0) wakeWaiters.splice(i, 1);
+  };
 }
 function markAwake(){
   if (awake) return;
@@ -91,6 +96,25 @@ export async function wakeServer(timeoutMs = 9000){
   } finally {
     clearTimeout(timer);
   }
+}
+
+// [stated] **앱을 켜는 순간 뒤에서 깨운다.** 예전엔 PVP 를 눌러야 깨우기가 시작돼서,
+// 그 전까지 홈은 코인·등수를 못 받고 그대로 굳어 있었다.
+// 화면을 막지 않는다 — 깨어나면 `onServerAwake` 가 울려서 각자 다시 받아 간다.
+// 무료 서버가 깨는 데 1분쯤 걸리므로 넉넉히 두드린다 (9초 제한 + 4초 쉼 x 10)
+let waking = null;
+export function startWaking(tries = 10, gapMs = 4000){
+  if (awake) return Promise.resolve(true);
+  if (waking) return waking;              // 여러 화면이 불러도 한 번만 돈다
+  waking = (async () => {
+    for (let i = 0; i < tries; i++){
+      if (await wakeServer()) return true;
+      if (awake) return true;
+      await sleep(gapMs);
+    }
+    return false;
+  })().finally(() => { waking = null; });
+  return waking;
 }
 
 function openOnce(transport){

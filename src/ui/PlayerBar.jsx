@@ -5,7 +5,7 @@ import { getNick, avatarPos } from '../state/profile.js';
 import { scoreOf, ticketsLeft, nextTicketIn, fmtLeft } from '../state/tickets.js';
 import { fitBar } from '../state/homeLayout.js';
 import { getSettings, setSetting } from '../state/settings.js';
-import { coinNow, onCoin, refreshCoin } from '../state/questclient.js';
+import { coinNow, coinKnown, onCoin, refreshCoin } from '../state/questclient.js';
 import { playMusic, stopMusic, unlockAudio } from '../game/audio.js';
 import { t } from '../i18n/index.js';
 
@@ -27,20 +27,26 @@ export default function PlayerBar({ onSettings, onFriends }){
   });
   // [stated] 티켓은 서버가 쥔다 → **화면을 켤 때 서버 값으로 맞춘다.**
   // 판이 끝나고 돌아올 때도 다시 받아야 방금 깎인 게 반영된다
+  // [stated] **서버가 깨면 다시 받는다.** 예전엔 화면을 켤 때 한 번 두드려 보고 끝이라,
+  // 자고 있으면 코인 0 · 티켓 기기값으로 굳은 채 영영 안 고쳐졌다 (순위표는 이미 이 방식이다)
+  const [coin, setCoin] = useState(coinNow());
+  const [known, setKnown] = useState(coinKnown());
   useEffect(() => {
     let live = true;
-    import('../state/friends.js')
-      .then(m => m.pullTickets())
-      .then(ok => { if (ok && live) tick(v => v + 1); })
+    const pull = () => {
+      import('../state/friends.js')
+        .then(m => m.pullTickets())
+        .then(ok => { if (ok && live) tick(v => v + 1); })
+        .catch(() => {});
+      refreshCoin().then(() => { if (live) setKnown(coinKnown()); }).catch(() => {});
+    };
+    const off = onCoin(c => { setCoin(c); setKnown(true); });
+    pull();                                    // 서버가 깨어 있으면 바로 들어온다
+    let offWake = null;
+    import('../net/connection.js')
+      .then(m => { if (live) offWake = m.onServerAwake(() => { if (live) pull(); }); })
       .catch(() => {});
-    return () => { live = false; };
-  }, []);
-  // [stated] 코인 잔액. 서버가 쥔 값이라 화면을 켤 때 받아 오고, 바뀌면 다시 그린다
-  const [coin, setCoin] = useState(coinNow());
-  useEffect(() => {
-    const off = onCoin(c => setCoin(c));
-    refreshCoin().catch(() => {});   // 서버가 자고 있어도 화면은 떠야 한다
-    return off;
+    return () => { live = false; off(); if (offWake) offWake(); };
   }, []);
 
   const wait = nextTicketIn();
@@ -76,7 +82,7 @@ export default function PlayerBar({ onSettings, onFriends }){
         {/* [stated] **코인은 티켓 옆 빈자리에.** 예전엔 홈 가운데에 따로 떠 있었다 */}
         <span className="pcell pcoin">
           <i className="coin-ico" />
-          <b>{coin.toLocaleString()}</b>
+          <b>{known ? coin.toLocaleString() : '—'}</b>
         </span>
 
         {/* 오른쪽 빈 자리에 붙인다. 예전엔 상단바 아래에 따로 떠 있었다 */}
