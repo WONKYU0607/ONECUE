@@ -1,6 +1,6 @@
 import {
-  FP, SELF, NET, TUNE, setArena,
-  stepCap, bulletFP, coolTicks, clampi, BUFF, BUFF_DEF, FAST_MUL, assignColors, MAXHP
+  FP, SELF, NET, setArena,
+  stepCap, bulletFP, coolTicks, BUFF, BUFF_DEF, FAST_MUL, assignColors, MAXHP
 } from './config.js';
 import { Loopback, Server, Client } from './net.js';
 import { createRenderer } from './render.js';
@@ -55,7 +55,7 @@ export function createGame(canvas, opts = {}){
   const nLocal = vsAll ? 3
     : ((!online && [3, 4, 5, 6].includes(session.n)) ? session.n : 2);
   // 칼전 여부: 로컬은 session, 온라인은 서버가 hello로 알려준 값
-  const isMelee = session.kind === 'melee' || (online ? !!SELF.melee : !!session.melee);
+  const isMelee = online ? !!SELF.melee : !!session.melee;
   // 축구는 온라인이면 서버가 hello 로 알려주고, 로컬이면 세션에 실려 온다
   const isSoccer = online ? !!SELF.soccer : !!session.soccer;
   const practice0 = !online && session.kind === 'practice';
@@ -728,14 +728,6 @@ export function createGame(canvas, opts = {}){
       let go = 0, placed = 0;
       for (let i = 0; i < n; i++){ if (r[i]) go++; if (d[i]) placed++; }
       return { go, placed, n, meDone: !!d[SELF.slot], meGo: !!r[SELF.slot] };
-    },
-    applyCfg,
-    // 튜닝값 한 칸 조절 (UI 버튼용)
-    bump(k, dir){
-      const t = TUNE[k], dec = t.inc < 1 ? (t.inc < 0.1 ? 100 : 10) : 1;
-      t.v = Math.round(clampi(t.v + dir * t.inc, t.min, t.max) * dec) / dec;
-      applyCfg();
-      return t.v;
     },
     start(){   // START 버튼: fire 비트를 시작 신호로 씀
       for (const pid of client.controlled) client.input(pid, 0, 0, 1);

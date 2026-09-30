@@ -26,9 +26,13 @@ export default function CoinRow({ onQuests, onMail, onCostume }){
 
   return (
     <div className="home-row">
-      <button className={'cost-entry ic q' + (quest ? ' dot' : '')} onClick={onQuests}>{t('home.quest')}</button>
+      {/* [stated] 빨간 점은 **글자 바로 오른쪽 위**에 붙인다 — 칸 오른쪽 끝에 있으면 너무 멀었다.
+          그래서 글자를 따로 감싼다 (점이 칸이 아니라 글자를 따라간다) */}
+      <button className={'cost-entry ic q' + (quest ? ' dot' : '')} onClick={onQuests}>
+        <span className="ce-t">{t('home.quest')}</span>
+      </button>
       <button className={'cost-entry ic m' + (mail > 0 ? ' dot' : '')} onClick={onMail}>
-        {t('home.mail')}
+        <span className="ce-t">{t('home.mail')}</span>
       </button>
       <button className="cost-entry" onClick={onCostume}>{t('cost.title')}</button>
     </div>

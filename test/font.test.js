@@ -7,8 +7,8 @@ import { fileURLToPath } from 'url';
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const css = fs.readFileSync('src/styles.css', 'utf8');
 
-// 조절 패널(.tune)은 개발용 도구라 숫자 정렬이 중요해 monospace를 남겨둔다
-const ALLOW = ['.tune'];
+// (예전엔 개발용 조절 패널(.tune)만 monospace 를 허용했는데, 패널을 없애 이제 예외가 없다)
+const ALLOW = [];
 const lines = css.split('\n');
 let block = '';
 const bad = [];

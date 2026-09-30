@@ -138,11 +138,12 @@ console.log('두 길이 따로 있다');
   // 옛 화면은 지웠다
   assert(!fs.existsSync('src/ui/screens/Matching.jsx'), '  갈래를 나누던 옛 화면은 없앴다');
   const app = fs.readFileSync('src/App.jsx', 'utf8');
-  assert(/screen === 'entering'/.test(app), '  방 접속 화면이 따로 있다');
-  // [stated] 빠른 매칭은 **로딩 화면 없이 홈에서** 찾는다 — 방만 접속 화면으로 간다
-  assert(/setScreen\('entering'\)/.test(app) && /setSearch\(\{ stage: 'waking'/.test(app),
-    '  시작할 때 길이 갈린다');
+  // [stated] **로딩 화면이 없다** — 빠른 매칭도 방도 홈에서 접속하고, 길은 컴포넌트에서 갈린다
+  assert(!/'entering'/.test(app), '  방 접속 화면(entering)은 없다');
   assert(!/screen === 'matching'/.test(app), '  빠른 매칭 로딩 화면은 없다');
+  assert(/<QuickMatch/.test(app) && /session\?\.mode === 'queue'/.test(app), '  빠른 매칭은 QuickMatch');
+  assert(/<RoomEnter/.test(app) && /isRoomMode\(session\)/.test(app), '  방은 RoomEnter');
+  assert(/return null;/.test(r), '  방 접속은 화면을 안 그린다 (친구 대전 칸이 상태를 보여준다)');
 }
 
 // [stated] **빠른 매칭의 '다시 하기' 는 새 상대를 찾는다.**

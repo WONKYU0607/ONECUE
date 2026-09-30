@@ -35,9 +35,9 @@ for (let i = 0; i < 40; i++){ try { if ((await fetch(`http://127.0.0.1:${VP}/src
 const api = (u, q = '') => fetch(`http://127.0.0.1:${SP}/quest?token=e2e-user${u}${q}`).then(r => r.json());
 const b = await puppeteer.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
 // `seed` — 처음 켤 때 기기에 적혀 있을 값 (AI 진행도·보유 스킨)
-const dev = async (u, seed, w = 393, h = 851, lang = 'ko') => {
+const dev = async (u, seed, w = 393, h = 851, lang = 'ko', dpr = 1) => {
   const c = await b.createBrowserContext(); const p = await c.newPage();
-  await p.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  await p.setViewport({ width: w, height: h, deviceScaleFactor: dpr, isMobile: true, hasTouch: true });
   p.on('pageerror', e => console.log('ERR', e.message.slice(0, 160)));
   await p.evaluateOnNewDocument((s, l) => { try {
     if (sessionStorage.getItem('seeded')) return;     // 다시 읽을 때는 앱이 쓴 값을 그대로 둔다
@@ -179,7 +179,7 @@ try {
   await Q.click('.shop-head .shop-btn');
   await Q.waitForSelector('.screen.home', { timeout: 10000 }); await wait(500);
   a = await avOf('.pbar .prof-av');
-  assert(a.av === 'gun:3' && /gun-skins/.test(a.img), `  상단바가 총격전 스킨으로 (${a.av} · ${a.img.slice(-30)})`);
+  assert(a.av === 'gun:3' && /av-gun/.test(a.img), `  상단바가 총격전 스킨으로 (${a.av} · ${a.img.slice(-30)})`);
   await Q.click('.prof-btn'); await wait(500);
   a = await avOf('.prof-tab .prof-av');
   assert(a && a.av === 'gun:3', `  프로필 창도 (${a && a.av})`);
@@ -192,7 +192,7 @@ try {
   await Q.screenshot({ path: '/tmp/aibox_cost.png', clip: { x: 0, y: 0, width: 393, height: 330 } });
   await toHome(Q);
   a = await avOf('.pbar .prof-av');
-  assert(a.av === 'melee:7' && /melee-skins/.test(a.img), `  다시 켜도 칼전 스킨 (${a.av})`);
+  assert(a.av === 'melee:7' && /av-melee/.test(a.img), `  다시 켜도 칼전 스킨 (${a.av})`);
   await Q.screenshot({ path: '/tmp/aibox_home.png', clip: { x: 0, y: 0, width: 393, height: 120 } });
 
   console.log('그 스킨을 더는 안 가지고 있으면 기본으로');
@@ -205,6 +205,90 @@ try {
   a = await avOf('.pbar .prof-av');
   assert(a.av === 'base:0', `  기본 캐릭터로 돌아간다 (${a.av})`);
   await Q.browserContext().close();
+
+  // [stated] **스킨이 칸에 안 맞았다** (삿갓·망토·방패·칼끝이 잘렸다) → 전체 스킨을 칸에 맞춘다.
+  // **실제 화면 픽셀로 본다**: 그림 뒤를 자홍색으로 칠하고 칸을 찍어,
+  //   ① 칸 테두리 1px 에 그림이 닿지 않는다(= 안 잘렸다) ② 그림이 칸 가운데에 있다 ③ 너무 작지 않다
+  const ALL = { gun: [1, 2, 3, 4, 5, 6, 7, 8], melee: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
+  for (const [w, h] of [[393, 851], [360, 640]]){
+    console.log(`프로필 캐릭터 — 스킨 18종 전부 칸 안에 (${w}px)`);
+    // 실제 폰처럼 **화면 배율 3** 으로 찍는다 — 배율 1 이면 상단바 사진이 13px 이라 픽셀 하나가 테두리에 걸린다
+    const V = await dev('avall' + w, { 'duel.tryskin': { gun: 0, melee: 0, soccer: 0, arena: 0, own: ALL } }, w, h, 'ko', 3);
+    await V.click('.home-row .cost-entry:nth-child(3)');
+    await V.waitForSelector('.screen.cost', { timeout: 10000 }); await wait(800);
+    await V.addStyleTag({ content: '.cost-pav,.prof-av{background-color:#ff00ff !important}' });
+    // 칸 하나를 찍어 브라우저 안에서 픽셀을 읽는다 (그림 파일을 따로 읽지 않는다 — 화면에 그려진 그대로)
+    const judge = async el => {
+      const png = await el.screenshot({ encoding: 'base64' });
+      return V.evaluate(async b64 => {
+        const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
+        const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+        const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+        const d = g.getImageData(0, 0, c.width, c.height).data;
+        const bg = i => d[i] > 200 && d[i + 1] < 70 && d[i + 2] > 200;
+        let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1, edge = 0;
+        for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++){
+          const i = (y * c.width + x) * 4;
+          if (bg(i)) continue;
+          x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+          if (x === 0 || y === 0 || x === c.width - 1 || y === c.height - 1) edge++;
+        }
+        return { W: c.width, H: c.height, edge, cx: (x0 + x1 + 1) / 2, cy: (y0 + y1 + 1) / 2,
+                 fw: (x1 - x0 + 1) / c.width, fh: (y1 - y0 + 1) / c.height };
+      }, png);
+    };
+    const tiles = await V.$$('.cost-avpick .cost-pav');
+    const ids = await V.evaluate(() => [...document.querySelectorAll('.cost-avpick .cost-pav')].map(x => x.dataset.av));
+    assert(ids.length === 19, `  기본 + 18종 (${ids.length})`);
+    for (let i = 1; i < tiles.length; i++){
+      const j = await judge(tiles[i]);
+      const mid = Math.abs(j.cx - j.W / 2) <= 4 && Math.abs(j.cy - j.H / 2) <= 4;   // 배율 3 기준 4px = 화면 1.3px
+      const big = Math.max(j.fw, j.fh) >= 0.85;
+      assert(j.edge === 0 && mid && big,
+        `  ${ids[i]}: 안 잘림 · 가운데 · 칸을 채움 (가장자리 ${j.edge}px · 가운데 ${j.cx.toFixed(1)},${j.cy.toFixed(1)} / ${j.W / 2},${j.H / 2} · 채움 ${Math.round(j.fw * 100)}%x${Math.round(j.fh * 100)}%)`);
+    }
+    // 상단바 사진도 같은 방식 — 가장 넓은 총격전 6번 · 칼전 10번
+    for (const [k, id] of [['gun', 6], ['melee', 10]]){
+      await V.evaluate((kk, ii) => {
+        const i = [...document.querySelectorAll('.cost-avpick .cost-pav')].findIndex(x => x.dataset.av === kk + ':' + ii);
+        document.querySelectorAll('.cost-avpick')[i].click();
+      }, k, id);
+      await V.click('.shop-head .shop-btn');
+      await V.waitForSelector('.screen.home', { timeout: 10000 }); await wait(500);
+      await V.addStyleTag({ content: '.cost-pav,.prof-av{background-color:#ff00ff !important}' });
+      const j = await judge(await V.$('.pbar .prof-av'));
+      assert(j.edge === 0 && Math.abs(j.cx - j.W / 2) <= 4,
+        `  상단바 ${k}:${id} 도 안 잘리고 가운데 (가장자리 ${j.edge}px · ${j.cx.toFixed(1)} / ${j.W / 2})`);
+      await V.click('.home-row .cost-entry:nth-child(3)');
+      await V.waitForSelector('.screen.cost', { timeout: 10000 }); await wait(400);
+      await V.addStyleTag({ content: '.cost-pav,.prof-av{background-color:#ff00ff !important}' });
+    }
+    await V.screenshot({ path: `/tmp/aibox_all_${w}.png` });
+    await V.browserContext().close();
+  }
+
+  // [stated] **AI·연습·친구 대전 칸** — 버튼이 크고 오른쪽으로 치우쳤다 → 칸 가운데, 작게
+  for (const [w, h, lang] of [[393, 851, 'ko'], [360, 640, 'en']]){
+    console.log(`칸 안 버튼이 칸 가운데에 있다 (${w}px · ${lang})`);
+    const C = await dev('mid' + w, {}, w, h, lang);
+    for (const [name, box] of [['친구 대전', '.hb-friend'], ['연습', '.hb-prac'], ['AI', '.hb-ai']]){
+      await C.click(box); await wait(400);
+      const m = await C.evaluate(bs => {
+        const bx = document.querySelector(bs), col = bx.querySelector('.fr-col'), bk = bx.querySelector('.fr-back');
+        const a = bx.getBoundingClientRect(), c = col.getBoundingClientRect(), k = bk.getBoundingClientRect();
+        const btns = [...bx.querySelectorAll('.fr-col > .fr-btn')].map(x => x.getBoundingClientRect());
+        return { off: Math.round(((c.left + c.right) / 2 - (a.left + a.right) / 2) * 10) / 10,
+                 share: Math.round(c.width / a.width * 100),
+                 hitBack: btns.concat([c]).some(r => r.left < k.right && r.top < k.bottom && r.right > k.left && r.bottom > k.top),
+                 inside: c.top >= a.top && c.bottom <= a.bottom + 0.5,
+                 btnH: Math.round(Math.max(...btns.map(r => r.height))) };
+      }, box);
+      assert(Math.abs(m.off) <= 1 && m.share <= 72 && !m.hitBack && m.inside,
+        `  ${name}: 가운데(${m.off}px) · 칸의 ${m.share}% · 뒤로 버튼과 안 겹침 · 칸 안 · 버튼 높이 ${m.btnH}px`);
+      await C.click(box + ' .fr-back'); await wait(300);
+    }
+    await C.browserContext().close();
+  }
 
   console.log('e2e-aibox.test.js 통과');
 } finally {

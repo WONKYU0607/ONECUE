@@ -34,6 +34,9 @@ import { warmUp, keysFor } from './game/assets.js';
 // GameCanvas는 'game'일 때만 마운트되므로, 화면을 벗어나면 게임 루프·소켓이 자동으로 정리된다.
 // **검사 전용 — 개발 서버에서만.** 앱은 켜자마자 구글 로그인을 요구하는데 검사 환경은
 // 구글 서버로 못 나간다. `import.meta.env.DEV` 라 **빌드에는 아예 안 들어간다**
+// 친구방(방 만들기·코드 입력·초대 입장)인가 — 빠른 매칭과 길이 갈린다
+const isRoomMode = sn => sn?.mode === 'create' || sn?.mode === 'join';
+
 function e2eSkipLogin(){
   return !!(import.meta.env && import.meta.env.DEV
     && typeof location !== 'undefined'
@@ -45,7 +48,7 @@ export default function App(){
   // 각자 구독하게 하면 빠뜨리는 곳이 생긴다
   const [, bumpLang] = useState(0);
   useEffect(() => onLangChange(() => bumpLang(v => v + 1)), []);
-  const [screen, setScreen] = useState('splash');   // splash|login|home|ai|practice|pvp|entering|room|game|result|ranks|friends
+  const [screen, setScreen] = useState('splash');   // splash|login|home|practice|pvp|room|game|result|ranks|friends|quests|mail|shop|costume
   const [rankKind, setRankKind] = useState('gun');  // 순위표에서 먼저 볼 종목
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
@@ -160,7 +163,6 @@ export default function App(){
       // [stated] **VS 화면에서는 바로 나가지 않고 한 번 묻는다** — 실수로 눌러 기권패가 되지 않게.
       // 판은 이미 잡혔으므로 나가기를 고르면 게임 중 나가기와 똑같이 패배 처리된다
       if (search && screen === 'home'){ if (search.stage === 'vs') setAskQuit(true); else cancelSearch(); return true; }
-      if (screen === 'entering'){ goHome(); return true; }
       // [stated] **방에서 뒤로가기** — 바로 나가지 않고 물어본다
       if (screen === 'room'){ setAskRoom(true); return true; }
       // **화면 안에 단계가 있으면 거기부터 돌아간다** (PVP 색 고르기 → 모드 고르기 → 홈).
@@ -187,11 +189,10 @@ export default function App(){
     // 예전엔 둘 다 mode라 펼치기에서 덮어써져 온라인인지 판정이 깨졌다
     warm({ melee: opt?.melee, soccer: opt?.soccer, n: opt?.n });
     setSession({ kind: 'pvp', ...opt });      // opt: {mode:'queue'|'create'|'join', code, n, melee}
-    // **여기서 길이 갈린다** — 빠른 매칭은 매칭 화면, 방은 접속 화면.
-    // 둘은 서로 아무것도 공유하지 않는다
-    if (opt?.mode === 'create' || opt?.mode === 'join'){ setSearch(null); setScreen('entering'); }
-    // [stated] **빠른 매칭은 홈에 머문다.** 로딩 화면 없이 PVP 칸에서 찾고, 잡히면 곧장 VS 화면
-    else { setSearch({ stage: 'waking', sec: 0, err: '' }); setScreen('home'); }
+    // [stated] **로딩 화면이 없다 — 빠른 매칭도 방도 홈에 머문다.**
+    // 빠른 매칭은 PVP 칸에서 찾고 잡히면 곧장 VS 화면, 방은 친구 대전 칸에서 접속하고 들어가면 곧장 방.
+    // 길은 **아래에서 갈린다** (빠른 매칭 `QuickMatch` / 방 `RoomEnter`) — 둘은 아무것도 공유하지 않는다
+    setSearch({ stage: 'waking', sec: 0, err: '' }); setScreen('home');
   }, []);
   const startPractice = useCallback(opt => {
     // [stated] 연습은 **홈 칸에서 바로** 시작한다 — 찾던 빠른 매칭이 있으면 끝낸다
@@ -199,13 +200,6 @@ export default function App(){
     SELF.slot = 0;
     warm({ melee: opt?.melee, soccer: opt?.soccer, n: 2 });
     setSession({ kind: 'practice', ...opt });   // opt: { melee }
-    setScreen('game');
-  }, []);
-  const startMelee = useCallback((n = 2, ffa = false) => {
-    disconnect();
-    setResult(null);
-    warm({ melee: true, n });
-    setSession({ kind: 'melee', n, ffa });
     setScreen('game');
   }, []);
   // [stated] **튜토리얼** — 총격전만. 실제 판을 돌리며 단계별로 안내한다
@@ -236,6 +230,7 @@ export default function App(){
   // [stated] **방에 들어갔다 → 로비로.** 빠른 매칭과 길이 아예 갈려 있어 조건이 필요 없다
   const toRoom = useCallback(() => {
     setSession(sn => (sn && SELF.watching ? { ...sn, watching: true } : sn));
+    setSearch(null);                     // 홈에서 접속하던 표시를 끈다
     setScreen(SELF.watching ? 'game' : 'room');
   }, []);
   // [stated] **판이 시작되기 전에 그림을 미리 준비한다** — 모든 모드에 적용.
@@ -374,7 +369,8 @@ export default function App(){
         setScreen('login');
       }} />}
       {screen === 'login'    && <Login onDone={() => { goHome(); goHomeFirst(); }} />}
-      {screen === 'home'     && <Home onStart={beginPvp} search={search && session?.mode === 'queue' ? { ...search, session } : null} onCancelSearch={cancelSearch} onAi={startAi} onPractice={startPractice} onMelee={startMelee}
+      {screen === 'home'     && <Home onStart={beginPvp} search={search && session?.mode === 'queue' ? { ...search, session } : null} onCancelSearch={cancelSearch}
+                                     joining={search && isRoomMode(session) ? search : null} onAi={startAi} onPractice={startPractice}
                                      onSettings={() => setShowSettings(true)}
                                      onRanks={k => { setRankKind(k); setScreen('ranks'); }}
                                      onJoin={beginPvp}
@@ -394,7 +390,10 @@ export default function App(){
       {search && screen === 'home' && session?.mode === 'queue' &&
         <QuickMatch session={session} onMatched={toGame}
                     onStatus={st => setSearch(p => (p ? { ...p, ...st } : p))} />}
-      {screen === 'entering' && <RoomEnter session={session} onCancel={goHome} onEntered={toRoom} />}
+      {/* [stated] 방도 **홈 위에서** 접속한다 — 들어가는 순간 방 화면으로. 접속 화면이 따로 없다 */}
+      {search && screen === 'home' && isRoomMode(session) &&
+        <RoomEnter session={session} onEntered={toRoom}
+                   onStatus={st => setSearch(p => (p ? { ...p, ...st } : p))} />}
       {/* [stated] **방(로비)** — 판이 끝나면 여기로 돌아온다 */}
       {screen === 'room'     && <Room room={room || getRoom()} onLeave={() => setAskRoom(true)} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome}

@@ -1,10 +1,10 @@
 // 홈 위쪽(점수·티켓 틀)의 모든 수치. **여기 숫자만 바꾸면 화면이 따라간다.**
 // 값은 **단위 없는 수**로 내보내고 CSS에서 --u(화면 폭 비례 단위)를 곱한다.
 // 그래야 폰과 PC에서 같은 비율로 보인다. 값은 CSS 변수로 내보내므로 화면을 다시 그리지 않아도 즉시 반영된다.
-// 조절 패널(HomeTune)에서 만진 값은 localStorage에 남고, 확정되면 아래 기본값에 옮겨 적으면 된다.
+// (예전 조절 패널(HomeTune)은 없앴다 — 그때 기기에 남은 값이 있으면 그대로 읽는다)
 const KEY = 'duel.homeui.v1';
 
-export const HOME_DEF = [
+const HOME_DEF = [
   // [열쇠, 이름, 기본값, 최소, 최대, 증감, 단위]
   ['padX',    '틀 좌우 안여백', 6, 0, 40, 1, ''],
   ['padY',    '틀 상하 안여백',  9, 0, 40, 1, ''],
@@ -39,18 +39,6 @@ function read(){
 }
 
 let cur = read();
-
-export function getHomeUI(){ return { ...cur }; }
-export function setHomeUI(k, v){
-  const d = HOME_DEF.find(x => x[0] === k);
-  if (!d) return cur[k];
-  cur[k] = Math.max(d[3], Math.min(d[4], v));
-  apply(); save();
-  return cur[k];
-}
-export function resetHomeUI(){ cur = defaults(); apply(); save(); return getHomeUI(); }
-
-function save(){ try { localStorage.setItem(KEY, JSON.stringify(cur)); } catch { /* 무시 */ } }
 
 // CSS 변수로 내보낸다. 단위가 없는 값(slice)은 그대로
 export function apply(){
@@ -111,7 +99,3 @@ export function watchHomeBar(){
   };
 }
 
-// 확정한 값을 코드에 옮겨 적기 좋게
-export function dumpHomeUI(){
-  return HOME_DEF.map(([k, nm]) => `${k}: ${cur[k]}   // ${nm}`).join('\n');
-}

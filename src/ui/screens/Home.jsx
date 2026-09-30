@@ -12,7 +12,7 @@ import Plaque from '../Plaque.jsx';
 import { setInnerBack } from '../../state/back.js';
 import { t } from '../../i18n/index.js';
 
-export default function Home({ onStart, search, onCancelSearch, onAi, onPractice, onSettings, onRanks, onJoin, onFriends, onShop, onCostume, onQuests, onMail }){
+export default function Home({ onStart, search, joining, onCancelSearch, onAi, onPractice, onSettings, onRanks, onJoin, onFriends, onShop, onCostume, onQuests, onMail }){
   // 하단 뒤로가기. **등록 자리(`setInnerBack`)는 하나뿐**이라 칸마다 따로 등록하면 서로 덮어쓴다.
   // 홈이 한 번 등록하고, 펼쳐진 칸이 있으면 그 칸이 접는다. 없으면 false → App 이 종료 확인을 띄운다
   const backs = useRef({});
@@ -43,7 +43,8 @@ export default function Home({ onStart, search, onCancelSearch, onAi, onPractice
         <PvpBox onStart={onStart} search={search} onCancelSearch={onCancelSearch} regBack={reg('pvp')} />
         {/* [stated] 자리 바꿈 — 가운데 줄: 친구 대전 · AI 모드 / 아래 줄: 연습 모드 · 상점.
             칸 크기는 그대로다(격자가 순서대로 채운다) */}
-        <FriendBox onStart={onStart} regBack={reg('friend')} />
+        {/* [stated] 방 접속도 **이 칸 안에서** — "서버에 연결하는 중" 화면으로 안 넘어간다 */}
+        <FriendBox onStart={onStart} joining={joining} onCancel={onCancelSearch} regBack={reg('friend')} />
         {/* [stated] AI 모드도 홈에서 — 누르면 칸 안에 ‹ N단계 › · 보상 · 시작하기, 누르면 바로 게임 */}
         <AiBox onStart={onAi} regBack={reg('ai')} />
         {/* [stated] 연습도 홈에서 — 누르면 칸 안에 총격전·칼전·축구, 고르면 바로 시작 */}
@@ -55,7 +56,7 @@ export default function Home({ onStart, search, onCancelSearch, onAi, onPractice
 
       {/* **배포됐는지 눈으로 확인하는 표시.** 고칠 때마다 올린다 —
           "덮었는데도 안 된다"가 옛 빌드 때문인지 바로 가려낼 수 있다 */}
-      <p className="ver">v0.2.5</p>
+      <p className="ver">v0.2.6</p>
     </div>
   );
 }

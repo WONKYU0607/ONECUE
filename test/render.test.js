@@ -274,7 +274,8 @@ console.log('그림을 미리 준비한다');
   const q = fs.readFileSync('src/ui/screens/QuickMatch.jsx', 'utf8');
   assert(/warmUp\(keysFor/.test(q), '  빠른 매칭(VS 화면)에서 미리 준비');
   const app = fs.readFileSync('src/App.jsx', 'utf8');
-  assert((app.match(/warm\(\{/g) || []).length >= 4, '  방·연습·칼전·AI 도 미리 준비');
+  // (따로 있던 '칼전' 시작(startMelee)은 쓰는 곳이 없어 지웠다 — 칼전은 방·빠른 매칭·연습으로 들어간다)
+  assert((app.match(/warm\(\{/g) || []).length >= 3, '  방·연습·AI 도 미리 준비');
 }
 
 console.log('render.test.js 통과');

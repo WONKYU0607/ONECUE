@@ -40,7 +40,7 @@ console.log('위에 뜬 것부터 닫는다');
   // `showHelp` 는 도움말 화면과 함께 없어졌다 (App.jsx 에 그 말 자체가 없다)
   const order = ['if (askQuit)', 'if (showSettings)',
                  // [stated] 빠른 매칭은 **홈에서 찾는다** — 찾는 중 뒤로가기는 찾기 취소
-                 "screen === 'game'", "if (search && screen === 'home')", "screen === 'entering'", "if (screen === 'home')"];
+                 "screen === 'game'", "if (search && screen === 'home')", "if (screen === 'home')"];
   let at = -1;
   for (const k of order){
     const i = body.indexOf(k);

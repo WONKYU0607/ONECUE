@@ -111,14 +111,19 @@ try {
       assert(ok, `  [${label}] 를 눌렀다`);
     };
     // [stated] "우편함에 메일 오면 버튼 오른쪽에 빨간 원으로 알림 뜸?" — 뜬다. 확인한다
+    // [stated] 점은 **칸 오른쪽 끝이 아니라 글자 바로 오른쪽 위** (끝에 있으니 너무 멀었다)
     const dot = () => p.evaluate(() => {
       const el = document.querySelector('.home-row .cost-entry.m');
       if (!el) return null;
       const on = el.classList.contains('dot');
-      const a = getComputedStyle(el, '::after');
-      const r = el.getBoundingClientRect();
-      return { on, bg: a.backgroundColor, w: a.width, right: a.right,
-               round: a.borderTopLeftRadius, box: Math.round(r.width) };
+      const tx = el.querySelector('.ce-t');
+      const a = getComputedStyle(tx, '::after');
+      const r = el.getBoundingClientRect(), tr = tx.getBoundingClientRect();
+      // 점의 실제 자리 = 글자 상자 오른쪽 위에서 right·top 만큼
+      const dl = tr.right - parseFloat(a.right) - parseFloat(a.width), dt = tr.top + parseFloat(a.top);
+      return { on, bg: a.backgroundColor, round: a.borderTopLeftRadius,
+               gap: Math.round(dl - tr.right), fromEnd: Math.round(r.right - (dl + parseFloat(a.width))),
+               inside: dl + parseFloat(a.width) <= r.right && dt >= r.top };
     });
     {
       // 값은 서버에서 받아 오므로 **바로는 안 뜬다** — 붙을 때까지 기다린다
@@ -127,7 +132,9 @@ try {
       assert(d && d.on, '  우편함 버튼에 빨간 점이 붙는다');
       assert(d.bg === 'rgb(255, 90, 78)', `  빨간색이다 (${d.bg})`);
       assert(d.round === '50%', `  동그랗다 (${d.round})`);
-      assert(d.right === '2px', `  버튼 오른쪽 끝이다 (${d.right})`);
+      assert(d.gap >= 0 && d.gap <= 4, `  글자 바로 오른쪽이다 (글자와 ${d.gap}px)`);
+      assert(d.fromEnd >= 8, `  칸 오른쪽 끝에서 떨어져 있다 (${d.fromEnd}px)`);
+      assert(d.inside, '  칸 밖으로 안 나간다');
     }
 
     await tap('우편함');

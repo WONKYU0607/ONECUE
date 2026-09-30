@@ -28,20 +28,7 @@ html,body{height:100%;background:#07070d;overflow:hidden;touch-action:none;
 .wrap{height:100%;display:flex;align-items:center;justify-content:center;
   padding:var(--sat) var(--sar) var(--sab) var(--sal)}
 canvas{display:block;background:#12121c}
-.tune{position:fixed;right:calc(var(--sar) + 6px);top:calc(var(--sat) + 6px);display:flex;flex-direction:column;gap:5px;
-z-index:10;font:11px/1 monospace;color:#7a7a95}
-.tune .row{display:flex;align-items:center;gap:5px;justify-content:flex-end}
-.tune .lbl{min-width:30px;text-align:right}
-.tune button{width:28px;height:28px;background:#1b1b2a;color:#4ec9f0;
-border:1px solid #4ec9f0;font:15px/1 monospace;cursor:pointer;padding:0}
-.tune button:active{background:#4ec9f0;color:#12121c}
-.tune .val{min-width:46px;text-align:center;color:#e8e8f0}
-.startbtn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;
-padding:14px 34px;background:rgba(18,18,28,0.92);color:#8fd8ff;border:2px solid #4ec9f0;
-font:900 21px/1 var(--gf);letter-spacing:2px;cursor:pointer}
-.startbtn:active{background:#4ec9f0;color:#12121c}
 
-.tune button.wide{width:auto;padding:0 10px}
 .game-root{height:100%}
 #root{height:100%}
 
@@ -77,10 +64,6 @@ justify-content:center;gap:18px;color:#e8e8f0;font-family:var(--gf);font-weight:
   }
 }
 .screen.list{justify-content:flex-start;padding:0}
-/* 한글 네 글자라 자간 8px은 너무 벌어진다. 좁히고 크기는 화면 폭에 맞춘다 */
-.logo{font-family:var(--gf);font-weight:900;font-size:min(46px,13vw);letter-spacing:3px;color:#8fd8ff;
-  text-shadow:0 0 18px rgba(78,201,240,.45);white-space:nowrap}
-.logo.win{color:#4ec9f0}.logo.lose{color:#f0645a}.logo.draw{color:#e8e8f0}
 .hint{font:700 12px var(--gf);color:#8b9db0;letter-spacing:2px}
 .big{font:900 17px var(--gf);letter-spacing:2px}
 .ver{position:fixed;bottom:calc(var(--sab) + 12px);font-size:11px;color:#4a4a63}
@@ -113,33 +96,15 @@ border-image:var(--frame) 86 fill stretch}
 border:1px solid #2f4a63;color:#8fd8ff;font-family:var(--gf);font-weight:900;
 font-size:calc(11 * var(--u));line-height:1;cursor:pointer;padding:0}
 .icon-btn:active{background:#4ec9f0;color:#12121c}
-/* 금속 틀 테두리(가로 44 / 세로 46) 안쪽으로. 밖에 두면 테두리에 걸린다 */
-/* 틀 안쪽(테두리 다음) 기준. 오른쪽 위 모서리 바로 밑에 붙인다 */
-/* 맨 윗줄은 점수·티켓이 쓴다. 물음표·설정은 그 아래 오른쪽 */
-/* **조절값은 단위 없는 수다.** 그냥 쓰면 `top:42`가 되어 CSS가 통째로 무시하고,
-   버튼이 흐름으로 떨어져 화면 한가운데로 간다. 반드시 --u를 곱할 것 */
-.top-right{position:absolute;right:calc(6 * var(--u));top:calc(var(--h-icoTop,42) * var(--u));z-index:30}
-.top-right2{position:absolute;right:calc(29 * var(--u));top:calc(var(--h-icoTop,42) * var(--u));z-index:30}
-/* 게임 화면의 '‹'. **`position:absolute` 인데 위치 기준이 되는 조상이 없어서
-   화면 맨 위(상태바 밑)에 붙는다.** 그래서 안전 영역을 직접 더한다 */
-.top-left{position:absolute;left:calc(var(--sal) + 6 * var(--u));
-  top:calc(var(--sat) + var(--h-icoTop,42) * var(--u));z-index:30}
-
 /* 로그인 화면. 진입창과 같은 결로 단순하게 — 버튼 하나와 설명 한 줄 */
 .login{gap:14px}
-.login-title{font:900 min(40px,11vw)/1 var(--gf);letter-spacing:3px;color:#8fd8ff;
-  text-shadow:0 0 18px rgba(90,190,255,.45);margin-bottom:6px}
+
 .login .menu-btn{width:min(260px,72vw)}
 .login-why{max-width:min(300px,84vw);text-align:center;line-height:1.5}
 
 /* ---------- 진입창 ---------- */
 .bar{width:min(260px,70vw);height:4px;background:#1b1b2a;overflow:hidden}
 .bar .fill{height:100%;background:#4ec9f0;transition:width .18s linear}
-
-/* ---------- 매칭 ---------- */
-.spinner{width:34px;height:34px;border:3px solid #2a2a40;border-top-color:#4ec9f0;
-border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
 
 /* ---------- 목록 화면 ---------- */
 .bar-top{display:flex;align-items:center;justify-content:space-between;width:100%;
@@ -165,10 +130,6 @@ border-radius:50%;transition:transform .15s,background .15s}
 .link-note{position:fixed;left:50%;top:calc(var(--sat) + 14px);transform:translateX(-50%);z-index:25;
 padding:8px 14px;background:rgba(18,18,28,.94);border:1px solid #f0a81e;
 color:#f0c86e;font:700 12px/1.4 var(--gf);white-space:nowrap}
-.placebtn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;
-padding:14px 28px;background:rgba(18,18,28,.92);color:#f0c86e;border:2px solid #f0a81e;
-font:900 16px/1 var(--gf);letter-spacing:2px;cursor:pointer}
-.placebtn:active{background:#f0a81e;color:#12121c}
 
 /* 패널 안(아이템 칸 위 여백)에 얹는 버튼 — 위치·크기는 JS가 계산해 넣는다 */
 .panelbtn{position:fixed;z-index:20;display:flex;align-items:center;justify-content:center;
@@ -179,7 +140,7 @@ letter-spacing:2px;cursor:pointer;line-height:1}
 .panelbtn.start{color:#8fd8ff;border:2px solid #4ec9f0}
 .panelbtn.start:active{background:#4ec9f0;color:#12121c}
 .wide-menu{width:min(340px, calc(100% - 4px))}
-.code-row{display:flex;gap:6px;align-items:stretch;width:100%}
+
 /* 입력칸을 반으로. 예전 110px + 금속 틀 버튼이면 폭을 넘겨 입장 버튼이 화면 밖으로 나갔다 */
 /* [stated] **네 글자가 다 안 보였다.** 자간 3px 이 마지막 글자 뒤에도 붙어 가운데가 밀리고,
    86px 은 네 자리에 빠듯했다 → 폭을 넉넉히 잡고 **줄어들지 못하게** 한다.
@@ -194,9 +155,7 @@ font:900 19px/1 var(--gf);letter-spacing:2px;text-indent:2px;text-align:center;p
   padding:6px 8px;color:#eaf7ff}
 .menu-btn.join .t{font-size:18px;letter-spacing:1px}
 .menu-btn.join:disabled{border-color:#2a2a40;color:#4a4a63;cursor:default}
-.roomcode{display:flex;flex-direction:column;align-items:center;gap:6px;margin:6px 0}
-.roomcode .lbl{font:700 11px var(--gf);color:#8b9db0;letter-spacing:2px}
-.roomcode strong{font:900 40px var(--gf);letter-spacing:10px;color:#8fd8ff}
+
 .link-note .sub{display:block;margin-top:4px;font-size:10px;color:#9a9ab0;letter-spacing:0}
 .panelbtn.place.off{border-color:#3a3a52;color:#6a6a85;cursor:default}
 /* 설치 완료 다음 단계. 앞 버튼(주황)과 확실히 구분되게 파랑 */
@@ -204,12 +163,7 @@ font:900 19px/1 var(--gf);letter-spacing:2px;text-indent:2px;text-align:center;p
   box-shadow:0 0 0 1px rgba(78,201,240,0.35),0 0 12px rgba(78,201,240,0.25)}
 .panelbtn.place.go:active{background:#4ec9f0;color:#12121c}
 .hint.record{margin:10px 0 0;letter-spacing:1px}
-.modal.help{width:min(400px,92vw);max-height:82vh;display:flex;flex-direction:column}
-.help-body{overflow-y:auto;padding:4px 0}
-.help-row{display:flex;gap:10px;padding:9px 14px;border-top:1px solid #1e1e2e}
-.help-row .k{flex:0 0 54px;color:#8fd8ff;font:900 12px var(--gf)}
-.help-row .v{flex:1 1 0;min-width:0;color:#c8c8da;font:700 12px/1.6 var(--gf)}
-.help-ok{margin:10px 14px 14px}
+
 /* 신청 버튼. **폭·높이를 고정한다** — 문구 길이에 따라 늘어나면 두 줄로 접혀
    아래 버튼과 겹친다(영어는 한국어의 2.5배까지 길어진다).
    글자는 칸에 맞춰 자동으로 줄어든다 */
@@ -245,45 +199,11 @@ white-space:nowrap;overflow:hidden}
 .topbox > span{display:block;width:100%;text-align:center;
 transform-origin:center;white-space:nowrap}
 .link-note.fast{border-color:#8f6ef0;color:#c3adff}
-/* 노템전은 2배속과 색을 갈라서 뭘 신청받았는지 바로 알게 한다 */
-.fastbtn.bare{border-color:#f0a81e;color:#f0c86e}
-.fastbtn.bare:active{background:#f0a81e;color:#12121c}
 .modal.ask{width:min(340px,88vw);padding:18px 16px}
 .ask-t{font:900 15px/1.6 var(--gf);color:#e8e8f0;margin:0 0 6px}
 .ask-d{font:700 12px/1.6 var(--gf);color:#9fb0c2;margin:0 0 14px}
 .ask-row{display:flex;gap:10px;width:100%}
 .ask-row .menu-btn{flex:1 1 0;min-width:0;align-items:center;text-align:center;padding:6px 8px}
-/* 게임 중엔 조절 패널을 접어두고 작은 버튼만 남긴다 */
-.tunetoggle{position:fixed;right:calc(var(--sar) + 6px);top:calc(var(--sat) + 6px);z-index:31;width:30px;height:30px;
-background:rgba(18,18,28,.75);border:1px solid #2a2a40;color:#5f5f7a;
-font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
-.tunetoggle:active{opacity:1;color:#8fd8ff}
-.tune .row.head{border-bottom:1px solid #2a2a40;padding-bottom:4px;margin-bottom:2px}
-.teampick{display:flex;gap:10px;width:min(340px,86vw);margin:6px 0}
-.teambtn{flex:1 1 0;min-width:0;align-items:center;text-align:center;padding:6px 8px;
-  display:flex;flex-direction:column;gap:2px;position:relative}
-/* [stated] 내가 어느 팀인지 안 보였다 — 인원수와 '내 팀' 표시를 붙인다 */
-.teambtn .c{font:700 12px var(--gf);color:#8fd8ff;letter-spacing:0}
-.teambtn .me{font:900 11px var(--gf);color:#0b1220;background:#ffd34d;
-  border-radius:3px;padding:1px 6px;letter-spacing:0}
-/* 그 팀에 있는 사람 이름 */
-.teambtn .roster{font:700 11px var(--gf);color:#cfe4ff;letter-spacing:0;
-  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.teambtn.primary{box-shadow:0 0 0 2px #ffd34d inset}
-.teambtn.off{opacity:.4;cursor:default}
-/* 색이 6개로 늘어 좁은 폰에서 빠듯하다. 넘치면 줄바꿈 */
-.colorpick{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:2px 0 4px}
-.swatch{width:38px;height:38px;border:2px solid #2a2a40;cursor:pointer;padding:0}
-.swatch.on{border-color:#e8e8f0;box-shadow:0 0 0 2px rgba(232,232,240,.35)}
-.swatch.off{opacity:.25;cursor:default}
-
-/* AI 스테이지: 1대1 / 2대2 고르기 */
-/* 고정 96px 세 개면 296px + 간격이라 작은 폰(메뉴 276px)에서 넘쳤다. 남는 만큼 나눠 갖게 한다 */
-.mode-row{display:flex;gap:6px;justify-content:center;margin:0 0 10px;width:100%}
-.menu-btn.mode{flex:1 1 0;min-width:0;max-width:104px;align-items:center;justify-content:center;
-  padding:8px 2px}
-.menu-btn.mode .t{font-size:15px;letter-spacing:0}
-.menu-btn.mode.on{border-color:#4ec9f0;color:#8fd8ff}
 
 /* ── 진입창 ─────────────────────────────────────────────── */
 /* 표지 그림이 화면을 꽉 채운다. 폰은 그림보다 세로로 길어서 cover로 채우고
@@ -413,8 +333,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .menu-btn.small{padding:6px 8px}
 .menu-btn.small .t{font-size:12px}
 
-.prof-colors{display:flex;align-items:center;gap:10px;justify-content:center}
-.prof-clabel{font-family:var(--gf);font-weight:900;font-size:12px;color:#9fb0cc;letter-spacing:1px}
 .cgrid{display:flex;gap:6px}
 .cdot{width:26px;height:26px;border:2px solid #3a4560;cursor:pointer;padding:0}
 .cdot.on{border-color:#eaf2ff;box-shadow:0 0 0 2px rgba(234,242,255,.35)}
@@ -434,7 +352,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   width:calc((var(--h-rowH,22) + 2) * var(--u));padding:0;color:#8fd8ff;
   font-family:var(--gf);font-weight:900;font-size:calc(var(--h-valSz,10) * var(--u));line-height:1}
 .pico:active{background:#2a4a68}
-.pico.help{font-size:calc(var(--h-rowH,22) * var(--u) * 0.60)}
+
 /* 아이콘 버튼 안의 그림. 글자 대신 그려서 뜻이 분명하다 */
 .pico svg{width:calc(var(--h-rowH,22) * var(--u) * 0.62);
   height:calc(var(--h-rowH,22) * var(--u) * 0.62);display:block}
@@ -453,10 +371,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* [stated] 축구는 **전용 티켓 그림**을 쓴다. 가로로 긴 그림이라 자리를 조금 넓게 */
 .tk-ico.soc{background-image:var(--tksoc);
   flex:0 0 calc(var(--h-tkW,13) * var(--u) * 1.55)}
-.pbar-warn{position:absolute;left:0;right:0;
-  top:calc((var(--h-barY,2) + var(--h-rowH,20) + 3) * var(--u));
-  z-index:24;font-family:var(--gf);font-weight:700;font-size:calc(var(--h-warnSz,8) * var(--u));
-  color:#f0a86e;text-align:center;margin:0}
+
 /* 메뉴 버튼 안 티켓 잔량 */
 .menu-btn .tkn{display:flex;align-items:center;justify-content:center;gap:4px;
   font:900 12px var(--gf);color:#8fd8ff;letter-spacing:0;margin-top:2px}
@@ -523,13 +438,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 
 /* 축구 결과 — 골 수만 크게 */
 .res-goals{font:900 34px var(--gf);color:#ffd34d;letter-spacing:2px}
-
-/* [stated] 키보드로 UI 가 줄어드는 문제를 재기 위한 **임시 표시**. 원인을 잡으면 지운다 */
-.kbprobe{position:fixed;z-index:9999;left:4px;top:4px;pointer-events:none;
-  padding:4px 6px;border-radius:3px;background:rgba(0,0,0,.82);
-  font:700 10px/1.35 var(--gf);color:#8fe;letter-spacing:0}
-.kbprobe b{color:#ffd34d}
-.kbprobe .kb-at{color:#789;font-weight:400}
 
 /* [stated] 설정의 '튜토리얼 다시 하기' — 다른 줄과 어울리게 작게 */
 /* [stated] **금속 틀을 쓰지 않는 평범한 버튼.** 설정창·프로필창 안에서는 이걸 쓴다 —
@@ -607,11 +515,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 
 .room-modes{display:flex;gap:5px;width:100%}
 .room-modes .room-btn{flex:1 1 0;min-width:0}
-/* [stated] 로비 버튼(이동·관전하기·종목·인원)은 **20% 작게**.
-   [stated] **2대2 로비에서 시작하기 버튼이 화면 밖으로 밀렸다**(640px 화면에 내용이 664px) →
-   틀 두께까지 줄여 더 작게 만든다. `.menu-btn` 은 틀이 15/17px 이라 그게 높이를 잡아먹는다 */
-.menu-btn.sm{padding:2px 3px;min-height:26px;border-width:9px 10px}
-.menu-btn.sm .t{font-size:11px}
 /* 관전 칸 — 팀과 종목 사이 */
 .room-watch{width:100%;padding:5px;border-radius:4px;
   background:rgba(12,22,36,.6);border:1px solid rgba(90,140,190,.3)}
@@ -775,7 +678,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* 친구 화면 */
 .fr-input{flex:1 1 0;min-width:0;font-size:14px;letter-spacing:1px;text-align:left;padding:0 8px}
 .fr-head{margin:10px 0 4px;text-align:left;width:100%}
-.fr-note{margin-top:10px;opacity:.7}
+
 .fr-row{display:flex;align-items:center;gap:7px;padding:6px 8px;margin-bottom:3px;
   background:rgba(10,18,30,.7);border:1px solid rgba(90,140,190,.28);border-radius:3px}
 /* 접속 중이면 켜지는 점 */
@@ -832,41 +735,9 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .prof-foot{display:flex;justify-content:center}
 .prof-foot .menu-btn{width:auto;min-width:120px}
 
-/* 홈 배치 조절 패널 (개발용).
-   **화면 위에 겹치지 않고 옆에 붙는다** — 조절한 결과를 바로 봐야 하기 때문 */
-.htune{position:fixed;z-index:60;width:148px;max-height:96vh;
-  display:flex;flex-direction:column;
-  background:rgba(8,12,20,.72);border:1px solid #35506b;backdrop-filter:blur(2px)}
-.htune:hover{background:rgba(8,12,20,.94)}
-.htune.wide{width:230px}
-/* 접으면 머리만 남는다. 조절 결과를 가리지 않고 확인할 수 있다 */
-.htune.fold{width:auto}
-.htune.fold .htune-rows,.htune.fold .htune-foot{display:none}
-.htune-top span{cursor:pointer}
-.htune-top{display:flex;align-items:center;gap:4px;padding:4px;cursor:move;touch-action:none;
-  background:#12203a;font:900 11px var(--gf);color:#8fd8ff}
-.htune-top span{flex:1 1 0;min-width:0}
-.htune-top button,.htune-foot button{background:#1b2436;color:#8fd8ff;border:1px solid #35506b;
-  font:900 10px/1 var(--gf);cursor:pointer;padding:3px 5px}
-.htune-rows{flex:1 1 auto;min-height:0;min-width:0;overflow:auto;
-  display:flex;flex-direction:column;gap:2px;padding:3px 4px}
-.htune-row{display:flex;align-items:center;gap:3px;font:700 10px var(--gf);color:#c8d8e6}
-.htune-row .nm{flex:1 1 0;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;
-  white-space:nowrap}
-.htune.wide .htune-row{font-size:12px}
-.htune-row .num{flex:0 0 26px;text-align:center;color:#8fd8ff;font-weight:900}
-.htune-row button{flex:0 0 20px;height:20px;background:#1b2436;color:#8fd8ff;
-  border:1px solid #35506b;font:900 12px/1 var(--gf);cursor:pointer;padding:0}
-.htune-row button:active{background:#35506b}
-.htune-foot{display:flex;gap:3px;padding:4px}
-.htune-foot button{flex:1 1 0;min-width:0}
-.htune-foot .go{background:#1d3a52;color:#ffe9a8}
-.htune-btn{position:absolute;right:6px;top:52px;z-index:30;opacity:.5}
-
 /* 티어 트로피 — 한 장짜리 시트에서 잘라 쓴다 */
 .tier-ico{display:inline-block;flex:0 0 auto;background-repeat:no-repeat;
   image-rendering:pixelated;vertical-align:middle}
-
 
 /* 결과 화면 점수 */
 .scorebox{padding:10px 12px}
@@ -907,11 +778,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .shop-tabs{display:flex;gap:4px;padding:0 8px 6px}
 .shop-tabs .menu-btn{flex:1 1 0;min-width:0}
 .shop-list{width:100%;flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:0 8px 10px}
-.shop-row{display:flex;align-items:center;gap:7px;padding:7px 8px;margin-bottom:3px;
-  background:rgba(10,18,30,.7);border:1px solid rgba(90,140,190,.28);border-radius:3px}
-.shop-info{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
-.shop-info .nm{font-weight:900;color:#e8e8f0}
-.shop-info .ds{font-size:11px;color:#9fb0c8}
+
 .shop-empty{text-align:center;color:#7f8ea6;padding:24px 0}
 
 /* [stated] 상점·코스튬 머리: 제목 없이 **작은 뒤로 버튼**.
@@ -1118,24 +985,23 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   background:linear-gradient(rgba(6,10,18,.6), rgba(6,10,18,.6)), var(--hbprac) center/cover no-repeat}
 .hb-prac.open:active{filter:none}
 .pr-col{gap:4px}
-.pr-col .fr-btn{padding:5px 0}
+.hbox .pr-col .fr-btn{padding:5px 0}
 /* [stated] **AI 모드 칸** — 펼치면 그 자리에 `‹ N단계 ›` · 보상 · 시작하기. 연습 칸과 같게 그림을 어둡게 깐다.
    360 폰에서 칸이 낮아(98px) 세 줄이 들어가게 줄마다 얇게 */
 .hb-ai.open{cursor:default;flex-direction:column;padding:6px 8px;
   background:linear-gradient(rgba(6,10,18,.6), rgba(6,10,18,.6)), var(--hbai) center/cover no-repeat}
 .hb-ai.open:active{filter:none}
 .ai-col{gap:5px}
-.ai-col .fr-btn{padding:6px 0}
-.ai-step{display:flex;align-items:center;gap:4px;min-width:0}
-.ai-arr{flex:0 0 auto;width:26px;height:26px;padding:0;cursor:pointer;
-  font:900 16px/1 var(--gf);color:#eaf4ff;
+.ai-step{display:flex;align-items:center;gap:3px;min-width:0}
+.ai-arr{flex:0 0 auto;width:22px;height:22px;padding:0;cursor:pointer;
+  font:900 14px/1 var(--gf);color:#eaf4ff;
   background:rgba(22,64,104,.96);border:1px solid #8fd8ff;border-radius:3px}
 .ai-arr:active{filter:brightness(1.3)}
 .ai-arr:disabled{opacity:.3;cursor:default;filter:none}
 /* 넘치면 `FitText` 가 가운데를 축으로 줄인다 — 그래서 가운데 정렬을 flex 로 한다
    (글자 칸이 부모보다 넓으면 text-align 가운데가 안 먹어 오른쪽으로 삐져나간다) */
 .ai-no{flex:1 1 auto;min-width:0;display:flex;justify-content:center;
-  font:900 16px/1 var(--gf);color:#fff;letter-spacing:1px;text-shadow:0 2px 3px rgba(0,0,0,.8)}
+  font:900 15px/1 var(--gf);color:#fff;letter-spacing:1px;text-shadow:0 2px 3px rgba(0,0,0,.8)}
 .ai-pay{display:flex;justify-content:center;min-width:0;
   font:700 11px/1.2 var(--gf);color:#ffd873;text-shadow:0 1px 2px rgba(0,0,0,.9)}
 .ai-no > span,.ai-pay > span{flex:0 0 auto;white-space:nowrap;transform-origin:center}
@@ -1148,15 +1014,29 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .hb-friend.open{position:relative;cursor:default;flex-direction:column;padding:6px 8px}
 .hb-friend.open:active{filter:none}
 .fr-back{position:absolute;left:4px;top:4px;width:24px;height:24px;font-size:14px}
-/* 뒤로 버튼 자리만큼 **왼쪽을 비운다**. 위를 비우면 짧은 폰(360x640, 칸 높이 98)에서
-   버튼 둘 + 여백이 안 들어가 뒤로 버튼과 5px 겹쳤다 */
-.fr-col{width:100%;display:flex;flex-direction:column;gap:6px;padding-left:24px}
+/* 칸 안 버튼 묶음 (친구 대전·연습·AI).
+   [stated] **칸 가운데에, 버튼은 작게.** 예전엔 뒤로 버튼 몫을 왼쪽에만 비워(padding-left 24px)
+   버튼이 오른쪽으로 치우쳤고, 칸 폭을 거의 다 써서 컸다.
+   → 뒤로 버튼 몫을 **양쪽에 같이** 비우고(칸 안쪽 폭 - 40px) 칸의 70% 까지만 쓴다.
+   위를 비우지 않는 이유: 짧은 폰(360x640, 칸 높이 98)에서 버튼 셋 + 여백이 안 들어간다 */
+.fr-col{width:min(70%, calc(100% - 40px));display:flex;flex-direction:column;gap:6px}
 .fr-btn{padding:8px 0;cursor:pointer;white-space:nowrap;
   font:900 13px/1 var(--gf);color:#fff;letter-spacing:.5px;
   background:rgba(22,64,104,.96);border:1px solid #8fd8ff;border-radius:3px}
 .fr-btn:active{filter:brightness(1.3)}
 .fr-btn.off{opacity:.45;cursor:default}
 .fr-code{flex:0 0 auto;height:30px;width:100%}
+/* 칸 안 버튼은 **조금 작게** (친구 목록 화면의 `.fr-btn` 은 건드리지 않게 칸 안으로 한정) */
+.hbox .fr-btn{padding:6px 0;font-size:12px}
+/* [stated] 방 접속 상태 — 칸 안에서 (따로 로딩 화면이 없다). PVP 칸의 찾는 표시와 같은 돌림 */
+.fr-status{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;
+  font:900 12px/1.2 var(--gf);color:#eaf7ff;text-shadow:0 1px 2px rgba(0,0,0,.9)}
+.fr-spin{flex:0 0 11px;height:11px;border-radius:50%;
+  border:2px solid rgba(143,216,255,.35);border-top-color:#8fd8ff;animation:pvp-spin .8s linear infinite}
+/* 글자는 넘치면 `FitText` 가 가운데를 축으로 줄인다 */
+.fr-st-t{flex:0 1 auto;min-width:0;display:flex;justify-content:center}
+.fr-st-t > span{flex:0 0 auto;white-space:nowrap;transform-origin:center}
+.fr-status.err{display:block;text-align:center;color:#ffb3a8;overflow-wrap:anywhere}
 /* 홈 칸 그림. 칸 비율(18:9 이상 1.24)로 그린 그림이라 cover 로 채운다 — 짧은 폰은 위아래가 조금 잘린다 */
 .hb-pvp{background:var(--hbpvp) center/cover no-repeat, rgba(20,40,66,.55)}
 /* ── 홈 PVP 칸: 접힘(세 판) / 펼침(한 종목) ────────────────────────
@@ -1218,7 +1098,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 /* 잡히면 홈 위에 VS 화면을 덮는다 */
 .screen.vs-over{z-index:35}   /* 나가기 확인 창(40)이 그 위에 떠야 한다 */
 
-
 .cost-entry{position:relative;flex:1 1 0;min-width:0;
   display:flex;align-items:center;justify-content:center;gap:5px;
   padding:5px 0;
@@ -1231,8 +1110,10 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   background:var(--icq) center/contain no-repeat;image-rendering:pixelated}
 .cost-entry.ic.q::before{--icq:var(--icquest)}
 .cost-entry.ic.m::before{--icq:var(--icmail)}
-/* 안 받은 우편 표시 */
-.cost-entry.dot::after{content:'';position:absolute;top:2px;right:2px;width:7px;height:7px;
+/* 안 받은 우편·받을 퀘스트 보상 표시.
+   [stated] **칸 오른쪽 끝이 아니라 글자 바로 오른쪽 위** — 끝에 있으니 너무 멀었다 */
+.cost-entry .ce-t{position:relative;min-width:0}
+.cost-entry.dot .ce-t::after{content:'';position:absolute;top:-3px;right:-9px;width:7px;height:7px;
   border-radius:50%;background:#ff5a4e;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
 
 .screen.list.cost{align-items:stretch;overflow-y:auto}
@@ -1284,7 +1165,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   border:1px solid rgba(110,170,220,.5);border-radius:3px}
 .login-guest:disabled{opacity:.4}
 
-
 /* [stated] 강퇴 — 방장만, 방장을 뺀 사람 옆에 */
 .seat{justify-content:space-between}
 .seat-nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1316,8 +1196,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 
 /* ── 퀘스트 · 우편함 · 코인 ─────────────────────────────────── */
 /* [stated] 코인은 홈에서 바로 보인다. 안 받은 우편이 있으면 점이 붙는다 */
-.coin-row{display:flex;gap:6px;align-items:center;margin:6px 0 0}
-.coin-row .room-btn{flex:1;min-width:0}
 .coin-tag{display:inline-flex;align-items:center;gap:4px;padding:0 8px;height:26px;
   border:1px solid #c8a24e;border-radius:6px;background:rgba(40,32,10,.86);
   font:700 13px/1 var(--gf);color:#ffd873;white-space:nowrap}
