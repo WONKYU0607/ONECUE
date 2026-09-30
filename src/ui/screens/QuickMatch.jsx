@@ -1,41 +1,36 @@
-// [stated] **빠른 매칭 전용 화면.**
+// [stated] **빠른 매칭 — 따로 로딩 화면이 없다.**
+// 홈의 PVP 칸에서 [시작하기] 를 누르면 **홈에 그대로 있으면서** 뒤에서 상대를 찾는다.
+// 찾는 동안의 상태(깨우는 중·찾는 중·몇 초)는 `onStatus` 로 올려 PVP 칸이 보여주고,
+// **상대가 잡히면 이 컴포넌트가 VS 화면을 홈 위에 덮어** 띄운 뒤 게임으로 넘긴다.
 //
 // 예전엔 빠른 매칭·방 만들기·코드 입력이 **한 화면**을 쓰면서 안에서 `mode` 로 갈래를 나눴다.
-// 그래서 로비 조건을 하나 건드릴 때마다 빠른 매칭이 같이 샜다 —
-// VS 화면이 사라지고, 빠른 매칭이 방으로 넘어가고, 로비 버튼이 안 먹었다.
-// **각자 자기 길만 안다**: 여기는 오직 `접속 → VS → 게임`.
+// 그래서 로비 조건을 하나 건드릴 때마다 빠른 매칭이 같이 샜다 — 여기는 오직 `접속 → VS → 게임`.
 import { useEffect, useRef, useState } from 'react';
-import { connectAndWait, disconnect, serverUrl } from '../../net/connection.js';
+import { connectAndWait, disconnect } from '../../net/connection.js';
 import { spendFor, useSoccer } from '../../state/tickets.js';
 import VsIntro from '../VsIntro.jsx';
 import { sfx } from '../../game/audio.js';
 import { warmUp, keysFor } from '../../game/assets.js';
 import { SELF } from '../../game/config.js';
-import { t } from '../../i18n/index.js';
 
-// **열쇠만 담는다.** 여기서 t() 를 부르면 파일을 읽을 때 한 번만 계산돼 언어를 바꿔도 안 바뀐다
-const LABEL = {
-  waking:     'match.waking',
-  connecting: 'match.connecting',
-  retrying:   'match.waking',
-  waiting:    'match.searching',
-  matched:    'match.found',
-  error:      'match.failed'
-};
-
-export default function QuickMatch({ session, onCancel, onMatched }){
+export default function QuickMatch({ session, onStatus, onMatched }){
   const goneRef = useRef(false);
   const go = () => { if (goneRef.current) return; goneRef.current = true; onMatched(); };
-  const [stage, setStage] = useState('waking');
-  const [err, setErr] = useState('');
-  const [sec, setSec] = useState(0);
   const [vs, setVs] = useState(null);
+  const [showVs, setShowVs] = useState(false);
   const vsRef = useRef(null);
   const alive = useRef(true);
+  // 부모가 그릴 때마다 새 함수가 와도 접속을 다시 하지 않게 붙들어 둔다
+  const status = useRef(onStatus);
+  status.current = onStatus;
+  const tell = s => { if (alive.current) try { status.current?.(s); } catch { /* 무시 */ } };
 
   useEffect(() => {
     alive.current = true;
-    const iv = setInterval(() => setSec(s => s + 1), 1000);
+    goneRef.current = false;
+    let sec = 0;
+    tell({ stage: 'waking', sec: 0, err: '' });
+    const iv = setInterval(() => { sec++; tell({ sec }); }, 1000);
 
     connectAndWait({
       mode: 'queue',                      // **여기는 빠른 매칭뿐이다**
@@ -45,10 +40,11 @@ export default function QuickMatch({ session, onCancel, onMatched }){
       soccer: !!session?.soccer,
       color: Number.isInteger(session?.color) ? session.color : -1,
       onVs: m => { if (alive.current){ vsRef.current = m; setVs(m); } },
-      onStage: s => { if (alive.current) setStage(s); }
+      onStage: s => tell({ stage: s })
     })
       .then(c => {
         if (!alive.current) return;
+        clearInterval(iv);
         // [stated] **관전은 티켓을 안 쓴다** — 자리가 없으니 판에 낀 게 아니다
         const watching = !!(c && c.watching);
         if (watching){ SELF.watching = true; go(); return; }
@@ -56,38 +52,32 @@ export default function QuickMatch({ session, onCancel, onMatched }){
         // 축구는 **전용 티켓**이라 일반 티켓을 안 건드린다
         if (session?.soccer) useSoccer(); else spendFor(!!session?.ffa);
         sfx.matched?.();
-        // [stated] **VS 화면 3초 동안 그림을 미리 준비한다** — 판이 시작될 때 올리면
-        // 그 순간이 걸린다. 여기서 미리 해두면 시작이 매끄럽다
+        // [stated] **VS 화면 3초 동안 그림을 미리 준비한다** — 판이 시작될 때 올리면 그 순간이 걸린다
         warmUp(keysFor({ melee: SELF.melee, soccer: SELF.soccer, n: SELF.n }));
+        tell({ stage: 'vs' });
+        setShowVs(true);
         // **VS 화면을 보여주고 넘어간다.** 정보가 안 오면 기다리지 않는다(0.6초)
-        setStage('vs');
         setTimeout(() => { if (alive.current && !vsRef.current) go(); }, 600);
       })
-      .catch(e => { if (alive.current){ setErr(e?.message || ''); setStage('error'); } });
+      .catch(e => {
+        clearInterval(iv);
+        if (alive.current && e?.message !== 'cancelled') tell({ stage: 'error', err: e?.message || '' });
+      });
 
-    return () => { alive.current = false; clearInterval(iv); };
-  }, [onMatched, session]);
+    return () => {
+      alive.current = false;
+      clearInterval(iv);
+      // [stated] **찾는 도중 홈을 떠나거나 취소하면 찾던 것도 끝낸다.**
+      // 안 끊으면 대기열에 남아 봇 판이 열리고, 모르는 사이 그 판에서 진다
+      if (!goneRef.current) disconnect();
+    };
+  }, [session]);
 
-  const cancel = () => { disconnect(); onCancel(); };
-
-  if (stage === 'vs' && vs){
-    return (
-      <div className="screen center">
-        <VsIntro vs={vs} mySlot={SELF.slot} onDone={go} />
-      </div>
-    );
-  }
-
+  // 찾는 동안에는 아무것도 안 그린다 — 홈이 그대로 보인다
+  if (!showVs || !vs) return null;
   return (
-    <div className="screen center match">
-      {stage !== 'error' && <div className="spinner" />}
-      <p className="match-msg">{t(LABEL[stage] || 'match.searching')}</p>
-      {stage === 'error' && err && <p className="match-err">{err}</p>}
-      {stage === 'error' && <p className="match-err small">{serverUrl}</p>}
-      <p className="match-sec">{t('match.sec', { s: sec })}</p>
-      <button className="menu-btn small" onClick={cancel}>
-        <span className="t">{t('common.cancel')}</span>
-      </button>
+    <div className="screen center vs-over">
+      <VsIntro vs={vs} mySlot={SELF.slot} onDone={go} />
     </div>
   );
 }

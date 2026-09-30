@@ -90,10 +90,11 @@ const endMatch = async () => {
 const A = await dev(), B = await dev();
 try {
   await wait(1200);
-  for (const p of [A, B]) await tap(p, 'PVP');
+  // [stated] 홈 PVP 칸: 총격전 판 → (1 vs 1 이 기본) → 시작하기. 로딩 화면 없이 홈에서 찾는다
+  for (const p of [A, B]){ await p.click('.pvp-pane:nth-child(1)'); }
   await wait(600);
   console.log('둘이 빠른 매칭을 누르면 서로 잡힌다');
-  for (const p of [A, B]) await tap(p, '1 vs 1');
+  for (const p of [A, B]) await p.click('.pvp-start');
   await wait(9000);                                  // VS 화면(3초) 포함
   assert(await where(A) === 'game' && await where(B) === 'game',
     `  둘 다 게임 화면 (${await where(A)} / ${await where(B)})`);

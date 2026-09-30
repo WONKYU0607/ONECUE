@@ -16,25 +16,37 @@ const KINDS = {
   soccer: { key: 'mode.soccer', pane: 2, sizes: [2, 4] },
 };
 const FFA_SIZES = [3, 4, 5, 6];
+// 찾는 단계별 문구 (열쇠만 — 언어를 바꾸면 따라 바뀌게).
+// **칸 전용 짧은 문구** — 영어 'Looking for an opponent…' 는 360 폰에서 칸을 넘쳤다
+const STAGE = { waking: 'home.sWaking', connecting: 'home.sWaking', retrying: 'home.sWaking',
+                waiting: 'home.sSearch', matched: 'home.sFound', vs: 'home.sFound' };
 
-export default function PvpBox({ onStart, regBack }){
-  const [open, setOpen] = useState(null);     // null | 'gun' | 'melee' | 'soccer'
+export default function PvpBox({ onStart, regBack, search, onCancelSearch }){
+  const [pick0, setOpen] = useState(null);    // null | 'gun' | 'melee' | 'soccer'
+  // [stated] **찾는 중이면 그 종목 칸이 펼쳐진 채로** 상태를 보여준다 (결과 화면 '다시 하기' 로 돌아와도)
+  const ss = search && search.session;
+  const searchKind = ss ? (ss.soccer ? 'soccer' : (ss.melee ? 'melee' : 'gun')) : null;
+  const open = searchKind || pick0;
   const [size, setSize] = useState(2);        // 2 | 4 | 6 | 'ffa'
   const [ffaN, setFfaN] = useState(3);
 
   const pick = k => { setOpen(k); setSize(2); setFfaN(3); };
-  const close = () => setOpen(null);
+  // 찾는 중에 닫으면 찾기도 끝낸다 — 칸만 접히고 뒤에서 계속 찾으면 안 된다
+  const close = () => { if (search) onCancelSearch?.(); setOpen(null); };
 
   // 하단 뒤로가기: 펼쳐져 있으면 **접기만** 한다(앱 종료 확인으로 안 간다).
   // 등록 자리가 하나뿐이라 홈이 받아서 칸마다 물어본다
   regBack(() => { if (!open) return false; close(); return true; });
 
-  const ffa = open === 'melee' && size === 'ffa';
+  // 찾는 중에는 **찾고 있는 인원**을 켜 두고 바꾸지 못하게 한다
+  const curSize = ss ? (ss.ffa ? 'ffa' : ss.n) : size;
+  const curFfaN = ss && ss.ffa ? ss.n : ffaN;
+  const ffa = open === 'melee' && curSize === 'ffa';
   const soccer = open === 'soccer';
   const blocked = soccer ? outSoccer() : out(ffa);
   const start = () => {
     if (!open || blocked) return;
-    const n = ffa ? ffaN : size;
+    const n = ffa ? curFfaN : curSize;
     onStart({ mode: 'queue', n, melee: open === 'melee', soccer, ffa, color: getColor() });
   };
 
@@ -65,7 +77,7 @@ export default function PvpBox({ onStart, regBack }){
           <div className="pvp-ctrl">
             <div className="pvp-sizes">
               {KINDS[open].sizes.map(s => (
-                <button key={s} className={'pvp-chip' + (size === s ? ' on' : '')} onClick={() => setSize(s)}>
+                <button key={s} className={'pvp-chip' + (curSize === s ? ' on' : '')} disabled={!!search} onClick={() => setSize(s)}>
                   {label(s)}
                 </button>
               ))}
@@ -73,18 +85,31 @@ export default function PvpBox({ onStart, regBack }){
             {ffa && (
               <div className="pvp-sizes">
                 {FFA_SIZES.map(k => (
-                  <button key={k} className={'pvp-chip' + (ffaN === k ? ' on' : '')} onClick={() => setFfaN(k)}>
+                  <button key={k} className={'pvp-chip' + (curFfaN === k ? ' on' : '')} disabled={!!search} onClick={() => setFfaN(k)}>
                     {t('pvp.players', { n: k })}
                   </button>
                 ))}
               </div>
             )}
-            <button className={'pvp-start' + (blocked ? ' off' : '')} onClick={start}>
-              <span className="t">{t('home.startBattle')}</span>
-              <span className="tkn">
-                <span className={'tk-ico' + (soccer ? ' soc' : '')} />{soccer ? tkSoccer() : tk(ffa)}
-              </span>
-            </button>
+            {!search && (
+              <button className={'pvp-start' + (blocked ? ' off' : '')} onClick={start}>
+                <span className="t">{t('home.startBattle')}</span>
+                <span className="tkn">
+                  <span className={'tk-ico' + (soccer ? ' soc' : '')} />{soccer ? tkSoccer() : tk(ffa)}
+                </span>
+              </button>
+            )}
+            {/* [stated] **로딩 화면 없이 여기서 찾는다.** 잡히면 VS 화면이 홈 위에 바로 뜬다 */}
+            {search && (
+              <div className="pvp-search">
+                <span className={'pvp-status' + (search.stage === 'error' ? ' err' : '')}>
+                  {search.stage === 'error'
+                    ? (search.err || t('match.failed'))
+                    : `${t(STAGE[search.stage] || 'home.sSearch')} ${t('match.sec', { s: search.sec | 0 })}`}
+                </span>
+                <button className="pvp-cancel" onClick={onCancelSearch}>{t('common.cancel')}</button>
+              </div>
+            )}
           </div>
         </div>
       )}

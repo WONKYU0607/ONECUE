@@ -19,6 +19,11 @@ const SID_KEY = 'duel.sid';
 
 let conn = null;          // { transport, slot, room }
 let pending = null;       // 매칭 중인 연결 (팀 선택용)
+// [stated] **빠른 매칭을 취소했는데 뒤에서 계속 찾고 있었다.** `disconnect()` 가 `conn`(접속이 끝난 연결)만
+// 끊어서, 아직 찾는 중인 연결(`pending`)은 대기열에 그대로 남았다 → 4.5초 뒤 서버가 봇을 채워 판을 열고,
+// 그 판이 끝난 연결을 `conn` 자리에 올려놓았다. 그다음 친구 대전 방을 만들면 방 화면에 **그 봇 판의 상대가 떴다.**
+// → 접속 시도마다 번호를 붙이고, **끊으면 번호를 올려** 옛 시도가 무엇을 받든 버리게 한다
+let gen = 0;
 
 export const serverUrl = BASE;
 export function getConnection(){ return conn; }
@@ -133,11 +138,15 @@ function openOnce(transport){
 // mode: 'queue'(랜덤) | 'create'(방 만들기) | 'join'(코드 입장)
 export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs, mode = 'queue', code = '', n = 2, melee = false, ffa = false, color = -1, soccer = false } = {}){
   SELF.watching = false;    // 새 접속마다 초기화 — 지난 판의 관전 상태가 남으면 안 된다
+  const my = ++gen;
+  const stale = () => my !== gen;       // 그 사이 취소됐거나 새 접속이 시작됐다
+  const cancelled = () => new Error('cancelled');
   // 깨우기를 여러 번 두드린다. 한 번에 응답이 없어도 화면이 멈추지 않게 진행 상황을 알린다
   let health = null;
   for (let i = 0; i < 4 && !health; i++){
     onStage?.('waking', i + 1, 4);
     health = await wakeServer();
+    if (stale()) throw cancelled();     // 깨우는 동안 취소하면 소켓을 아예 안 연다
   }
   // 서버가 살아 있는데 버전이 다르면 소켓을 열어봐야 소용없다. 여기서 바로 알린다
   if (health && (health.ver || 0) !== PROTO_VER){
@@ -148,8 +157,11 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
   for (let i = 0; i < TRIES; i++){
     onStage?.(i === 0 ? 'connecting' : 'retrying', i + 1, TRIES);
     transport = new WsTransport(wsUrl(mode, code, false, n, melee, ffa, color, soccer));
-    try { await openOnce(transport); break; }
-    catch { transport.close(); transport = null; await sleep(GAP_MS); }
+    try { await openOnce(transport); }
+    catch { transport.close(); transport = null; await sleep(GAP_MS); if (stale()) throw cancelled(); continue; }
+    // 여는 동안 취소했으면 방금 연 소켓을 닫는다 — 안 닫으면 대기열에 들어가 봇 판이 열린다
+    if (stale()){ transport.close(); throw cancelled(); }
+    break;
   }
   if (!transport) throw new Error(t('err.noServer'));
   pending = transport;   // 팀 선택 메시지를 보낼 통로
@@ -167,6 +179,8 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
         let watching = false;   // [stated] 관전으로 들어왔는지
     const done = () => {
       if (settled) return;
+      // 취소된 시도는 절대 `conn` 이 되지 않는다
+      if (stale()){ settled = true; transport.close(); reject(cancelled()); return; }
       settled = true;
       transport.auto = true;                // 이제부터 끊기면 자동으로 다시 붙는다
       // 자동 재접속은 '복귀'로 표시해야 서버가 원래 자리로 되돌려준다.
@@ -180,6 +194,7 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
     // `Client` 가 만들어지면 `toClient` 를 통째로 가져가서, 한 번 게임에 들어갔다 나오면
     // 방 화면 버튼이 전부 죽었다(방장·자리 정보가 안 와서) → **먼저 여기서 가로챈다**
     const always = m => {
+      if (stale()) return;              // 취소된 연결이 보내는 방 상태·시작 알림은 버린다
       if (m.t === 'roomst'){
         roomState = m;
         // [stated] **자리를 여러 번 옮기면 버튼이 전부 죽었다** — 옮긴 자리를 클라가 몰라
@@ -379,6 +394,11 @@ export function unpickTeam(){
 }
 
 export function disconnect(){
+  gen++;                                // 진행 중인 접속 시도를 모두 무효로
+  // **찾는 중인 연결도 끊는다.** 여기엔 'bye' 를 안 보낸다 — 대기열 연결에 'bye' 를 보내면
+  // 옛 서버는 대기열을 잘못 뒤지다(`waiting.indexOf`) 예외로 죽는다. 닫기만 해도 서버가 대기열에서 뺀다
+  if (pending && (!conn || conn.transport !== pending)){ try { pending.close(); } catch { /* 무시 */ } }
+  pending = null;
   if (!conn) return;
   try { conn.transport.clientSend({ t: 'bye' }); } catch { /* 이미 끊겼으면 무시 */ }
   conn.transport.close();

@@ -88,7 +88,7 @@ const A = await dev(), B = await dev();
 try {
   await wait(1200);
   assert(await where(A) === 'home' && await where(B) === 'home', '  로그인 없이 홈까지 온다');
-  await tap(A, 'PVP'); await tap(B, 'PVP'); await wait(600);
+  await tap(A, '친구 대전'); await tap(B, '친구 대전'); await wait(600);   // [stated] 방은 홈의 친구 대전 칸에서
   await tap(A, '방 만들기'); await wait(2500);
   assert(await where(A) === 'room', '  방을 만들면 로비로 간다');
   const code = await A.evaluate(() => { const m = (document.querySelector('.screen')?.textContent || '').match(/\d{4}/); return m ? m[0] : null; });

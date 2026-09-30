@@ -160,7 +160,7 @@ try {
   // [stated] 친구방도 인정하므로 방을 만들어서 한다
   console.log('한 판을 치르면 진행도가 오른다');
   await tap(A, '‹'); await wait(1200);
-  for (const p of [A, B2]) await tap(p, 'PVP');
+  for (const p of [A, B2]) await tap(p, '친구 대전');   // [stated] 방은 홈의 친구 대전 칸에서
   await wait(600);
   await tap(A, '방 만들기'); await wait(2500);
   const code = await A.evaluate(() => { const m = (document.querySelector('.screen')?.textContent || '').match(/\d{4}/); return m ? m[0] : null; });

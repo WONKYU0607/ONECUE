@@ -48,7 +48,7 @@ export default function App(){
   // 각자 구독하게 하면 빠뜨리는 곳이 생긴다
   const [, bumpLang] = useState(0);
   useEffect(() => onLangChange(() => bumpLang(v => v + 1)), []);
-  const [screen, setScreen] = useState('splash');   // splash|login|home|ai|practice|pvp|matching|game|result|ranks|friends
+  const [screen, setScreen] = useState('splash');   // splash|login|home|ai|practice|pvp|entering|room|game|result|ranks|friends
   const [rankKind, setRankKind] = useState('gun');  // 순위표에서 먼저 볼 종목
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
@@ -81,6 +81,8 @@ export default function App(){
     return () => { onRoom(null); onGo(null); onKicked(null); onAgainMsg(null); onModeMsg(null);
       onAgainAsk(null); onAgainNo(null); };
   }, []);
+  // [stated] **빠른 매칭은 홈에서 찾는다** — 따로 로딩 화면이 없다. 찾는 중이면 {stage, sec, err}
+  const [search, setSearch] = useState(null);
   const [summary, setSummary] = useState(null);   // 결과 창에 띄울 한 판 요약
   const [score, setScore] = useState(null);       // 이번 판 점수 변화 (PVP만)
   const [showSettings, setShowSettings] = useState(false);
@@ -129,7 +131,15 @@ export default function App(){
   const goHome    = useCallback(() => {
     disconnect();
     SELF.watching = false;          // **반드시 끈다** — 안 끄면 다음 판에서 조작이 막힌다
+    setSearch(null);
     setSession(null); setResult(null); setScreen('home');
+  }, []);
+  // [stated] 찾는 도중 **홈을 떠나면**(상점·AI 등) 찾기도 끝낸다. 찾는 컴포넌트가 사라지며 연결을 끊는다
+  useEffect(() => { if (search && screen !== 'home' && screen !== 'game') setSearch(null); }, [screen, search]);
+  // 찾기 취소 — 홈에 그대로 있는다
+  const cancelSearch = useCallback(() => {
+    disconnect();
+    setSearch(null); setSession(null);
   }, []);
 
   // **`goHome` 아래에 두어야 한다.** const 는 정의 전에 읽을 수 없어(TDZ),
@@ -148,7 +158,12 @@ export default function App(){
       if (askRoom){ setAskRoom(false); return true; }
       if (showSettings){ setShowSettings(false); return true; }
       if (screen === 'game'){ setAskQuit(true); return true; }
-      if (screen === 'matching' || screen === 'entering'){ goHome(); return true; }
+      // [stated] 홈에서 찾는 중이면 뒤로가기는 **찾기 취소**. VS 화면이 떠 있으면(이미 잡힌 판) 홈으로 —
+      // 그건 판을 나가는 것이라 서버가 기권으로 처리한다
+      // [stated] **VS 화면에서는 바로 나가지 않고 한 번 묻는다** — 실수로 눌러 기권패가 되지 않게.
+      // 판은 이미 잡혔으므로 나가기를 고르면 게임 중 나가기와 똑같이 패배 처리된다
+      if (search && screen === 'home'){ if (search.stage === 'vs') setAskQuit(true); else cancelSearch(); return true; }
+      if (screen === 'entering'){ goHome(); return true; }
       // [stated] **방에서 뒤로가기** — 바로 나가지 않고 물어본다
       if (screen === 'room'){ setAskRoom(true); return true; }
       // **화면 안에 단계가 있으면 거기부터 돌아간다** (PVP 색 고르기 → 모드 고르기 → 홈).
@@ -166,7 +181,7 @@ export default function App(){
       if (screen === 'home'){ setAskExit(true); return true; }
       return true;
     });
-  }, [screen, showSettings, askQuit, askExit, askRoom, goHome]);
+  }, [screen, showSettings, askQuit, askExit, askRoom, goHome, search, cancelSearch]);
   const beginPvp  = useCallback(opt => {
     disconnect();
     // kind는 게임 종류(pvp/ai), mode는 접속 방식(queue/create/join).
@@ -175,8 +190,9 @@ export default function App(){
     setSession({ kind: 'pvp', ...opt });      // opt: {mode:'queue'|'create'|'join', code, n, melee}
     // **여기서 길이 갈린다** — 빠른 매칭은 매칭 화면, 방은 접속 화면.
     // 둘은 서로 아무것도 공유하지 않는다
-    if (opt?.mode === 'create' || opt?.mode === 'join') setScreen('entering');
-    else setScreen('matching');
+    if (opt?.mode === 'create' || opt?.mode === 'join'){ setSearch(null); setScreen('entering'); }
+    // [stated] **빠른 매칭은 홈에 머문다.** 로딩 화면 없이 PVP 칸에서 찾고, 잡히면 곧장 VS 화면
+    else { setSearch({ stage: 'waking', sec: 0, err: '' }); setScreen('home'); }
   }, []);
   const startPractice = useCallback(opt => {
     SELF.slot = 0;
@@ -226,6 +242,7 @@ export default function App(){
   }, []);
   const toGame    = useCallback(() => {
     setSession(sn => (sn && SELF.watching ? { ...sn, watching: true } : sn));
+    setSearch(null);
     setScreen('game');
   }, []);
   const onFinish  = useCallback((r, summary, host) => {
@@ -298,7 +315,9 @@ export default function App(){
     // 방(친구방)에서만 같은 사람들로 새 판을 차린다
     if (session?.mode === 'queue'){
       disconnect();
-      setScreen('matching');                 // 처음부터 다시 찾는다
+      // 처음부터 다시 찾는다 — **홈에서** (로딩 화면이 없다)
+      setSearch({ stage: 'waking', sec: 0, err: '' });
+      setScreen('home');
       return;
     }
     // [stated] **방에서는 묻고 시작한다** — 예전엔 누르는 순간 모두 게임으로 끌려갔다.
@@ -341,7 +360,7 @@ export default function App(){
         setScreen('login');
       }} />}
       {screen === 'login'    && <Login onDone={() => { goHome(); goHomeFirst(); }} />}
-      {screen === 'home'     && <Home onStart={beginPvp} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
+      {screen === 'home'     && <Home onStart={beginPvp} search={search && session?.mode === 'queue' ? { ...search, session } : null} onCancelSearch={cancelSearch} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
                                      onSettings={() => setShowSettings(true)}
                                      onRanks={k => { setRankKind(k); setScreen('ranks'); }}
                                      onJoin={beginPvp}
@@ -360,7 +379,10 @@ export default function App(){
       {screen === 'practice' && <PracticeMenu onBack={goHome} onStart={startPractice} />}
       {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {/* [stated] **빠른 매칭과 방은 길이 다르다.** 한 화면에서 갈래를 나누다 계속 샜다 */}
-      {screen === 'matching' && <QuickMatch session={session} onCancel={goHome} onMatched={toGame} />}
+      {/* [stated] 빠른 매칭은 **홈 위에서** 돈다. 찾는 동안엔 아무것도 안 그리고, 잡히면 VS 화면을 덮는다 */}
+      {search && screen === 'home' && session?.mode === 'queue' &&
+        <QuickMatch session={session} onMatched={toGame}
+                    onStatus={st => setSearch(p => (p ? { ...p, ...st } : p))} />}
       {screen === 'entering' && <RoomEnter session={session} onCancel={goHome} onEntered={toRoom} />}
       {/* [stated] **방(로비)** — 판이 끝나면 여기로 돌아온다 */}
       {screen === 'room'     && <Room room={room || getRoom()} onLeave={() => setAskRoom(true)} />}

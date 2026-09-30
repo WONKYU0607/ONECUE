@@ -90,7 +90,7 @@ const endMatch = async () => {
 const A = await dev(), B = await dev(), C = await dev();
 try {
   await wait(1200);
-  for (const p of [A, B, C]) await tap(p, 'PVP');
+  for (const p of [A, B, C]) await tap(p, '친구 대전');   // [stated] 방은 홈의 친구 대전 칸에서
   await wait(600);
   await tap(A, '방 만들기'); await wait(2500);
   const code = await A.evaluate(() => { const m = (document.querySelector('.screen')?.textContent || '').match(/\d{4}/); return m ? m[0] : null; });

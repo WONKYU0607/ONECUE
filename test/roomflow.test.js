@@ -138,8 +138,10 @@ console.log('두 길이 따로 있다');
   assert(!fs.existsSync('src/ui/screens/Matching.jsx'), '  갈래를 나누던 옛 화면은 없앴다');
   const app = fs.readFileSync('src/App.jsx', 'utf8');
   assert(/screen === 'entering'/.test(app), '  방 접속 화면이 따로 있다');
-  assert(/setScreen\('entering'\)/.test(app) && /setScreen\('matching'\)/.test(app),
+  // [stated] 빠른 매칭은 **로딩 화면 없이 홈에서** 찾는다 — 방만 접속 화면으로 간다
+  assert(/setScreen\('entering'\)/.test(app) && /setSearch\(\{ stage: 'waking'/.test(app),
     '  시작할 때 길이 갈린다');
+  assert(!/screen === 'matching'/.test(app), '  빠른 매칭 로딩 화면은 없다');
 }
 
 // [stated] **빠른 매칭의 '다시 하기' 는 새 상대를 찾는다.**
@@ -147,7 +149,8 @@ console.log('두 길이 따로 있다');
 console.log('다시 하기가 갈래마다 다르다');
 {
   const app = fs.readFileSync('src/App.jsx', 'utf8');
-  assert(/session\?\.mode === 'queue'[\s\S]{0,200}setScreen\('matching'\)/.test(app),
+  // 로딩 화면이 없어져 **홈에서** 다시 찾는다
+  assert(/session\?\.mode === 'queue'[\s\S]{0,200}setSearch\(\{ stage: 'waking'/.test(app),
     '  빠른 매칭은 처음부터 다시 찾는다');
   // [stated] **다시 하기는 묻고 시작한다** — 방에서는 신청만 보내고 상대가 수락해야 새 판이 열린다
   assert(/'create' \|\| session\?\.mode === 'join'[\s\S]{0,240}askAgain\(\)/.test(app),

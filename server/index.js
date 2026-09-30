@@ -1327,7 +1327,9 @@ wss.on('connection', (ws, req) => {
       if (ws.room && ws.watching){ ws.room.watchers.delete(ws); ws.close(); return; }
       if (ws.room && ws.slot >= 0) ws.room.quit(ws.slot);
       else if (ws.room){ const i = ws.room.waitingList.indexOf(ws); if (i >= 0) ws.room.waitingList.splice(i, 1); ws.room.sendLobby(); ws.room.sendRoom(); }
-      else { const i = waiting.indexOf(ws); if (i >= 0) waiting.splice(i, 1); }
+      // **대기열은 모드별 목록(Map)이다.** 예전엔 `waiting.indexOf` 를 불러 예외가 났고,
+      // 메시지 처리에 try 가 없어 **서버가 통째로 죽을 수 있었다** (대기 중 'bye' 를 보내면)
+      else { const q = ws.qkey ? queueOf(ws.qkey) : null; const i = q ? q.indexOf(ws) : -1; if (i >= 0) q.splice(i, 1); }
       ws.close();
       return;
     }
