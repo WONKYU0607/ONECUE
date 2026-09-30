@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Splash from './ui/screens/Splash.jsx';
 import Home from './ui/screens/Home.jsx';
-import AiStages from './ui/screens/AiStages.jsx';
-import PracticeMenu from './ui/screens/PracticeMenu.jsx';
-import PvpMenu from './ui/screens/PvpMenu.jsx';
 import RankBoard from './ui/screens/RankBoard.jsx';
 import Login from './ui/screens/Login.jsx';
 import Friends from './ui/screens/Friends.jsx';
@@ -23,7 +20,7 @@ import { onLangChange, t } from './i18n/index.js';
 import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
-import { startPlayClock } from './state/questclient.js';
+import { startPlayClock, claimAiRewards } from './state/questclient.js';
 import { playAgain, setRoomMode, getRoom, onRoom, onGo, onKicked, backToLobby,
          onAgainMsg, onModeMsg, askAgain, answerAgain, onAgainAsk, onAgainNo } from './net/connection.js';
 import { scoreDelta } from './game/score.js';
@@ -171,7 +168,9 @@ export default function App(){
       if (tryInnerBack()) return true;
       // [stated] **하단바 뒤로가기는 말 안 해도 넣어야 하는 기본**이다.
       // 새 화면을 만들 때 여기 목록에 넣지 않으면 앱이 그냥 닫힌다
-      if (screen === 'result' || screen === 'ai' || screen === 'practice' || screen === 'pvp'
+      // [stated] PVP·연습은 **홈 칸 안에서** 고른다 — 따로 화면이 없다 (옛 `PvpMenu`·`PracticeMenu` 삭제)
+      // 순위·친구 화면이 이 목록에서 빠져 있어 **하단 뒤로가기를 눌러도 아무 일도 안 났다**
+      if (screen === 'result' || screen === 'ranks' || screen === 'friends'
           || screen === 'shop' || screen === 'costume' || screen === 'quests' || screen === 'mail'){
         goHome(); return true;
       }
@@ -195,6 +194,8 @@ export default function App(){
     else { setSearch({ stage: 'waking', sec: 0, err: '' }); setScreen('home'); }
   }, []);
   const startPractice = useCallback(opt => {
+    // [stated] 연습은 **홈 칸에서 바로** 시작한다 — 찾던 빠른 매칭이 있으면 끝낸다
+    disconnect(); setSearch(null);
     SELF.slot = 0;
     warm({ melee: opt?.melee, soccer: opt?.soccer, n: 2 });
     setSession({ kind: 'practice', ...opt });   // opt: { melee }
@@ -221,6 +222,8 @@ export default function App(){
     setScreen('game');
   }, []);
   const startAi   = useCallback((stage, n = 2) => {
+    // [stated] AI 도 **홈 칸에서 바로** 시작한다 — 찾던 빠른 매칭이 있으면 끝낸다 (연습과 같다)
+    disconnect(); setSearch(null);
     SELF.slot = 0;                       // AI전은 항상 내가 아래쪽
     // [stated] 그림을 미리 받아 둔다 — 안 하면 판이 열릴 때 한 박자 멈춘다.
     // 칼전 AI 를 없애면서 그쪽에 있던 준비 호출이 같이 사라져 여기에 남긴다
@@ -288,7 +291,11 @@ export default function App(){
     }
     // AI 모드에서 이기면 다음 단계가 열린다
     // 모드별로 따로 기록한다 (1대1을 깼다고 3대3까지 열리면 안 된다)
-    if (session?.kind === 'ai') recordResult(session.stage, r, modeKey(session.n || 2, !!session.melee));
+    if (session?.kind === 'ai'){
+      recordResult(session.stage, r, modeKey(session.n || 2, !!session.melee));
+      // [stated] **단계 첫 클리어 보상** — 이기면 바로 서버에 알려 받는다 (못 받으면 홈에 올 때 다시)
+      if (r === 'win') claimAiRewards().catch(() => {});
+    }
     // [stated] **관전자는 판이 끝나면 로비로** — 결과 화면은 선수의 것이다
     if (SELF.watching){
       setResult(null);
@@ -297,6 +304,13 @@ export default function App(){
     }
     setResult(r); setIsHost(!!host); setScreen('result');
   }, [session, goHome]);
+  // **검사 전용(개발 서버 `?e2e=1`)** — 판을 이긴/진 것으로 끝낸다. 승패 판정(시뮬)은 건드리지 않고
+  // **그 뒤**(AI 단계 기록 → 보상 받기 → 결과 화면)를 진짜로 돌려 보려는 것. 빌드에는 안 들어간다
+  useEffect(() => {
+    if (!e2eSkipLogin()) return undefined;
+    window.__e2eFinish = r => onFinish(r, null, false);
+    return () => { delete window.__e2eFinish; };
+  }, [onFinish]);
   // [stated] **판이 끝나면 방으로 돌아온다** — 친구방이면 로비 화면으로
   const backToRoom = useCallback(() => {
     setResult(null);
@@ -360,7 +374,7 @@ export default function App(){
         setScreen('login');
       }} />}
       {screen === 'login'    && <Login onDone={() => { goHome(); goHomeFirst(); }} />}
-      {screen === 'home'     && <Home onStart={beginPvp} search={search && session?.mode === 'queue' ? { ...search, session } : null} onCancelSearch={cancelSearch} onAi={() => setScreen('ai')} onPractice={() => setScreen('practice')} onMelee={startMelee}
+      {screen === 'home'     && <Home onStart={beginPvp} search={search && session?.mode === 'queue' ? { ...search, session } : null} onCancelSearch={cancelSearch} onAi={startAi} onPractice={startPractice} onMelee={startMelee}
                                      onSettings={() => setShowSettings(true)}
                                      onRanks={k => { setRankKind(k); setScreen('ranks'); }}
                                      onJoin={beginPvp}
@@ -375,9 +389,6 @@ export default function App(){
       {screen === 'mail'     && <Mailbox onBack={goHome} />}
       {screen === 'shop'     && <Shop onBack={goHome} />}
       {screen === 'costume'  && <Costume onBack={goHome} />}
-      {screen === 'ai'       && <AiStages onBack={goHome} onStart={startAi} />}
-      {screen === 'practice' && <PracticeMenu onBack={goHome} onStart={startPractice} />}
-      {screen === 'pvp'      && <PvpMenu onBack={goHome} onStart={beginPvp} />}
       {/* [stated] **빠른 매칭과 방은 길이 다르다.** 한 화면에서 갈래를 나누다 계속 샜다 */}
       {/* [stated] 빠른 매칭은 **홈 위에서** 돈다. 찾는 동안엔 아무것도 안 그리고, 잡히면 VS 화면을 덮는다 */}
       {search && screen === 'home' && session?.mode === 'queue' &&

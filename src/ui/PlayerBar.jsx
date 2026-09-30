@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import TierIcon from './TierIcon.jsx';
 import ProfileTab from './ProfileTab.jsx';
-import { getNick, avatarPos } from '../state/profile.js';
+import { getNick } from '../state/profile.js';
+import ProfAvatar from './ProfAvatar.jsx';
 import { scoreOf, ticketsLeft, nextTicketIn, fmtLeft } from '../state/tickets.js';
 import { fitBar } from '../state/homeLayout.js';
 import { getSettings, setSetting } from '../state/settings.js';
@@ -60,7 +61,8 @@ export default function PlayerBar({ onSettings, onFriends }){
     <>
       <div className="pbar">
         <button className="pcell prof-btn" onClick={() => setProf(true)} aria-label={t('home.profile')}>
-          <span className="prof-av" style={{ backgroundPositionX: avatarPos() }} />
+          {/* [stated] 코스튬에서 고른 **프로필 캐릭터** (기본 또는 보유 스킨) */}
+          <ProfAvatar />
           <span className="prof-name">{getNick()}</span>
         </button>
 

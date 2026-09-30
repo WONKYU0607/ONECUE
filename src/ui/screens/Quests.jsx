@@ -3,8 +3,8 @@
 // 진행도·보상은 **서버가 쥔다** — 여기서는 받아 와서 보여주고, [받기] 를 누르면 서버가 판정한다.
 // **못 받아도 화면은 떠야 한다** (서버가 자고 있을 수 있다).
 import { useState, useEffect, useCallback } from 'react';
-import { fetchQuest, claimQuest, setCoin, pendingSec } from '../../state/questclient.js';
-import { questsOf, PAY, doneOf, allDone } from '../../state/quests.js';
+import { fetchQuest, claimQuest, setCoin, withTime } from '../../state/questclient.js';
+import { questsOf, PAY, doneOf, allDone, claimable } from '../../state/quests.js';
 import { setInnerBack } from '../../state/back.js';
 import { t } from '../../i18n/index.js';
 import FitText from '../FitText.jsx';
@@ -39,13 +39,17 @@ export default function Quests({ onBack }){
     return () => clearInterval(id);
   }, []);
 
-  const per = (data && data[tab]) || { v: {}, got: [] };
+  // 시간 퀘스트는 **서버 값에 아직 안 들어간 초까지** 얹어 보여준다 —
+  // 서버에는 1분마다 몰아 보내므로 그 사이 숫자가 멈추거나 되돌아가면 안 올라가는 줄 안다
+  const per = withTime(tab, (data && data[tab]) || { v: {}, got: [] });
   const list = questsOf(tab);
   const pay = PAY[tab];
+  // [stated] **보상 한번에 받기** — 이 탭에서 지금 받을 수 있는 걸 전부(전부 완료 보상 포함)
+  const ready = claimable(tab, per);
 
-  // [stated] **퀘스트마다 [받기]** — 아래의 "N 코인 받기" 한 방 버튼은 없앴다.
+  // [stated] **퀘스트마다 [받기]**. `id` 없이 부르면 이 탭 전부 ([보상 한번에 받기]).
   // 받을 자격은 서버가 다시 판정한다
-  const take = async id => {
+  const take = async (id = '') => {
     if (busy) return;
     setBusy(true);
     // [stated] **"N 코인을 받았습니다" 알림은 안 띄운다.** 코인 숫자와 [받음] 표시로 충분하다
@@ -54,12 +58,7 @@ export default function Quests({ onBack }){
     await load();
   };
 
-  // 시간 퀘스트는 **서버에 아직 안 보낸 초까지** 더해 보여준다 —
-  // 서버에는 1분마다 몰아 보내므로 그 사이 숫자가 멈춰 있으면 안 올라가는 줄 안다
-  const valOf = q => {
-    const base = (per.v && per.v[q.id]) | 0;
-    return q.time ? Math.min(q.goal, base + pendingSec()) : base;
-  };
+  const valOf = q => (per.v && per.v[q.id]) | 0;
 
   return (
     <div className="screen list quests">
@@ -114,6 +113,10 @@ export default function Quests({ onBack }){
         })()}
       </div>
 
+      {/* [stated] 전부 완료 보상 줄 **바로 밑**. 목록이 길어 굴러가도 이 버튼은 늘 보인다 */}
+      <button className="q-takeall" disabled={busy || !ready} onClick={() => take()}>
+        {t('q.takeAll')}
+      </button>
       </div>
     </div>
   );

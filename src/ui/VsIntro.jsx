@@ -37,15 +37,21 @@ const SHOW_MS = 3000;
 // [stated] **기본과 스킨 크기가 달랐고 스킨이 잘렸다.**
 // 배율을 `92 / 칸높이` 로 잡아 스킨이 작아졌고, 높이를 92 로 고정해 칸이 큰 스킨이 넘쳤다.
 // 시트에서 직접 잰 값을 넣는다 — `bh` 몸통, `ax`~`aw` 가로 창, `by` 캐릭터 아래끝(칸 위에서)
+// [stated] **스킨을 입으면 VS 화면에서 내 위치가 달라지고, 칼전은 캐릭터가 아예 안 보였다.**
+// 원인 둘 (2026-09-30, 실제 화면으로 재서 확인):
+//  1) 스킨일 때 **초상화 상자 자체를 스킨 칸 크기로 바꿨다**(총격 폭 +26px·높이 +8px).
+//     VS 자리는 무리 전체의 폭·높이로 크기와 위치를 푸는데, 한 칸이 커지니 **무리 전체가 줄고 밀렸다**
+//     (총격 1대1: 내 줄이 왼쪽 26px·아래 24px). 팀원과도 줄이 안 맞았다.
+//  2) 칼전 스킨 시트가 10줄(코인 5 + 결제 5)로 늘었는데 여기는 **5줄로 적혀 있었다** →
+//     그림이 세로로 반으로 눌려 1~5번은 두 캐릭터가 겹친 모양, **6~10번은 시트 밖을 가리켜 빈칸**.
+// → **상자는 늘 기본 캐릭터 크기 그대로** 두고, 스킨은 그 안에 **게임과 같은 규칙으로 겹쳐** 그린다:
+//   기본 칸과 **같은 배율**로, 가로 가운데·아래 끝을 기본 칸에 맞춘다(`render.js` 와 같다).
+//   날개·후광처럼 기본보다 넓은 부분은 상자 밖으로 삐져나오게 둔다(자리는 안 먹는다).
+// 줄 수는 **실제 시트에서** 셌다: 총격 320x480 = 4열 x 8줄, 칼전 2160x1310 = 8열 x 10줄, 축구 1040x260 = 13열 x 5줄
 const SKIN_SHEET = {
-  // [stated] **스킨 시트를 기본과 같은 자리에 다시 맞췄다**(사거리가 짧게 느껴지던 원인) →
-  // 잘라 쓰는 자리도 새 시트 기준으로. 몸통 발끝 y 와 몸통 높이는 실제로 재서 넣은 값이다
-  soccer: { src: 'assets/soccer-skins.webp', cw: 80,  ch: 52,  cols: 13, rows: 5, still: 0,
-            ax: 23, aw: 33,  by: 51,  bh: 45,  vh: 92 },
-  melee:  { src: 'assets/melee-skins.webp',  cw: 270, ch: 131, cols: 8,  rows: 5, still: 0,
-            ax: 66, aw: 130, by: 129, bh: 92,  vh: 92 },
-  gun:    { src: 'assets/gun-skins.webp',    cw: 80,  ch: 60,  cols: 4,  rows: 8, still: 0,
-            ax: 9,  aw: 61,  by: 59,  bh: 48,  vh: 100 }
+  soccer: { src: 'assets/soccer-skins.webp', cw: 80,  ch: 52,  cols: 13, rows: 5,  still: 0 },
+  melee:  { src: 'assets/melee-skins.webp',  cw: 270, ch: 131, cols: 8,  rows: 10, still: 0 },
+  gun:    { src: 'assets/gun-skins.webp',    cw: 80,  ch: 60,  cols: 4,  rows: 8,  still: 0 }
 };
 // 기본 캐릭터가 화면에서 차지하던 몸통 크기 (92 x 몸통 / 칸높이)
 const TGT = { gun: 92, melee: 80.8, soccer: 79.6 };
@@ -57,32 +63,45 @@ const SHEET = {
 };
 
 function Portrait({ kind, color, zoom = 1, skin = 0 }){
-  // 스킨이 있으면 스킨 시트를 쓴다 (자리·크기는 그대로)
+  const sh = SHEET[kind] || SHEET.gun;
   const sk = skin | 0;
-  const ss = sk > 0 ? SKIN_SHEET[kind] : null;
-  const sh = ss || SHEET[kind] || SHEET.gun;
+  const ss = sk > 0 && sk <= (SKIN_SHEET[kind] || {}).rows ? SKIN_SHEET[kind] : null;
   const ci = Math.max(0, color | 0);
-  const cx = ss ? ss.still : sh.col(ci), cy = ss ? sk - 1 : sh.row(ci);
   // 칸 높이를 이 크기에 맞춘다. **가로·세로 배율을 따로 주면 안 된다** — 찌그러진다
   const k = (TGT[kind] || TGT.gun) * zoom / sh.bh;
+  const boxW = Math.round((sh.aw || sh.cw) * k), boxH = Math.round((sh.vh || 92) * zoom);
+  // 기본 칸이 상자 안에서 놓이는 자리 (칸 왼쪽 위 / 칸 가운데 / 칸 아래 끝)
+  const cellL = -(sh.ax || 0) * k, cellT = boxH - (sh.by || sh.ch) * k;
+  const cellCx = cellL + sh.cw * k / 2, cellB = cellT + sh.ch * k;
+  let inner = null;
+  if (ss){
+    const w = ss.cw * k, h = ss.ch * k;
+    inner = (
+      <span className="vs-skin" style={{
+        left: Math.round(cellCx - w / 2) + 'px', top: Math.round(cellB - h) + 'px',
+        width: Math.round(w) + 'px', height: Math.round(h) + 'px',
+        backgroundImage: `url(${ss.src})`,
+        backgroundSize: `${Math.round(ss.cw * ss.cols * k)}px ${Math.round(ss.ch * ss.rows * k)}px`,
+        backgroundPosition: `${-Math.round(ss.still * ss.cw * k)}px ${-Math.round((sk - 1) * ss.ch * k)}px`
+      }} />
+    );
+  }
   return (
     <span className="vs-por" style={{
-      // **그림이 있는 만큼만** 자리를 차지한다 (칸 전체가 아니라)
-      // [stated] 후광·날개가 있는 스킨은 92 로는 **위가 잘린다** → 시트마다 필요한 창 높이(`vh`)
-      width: Math.round((sh.aw || sh.cw) * k) + 'px',
-      height: Math.round((sh.vh || 92) * zoom) + 'px',
-      backgroundImage: `url(${sh.src})`,
+      // **그림이 있는 만큼만** 자리를 차지한다 (칸 전체가 아니라). 스킨이어도 **같은 크기**
+      width: boxW + 'px',
+      height: boxH + 'px',
+      // 스킨이면 기본 그림은 안 그린다 (자리만 잡는다)
+      backgroundImage: ss ? 'none' : `url(${sh.src})`,
       // **시트 전체 크기**를 지정해야 칸이 정확히 맞는다 (auto 로 두면 세로가 어긋난다)
       backgroundSize: `${Math.round(sh.cw * sh.cols * k)}px ${Math.round(sh.ch * sh.rows * k)}px`,
-      // 높이는 92 로 고정이므로 **캐릭터 발끝을 창 아래에 맞춘다** — 안 그러면 칸이 큰
-      // 스킨이 위아래로 잘린다. `by` 는 칸 위에서 캐릭터 아래끝까지의 거리
+      // 발끝을 창 아래에 맞춘다. `by` 는 칸 위에서 캐릭터 아래끝까지의 거리
       // [stated] **`-${...}` 로 쓰면 값이 음수일 때 `--6px` 이 되어 CSS 가 깨진다.**
-      // 축구 스킨이 그 경우였고(계산값 -6) 자리가 통째로 틀어져 잘려 보였다.
       // 부호를 문자열로 붙이지 말고 **음수 그대로** 넣는다
       backgroundPosition:
-        `${-Math.round((cx * sh.cw + (sh.ax || 0)) * k)}px `
-        + `${-Math.round((cy * sh.ch + (sh.by || sh.ch)) * k - (sh.vh || 92) * zoom)}px`
-    }} />
+        `${-Math.round((sh.col(ci) * sh.cw + (sh.ax || 0)) * k)}px `
+        + `${-Math.round((sh.row(ci) * sh.ch + (sh.by || sh.ch)) * k - (sh.vh || 92) * zoom)}px`
+    }}>{inner}</span>
   );
 }
 

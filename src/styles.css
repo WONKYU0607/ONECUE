@@ -146,13 +146,6 @@ border-radius:50%;animation:spin .8s linear infinite}
 padding:10px 12px;border-bottom:1px solid #1e1e2e}
 .bar-top .title{font:900 15px/1.2 var(--gf);letter-spacing:3px}
 .bar-top .spacer{width:40px}
-.stages{width:100%;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:12px}
-.stage{display:flex;align-items:center;gap:14px;padding:14px;cursor:pointer;
-background:rgba(18,18,28,.92);border:1px solid #2a2a40;color:#e8e8f0;font-family:var(--gf);font-weight:700}
-.stage .no{width:28px;color:#4ec9f0;font:900 17px var(--gf)}
-.stage .nm{flex:1 1 0;min-width:0;text-align:left;font:900 14px var(--gf);letter-spacing:2px}
-.stage .st{font-size:11px;color:#7a7a95}
-.stage.locked{opacity:.4;cursor:default}
 
 /* ---------- 설정 ---------- */
 .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:40;
@@ -211,8 +204,6 @@ font:900 19px/1 var(--gf);letter-spacing:2px;text-indent:2px;text-align:center;p
   box-shadow:0 0 0 1px rgba(78,201,240,0.35),0 0 12px rgba(78,201,240,0.25)}
 .panelbtn.place.go:active{background:#4ec9f0;color:#12121c}
 .hint.record{margin:10px 0 0;letter-spacing:1px}
-.stage.done .st{color:#4ec9f0}
-.stage.done .no{color:#8fd8ff}
 .modal.help{width:min(400px,92vw);max-height:82vh;display:flex;flex-direction:column}
 .help-body{overflow-y:auto;padding:4px 0}
 .help-row{display:flex;gap:10px;padding:9px 14px;border-top:1px solid #1e1e2e}
@@ -405,8 +396,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   width:calc((var(--h-rowH,20) - 4) * var(--u) * 0.875);
   /* 캐릭터 시트는 24칸(6색 x 앞뒤 + 피격). 자리 계산은 profile.js 의 avatarPos() */
   background:var(--chars) 0 0/2400% 100% no-repeat;image-rendering:pixelated}
-/* [stated] 총격전·칼전과 인원을 한 화면에. 모드마다 한 줄씩 */
-.pick-group{width:100%}
 /* [stated] PVP 메뉴의 종목 이름 — **진한 흰색으로, 3포인트 크게** */
 .pick-title{display:block;margin:6px 0 4px;font-family:var(--gf);font-weight:900;
   font-size:15px;letter-spacing:2px;color:#f2f6ff;text-align:center}
@@ -421,19 +410,6 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .pick-row .menu-btn .t{font-size:12px;letter-spacing:.5px;white-space:nowrap}
 .pick-row .menu-btn .tkn{font-size:11px;margin-top:1px}
 .pick-row .menu-btn .tkn .tk-ico{flex:0 0 15px;height:10px}
-.sub-row{margin-top:10px}
-/* [stated] 펼친 단계는 **부모 버튼 바로 아래**로 온다.
-   줄을 **네 칸 격자**로 보고 칸 번호로 자리를 잡는다 (총격전 0 / 칼전·팀전 1 /
-   개인전 2 / 코드 입력 2~3). 방 만들기 칸(줄의 절반)이 정확히 두 칸이라
-   왼쪽 끝이 딱 맞는다. 빈 칸은 `visibility:hidden` 이라 자리는 차지하되 안 보인다.
-   인원은 **옆으로 늘어놓지 않고 한 칸에 세로로 쌓는다** */
-.mk-group{margin-top:6px}
-.mk-lvl{margin-top:6px}
-/* **`flex:1 1 0` 으로는 칸이 안 맞는다.** flex-basis:0 은 box-sizing 과 상관없이
-   내용 상자 기준이라, 금속 틀(좌우 10px)과 여백이 있는 버튼만 26px씩 더 넓어져
-   빈 칸과 폭이 어긋난다(실측 94 vs 68). 폭을 직접 못박아야 격자가 맞는다 */
-.pick-row.mk-lvl > *{flex:0 0 calc((100% - 18px) / 4);min-width:0}
-.mk-slot{visibility:hidden}
 .menu-btn.small{padding:6px 8px}
 .menu-btn.small .t{font-size:12px}
 
@@ -728,7 +704,8 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .vs-half.bot .vs-info{align-items:flex-start}
 
 .vs-row{display:flex;align-items:center;gap:1em;padding:.4em 0;font-size:16px}
-.vs-por{display:block;flex:0 0 auto;background-repeat:no-repeat;image-rendering:auto;
+.vs-skin{position:absolute;background-repeat:no-repeat;pointer-events:none}
+.vs-por{position:relative;overflow:visible;display:block;flex:0 0 auto;background-repeat:no-repeat;image-rendering:auto;
   filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
 .vs-info{display:flex;flex-direction:column;gap:2px}
 .vs-nick{font-size:1.25em;font-weight:900;color:#e8e8f0;white-space:nowrap}
@@ -937,17 +914,17 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .shop-info .ds{font-size:11px;color:#9fb0c8}
 .shop-empty{text-align:center;color:#7f8ea6;padding:24px 0}
 
-/* [stated] 상점 머리: 제목 없이 **뒤로 버튼만 우상단에 작게**.
-   `.menu-btn` 은 min-height 58px + 금속 틀이라 상점에는 너무 크다 → 틀 없는 작은 버튼 */
+/* [stated] 상점·코스튬 머리: 제목 없이 **작은 뒤로 버튼**.
+   `.menu-btn` 은 min-height 58px + 금속 틀이라 상점에는 너무 크다 → 틀 없는 작은 버튼.
+   [stated] **뒤로가기는 어느 화면이든 늘 왼쪽 위** — 퀘스트·우편함·순위 등과 같은 자리.
+   (예전엔 상점·코스튬만 오른쪽 위였다) */
 .shop-head{width:100%;display:flex;align-items:center;gap:7px;
-  justify-content:flex-end;padding:5px 8px 2px}
-/* [stated] **코인은 좌상단, 뒤로는 우상단.** 코스튬 화면도 같은 `.shop-head` 를 쓰는데
-   거기엔 뒤로 버튼만 있다 → `justify-content` 를 그대로 두고 **코인 오른쪽에 남은 자리를 몰아**
-   가른다 (그래야 코스튬 쪽은 지금처럼 뒤로 버튼만 오른쪽에 남는다) */
-.shop-head .coin-tag{flex:0 0 auto;margin-right:auto}
-/* 첫 구매 할인·구매 결과 문구 — **코인 바로 아래 한 줄.**
+  justify-content:flex-start;padding:5px 8px 2px}
+/* 코인은 오른쪽 위 — 상점 일반 탭처럼 코인이 없어도 뒤로는 왼쪽에 그대로 있다 */
+.shop-head .coin-tag{flex:0 0 auto;margin-left:auto}
+/* 첫 구매 할인·구매 결과 문구 — **코인 바로 아래 한 줄, 오른쪽 정렬.**
    코인 옆에 붙였더니 영어가 360px 폰에서 잘렸다 → 한 줄을 다 쓴다 */
-.shop-first{width:100%;padding:0 8px 3px;
+.shop-first{width:100%;padding:0 8px 3px;text-align:right;
   font:700 10px/1.3 var(--gf);color:#ffd873;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .shop-btn{flex:0 0 auto;min-width:0;padding:4px 12px;font:900 12px/1.2 var(--gf);
@@ -1135,6 +1112,34 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
    짧은 폰(16:9)은 위아래가 조금 잘린다 */
 .hb-ai{background:var(--hbai) center/cover no-repeat, rgba(20,40,66,.55)}
 .hb-prac{background:var(--hbprac) center/cover no-repeat, rgba(20,40,66,.55)}
+/* [stated] 연습 칸을 펼치면 버튼이 그림 위에 올라온다 — 친구 대전 칸과 같게 그림을 어둡게 깐다.
+   칸이 낮아(360 폰 98px) 버튼 셋이 들어가게 버튼을 조금 얇게 */
+.hb-prac.open{position:relative;cursor:default;flex-direction:column;padding:6px 8px;
+  background:linear-gradient(rgba(6,10,18,.6), rgba(6,10,18,.6)), var(--hbprac) center/cover no-repeat}
+.hb-prac.open:active{filter:none}
+.pr-col{gap:4px}
+.pr-col .fr-btn{padding:5px 0}
+/* [stated] **AI 모드 칸** — 펼치면 그 자리에 `‹ N단계 ›` · 보상 · 시작하기. 연습 칸과 같게 그림을 어둡게 깐다.
+   360 폰에서 칸이 낮아(98px) 세 줄이 들어가게 줄마다 얇게 */
+.hb-ai.open{cursor:default;flex-direction:column;padding:6px 8px;
+  background:linear-gradient(rgba(6,10,18,.6), rgba(6,10,18,.6)), var(--hbai) center/cover no-repeat}
+.hb-ai.open:active{filter:none}
+.ai-col{gap:5px}
+.ai-col .fr-btn{padding:6px 0}
+.ai-step{display:flex;align-items:center;gap:4px;min-width:0}
+.ai-arr{flex:0 0 auto;width:26px;height:26px;padding:0;cursor:pointer;
+  font:900 16px/1 var(--gf);color:#eaf4ff;
+  background:rgba(22,64,104,.96);border:1px solid #8fd8ff;border-radius:3px}
+.ai-arr:active{filter:brightness(1.3)}
+.ai-arr:disabled{opacity:.3;cursor:default;filter:none}
+/* 넘치면 `FitText` 가 가운데를 축으로 줄인다 — 그래서 가운데 정렬을 flex 로 한다
+   (글자 칸이 부모보다 넓으면 text-align 가운데가 안 먹어 오른쪽으로 삐져나간다) */
+.ai-no{flex:1 1 auto;min-width:0;display:flex;justify-content:center;
+  font:900 16px/1 var(--gf);color:#fff;letter-spacing:1px;text-shadow:0 2px 3px rgba(0,0,0,.8)}
+.ai-pay{display:flex;justify-content:center;min-width:0;
+  font:700 11px/1.2 var(--gf);color:#ffd873;text-shadow:0 1px 2px rgba(0,0,0,.9)}
+.ai-no > span,.ai-pay > span{flex:0 0 auto;white-space:nowrap;transform-origin:center}
+.ai-pay.got{color:#9fb0c8}
 .hb-shop{background:var(--hbshop) center/cover no-repeat, rgba(20,40,66,.55)}
 /* [stated] 친구 대전 배경(520x635, 칸 비율 0.82 그대로). 짧은 폰은 위아래가 조금 잘린다 */
 .hb-friend{background:var(--hbfriend) center/cover no-repeat, rgba(20,40,66,.55)}
@@ -1254,6 +1259,10 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
   background:#8fd0ff;border:1px solid rgba(255,255,255,.5);border-radius:2px;cursor:pointer}
 .cost-eq.off{color:#cfe4ff;background:rgba(20,34,52,.95);border-color:rgba(143,208,255,.7)}
 .cost-item.on{border-color:#8fd0ff;background:rgba(40,110,180,.35)}
+/* [stated] **프로필 캐릭터** 고르기 — 칸 전체를 누른다. 그림 크기는 색 미리보기(`.cost-av`)와 같게 */
+.cost-avpick{cursor:pointer}
+.cost-pav{display:block;flex:0 0 auto;height:56px;width:49px;
+  background:var(--chars) 0 0/2400% 100% no-repeat;image-rendering:pixelated}
 /* [stated] 안 가진 스킨은 **실루엣만** */
 .cost-item.lock i{filter:brightness(0) saturate(0);opacity:.45}
 .cost-item i{display:block}
@@ -1326,7 +1335,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .q-tabs .room-btn{flex:1;min-width:0}
 /* [stated] 주간 8줄이 폰에서 넘친다 → 목록만 따로 굴린다 */
 .q-list{display:flex;flex-direction:column;gap:6px;
-  flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  flex:0 1 auto;min-width:0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .q-row{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;
   background:rgba(12,16,26,.72);border:1px solid rgba(120,140,170,.26);flex:0 0 auto}
 .q-row.done{border-color:#4ec9f0}
@@ -1342,7 +1351,7 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .q-bar span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font:700 10px/1 var(--gf);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.9)}
 .q-pay{flex:0 0 auto;min-width:36px;text-align:right;font:700 12px/1 var(--gf);color:#ffd873}
-/* [stated] **퀘스트마다 [받기]** — 맨 오른쪽. 아래의 "N 코인 받기" 한 방 버튼은 없앴다 */
+/* [stated] **퀘스트마다 [받기]** — 맨 오른쪽 */
 .q-get{flex:0 0 auto;min-width:46px;padding:5px 8px;border-radius:6px;cursor:pointer;
   background:linear-gradient(#2f6ea8,#1b4472);border:1px solid #5a96c8;
   font:700 11px/1 var(--gf);color:#eaf4ff}
@@ -1352,6 +1361,15 @@ font:900 15px/1 var(--gf);cursor:pointer;opacity:.55}
 .q-row.q-bonus{border-color:#c8a24e;background:rgba(26,20,10,.72)}
 .q-row.q-bonus .q-nm{color:#ffd873;flex:1}
 .q-wrap > .menu-btn{flex:0 0 auto}
+/* [stated] **보상 한번에 받기** — 전부 완료 보상 줄 바로 밑. 목록은 내용만큼만 차지해(위 `flex:0 1 auto`)
+   버튼이 줄 밑에 붙고, 목록이 길면 목록만 굴러가고 버튼은 늘 보인다.
+   [stated] 금속 틀(`.menu-btn`) 말고 **일반 CSS** — 줄마다 붙은 [받기] 와 같은 색 */
+.q-takeall{flex:0 0 auto;width:100%;margin-top:8px;padding:12px 10px;border-radius:7px;cursor:pointer;
+  background:linear-gradient(#2f6ea8,#1b4472);border:1px solid #5a96c8;
+  font:900 15px/1 var(--gf);letter-spacing:1px;color:#eaf4ff;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+.q-takeall:active{filter:brightness(1.25)}
+.q-takeall:disabled{cursor:default;background:rgba(12,16,26,.7);border-color:rgba(120,140,170,.3);
+  color:#8ea0b8;text-shadow:none;filter:none}
 /* [stated] 재화 칸 — 코인으로 티켓 사기. 한 줄에 하나씩 쌓는다 */
 .shop-list.money{display:flex;flex-direction:column;gap:10px;padding:10px 8px}
 /* `.shop-card-in` 이 **세로 배치**라 그대로 쓰면 그림이 폭 0 으로 찌그러진다 → 가로로 돌린다.

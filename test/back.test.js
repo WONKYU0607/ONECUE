@@ -129,7 +129,9 @@ console.log('화면 안의 단계부터 돌아간다');
   // 홈으로 보내기 **전에** 물어야 한다
   assert(body.indexOf('tryInnerBack') < body.indexOf("screen === 'result'"),
     '홈으로 보내기 전에 묻는다');
-  for (const f of ['src/ui/screens/PvpMenu.jsx', 'src/ui/screens/AiStages.jsx']){
+  // PVP·연습·친구 대전·AI 는 **홈 칸 안에서** 단계가 있다 — 홈이 한 번 등록하고 칸마다 묻는다
+  // (AI 단계 화면 `AiStages` 는 없앴다 — AI 칸이 홈 안에서 고른다)
+  for (const f of ['src/ui/screens/Home.jsx']){
     const src = fs.readFileSync(f, 'utf8');
     assert(/setInnerBack\(/.test(src), `  ${f} 가 자기 단계를 등록한다`);
     assert(/setInnerBack\(null\)/.test(src), `  ${f} 가 떠날 때 지운다`);

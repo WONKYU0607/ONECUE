@@ -8,7 +8,8 @@
 // 상대에게도 보이려면 `s.skin` 을 서버가 채워야 하고, 그건 소유 배선과 같이 붙인다.
 import { useState, useEffect } from 'react';
 import { setInnerBack } from '../../state/back.js';
-import { getColor, setColor, avatarPos } from '../../state/profile.js';
+import { getColor, setColor, avatarPos, setAv } from '../../state/profile.js';
+import ProfAvatar, { shownAv, avUsable } from '../ProfAvatar.jsx';
 import { tryOf, setTry, ownsSkin } from '../../state/tryskin.js';
 import { GUN_SKINS, MELEE_SKINS, SOCCER_SKINS, MELEE_ARENAS, coinSkinsOf, coinArenasOf,
   GUN_PREV_IMG, GUN_PREV_FW, GUN_PREV_FH, GUN_PREV_COLS, GUN_PREV_ROWS_N,
@@ -54,6 +55,7 @@ export default function Costume({ onBack }){
 
   return (
     <div className="screen list cost">
+      {/* [stated] **뒤로가기는 늘 왼쪽 위** */}
       <div className="shop-head">
         <button className="shop-btn" onClick={onBack}>{t('common.back')}</button>
       </div>
@@ -72,6 +74,32 @@ export default function Costume({ onBack }){
           <span className="cost-av" style={{ backgroundPositionX: avatarPos(color) }} />
         </div>
       </div>
+
+      {/* [stated] **프로필 캐릭터** — 홈 상단바·프로필 창 사진. 기본 캐릭터 또는
+          **가지고 있는** 총격전·칼전 스킨 중에서 고른다 (안 가진 건 아예 안 보인다) */}
+      {(() => {
+        const cur = shownAv();
+        const opts = [{ k: 'base', id: 0 },
+          ...['gun', 'melee'].flatMap(k => [...SHEETS[k].list, ...coinSkinsOf(k)]
+            .map(s => ({ k, id: s.id })).filter(avUsable).sort((x, y) => x.id - y.id))];
+        return (
+          <div className="cost-sec">
+            <span className="cost-h">{t('cost.avatar')}</span>
+            <div className="cost-row">
+              {opts.map(a => {
+                const on = a.k === cur.k && a.id === cur.id;
+                return (
+                  <button key={a.k + a.id} className={'cost-item cost-avpick' + (on ? ' on' : '')}
+                          aria-label={t('cost.avatar') + ' ' + a.k + ' ' + a.id}
+                          onClick={() => { setAv(a.k, a.id); bump(x => x + 1); }}>
+                    <ProfAvatar av={a} color={color} className="cost-pav" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 종목마다 한 줄. 맨 앞은 **기본**(벗기) */}
       {KINDS.map(kind => {

@@ -64,9 +64,10 @@ console.log('티켓 — 친구방은 안 깎는다 (C안)');
   assert(!/this\.charged = new Set\(\)/.test(again),
     '  다시 시작할 때 낸 티켓 기록을 지우지 않는다');
   // 방 만들기 화면에서도 티켓 잠금이 없어야 한다
-  const menu = fs.readFileSync('src/ui/screens/PvpMenu.jsx', 'utf8');
+  // [stated] 방 만들기·코드 입력은 **홈의 친구 대전 칸**에 있다 (옛 PVP 메뉴 화면은 지웠다)
+  const menu = fs.readFileSync('src/ui/FriendBox.jsx', 'utf8');
   // [stated] **방 만들기를 누르면 바로 로비로** — 종목·인원은 로비에서 고른다.
-  // 그래서 이 화면의 `create` 는 **하나뿐**이다(예전엔 종목·인원마다 하나씩 있었다)
+  // 그래서 이 칸의 `create` 는 **하나뿐**이다(예전엔 종목·인원마다 하나씩 있었다)
   const create = menu.match(/mode: 'create'[^}]*}/g) || [];
   assert(create.length === 1, `  방 만들기 버튼은 하나 (${create.length})`);
   assert(!/guard\([^)]*\) => onStart\(\{ mode: 'create'/.test(menu),

@@ -604,7 +604,7 @@ export async function buildRanks(kind = 'gun', top = 30){
 import {
   PAY, PERIODS, questsOf, keyOf, emptyPeriod, doneOf, allDone,
   claimable, bump as qbump, SKIN_COST, SKIN_FIRST_OFF, TICKET_COST,
-  BUY_TK_MAX, BUY_SOC_MAX, PLAY_DAY_MAX, countsOf as questCounts, matchCoin
+  BUY_TK_MAX, BUY_SOC_MAX, PLAY_DAY_MAX, countsOf as questCounts, matchCoin, aiStagePay
 } from '../src/state/quests.js';
 
 // **검사 전용** — `E2E_FAKE_STORE=1` 이면 파이어스토어 없이 같은 코드를 돌린다.
@@ -672,6 +672,7 @@ export async function readQuest(uid){
         mail: box,
         bought: v.bought | 0,
         own: v.own || {},
+        aiPaid: Array.isArray(v.aiPaid) ? v.aiPaid : [],
         buy: v.buy && v.buy.day === dayKey() ? v.buy : { day: dayKey(), tk: 0, soc: 0 }
       };
     });
@@ -784,6 +785,35 @@ export async function claimQuest(uid, p, id = ''){
     });
   } catch (e){
     console.log('[store] 보상 받기 실패', e && e.code);
+    return { ok: false, why: 'err' };
+  }
+}
+
+/** [stated] **AI 모드 단계 보상.** `stages` 는 폰이 "깼다" 고 알려 온 단계들.
+ *  **아직 안 받은 단계만** 준다 — 받은 단계는 `aiPaid` 에 적어 두고 다시는 안 준다.
+ *  AI 판은 폰 안에서 돌아 서버가 확인할 수 없으므로 한 번만 준다(최대 총합까지만 나간다).
+ *  `aiPaid` 는 서버만 쓴다 — 보안 규칙의 클라 쓰기 목록에 없다 */
+export async function claimAi(uid, stages){
+  const want = [...new Set((Array.isArray(stages) ? stages : []).map(x => x | 0))]
+    .filter(st => aiStagePay(st) > 0);
+  if (!isOn() || !uid) return { ok: false };
+  if (!want.length) return { ok: false, why: 'none' };
+  try {
+    return await withDoc(uid, async (tx, dbx) => {
+      const ref = dbx && dbx.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const v = d.exists ? d.data() : {};
+      const had = Array.isArray(v.aiPaid) ? v.aiPaid.map(x => x | 0) : [];
+      const fresh = want.filter(st => !had.includes(st)).sort((a, b) => a - b);
+      if (!fresh.length) return { ok: false, why: 'none', paid: had };
+      const coin = fresh.reduce((sum, st) => sum + aiStagePay(st), 0);
+      const paid = [...had, ...fresh].sort((a, b) => a - b);
+      const coinNow = (v.coin | 0) + coin;
+      tx.set(ref, { coin: coinNow, aiPaid: paid }, { merge: true });
+      return { ok: true, coin, got: fresh, total: coinNow, paid };
+    });
+  } catch (e){
+    console.log('[store] AI 보상 실패', e && e.code);
     return { ok: false, why: 'err' };
   }
 }

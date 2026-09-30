@@ -19,6 +19,7 @@ import { createRequire } from 'module';
 import { assert } from './harness.js';
 import { findChrome } from './chrome.js';
 import { fileURLToPath } from 'url';
+import * as Q from '../src/state/quests.js';
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const skip = why => { console.log('e2e-quest.test.js 건너뜀 — ' + why); process.exit(0); };
 let puppeteer;
@@ -108,6 +109,9 @@ try {
     '  코인이 상단바 티켓 옆에 있다');
   assert(await A.evaluate(() => /퀘스트/.test(document.body.innerText)), '  퀘스트 버튼');
   assert(await A.evaluate(() => /우편함/.test(document.body.innerText)), '  우편함 버튼');
+  // [stated] 받을 퀘스트 보상이 있으면 [퀘스트] 에 빨간 점 — 처음엔 받을 게 없다
+  const qDot = p => p.evaluate(() => !!document.querySelector('.home-row .cost-entry.q.dot'));
+  assert(!(await qDot(A)), '  받을 게 없으면 [퀘스트] 에 빨간 점이 없다');
 
   console.log('퀘스트 화면 — 일일 6 · 주간 8 · 월간 7');
   await tap(A, '퀘스트'); await wait(1800);
@@ -131,8 +135,18 @@ try {
       allDisabled: [...document.querySelectorAll('.q-row .q-get')].every(b => b.disabled),
       bonusLast: !!bonus && bonus === last,
       bonusText: bonus ? bonus.innerText.replace(/\s+/g, ' ') : '',
-      // 아래 한 방 버튼과 점선 상자는 없어졌다
-      noBottom: !document.querySelector('.q-wrap > .menu-btn') && !document.querySelector('.q-all'),
+      noBox: !document.querySelector('.q-all'),
+      // [stated] **보상 한번에 받기** — 전부 완료 보상 줄 바로 밑
+      takeAll: (() => {
+        const t = document.querySelector('.q-takeall');
+        if (!t) return null;
+        const list = document.querySelector('.q-list');
+        const br = bonus.getBoundingClientRect(), tr = t.getBoundingClientRect();
+        return { text: t.innerText.trim(), disabled: t.disabled,
+                 plain: !t.classList.contains('menu-btn') && getComputedStyle(t).borderImageSource === 'none',
+                 afterList: list.nextElementSibling === t,
+                 gap: Math.round(tr.top - br.bottom) };
+      })(),
       barFlex: getComputedStyle(document.querySelector('.q-bar')).flexGrow
     };
   });
@@ -141,7 +155,12 @@ try {
   assert(shape.bonusLast, '  전부 완료 보상이 **맨 마지막 줄**이다');
   assert(/모두 완료 보상/.test(shape.bonusText) && /\+200/.test(shape.bonusText),
     `  보상 줄에 이름과 +200 (${shape.bonusText})`);
-  assert(shape.noBottom, '  아래 "N 코인 받기" 버튼과 점선 상자가 없다');
+  assert(shape.noBox, '  점선 상자가 없다');
+  assert(shape.takeAll && shape.takeAll.text === '보상 한번에 받기', `  [보상 한번에 받기] 버튼이 있다 (${JSON.stringify(shape.takeAll)})`);
+  assert(shape.takeAll && shape.takeAll.afterList && shape.takeAll.gap >= 0 && shape.takeAll.gap <= 20,
+    `  전부 완료 보상 줄 바로 밑에 붙어 있다 (${JSON.stringify(shape.takeAll)})`);
+  assert(shape.takeAll && shape.takeAll.disabled, '  받을 게 없으면 [보상 한번에 받기] 도 꺼져 있다');
+  assert(shape.takeAll && shape.takeAll.plain, '  금속 틀이 아니라 일반 CSS 버튼이다');
   assert(shape.barFlex === '0.7', `  진행바가 30% 줄었다 (flex-grow ${shape.barFlex})`);
 
   // [stated] 접속 시간은 **화면이 보일 때만** 센다. 클라가 1분마다 보내므로 여기서는
@@ -192,6 +211,7 @@ try {
   // "하나만 받기"와 "전부 받기"가 같은 값이라 검사가 헛돈다 (실제로 그래서 못 잡았다)
   for (let i = 0; i < 3; i++) await api('&act=time&sec=300');   // 접속 시간 10분 채우기
   await reopen(A);
+  assert(await qDot(A), '  받을 보상이 생기면 홈 [퀘스트] 에 빨간 점');
   await tap(A, '퀘스트'); await wait(1800);
   const canN = () => A.evaluate(() =>
     [...document.querySelectorAll('.q-row .q-get')].filter(b => !b.disabled).length);
@@ -222,11 +242,73 @@ try {
   // **나머지 줄은 그대로 남아 있어야 한다** — 한 번에 다 받아 버리면 안 된다
   assert(await canN() >= 1, `  다른 줄은 아직 받을 수 있다 (${await canN()})`);
 
+  // [stated] **보상 한번에 받기** — 이 탭에서 받을 수 있는 걸 전부 한 번에
+  console.log('보상 한번에 받기');
+  // 서버가 말하는 "지금 받을 수 있는 코인" 만큼 들어와야 한다
+  const want = Q.claimable('d', (await api('')).d);
+  assert(want >= 100, `  받을 게 남아 있다 (${want})`);
+  const nOn = await canN();
+  const before2 = await coinOf();
+  assert(await A.evaluate(() => !document.querySelector('.q-takeall').disabled), '  받을 게 있으면 켜져 있다');
+  await A.click('.q-takeall'); await wait(2000);
+  const after2 = await coinOf();
+  assert(after2 === before2 + want, `  켜져 있던 ${nOn}줄 몫(${want})이 한 번에 들어온다 (${before2} → ${after2})`);
+  assert(await canN() === 0, `  받기 버튼이 전부 꺼진다 (${await canN()})`);
+  assert(await A.evaluate(() => document.querySelector('.q-takeall').disabled), '  다 받으면 [보상 한번에 받기] 도 꺼진다');
+  const srv = await api('');
+  assert(Q.claimable('d', srv.d) === 0, `  서버에도 전부 받은 걸로 적혔다 (${JSON.stringify(srv.d.got)})`);
+  await tap(A, '‹'); await wait(1500);
+  assert(!(await qDot(A)), '  다 받고 홈에 오면 빨간 점이 꺼진다');
+  await tap(A, '퀘스트'); await wait(1500);
+
+  // **여러 줄을 한 번에** — 같은 판을 한 상대(B2)는 아직 아무것도 안 받았다
+  console.log('보상 한번에 받기 — 여러 줄이 한 번에');
+  const api2 = q => fetch(`http://127.0.0.1:${SP}/quest?token=e2e-user2${q}`).then(r => r.json());
+  for (let i = 0; i < 2; i++) await api2('&act=time&sec=300');
+  await reopen(B2);
+  assert(await qDot(B2), '  홈 [퀘스트] 에 빨간 점');
+  const want2 = Q.claimable('d', (await api2('')).d);
+  await tap(B2, '퀘스트'); await wait(1800);
+  const on2 = await B2.evaluate(() => [...document.querySelectorAll('.q-row .q-get')].filter(b => !b.disabled).length);
+  assert(on2 >= 2 && want2 >= 200, `  받을 줄이 둘 이상 (${on2}줄 · ${want2})`);
+  const coin2 = () => B2.evaluate(() => +(document.querySelector('.coin-tag')?.innerText || '0').replace(/[^0-9]/g, ''));
+  const b2 = await coin2();
+  await B2.click('.q-takeall'); await wait(2000);
+  const a2 = await coin2();
+  assert(a2 === b2 + want2, `  ${on2}줄 몫이 한 번에 (${b2} → ${a2})`);
+  assert(await B2.evaluate(() => [...document.querySelectorAll('.q-row .q-get')].every(b => b.disabled)), '  받기가 전부 꺼진다');
+  assert(Q.claimable('d', (await api2('')).d) === 0, '  서버에도 전부 받은 걸로 적혔다');
+
   console.log('우편함 화면이 열린다');
   await tap(A, '‹'); await wait(1500);
   await tap(A, '우편함'); await wait(1800);
   assert(await A.evaluate(() => /받을 우편이 없습니다/.test(document.body.innerText)),
     '  우편함이 열린다 (지금은 비어 있다)');
+  // [stated] 접속 시간 퀘스트는 **홈에 가만히 있어도** 채워진다 → 화면을 안 옮겨도 빨간 점이 켜져야 한다.
+  // 서버에는 1분마다 몰아 보내므로 그 사이 안 보낸 초까지 쳐서 본다
+  console.log('홈에 가만히 있다가 접속 시간이 차면 빨간 점이 켜진다');
+  const api3 = q => fetch(`http://127.0.0.1:${SP}/quest?token=e2e-user3${q}`).then(r => r.json());
+  await api3('&act=time&sec=300'); await api3('&act=time&sec=292');      // 9분 52초
+  const C = await dev(false, '3');
+  await C.waitForSelector('.screen.home', { timeout: 20000 });
+  await wait(1500);
+  assert(!(await qDot(C)), '  처음엔 꺼져 있다 (9분 52초)');
+  let lit = false;
+  for (let i = 0; i < 30 && !lit; i++){ await wait(1000); lit = await qDot(C); }
+  assert(lit, '  몇 초 지나 10분이 되면 화면을 안 옮겨도 켜진다');
+  // 서버는 아직 10분이 안 된 줄 안다 — [받기] 가 **먼저 쌓인 시간을 보내고** 받아야 한다
+  const srv3 = await api3('');
+  assert((srv3.d.v['d.time'] | 0) < 600, `  서버는 아직 10분 전 (${srv3.d.v['d.time'] | 0})`);
+  await tap(C, '퀘스트'); await wait(1800);
+  const c3 = () => C.evaluate(() => +(document.querySelector('.coin-tag')?.innerText || '0').replace(/[^0-9]/g, ''));
+  const b3 = await c3();
+  assert(await C.evaluate(() => !document.querySelector('.q-takeall').disabled), '  [보상 한번에 받기] 가 켜져 있다');
+  await C.click('.q-takeall'); await wait(2000);
+  const a3 = await c3();
+  assert(a3 === b3 + 100, `  접속 시간 보상이 실제로 들어온다 (${b3} → ${a3})`);
+  await tap(C, '‹'); await wait(1500);
+  assert(!(await qDot(C)), '  받고 나면 꺼진다');
+
   console.log('e2e-quest.test.js 통과');
 } finally {
   await b.close().catch(() => {});

@@ -9,6 +9,12 @@ const KEY = 'duel.profile.v1';
 // 고를 수 있는 색 수 (config 의 COLOR_COUNT 와 같아야 한다)
 const COLORS = 6;
 const okColor = c => (Number.isInteger(c) && c >= 0 && c < COLORS) ? c : 0;
+// [stated] **프로필 캐릭터** — 기본 캐릭터 또는 보유한 총격전·칼전 스킨.
+// `{ k: 'base' | 'gun' | 'melee', id }`. 기본이면 id 0. 스킨 번호는 게임 시트 줄(1부터)
+const AV_KINDS = ['base', 'gun', 'melee'];
+const BASE_AV = { k: 'base', id: 0 };
+export const okAv = a => ((a && AV_KINDS.includes(a.k) && Number.isInteger(a.id) && a.id >= 0 && a.id <= 20)
+  ? { k: a.k, id: a.k === 'base' ? 0 : a.id } : BASE_AV);
 
 export const NICK_BUDGET = 10;
 export const NICK_MAX = 10;           // 영문 기준 최대 글자 수 (안내용)
@@ -43,9 +49,9 @@ function read(){
   try {
     const v = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (v && typeof v.nick === 'string' && v.nick.trim())
-      return { nick: clampNick(v.nick), color: okColor(v.color) };
+      return { nick: clampNick(v.nick), color: okColor(v.color), av: okAv(v.av) };
   } catch { /* 무시 */ }
-  const m = { nick: makeDefault(), color: 0 };
+  const m = { nick: makeDefault(), color: 0, av: BASE_AV };
   try { localStorage.setItem(KEY, JSON.stringify(m)); } catch { /* 무시 */ }
   return m;
 }
@@ -81,13 +87,28 @@ export function setNick(v){
   if (onSaved) { try { onSaved(); } catch { /* 무시 */ } }
   return cur.nick;
 }
-// 구름과 잇는 부분
-export const nickSnapshot = () => ({ nick: cur.nick, color: cur.color });
+/** 고른 프로필 캐릭터 (보유 여부는 그리는 쪽이 본다 — `ProfAvatar`) */
+export const getAv = () => okAv(cur.av);
+export function setAv(k, id = 0){
+  cur = { ...cur, av: okAv({ k, id: id | 0 }) };
+  avSent = true;
+  try { localStorage.setItem(KEY, JSON.stringify(cur)); } catch { /* 무시 */ }
+  if (onSaved) { try { onSaved(); } catch { /* 무시 */ } }
+  return cur.av;
+}
+// 구름과 잇는 부분.
+// **`av` 는 한 번이라도 고르거나 구름에 있을 때만 싣는다.** 보안 규칙에 `av` 를 추가하기 전에
+// 늘 실어 보내면 규칙이 문서 쓰기 **전체**를 막아 색·AI 기록까지 저장이 안 된다
+let avSent = false;
+export const nickSnapshot = () => ({ nick: cur.nick, color: cur.color,
+  ...(avSent || okAv(cur.av).k !== 'base' ? { av: okAv(cur.av) } : {}) });
 export function hydrateNick(v){
   if (v && typeof v.nick === 'string' && v.nick.trim()){
     // **색을 같이 챙긴다.** 예전엔 nick 만 담아서, 구름에서 받아오는 순간
     // 골라둔 색이 통째로 사라지고 getColor() 가 undefined 가 됐다
-    cur = { nick: clampNick(v.nick), color: okColor(v.color != null ? v.color : cur.color) };
+    if (v.av) avSent = true;
+    cur = { nick: clampNick(v.nick), color: okColor(v.color != null ? v.color : cur.color),
+            av: v.av ? okAv(v.av) : okAv(cur.av) };
     try { localStorage.setItem(KEY, JSON.stringify(cur)); } catch { /* 무시 */ }
     return true;
   }

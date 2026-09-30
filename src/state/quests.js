@@ -36,6 +36,12 @@ export function matchCoin(res, streak = 0){
   return Math.round(WIN_COIN * streakMul(streak | 0));
 }
 
+// [stated] **AI 모드 단계 보상** — 1단계 100, 한 단계마다 100씩 더해 30단계 3,000.
+// [stated] **단계마다 처음 깰 때 한 번만.** AI 판은 서버가 아니라 폰 안에서 돌아 서버가 이겼는지
+// 확인할 수 없다 — 몇 번이고 주면 조작으로 무한히 받아 간다. 한 번만 주면 최대가 총합(46,500)이다
+export const AI_STAGE_MAX = 30;
+export const aiStagePay = st => (Number.isInteger(st) && st >= 1 && st <= AI_STAGE_MAX ? st * 100 : 0);
+
 // [stated] 게임 누적 접속 시간 — **화면이 보일 때만** 센다.
 // 하루에 인정하는 상한을 둔다: 안 두면 시간을 조작해 크게 보낼 수 있다
 export const PLAY_DAY_MAX = 4 * 60 * 60;   // 하루 4시간까지만 인정 (초)

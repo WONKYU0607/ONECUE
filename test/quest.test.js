@@ -238,5 +238,35 @@ console.log('친구방도 퀘스트는 인정한다 (코드 검사)');
   assert(q < stop, '  퀘스트를 **점수 동결보다 먼저** 처리한다 (친구방에서도 쌓인다)');
 }
 
+// [stated] AI 모드 단계 보상 — 1단계 100, 단계마다 100씩, 30단계 3,000. **단계마다 처음 한 번만**
+console.log('AI 단계 보상');
+{
+  assert(Q.aiStagePay(1) === 100 && Q.aiStagePay(5) === 500 && Q.aiStagePay(30) === 3000, '  1단계 100 · 5단계 500 · 30단계 3,000');
+  assert(Q.aiStagePay(0) === 0 && Q.aiStagePay(31) === 0 && Q.aiStagePay(2.5) === 0, '  없는 단계는 0');
+  let all = 0; for (let st = 1; st <= 30; st++) all += Q.aiStagePay(st);
+  assert(all === 46500, `  전부 합해 46,500 (${all})`);
+
+  const U = 't.ai';
+  const c0 = (await S.readQuest(U)).coin | 0;
+  // 보상이 생기기 전에 깬 1~4단계를 한 번에
+  const a = await S.claimAi(U, [1, 2, 3, 4]);
+  assert(a.ok && a.coin === 1000, `  1~4단계 한 번에 1,000 (${a.coin})`);
+  assert((await S.readQuest(U)).coin === c0 + 1000, '  코인에 들어갔다');
+  assert(JSON.stringify((await S.readQuest(U)).aiPaid) === '[1,2,3,4]', '  받은 단계가 적혔다');
+  // 같은 단계는 다시 안 준다
+  const b = await S.claimAi(U, [1, 2, 3, 4]);
+  assert(!b.ok && b.why === 'none', '  같은 단계를 또 받을 수 없다');
+  // 받은 것 + 새로 깬 것을 같이 보내면 새것만
+  const c = await S.claimAi(U, [3, 4, 5]);
+  assert(c.ok && c.coin === 500 && JSON.stringify(c.got) === '[5]', `  새로 깬 5단계만 500 (${c.coin})`);
+  // 이상한 값은 무시한다
+  const d = await S.claimAi(U, [0, -1, 31, 999, 'x', 5]);
+  assert(!d.ok, '  없는 단계·받은 단계만 보내면 아무것도 안 준다');
+  assert((await S.readQuest(U)).coin === c0 + 1500, '  합계 1,500');
+  // 서버 입구가 `st=1,2,3` 을 받는다
+  const src = fs.readFileSync('server/index.js', 'utf8');
+  assert(/act === 'ai'\)\s*return store\.claimAi\(me,/.test(src), '  /quest?act=ai 가 claimAi 로 간다 (본인 확인 뒤)');
+}
+
 back();
 console.log('quest.test.js 통과');

@@ -1,5 +1,5 @@
-// PVP 입장 티켓 판정 — 홈 PVP 칸과 PvpMenu 가 같이 쓴다.
-// 예전엔 PvpMenu 안에만 있었는데, 홈에서 바로 시작하게 되면서 두 곳이 필요해졌다.
+// PVP 입장 티켓 판정 — 홈 PVP 칸(`PvpBox`)이 쓴다.
+// 예전엔 옛 PVP 메뉴 화면(`PvpMenu`, 삭제) 안에 있었다.
 // **한 곳에 둬야** 디버그 스위치를 한 번만 끄면 된다
 import { leftFor, maxFor, socLeft } from '../state/tickets.js';
 

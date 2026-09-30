@@ -124,24 +124,48 @@ try {
   }, sel);
 
   for (const [w, lang] of [[393, 'ko'], [360, 'ko'], [393, 'en'], [360, 'en']]){
-    console.log(`코인이 좌상단에 있다 — ${w}px · ${lang}`);
+    // [stated] **상점만 반대였다** → 뒤로 좌상단 · 코인 우상단 (퀘스트·우편함과 같은 자리)
+    console.log(`뒤로는 좌상단, 코인은 우상단 — ${w}px · ${lang}`);
     assert(await openShop(w, lang), '  상점이 열린다');
     const head = await box('.screen.shop .shop-head');
     const tag = await box('.screen.shop .shop-head .coin-tag');
     const tabs = await box('.screen.shop .shop-tabs.pay');
     const back = await box('.screen.shop .shop-head .shop-btn');
     assert(tag, '  코인이 머리줄 안에 있다');
-    assert(tag.x - head.x <= 12, `  왼쪽에 붙어 있다 (머리줄에서 ${tag.x - head.x}px)`);
-    assert(tag.r < w / 2, `  화면 왼쪽 절반 안이다 (오른쪽 끝 ${tag.r} < ${Math.round(w / 2)})`);
+    assert(head.r - tag.r <= 12, `  코인이 오른쪽에 붙어 있다 (머리줄 끝에서 ${head.r - tag.r}px)`);
+    assert(tag.x > w / 2, `  화면 오른쪽 절반 안이다 (왼쪽 끝 ${tag.x} > ${Math.round(w / 2)})`);
     assert(tag.y < tabs.y, `  탭보다 위다 (${tag.y} < ${tabs.y})`);
-    assert(head.r - back.r <= 12, `  뒤로는 그대로 오른쪽 끝이다 (${head.r - back.r}px)`);
+    assert(back.x - head.x <= 12, `  뒤로가 왼쪽 끝이다 (${back.x - head.x}px)`);
 
     const tx = await box('.screen.shop .shop-first');
     assert(tx && /50/.test(tx.tx), `  할인 문구가 있다 ("${tx && tx.tx}")`);
     assert(!tx.cut, `  문구가 안 잘린다 ("${tx.tx}")`);
     assert(tx.y >= tag.y, '  코인 바로 아래다');
     assert(tx.y < tabs.y, `  탭보다 위다 (${tx.y} < ${tabs.y})`);
-    assert(tx.x - head.x <= 12, `  왼쪽에 붙어 있다 (${tx.x - head.x}px)`);
+    // [stated] **코인 아이콘 밑** — 글자 오른쪽 끝이 코인 오른쪽 끝과 맞는다
+    const txr = await p.evaluate(() => {
+      const el = document.querySelector('.screen.shop .shop-first');
+      const rg = document.createRange(); rg.selectNodeContents(el);
+      const r = rg.getBoundingClientRect();
+      return { l: Math.round(r.left), r: Math.round(r.right) };
+    });
+    assert(Math.abs(txr.r - tag.r) <= 3, `  글자 오른쪽 끝이 코인 오른쪽 끝과 맞는다 (${txr.r} / ${tag.r})`);
+    assert(txr.l > back.r, `  뒤로 버튼 밑이 아니다 (글자 왼쪽 ${txr.l} > 뒤로 오른쪽 ${back.r})`);
+  }
+
+  console.log('일반 탭(코인 없음)에서도 뒤로는 왼쪽 그대로');
+  {
+    assert(await openShop(393, 'ko'), '  상점이 열린다');
+    const toGen = await p.evaluate(() => {
+      const el = [...document.querySelectorAll('.shop-tabs.pay .shop-btn')].find(b2 => (b2.innerText || '').trim() === '일반');
+      if (!el) return false; el.click(); return true;
+    });
+    assert(toGen, '  일반 탭으로 옮겼다');
+    await wait(500);
+    const head = await box('.screen.shop .shop-head');
+    const back = await box('.screen.shop .shop-head .shop-btn');
+    assert(!(await box('.screen.shop .shop-head .coin-tag')), '  일반 탭엔 코인이 없다');
+    assert(back.x - head.x <= 12, `  뒤로가 왼쪽 끝이다 (${back.x - head.x}px)`);
   }
 
   // [stated] "축구 티켓 300원도 노란색 표시 해놔"
@@ -214,7 +238,7 @@ try {
     const tx = await box('.screen.shop .shop-first');
     assert(!/50/.test((tx && tx.tx) || ''), `  할인 문구가 사라졌다 ("${tx && tx.tx}")`);
     const after = await box('.screen.shop .shop-head .coin-tag');
-    assert(after, '  코인은 그대로 좌상단에 있다');
+    assert(after, '  코인은 그대로 우상단에 있다');
     assert(+after.tx.replace(/[^0-9]/g, '') === +before.tx.replace(/[^0-9]/g, '') - NEED,
       `  6,000 이 빠졌다 (${before.tx} → ${after.tx})`);
 
@@ -224,7 +248,8 @@ try {
     assert(!tx2, '  다시 열어도 문구 줄 자체가 없다');
   }
 
-  console.log('코스튬 화면의 뒤로 버튼은 그대로 우상단이다');
+  // [stated] **뒤로가기는 늘 왼쪽 위** — 코스튬도 (예전엔 오른쪽 위였다)
+  console.log('코스튬 화면의 뒤로 버튼도 좌상단이다');
   {
     await p.goto(`http://127.0.0.1:${VP}/?e2e=1`, { waitUntil: 'networkidle0' });
     await p.waitForSelector('.screen.splash.ready', { timeout: 20000 }).catch(() => {});
@@ -240,7 +265,7 @@ try {
     const head = await box('.screen.cost .shop-head');
     const back = await box('.screen.cost .shop-head .shop-btn');
     assert(!(await box('.screen.cost .shop-head .coin-tag')), '  여기엔 코인이 없다');
-    assert(head.r - back.r <= 12, `  뒤로가 오른쪽 끝이다 (${head.r - back.r}px)`);
+    assert(back.x - head.x <= 12, `  뒤로가 왼쪽 끝이다 (${back.x - head.x}px)`);
   }
 
   console.log('e2e-shopcoin.test.js 통과');

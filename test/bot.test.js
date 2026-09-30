@@ -116,11 +116,13 @@ console.log('모든 모드가 팀 화면 없이 바로 시작한다');
   assert(/this\.hasBots/.test(lob), '봇으로 채운 방도 안 보낸다');
 
   // [stated] 색은 프로필에서 한 번 고른 걸 계속 쓴다. 판마다 고르지 않는다
-  const menu = fs.readFileSync('src/ui/screens/PvpMenu.jsx', 'utf8');
+  // [stated] PVP 는 **홈 PVP 칸 안에서** 종목·인원을 고른다 (옛 PVP 메뉴 화면은 지웠다)
+  const menu = fs.readFileSync('src/ui/PvpBox.jsx', 'utf8');
   assert(!/setStep\('color'\)/.test(menu), '메뉴에 색 고르기 단계가 없다');
   assert(/getColor\(\)/.test(menu), '프로필에 저장된 색을 쓴다');
-  // 총격전·칼전과 인원이 한 화면에 있다
-  assert(/pick-group/.test(menu), '모드와 인원이 한 화면에 있다');
+  // 종목을 펼치면 그 안에 인원과 시작하기가 같이 있다
+  assert(/pvp-sizes/.test(menu) && /pvp-start/.test(menu), '모드와 인원이 한 화면에 있다');
+  assert(!fs.existsSync('src/ui/screens/PvpMenu.jsx'), '옛 PVP 메뉴 화면은 없앴다');
 }
 
 console.log('봇이 사람 색을 뺏지 않는다');

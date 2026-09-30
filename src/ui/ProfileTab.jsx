@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { getNick, setNick, clampNick, NICK_MAX, NICK_MAX_KO, getColor, setColor, avatarPos } from '../state/profile.js';
+import { getNick, setNick, clampNick, NICK_MAX, NICK_MAX_KO, getColor, setColor } from '../state/profile.js';
 import { scoreOf } from '../state/tickets.js';
 import { tierOf, tierName } from '../state/rank.js';
 import TierIcon from './TierIcon.jsx';
+import ProfAvatar from './ProfAvatar.jsx';
 import { loadAllRanks, cachedRank, fmtRank } from '../state/ranks.js';
 import { resyncAccount } from '../cloud/sync.js';
 import { t } from '../i18n/index.js';
@@ -108,8 +109,8 @@ export default function ProfileTab({ onClose, onFriends }){
 
         {/* 칸으로 묶어 가운데 정렬. 티켓은 상단바에 이미 있어 여기서는 뺐다 */}
         <div className="prof-head prof-card">
-          {/* [stated] 프로필 사진도 고른 색으로 바뀐다. 자리 계산은 profile.js 한 곳에 */}
-          <span className="prof-av" style={{ backgroundPositionX: avatarPos(color) }} />
+          {/* [stated] 프로필 사진 = 코스튬에서 고른 **프로필 캐릭터** (기본이면 고른 색) */}
+          <ProfAvatar color={color} />
           {edit ? (
             <div className="prof-edit-row">
               <input className="code-input nick-input" value={draft}

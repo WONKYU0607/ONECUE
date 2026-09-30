@@ -211,18 +211,20 @@ export default function Shop({ onBack }){
 
   return (
     <div className="screen list shop">
-      {/* [stated] 제목은 빼고, 뒤로 버튼을 **우상단에 작게**.
+      {/* [stated] 제목은 빼고 작은 버튼만.
           탭만으로 어느 화면인지 알 수 있어 제목이 자리를 낭비했다 */}
       <div className="shop-head">
-        {/* [stated] **코인은 좌상단.** 예전엔 탭 밑 한가운데 떠 있어서 눈에 안 들어왔다 */}
-        {pay === 'coin' && <span className="coin-tag">{coin.toLocaleString()}</span>}
+        {/* [stated] **뒤로는 좌상단, 코인은 우상단** — 퀘스트·우편함 화면과 같은 자리.
+            (예전엔 상점만 코인 왼쪽 · 뒤로 오른쪽으로 반대였다) */}
         <button className="shop-btn" onClick={onBack}>{t('common.back')}</button>
+        {pay === 'coin' && <span className="coin-tag">{coin.toLocaleString()}</span>}
       </div>
 
       {/* [stated] **첫 구매 50% 할인 문구도 같이 위로**, 그리고 **한 번 사면 사라진다** —
           `bought` 는 서버가 세는 구매 횟수라 화면을 껐다 켜도 안 되살아난다.
-          코인 **바로 아래 한 줄**로 둔다: 코인 옆에 붙이면 영어(`50% off your first coin
-          purchase`)가 360px 폰에서 잘렸다. 구매 결과(`note`)도 같은 자리에 뜬다 */}
+          [stated] **코인 바로 밑, 오른쪽 정렬.** 코인 옆에 붙이면 영어(`50% off your first coin
+          purchase`)가 360px 폰에서 잘렸다 → 한 줄을 다 쓰고 코인 쪽(오른쪽)에 붙인다.
+          구매 결과(`note`)도 같은 자리에 뜬다 */}
       {pay === 'coin' && (note || bought === 0) && (
         <div className="shop-first">{note || t('shop.first50')}</div>
       )}

@@ -761,6 +761,8 @@ const http = createServer((req, res) => {
       // [stated] 퀘스트마다 [받기] — `id` 가 오면 그 하나만, `'all'` 이면 전부완료 보너스
       if (act === 'claim') return store.claimQuest(me, q.get('p') || 'd', q.get('id') || '');
       if (act === 'mail')  return store.claimMail(me, q.get('id') || '');
+      // [stated] AI 모드 단계 보상 — `st=1,2,3` (깬 단계들). 안 받은 것만 준다
+      if (act === 'ai')    return store.claimAi(me, String(q.get('st') || '').split(',').slice(0, 40).map(Number));
       if (act === 'time')  return { ok: await store.addPlayTime(me, +q.get('sec') || 0) };
       if (act === 'buy'){
         if (q.get('what') === 'ticket') return store.buyTicket(me, q.get('soccer') === '1');
