@@ -22,6 +22,8 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
 
   const [ready, setReady] = useState({ me: false, peer: false });
   const [box, setBox] = useState(null);   // 버튼을 놓을 자리 (아이템 칸 위 여백)
+  // [stated] **총격전 배치 단계 줄** 자리 (`layout.placeBar`). 그 단계가 아니면 null
+  const [bar, setBar] = useState(null);
 
   // 남은 초를 1초마다 줄인다. 0이 되면 서버가 알아서 판을 끝낸다
   useEffect(() => {
@@ -51,7 +53,7 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
 
   // 버튼 자리는 캔버스 크기·패널 높이에 따라 달라진다
   useEffect(() => {
-    const upd = () => { const g = gameRef.current; if (g) setBox(g.uiBox()); };
+    const upd = () => { const g = gameRef.current; if (g){ setBox(g.uiBox()); setBar(g.placeBar ? g.placeBar() : null); } };
     upd();
     const iv = setInterval(upd, 400);
     addEventListener('resize', upd);
@@ -118,6 +120,11 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
 
   const placing = phase === PH_READY;
   // 2배속 신청 UI는 칼전(카운트다운 중)에서도 떠야 한다
+  // [stated] **총격전 배치 단계는 아레나 위에 아무것도 안 띄운다** — 신청·준비 버튼을
+  // 체력바·스틱 자리로 내린다(`barMode`). 칼전·축구·관전은 예전 그대로
+  const barMode = placing && !!bar && !SELF.watching;
+  const pos = r => ({ left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+  const cntText = ready.cnt ? t('ready.waitN', { a: ready.cnt.go, b: ready.cnt.n }) : t('ready.waitMe');
 
   return (
     <div className="game-root">
@@ -174,7 +181,7 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
       {/* [stated] **관전 중**임을 알려준다 — 왜 조작이 안 되는지 알 수 있게 */}
       {SELF.watching && <div className="watch-tag ui-overlay">{t('room.watching')}</div>}
       {/* [stated] **관전자에게는 조작·신청 UI 를 안 그린다** — 보기만 한다 */}
-      {!SELF.watching && (((ready.prompt?.banner || []).length > 0) || placing ||
+      {!SELF.watching && !barMode && (((ready.prompt?.banner || []).length > 0) || placing ||
         (ready.prompt?.offer || []).length > 0) && (
         <div className="gtop ui-overlay">
           {placing && (
@@ -197,8 +204,10 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
         </div>
       )}
       {/* [stated] 수락되면 화면 가운데에 알림 문구를 잠깐 띄운다 */}
+      {/* [stated] **알림 색은 그 종류 색으로** — 2배속은 보라, 노템전은 초록.
+          예전엔 늘 초록이라 노템전이 초록이 된 뒤로 2배속 알림이 노템전처럼 보였다 */}
       {ready.prompt?.done && (
-        <div className="negdone ui-overlay">
+        <div className={'negdone ui-overlay ' + (ready.prompt.done.kind === 'bare' ? 'bare' : 'fast')}>
           {/* [stated] 문구가 반대로 나왔다. `done.mine` 은 **내가 신청했다**는 뜻이므로
               그때는 "상대방이 수락했다"가 맞다 */}
           {t(ready.prompt.done.mine ? 'ready.donePeer' : 'ready.doneMine',
@@ -209,7 +218,7 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
       {ready.prompt?.lost && (
         <div className="negdone ui-overlay lost">{t('ready.lost')}</div>
       )}
-      {ready.prompt?.waiting && (
+      {ready.prompt?.waiting && !barMode && (
         <div className="link-note ui-overlay">
           {negText(ready.prompt.waiting.kind, 'wait', ready.prompt?.melee)} · {t('ready.waitPeer', { n: ready.prompt.waiting.sec })}
           {ready.prompt.waiting.vote && ready.prompt.waiting.vote.total > 1 && (
@@ -219,7 +228,7 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
           )}
         </div>
       )}
-      {ready.prompt?.ask && (
+      {ready.prompt?.ask && !barMode && (
         <div className="modal-back">
           <div className="modal ask">
             <p className="ask-t">{negText(ready.prompt.ask.kind, 'title', ready.prompt?.melee)}</p>
@@ -239,8 +248,57 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
         </div>
       )}
 
+      {/* [stated] **총격전 배치 단계 줄** — 체력바 자리에 신청 버튼, 스틱 자리에 크게 시작 버튼.
+          상대가 신청하면 신청 버튼 자리가 [거절] [수락] 으로, 내가 신청했으면 기다리는 표시로 바뀐다.
+          튜토리얼이 짚는 이름(`.topbox.btn` · `.panelbtn.place` · `.go`)은 그대로 쓴다 */}
+      {barMode && (ready.prompt?.ask ? (
+        <div className={'pb-ask ui-overlay' + (ready.prompt.ask.kind === 'bare' ? ' bare' : '')} style={pos(bar.ask)}>
+          <div className="q"><FitText>
+            {t('ready.askShort', { what: negText(ready.prompt.ask.kind, 'name', ready.prompt?.melee) })} · {ready.prompt.ask.sec}
+            {ready.prompt.ask.vote && ready.prompt.ask.vote.total > 1 ? ' · ' + t('ready.votesShort', ready.prompt.ask.vote) : ''}
+          </FitText></div>
+          <div className="r">
+            <button className="no" onClick={() => gameRef.current?.answer(ready.prompt.ask.kind, false)}>{t('common.decline')}</button>
+            <button className="yes" onClick={() => gameRef.current?.answer(ready.prompt.ask.kind, true)}>{t('common.accept')}</button>
+          </div>
+        </div>
+      ) : ready.prompt?.waiting ? (
+        <div className={'pb-wait ui-overlay' + (ready.prompt.waiting.kind === 'bare' ? ' bare' : '')} style={pos(bar.ask)}>
+          <FitText>{negText(ready.prompt.waiting.kind, 'wait', ready.prompt?.melee)} · {t('ready.waitPeer', { n: ready.prompt.waiting.sec })}</FitText>
+          {ready.prompt.waiting.vote && ready.prompt.waiting.vote.total > 1 && (
+            <span className="votes"><FitText>{t('ready.votesShort', ready.prompt.waiting.vote)}</FitText></span>
+          )}
+        </div>
+      ) : ['fast', 'bare'].map((k, i) => (
+        (ready.prompt?.offer || []).includes(k) ? (
+          <button key={k} className={'topbox btn pb-chip ui-overlay' + (k === 'bare' ? ' bare' : '')} style={pos(bar.chips[i])}
+                  onClick={() => gameRef.current?.request(k)}>
+            <FitText>{negText(k, 'btn', ready.prompt?.melee)}</FitText>
+          </button>
+        ) : (ready.prompt?.banner || []).includes(k) ? (
+          <div key={k} className={'topbox on pb-chip ui-overlay' + (k === 'bare' ? ' bare' : '')} style={pos(bar.chips[i])}>
+            <FitText>{negText(k, 'on', ready.prompt?.melee)}</FitText>
+          </div>
+        ) : null
+      )))}
+      {barMode && !ready.cnt?.meDone && (
+        <button className="panelbtn place big ui-overlay" style={pos(bar.go)}
+                onClick={() => gameRef.current?.ready()}>
+          <span className="t">{t('ready.placeDone')}</span>
+          <span className="sub">{cntText}</span>
+        </button>
+      )}
+      {barMode && ready.cnt?.meDone && (
+        <button className={'panelbtn place go big ui-overlay' + (ready.me ? ' done' : '')}
+                disabled={ready.me} style={pos(bar.go)}
+                onClick={() => gameRef.current?.go()}>
+          <span className="t">{t('ready.goDone')}</span>
+          <span className="sub">{ready.me && ready.peer ? t('ready.soon') : cntText}</span>
+        </button>
+      )}
+
       {/* 1단계. **다 놓으면 저절로 넘어가므로** 이 버튼은 덜 놓고 건너뛸 때만 쓴다 */}
-      {!SELF.watching && placing && !ready.cnt?.meDone && (
+      {!SELF.watching && placing && !barMode && !ready.cnt?.meDone && (
         <button className="panelbtn place ui-overlay" style={boxStyle}
                 onClick={() => gameRef.current?.ready()}>
           {t('ready.placeDone')}
@@ -251,7 +309,7 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
           예전엔 내가 누르는 순간 이 버튼만 먼저 사라지고 신청 버튼은 나중에 없어져
           따로따로 없어지는 것처럼 보였다. 눌러도 남겨두되 눌린 표시만 하고,
           카운트다운이 시작되면(=`placing` 이 꺼지면) 다 같이 사라진다 */}
-      {!SELF.watching && placing && ready.cnt?.meDone && (
+      {!SELF.watching && placing && !barMode && ready.cnt?.meDone && (
         <button className={'panelbtn place go ui-overlay' + (ready.me ? ' done' : '')}
                 disabled={ready.me}
                 style={soccer ? soccerReadyStyle() : boxStyle}
@@ -276,7 +334,7 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
           </span>
         </div>
       )}
-      {placing && ready.me && ready.peer && (
+      {placing && !barMode && ready.me && ready.peer && (
         <div className="link-note ui-overlay">{t('ready.soon')}</div>
       )}
       {/* [stated] 조율 패널(⚙)도 뺐다 — 값을 맞추려고 만든 개발용이라

@@ -1,4 +1,4 @@
-import { W, H, TUNE, HAND, itemKinds, THROW_DEF, ARENA, BARE } from './config.js';
+import { W, H, TUNE, HAND, itemKinds, THROW_DEF, ARENA, BARE, PH_READY, SELF } from './config.js';
 
 // 감도 값은 튜닝 패널에서 실시간으로 바꾼다
 const dead = () => TUNE.dead.v;   // 중심 근처는 무시
@@ -77,6 +77,28 @@ export function uiBoxRect(uiH){
 }
 
 
+
+// [stated] **총격전 배치 단계 줄.** 배치하는 동안엔 남은 초·신청 버튼이 아레나를 가려 거슬렸다.
+// 배치 중엔 다들 체력 100% 라 체력바가 필요 없고, 움직일 수도 없어 스틱도 필요 없다 →
+//   체력바 자리: [2배속 신청] [노템전 신청] (상대가 신청하면 이 자리가 [거절] [수락] 으로)
+//   스틱 자리:   크게 [이대로 시작] (준비 몇 명인지 안에)
+// 남은 초는 아레나 가운데 DMZ 줄 안에 작게 (render.js `drawReadyTimer`).
+// 칼전(배치 없음)·축구·관전은 예전 그대로다
+export const placeBarOn = s =>
+  !!s && s.phase === PH_READY && !s.melee && !s.soccer && !SELF.watching;
+export function placeBar(uiH){
+  const top = H + 1.5, gap = 3, chipW = 41, chipH = 14;
+  const goW = 84, goH = Math.max(20, Math.min(30, uiH - 8));
+  // 스틱이 있던 쪽에 시작 버튼, 반대쪽(팔레트 쪽)에 신청 버튼
+  const chipsX = HAND.left ? W - 3 - (chipW * 2 + gap) : 3;
+  const goX = HAND.left ? 3 : W - 3 - goW;
+  return {
+    chips: [{ x: chipsX, y: top, w: chipW, h: chipH }, { x: chipsX + chipW + gap, y: top, w: chipW, h: chipH }],
+    // 신청이 오면 두 칸을 합쳐 [거절] [수락] 을 띄운다 — 문구 한 줄 + 버튼 한 줄이라 조금 높다
+    ask: { x: chipsX, y: top, w: chipW * 2 + gap, h: 19 },
+    go: { x: goX, y: top, w: goW, h: goH }
+  };
+}
 
 // 배치 팔레트: 스틱 반대쪽에 아이템 아이콘. 종류 수는 아레나에 따라 다르다
 // (1대1 3개 / 2대2 7개). 5개부터는 두 줄로 접는다

@@ -39,16 +39,17 @@ console.log('퀘스트 개수와 보상');
   assert(new Set(ids).size === ids.length, '  id 가 겹치지 않는다');
 }
 
-// [stated] 주간은 **월요일 0시**, 월간은 **1일 0시**. UTC 로 세면 한국에서 오전 9시에 바뀐다
-console.log('기간 열쇠는 한국 시간으로 끊는다');
+// [stated] **한국 시간 아침 9시에 바뀐다** (일일·주간·월간 전부). 예전엔 자정이었다
+console.log('기간 열쇠는 한국 시간 아침 9시에 끊는다');
 {
-  const 일요밤 = '2026-09-27T14:00:00Z';     // 일 23:00 KST
-  const 월요새벽 = '2026-09-27T15:30:00Z';   // 월 00:30 KST
-  assert(Q.dayKey(new Date(일요밤).getTime()) === '2026-09-27', '  날짜가 KST 기준');
-  assert(Q.dayKey(new Date(월요새벽).getTime()) === '2026-09-28', '  자정에 날짜가 바뀐다');
-  assert(Q.weekKey(new Date(일요밤).getTime()) === 'w2026-09-21', '  일요일은 지난 주');
-  assert(Q.weekKey(new Date(월요새벽).getTime()) === 'w2026-09-28', '  월요일 0시에 주가 바뀐다');
-  assert(Q.monthKey(new Date('2026-09-30T15:30:00Z').getTime()) === '2026-10', '  1일 0시에 달이 바뀐다');
+  const kst = s => new Date(s + '+09:00').getTime();
+  assert(Q.dayKey(kst('2026-09-28T00:30:00')) === '2026-09-27', '  자정이 지나도 아직 어제 (월 00:30)');
+  assert(Q.dayKey(kst('2026-09-28T08:59:00')) === '2026-09-27', '  8시 59분까지 어제');
+  assert(Q.dayKey(kst('2026-09-28T09:00:00')) === '2026-09-28', '  9시에 날짜가 바뀐다');
+  assert(Q.weekKey(kst('2026-09-28T08:59:00')) === 'w2026-09-21', '  월요일 8시 59분은 지난 주');
+  assert(Q.weekKey(kst('2026-09-28T09:00:00')) === 'w2026-09-28', '  월요일 9시에 주가 바뀐다');
+  assert(Q.monthKey(kst('2026-10-01T08:59:00')) === '2026-09', '  1일 8시 59분은 지난 달');
+  assert(Q.monthKey(kst('2026-10-01T09:00:00')) === '2026-10', '  1일 9시에 달이 바뀐다');
 }
 
 console.log('한 판을 하면 진행도가 오른다');
@@ -167,6 +168,38 @@ console.log('기간이 지나면 안 받은 보상이 우편함으로');
   assert(got.ok && got.coin === 300, '  우편함에서 받는다');
   r = await S.readQuest(U);
   assert(r.coin === 300 && r.mail.length === 0, '  코인이 들어오고 우편함이 빈다');
+}
+
+// [stated] **전날 다 깨고 안 받은 채 다음 날이 되면, 일일은 초기화되고 안 받은 보상은 우편함으로.**
+// 실제로는 **어제 깬 게 오늘도 깬 걸로 남아 또 받아졌다.** 원인: 파이어스토어 `merge: true` 는
+// 안쪽 칸까지 합쳐서, 새 날 첫 기록이 **접속 시간·판 결과처럼 칸이 든 진행도**면
+// 어제의 다른 칸(`qd.v`)이 그대로 남았다. (첫 기록이 '읽기'면 빈 칸이라 통째로 비워져 멀쩡했다 —
+// 그래서 위 검사는 통과했다) 가짜 저장소도 이제 진짜처럼 합친다
+console.log('전날 다 깨고 안 받았는데 다음 날 첫 기록이 접속 시간이면');
+{
+  const U = 't.carry';
+  at('2026-10-01T05:00:00Z');                             // 10/1 14:00 (한국)
+  for (const kind of ['gun', 'melee', 'soccer']) await S.bumpQuest(U, { kind, res: 'win', goals: 1 });
+  await S.addPlayTime(U, 300); await S.addPlayTime(U, 300);
+  let r = await S.readQuest(U);
+  assert(Q.allDone('d', r.d) && Q.claimable('d', r.d) === 800, '  전날 일일을 전부 채웠다 (안 받음, 800)');
+  const dd1 = r.w.v['w.daily4'] | 0;
+  at('2026-10-02T03:00:00Z');                             // 다음 날 12:00 (한국) — 9시 지남
+  await S.addPlayTime(U, 60);                             // **새 날 첫 기록 = 접속 시간**
+  r = await S.readQuest(U);
+  assert(r.d.key === '2026-10-02', `  오늘 칸이다 (${r.d.key})`);
+  assert(JSON.stringify(r.d.v) === JSON.stringify({ 'd.time': 60 }), `  어제 진행도가 안 남는다 (${JSON.stringify(r.d.v)})`);
+  assert(Q.claimable('d', r.d) === 0, '  어제 것을 오늘 또 받을 수 없다');
+  const c = await S.claimQuest(U, 'd');
+  assert(!c.ok, '  받기를 눌러도 안 준다');
+  const m = r.mail.find(x => x.id === 'd:2026-10-01');
+  assert(m && m.coin === 800, `  어제 안 받은 800 은 우편함으로 (${JSON.stringify(r.mail)})`);
+  // 어제 "일일 전부 완료" 표시(full)도 남으면 안 된다 — 남으면 오늘 다 깨도 주간 "일일 4회" 가 안 오른다
+  for (const kind of ['gun', 'melee', 'soccer']) await S.bumpQuest(U, { kind, res: 'win', goals: 1 });
+  for (let i = 0; i < 2; i++) await S.addPlayTime(U, 300);
+  r = await S.readQuest(U);
+  assert(Q.allDone('d', r.d) && (r.w.v['w.daily4'] | 0) === dd1 + 1,
+    `  오늘 다 깨면 주간 "일일 완료" 가 또 오른다 (${dd1} → ${r.w.v['w.daily4'] | 0})`);
 }
 
 console.log('스킨은 코인으로 산다 — 첫 구매만 반값');

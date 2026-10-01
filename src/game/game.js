@@ -16,7 +16,7 @@ import {
   ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed, coverCells, coverSizes,
   GRID_X0, GRID_Y0, GRID_MIDROW, cellOwner, cellX, cellY
 } from './config.js';
-import { paletteSlots, uiBoxRect, stickGeom, throwSlots } from './layout.js';
+import { paletteSlots, uiBoxRect, stickGeom, throwSlots, placeBar, placeBarOn } from './layout.js';
 import { uiPrompt, resultFor, matchSummary } from './ui-state.js';
 import { CHARGE_MAX_MS, PH_PLAY } from './config.js';
 import { t } from '../i18n/index.js';
@@ -617,6 +617,15 @@ export function createGame(canvas, opts = {}){
         width: b.w * k,
         height: Math.max(18, b.h * k)
       };
+    },
+    /** [stated] **총격전 배치 단계 줄**의 화면 자리 (`layout.placeBar`). 지금 그 단계가 아니면 null */
+    placeBar(){
+      if (!placeBarOn(client.pred)) return null;
+      const r = canvas.getBoundingClientRect();
+      const k = view.scale;
+      const S = q => ({ left: r.left + q.x * k, top: r.top + q.y * k, width: q.w * k, height: q.h * k });
+      const b = placeBar(view.uiH);
+      return { chips: b.chips.map(S), ask: S(b.ask), go: S(b.go) };
     },
     /**
      * [stated] **튜토리얼이 짚을 자리.** 배치 칸·스틱은 캔버스에 그려져 DOM 이 없다 —

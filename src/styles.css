@@ -194,8 +194,10 @@ font-family:var(--gf);font-weight:700;font-size:12px;letter-spacing:1px;
 white-space:nowrap;overflow:hidden}
 .topbox.on{border-color:#f0a81e;color:#f0c86e}
 .topbox.btn{border-color:#8f6ef0;color:#c3adff;cursor:pointer}
-.topbox.btn.bare{border-color:#f0a81e;color:#f0c86e}
+/* [stated] **노템전은 초록.** 주황이라 [이대로 시작](주황)과 색이 겹쳤다 */
+.topbox.btn.bare{border-color:#3ec46d;color:#8ee6a8}
 .topbox.btn:active{background:#8f6ef0;color:#12121c}
+.topbox.btn.bare:active{background:#3ec46d;color:#12121c}
 .topbox > span{display:block;width:100%;text-align:center;
 transform-origin:center;white-space:nowrap}
 .link-note.fast{border-color:#8f6ef0;color:#c3adff}
@@ -435,6 +437,9 @@ transform-origin:center;white-space:nowrap}
 .panelbtn.place.go.done{opacity:.5;filter:saturate(.5)}
 
 .negdone.lost{color:#ffb08a}
+/* 종류 색 — 2배속 보라 · 노템전 초록 (신청 버튼과 같은 색) */
+.negdone.fast{border-color:#8f6ef0;color:#ddd2ff}
+.negdone.bare{border-color:#3ec46d;color:#c9f3d6}
 
 /* 축구 결과 — 골 수만 크게 */
 .res-goals{font:900 34px var(--gf);color:#ffd34d;letter-spacing:2px}
@@ -1285,3 +1290,27 @@ transform-origin:center;white-space:nowrap}
   background:var(--icq) center/contain no-repeat}
 .head-ic.q{--icq:var(--icquest)}
 .head-ic.m{--icq:var(--icmail)}
+
+/* [stated] **총격전 배치 단계 줄** — 체력바 자리에 신청 버튼, 스틱 자리에 크게 [이대로 시작].
+   자리·크기는 `layout.placeBar` 가 정하고 여기서는 모양만 */
+.topbox.pb-chip{position:fixed;z-index:26;font-size:12px}
+/* 걸린 상태는 그 종류 색으로 채운다 — 주황(시작 버튼)과 안 겹치게 */
+.topbox.on.pb-chip{border-color:#8f6ef0;color:#e4dbff;background:rgba(143,110,240,.32)}
+.topbox.on.pb-chip.bare{border-color:#3ec46d;color:#d6f7e0;background:rgba(62,196,109,.30)}
+.pb-ask,.pb-wait{position:fixed;z-index:26;box-sizing:border-box;display:flex;flex-direction:column;
+justify-content:center;gap:3px;padding:2px 4px;background:rgba(18,18,28,.96);border:1px solid #8f6ef0;
+font-family:var(--gf);color:#c3adff}
+.pb-ask.bare,.pb-wait.bare{border-color:#3ec46d;color:#8ee6a8}
+.pb-ask .q{font-size:10px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden}
+.pb-ask .r{display:flex;gap:4px;flex:1;min-height:0;min-width:0}
+.pb-ask .r button{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;padding:0;
+font-family:var(--gf);font-size:12px;font-weight:700;cursor:pointer}
+.pb-ask .r .no{background:transparent;border:1px solid #4a5570;color:#cfd8ee}
+.pb-ask .r .yes{background:#8f6ef0;border:1px solid #8f6ef0;color:#12121c}
+.pb-ask.bare .r .yes{background:#3ec46d;border-color:#3ec46d}
+.pb-wait{font-size:11px;font-weight:700;align-items:center;text-align:center;white-space:nowrap}
+.pb-wait .votes{font-size:9px;color:#8a95b0;width:100%}
+.panelbtn.place.big{flex-direction:column;gap:3px;letter-spacing:1px}
+.panelbtn.place.big .t{font-size:17px}
+.panelbtn.place.big .sub{font-size:10px;font-weight:700;letter-spacing:0;color:#b49a5c}
+.panelbtn.place.go.big .sub{color:#7fb3cf}

@@ -431,7 +431,7 @@ export async function spendTicket(uid, ffa){
         if (ffa && g.ffa <= 0) return { ok: false, why: 'noFfa', ...g };
         const next = { tk: g.tk - 1, at: g.at, ffa: ffa ? g.ffa - 1 : g.ffa, day: g.day };
         if (g.tk >= TICKET_MAX) next.at = now;
-        tx.set(null, next);
+        tx.set(null, next, { merge: true });
         return { ok: true, ...next };
       });
     }
@@ -609,13 +609,45 @@ import {
 
 // **검사 전용** — `E2E_FAKE_STORE=1` 이면 파이어스토어 없이 같은 코드를 돌린다.
 // 트랜잭션 흉내: 문서를 꺼내 주고, 쓰면 합쳐 넣는다 (한 번에 한 사람만 쓰므로 충분하다)
+//
+// **합치는 방식을 진짜 파이어스토어와 똑같이 한다.** 예전엔 겉만 합쳐서(`{...a, ...b}`)
+// 진짜에선 생기는 버그가 검사에선 안 보였다: `{ merge: true }` 는 **안쪽 칸까지 합쳐서**
+// 새 날의 퀘스트 칸(`qd`)을 써도 **어제 진행도(`qd.v` 의 다른 칸)가 남았다** — 어제 다 깬 퀘스트가
+// 오늘도 깬 걸로 보이고 또 받아졌다.
+//   옵션 없음        문서를 통째로 바꾼다
+//   merge: true      안쪽 객체까지 칸 단위로 합친다. **빈 객체({})는 통째로 비운다**(진짜와 같다)
+//   mergeFields: [.] 적은 칸만 **통째로** 바꾼다
 const fakeDoc = uid => (FAKE.get(uid) || {});
+const plain = x => !!x && typeof x === 'object' && !Array.isArray(x);
+function deepMerge(dst, src){
+  const out = { ...dst };
+  for (const [k, val] of Object.entries(src)){
+    out[k] = plain(val) && Object.keys(val).length ? deepMerge(plain(dst[k]) ? dst[k] : {}, val)
+                                                   : structuredClone(val);
+  }
+  return out;
+}
+function fakeSet(uid, patch, opt){
+  const cur = fakeDoc(uid);
+  if (opt && Array.isArray(opt.mergeFields)){
+    const next = { ...cur };
+    for (const f of opt.mergeFields) next[f] = structuredClone(patch[f]);
+    FAKE.set(uid, next);
+  } else if (opt && opt.merge){
+    FAKE.set(uid, deepMerge(cur, patch));
+  } else {
+    FAKE.set(uid, structuredClone(patch));
+  }
+}
+// [stated] **기간이 바뀌면 퀘스트 칸을 통째로 갈아야 한다** — `merge: true` 로 쓰면 어제 진행도가 섞인다.
+// 그래서 퀘스트 칸을 쓰는 곳은 **적은 칸만 통째로 바꾸는** `mergeFields` 로 쓴다
+const whole = patch => ({ mergeFields: Object.keys(patch) });
 async function withDoc(uid, fn){
   if (FAKE){
     const v = fakeDoc(uid);
     let out;
     const tx = { get: async () => ({ exists: true, data: () => v }),
-                 set: (_r, patch) => { FAKE.set(uid, { ...fakeDoc(uid), ...patch }); } };
+                 set: (_r, patch, opt) => fakeSet(uid, patch, opt) };
     out = await fn(tx, { doc: () => null });
     return out;
   }
@@ -664,7 +696,8 @@ export async function readQuest(uid){
       const { per, mail, changed } = rollAll(v, now);
       const box = [...(Array.isArray(v.mail) ? v.mail : []), ...mail].slice(-MAIL_KEEP);
       if (changed){
-        tx.set(ref, { qd: per.d, qw: per.w, qm: per.m, mail: box }, { merge: true });
+        const patch = { qd: per.d, qw: per.w, qm: per.m, mail: box };
+        tx.set(ref, patch, whole(patch));
       }
       return {
         coin: v.coin | 0,
@@ -704,7 +737,8 @@ export async function bumpQuest(uid, m){
       if (!per.d.full && allDone('d', per.d)){ per.d.full = true; qbump(per.w, 'w', 'dDone', 1); }
       if (!per.w.full && allDone('w', per.w)){ per.w.full = true; qbump(per.m, 'm', 'wDone', 1); }
       const box = [...(Array.isArray(v.mail) ? v.mail : []), ...mail].slice(-MAIL_KEEP);
-      tx.set(ref, { qd: per.d, qw: per.w, qm: per.m, mail: box, sall }, { merge: true });
+      const patch = { qd: per.d, qw: per.w, qm: per.m, mail: box, sall };
+      tx.set(ref, patch, whole(patch));
     });
     return true;
   } catch (e){
@@ -736,8 +770,8 @@ export async function addPlayTime(uid, sec){
           if (q.time) per[p].v[q.id] = Math.min(q.goal, (per[p].v[q.id] | 0) + give);
       const box = [...(Array.isArray(v.mail) ? v.mail : []), ...mail].slice(-MAIL_KEEP);
       if (!per.d.full && allDone('d', per.d)){ per.d.full = true; qbump(per.w, 'w', 'dDone', 1); }
-      tx.set(ref, { qd: per.d, qw: per.w, qm: per.m, mail: box,
-                    sec: { day: today, n: had + give } }, { merge: true });
+      const patch = { qd: per.d, qw: per.w, qm: per.m, mail: box, sec: { day: today, n: had + give } };
+      tx.set(ref, patch, whole(patch));
     });
     return true;
   } catch (e){
@@ -780,7 +814,8 @@ export async function claimQuest(uid, p, id = ''){
       cur.got = [...got];
       const box = [...(Array.isArray(v.mail) ? v.mail : []), ...mail].slice(-MAIL_KEEP);
       const coinNow = (v.coin | 0) + coin;
-      tx.set(ref, { coin: coinNow, qd: per.d, qw: per.w, qm: per.m, mail: box }, { merge: true });
+      const patch = { coin: coinNow, qd: per.d, qw: per.w, qm: per.m, mail: box };
+      tx.set(ref, patch, whole(patch));
       return { ok: true, coin, total: coinNow };
     });
   } catch (e){

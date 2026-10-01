@@ -8,7 +8,7 @@ import {
   THROW, THROW_DEF, FLY_TICKS, FLASH_RADIUS, BLIND_TICKS, BLIND_FULL,
   viewColors} from './config.js';
 import { makeRoller, BALL_R, GOAL_SEQ, GOAL_HOLD, GOAL_SCORE, KICK_FX_TICKS } from './ball.js';
-import { RS, computeLayout, stickGeom, shieldBtn, tackleBtn } from './layout.js';
+import { RS, computeLayout, stickGeom, shieldBtn, tackleBtn, placeBarOn } from './layout.js';
 import { resultFor } from './ui-state.js';
 import { GUN_FW, GUN_FH, MSK_FW, MSK_FH, arenaFloorOf } from './skins.js';
 import { tryForArena, tryOf } from '../state/tryskin.js';
@@ -414,6 +414,20 @@ export function createRenderer(canvas){
     // [stated] **튜토리얼은 준비 시간이 안 간다** — 안 줄어드는 숫자를 띄우면 이상하다
     if (s.phase !== PH_READY || s.solo || s.tuto || !(s.rdy > 0)) return;
     const left = Math.ceil(s.rdy / 60);
+    // [stated] **총격전 배치 단계: 남은 초는 DMZ 줄 안 가운데에 작게.** "준비하세요" 는 뺀다.
+    // 예전엔 아레나 한가운데에 크게(30) 띄워 배치하는 자리를 가렸다
+    if (placeBarOn(s) && ARENA.neutral){
+      const fs = Math.min(15, GRID_CH * 0.78);
+      const cx = W / 2 * RS, cy = (cellY(GRID_MIDROW) + GRID_CH / 2) * RS;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '900 ' + Math.round(fs * RS) + 'px ' + GF;
+      ctx.lineWidth = fs * 0.2 * RS; ctx.strokeStyle = 'rgba(6,8,14,0.9)';
+      ctx.strokeText(String(left), cx, cy);
+      ctx.fillStyle = left <= 5 ? '#f0a81e' : '#dceaf6';
+      ctx.fillText(String(left), cx, cy);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      return;
+    }
     const cx = W / 2 * RS, cy = H * 0.42 * RS;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.font = '900 ' + (30 * RS) + 'px ' + GF;
@@ -613,7 +627,8 @@ export function createRenderer(canvas){
       ctx.fillStyle = colFor(foeSlot);
       ctx.fillText(fo, (W - 4) * RS, cy2);
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-    } else {
+    } else if (!placeBarOn(s)) {
+    // [stated] **총격전 배치 단계엔 체력바를 안 그린다** — 그 자리에 신청 버튼이 들어간다 (`placeBar`)
 
     // 상단 바: 우리 팀(왼쪽) / 상대 팀(오른쪽) / 가운데 남은 시간
     const n = s.p.length;
@@ -691,7 +706,8 @@ export function createRenderer(canvas){
     }
 
     // [stated] **관전자에게는 조이스틱을 안 그린다** — 조작이 없으니 그림만 남는다
-    if (SELF.watching) return;
+    // [stated] **총격전 배치 단계에도 안 그린다** — 움직일 수 없고, 그 자리에 [이대로 시작] 이 들어간다
+    if (SELF.watching || placeBarOn(s)) return;
     const g = stickGeom(uiH);
     circle(g.cx, g.cy, g.r, 'rgba(255,255,255,0.045)', 'rgba(255,255,255,0.18)', 0.8);
     circle(g.cx, g.cy, g.r * 0.60, null, 'rgba(255,255,255,0.08)', 0.5);

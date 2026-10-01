@@ -200,6 +200,7 @@ export function createAI(stage = 1, fair = false){
   let mNext = 0, mvx = 0, mvy = 0;   // 칼전: 다음 판단 시각과 그때 정한 방향
   let goal = null, goalAt = 0, goalFoe = -1;   // 칼전: 지금 노리는 것
   let wander = 0, wanderT = 0;
+  let depth = null, depthT = 0;                  // 총격전: 지금 노리는 깊이(0 = 맨 뒤, 1 = 맨 앞)와 다시 고를 때까지
   let nextThrow = 2500 + Math.random() * 2500;   // 처음 던지기까지
   let aimKind = -1, aimErrC = 0, aimErrR = 0, aimSince = 0;   // 이번 투척의 목표와 오차
   // [stated] **투척 개수.** 1~10 사람과 같고, 11~20 하나씩, 21~30 둘씩 더.
@@ -439,13 +440,38 @@ export function createAI(stage = 1, fair = false){
       // 실측에서 10단계(1.48배)가 7단계보다 약했던 원인
       let vx = Math.max(-1, Math.min(1, dx / (6 * FP * (p.mul || 1))));
 
-      // 앞뒤: push가 클수록 중앙선 쪽에 붙는다. 약간의 어슬렁거림 추가
+      // 앞뒤. 약간의 어슬렁거림 추가
       wanderT -= dt;
       if (wanderT <= 0){ wander = Math.random() * 2 - 1; wanderT = 1.2 + Math.random() * 1.2; }
+      // [stated] **앞뒤로도 움직인다.** 예전엔 정해진 깊이(`push`)에 서서 살짝 흔들리기만 해서
+      // 맨 뒤 한두 줄에 붙어 **좌우로만 움직였다**(2대2·3대3 에서 특히 티가 났다).
+      // → 몇 초마다 **자기 진영 안에서 새 깊이**를 고른다.
+      //   - 단계가 높을수록(`push` 가 클수록) 앞쪽을 고른다 = 압박
+      //   - 체력이 적으면 뒤로 빠진다 (단계가 높을수록 잘 빠진다)
+      depthT -= dt;
+      if (depth === null || depthT <= 0){
+        let d = p.push + (Math.random() * 2 - 1) * 0.55;
+        if (my.hp < MAXHP * 0.35 && Math.random() < 0.3 + (p.aim || 0)) d = Math.random() * 0.2;
+        depth = Math.max(0, Math.min(1, d));
+        depthT = 1.8 + Math.random() * 2.4;
+      }
       const mt = teamOf(me, s.n);
       const lo = teamYMin(mt), hi = teamYMax(mt);
-      const want = mt === 0 ? hi - (hi - lo) * p.push : lo + (hi - lo) * p.push;
+      const want = mt === 0 ? hi - (hi - lo) * depth : lo + (hi - lo) * depth;
       let vy = Math.max(-1, Math.min(1, (want - my.y) / (24 * FP) + wander * 0.25));
+      // **총알이 오고 있으면 앞뒤 이동은 미룬다.** 대각선으로 가면 가로 속도가 줄어 피하기가 무너진다
+      // (총알은 세로로 날아와 피하는 건 가로뿐이다). 어슬렁거림만 남긴다
+      {
+        const myCy = my.y + MID;
+        let threat = false;
+        for (const b of s.bullets){
+          if (b.o === me || teamOf(b.o, s.n) === mt) continue;
+          const gap = myCy - b.y;
+          if (Math.sign(gap) !== Math.sign(b.vy)) continue;
+          if (Math.abs(gap / b.vy) <= p.horizon && Math.abs(b.x + FP - myCx) < p.danger * FP * 1.3){ threat = true; break; }
+        }
+        if (threat) vy = wander * 0.25;
+      }
 
       // ---- 투척: 상대가 있을 자리를 예측해 조준한다 ----
       // 목표를 한 번 정해놓고 그 열로 걸어가면, 도착할 때쯤 예측이 낡아 빗나간다.

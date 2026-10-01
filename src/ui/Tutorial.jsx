@@ -40,6 +40,9 @@ export default function Tutorial({ getState, spotRect, onQuit }){
   const [step, setStep] = useState(0);
   const [hi, setHi] = useState(null);
   const [path, setPath] = useState(null);
+  // 안내 상자가 **가리면 안 되는 띠**(세로 구간). 강조한 것 말고도 —
+  //   끌어다 놓을 자리(내 진영·상대 진영), 배치 단계 줄(신청 버튼·시작 버튼)
+  const [avoid, setAvoid] = useState([]);
   const watch = useRef(null);
   if (!watch.current) watch.current = makeWatch();
 
@@ -126,7 +129,7 @@ export default function Tutorial({ getState, spotRect, onQuit }){
       } else {
         r = spotRect && spotRect(spot);
       }
-      if (!r){ setHi(null); setPath(null); return; }
+      if (!r){ setHi(null); setPath(null); setAvoid([]); return; }
       // **화면 밖으로 나가지 않게 자른다** — 스틱은 아래 끝에 붙어 있어 그냥 넓히면 삐져나간다
       const vw = window.innerWidth, vh2 = window.innerHeight;
       const L = Math.max(2, r.left - 4), T = Math.max(2, r.top - 4);
@@ -140,6 +143,15 @@ export default function Tutorial({ getState, spotRect, onQuit }){
       } else {
         setPath(null);
       }
+      // [stated] **배치 단계 줄로 버튼 자리가 바뀌었으면 안내 상자 자리도 맞춰야 한다.**
+      // 예전 자리 계산(강조 바로 위)대로 두니 벽·드럼통 단계에서 상자가 신청·시작 버튼을 덮었다
+      const zones = [];
+      if (dst) zones.push({ top: dst.top, bottom: dst.top + dst.height });
+      document.querySelectorAll('.pb-chip, .pb-ask, .pb-wait, .panelbtn.place').forEach(e => {
+        const q = e.getBoundingClientRect();
+        if (q.height > 0) zones.push({ top: q.top, bottom: q.bottom });
+      });
+      setAvoid(prev => (JSON.stringify(prev) === JSON.stringify(zones) ? prev : zones));
     };
     find();
     const id = setInterval(find, 300);
@@ -163,10 +175,23 @@ export default function Tutorial({ getState, spotRect, onQuit }){
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const boxStyle = (() => {
     if (!hi) return { bottom: 'calc(var(--sab) + 84px)', left: 10, right: 10 };
-    const above = hi.top - 10 - boxH;        // 위에 놓을 때의 윗변
-    if (above >= 52) return { top: above, left: 10, right: 10 };
-    const below = hi.top + hi.height + 10;   // 아래로 밀어 붙인다
-    return { top: Math.max(52, Math.min(below, vh - boxH - 12)), left: 10, right: 10 };
+    // 상자는 가로로 꽉 차므로 **세로 구간**만 보면 된다.
+    // 가릴 수 없는 띠: 강조한 것 + 끌어다 놓을 자리 + 배치 단계 줄. 그 띠들의 위·아래와 화면 맨 위를
+    // 후보로 놓고, **아무것도 안 가리는 자리 중 강조에 가장 가까운 곳**을 고른다
+    const zones = [{ top: hi.top, bottom: hi.top + hi.height }, ...avoid];
+    const lo = 52, hiLim = vh - boxH - 12;
+    const clear = top => top >= lo && top <= hiLim &&
+      zones.every(z => top + boxH <= z.top - 2 || top >= z.bottom + 2);
+    const cands = [lo];
+    for (const z of zones) cands.push(z.top - 10 - boxH, z.bottom + 10);
+    const mid = hi.top + hi.height / 2;
+    const ok = cands.filter(clear).sort((a, b) => Math.abs(a + boxH / 2 - mid) - Math.abs(b + boxH / 2 - mid));
+    if (ok.length) return { top: ok[0], left: 10, right: 10 };
+    // 어디에도 못 놓으면 예전처럼: 위에 자리가 있으면 위, 없으면 아래
+    const above = hi.top - 10 - boxH;
+    if (above >= lo) return { top: above, left: 10, right: 10 };
+    const below = hi.top + hi.height + 10;
+    return { top: Math.max(lo, Math.min(below, hiLim)), left: 10, right: 10 };
   })();
 
   return (

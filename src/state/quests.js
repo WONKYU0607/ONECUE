@@ -93,24 +93,23 @@ export const PERIODS = ['d', 'w', 'm'];
 
 // ── 기간 열쇠 ──────────────────────────────────────────────────
 // 기간이 바뀌었는지는 **열쇠가 달라졌는지**로 본다 (티켓의 `day` 와 같은 방식).
-// 서버·클라가 같은 값을 내야 하므로 **UTC 가 아니라 한국 시간** 기준으로 센다 —
-// UTC 로 하면 한국에서 오전 9시에 날짜가 바뀐다
-const KST = 9 * 60 * 60 * 1000;
-const kst = (at = Date.now()) => new Date(at + KST);
+// [stated] **한국 시간 아침 9시에 바뀐다** (예전엔 자정). 9시 = UTC 0시라 **UTC 날짜**를 그대로 쓴다 —
+// 티켓 구매 한도·접속 시간 상한(서버 `dayKey`)도 UTC 라 이제 전부 같은 때 바뀐다
+const utc = (at = Date.now()) => new Date(at);
 
 export function dayKey(at = Date.now()){
-  return kst(at).toISOString().slice(0, 10);
+  return utc(at).toISOString().slice(0, 10);
 }
-/** 주간 — **월요일 0시**에 바뀐다. 그 주 월요일 날짜를 열쇠로 쓴다 */
+/** 주간 — **월요일 아침 9시**(UTC 월요일 0시)에 바뀐다. 그 주 월요일 날짜를 열쇠로 쓴다 */
 export function weekKey(at = Date.now()){
-  const d = kst(at);
+  const d = utc(at);
   const dow = (d.getUTCDay() + 6) % 7;             // 월=0 … 일=6
   d.setUTCDate(d.getUTCDate() - dow);
   return 'w' + d.toISOString().slice(0, 10);
 }
-/** 월간 — **1일 0시**에 바뀐다 */
+/** 월간 — **1일 아침 9시**(UTC 1일 0시)에 바뀐다 */
 export function monthKey(at = Date.now()){
-  return kst(at).toISOString().slice(0, 7);
+  return utc(at).toISOString().slice(0, 7);
 }
 export const keyOf = (p, at) =>
   (p === 'd' ? dayKey(at) : p === 'w' ? weekKey(at) : monthKey(at));
