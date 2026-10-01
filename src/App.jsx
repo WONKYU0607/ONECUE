@@ -22,7 +22,7 @@ import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
 import { startPlayClock, claimAiRewards } from './state/questclient.js';
 import { playAgain, setRoomMode, getRoom, onRoom, onGo, onKicked, backToLobby,
-         onAgainMsg, onModeMsg, askAgain, answerAgain, onAgainAsk, onAgainNo } from './net/connection.js';
+         onAgainMsg, onModeMsg, askAgain, answerAgain, onAgainAsk, onAgainNo, onMatchCoin } from './net/connection.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -59,8 +59,12 @@ export default function App(){
   // [stated] **다시 하기는 묻고 시작한다** — 신청 받은 사람에게 뜨는 창 / 신청한 사람의 대기 표시
   const [againAsk, setAgainAsk] = useState(null);        // { from }
   const [againWait, setAgainWait] = useState(false);
+  // [stated] **결과 화면에 이번 판에 받은 코인** — 빠른 매칭은 서버가 준 값, AI 는 단계 첫 클리어 보상.
+  // 판에 들어갈 때 비운다 (지난 판 값이 남으면 안 된다)
+  const [gain, setGain] = useState(0);
   useEffect(() => {
     onRoom(r => setRoom(r));
+    onMatchCoin(n => setGain(n > 0 ? n : 0));
     onGo(() => setScreen('game'));
     // [stated] **강퇴당하면 홈으로 보내고 알린다**
     // [stated] **화면과 상관없이** 받는다 (결과 화면에서도)
@@ -79,8 +83,9 @@ export default function App(){
       setScreen('home');
     });
     return () => { onRoom(null); onGo(null); onKicked(null); onAgainMsg(null); onModeMsg(null);
-      onAgainAsk(null); onAgainNo(null); };
+      onAgainAsk(null); onAgainNo(null); onMatchCoin(null); };
   }, []);
+  useEffect(() => { if (screen === 'game') setGain(0); }, [screen]);
   // [stated] **빠른 매칭은 홈에서 찾는다** — 따로 로딩 화면이 없다. 찾는 중이면 {stage, sec, err}
   const [search, setSearch] = useState(null);
   const [summary, setSummary] = useState(null);   // 결과 창에 띄울 한 판 요약
@@ -288,8 +293,11 @@ export default function App(){
     // 모드별로 따로 기록한다 (1대1을 깼다고 3대3까지 열리면 안 된다)
     if (session?.kind === 'ai'){
       recordResult(session.stage, r, modeKey(session.n || 2, !!session.melee));
-      // [stated] **단계 첫 클리어 보상** — 이기면 바로 서버에 알려 받는다 (못 받으면 홈에 올 때 다시)
-      if (r === 'win') claimAiRewards().catch(() => {});
+      // [stated] **단계 첫 클리어 보상** — 이기면 바로 서버에 알려 받는다 (못 받으면 홈에 올 때 다시).
+      // 받았으면 결과 화면에 보여준다 (이미 받은 단계면 0 이라 안 뜬다)
+      if (r === 'win') claimAiRewards()
+        .then(x => { if (x && x.ok && x.coin > 0) setGain(x.coin); })
+        .catch(() => {});
     }
     // [stated] **관전자는 판이 끝나면 로비로** — 결과 화면은 선수의 것이다
     if (SELF.watching){
@@ -398,7 +406,7 @@ export default function App(){
       {screen === 'room'     && <Room room={room || getRoom()} onLeave={() => setAskRoom(true)} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome}
                                           onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} onTuto={goHome} />}
-      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost}
+      {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} gain={gain}
                                        waiting={againWait} paused={!!againAsk}
                                        onAuto={() => {
                                          // [stated] **5초가 지나면 결판난다** — 수락 창이 떠 있으면 거절과 같게

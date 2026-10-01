@@ -25,8 +25,32 @@ function name(r, sum){
   return same.length > 1 ? `${base}${idx}` : base;
 }
 
+// [stated] **받은 코인 — 아이콘과 숫자, 숫자는 0 에서 굴러 올라간다(1초 안).**
+// 빠르게 시작해 끝에서 느려진다(마지막 자리가 또렷이 멈추게). 소리는 따로 안 낸다
+const COIN_MS = 800;
+function CoinGain({ n }){
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const t0 = performance.now();
+    const step = now => {
+      const k = Math.min(1, (now - t0) / COIN_MS);
+      setV(Math.round(n * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [n]);
+  return (
+    <div className="res-coin" data-n={n}>
+      <i className="res-coin-ico" />
+      <b>+{v.toLocaleString()}</b>
+    </div>
+  );
+}
+
 export default function Result({ result, summary, score, session, host, waiting, paused, onAuto,
-                                onAgain, onMode, onRoom, onNext, onHome }){
+                                onAgain, onMode, onRoom, onNext, onHome, gain = 0 }){
   // [stated] **결과 화면에서 아무것도 안 누르면 다음 판을 못 한다** → 5초 뒤 저절로 로비로.
   // 다시 하기 신청을 받았거나(수락 창) 상대 응답을 기다리는 동안에는 **세지 않는다**
   // **`session.online` 은 앱 어디에서도 안 채우는 옛 값이다** — PVP 판인지로 본다
@@ -95,6 +119,9 @@ export default function Result({ result, summary, score, session, host, waiting,
       </header>
 
       <div className="menu wide-menu">
+        {/* [stated] **이번 판에 받은 코인** — 빠른 매칭(이기면 100·연승 가산, 지면 50)과
+            AI 모드 단계 첫 클리어. 친구방·연습·이미 받은 AI 단계는 코인이 없어 안 뜬다 */}
+        {gain > 0 && <CoinGain n={gain} />}
         {/* 점수 변화 — PVP만. 어떻게 나온 값인지 같이 보여준다 */}
         {score && (
           <div className="resbox scorebox">

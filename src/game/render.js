@@ -113,6 +113,16 @@ export function createRenderer(canvas){
   // 바닥 사각형이 없는 그림(총격전·축구)은 예전처럼 통째로 늘인다.
   function drawArenaBg(bg, key){
     const f = arenaFloorOf(key);
+    // 1대1 새 배경은 **위아래 대칭이 아니다.** 위쪽 팀은 화면을 뒤집어 보므로
+    // 배경도 같이 뒤집어야 벽 그림과 벽(충돌)이 맞는다. 뒤집기 축은 아레나 격자 가운데(`flip`)
+    if (!f && ARENA.bgFlip && flipped()){
+      ctx.save();
+      ctx.translate(0, ARENA.flip * RS);
+      ctx.scale(1, -1);
+      ctx.drawImage(bg, 0, 0, W * RS, H * RS);
+      ctx.restore();
+      return;
+    }
     if (!f){ ctx.drawImage(bg, 0, 0, W * RS, H * RS); return; }
     // 값은 540x933 기준으로 쟀다. 그림이 그보다 크면 같은 비율로 키운다
     const iw = bg.naturalWidth || bg.width, ih = bg.naturalHeight || bg.height;
@@ -1200,6 +1210,13 @@ export function createRenderer(canvas){
     // 진영 경계. 칼전은 진영이 없어 선을 안 그린다
     if (ARENA.melee){
       // 아무것도 안 그림
+    } else if (ARENA.neutral && ARENA.bg === 'arena'){
+      // [stated] **1대1 DMZ(가운데 한 줄)** — 예전 가운데 선처럼 **선만** 양쪽 경계에 긋는다.
+      // (보고 정하기로 한 임시 표시. 칠하기는 없다)
+      // [stated] **칸이 있는 곳까지만** — 벽 그림 위로 넘어가지 않게 격자 폭만큼
+      const gw = GRID_CW * GRID_COLS;
+      px(GRID_X0, cellY(GRID_MIDROW) - 1, gw, 2, '#ffffff');
+      px(GRID_X0, cellY(GRID_MIDROW + 1) - 1, gw, 2, '#ffffff');
     } else if (ARENA.neutral){
       // 선을 W 전체로 그으면 아레나 밖 검은 여백까지 삐져나온다.
       // 그 높이의 실제 벽 안쪽까지만 긋는다 (WALL_R은 왼쪽 끝 기준이라 캐릭터 폭을 더한다)

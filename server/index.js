@@ -9,6 +9,7 @@ import { createAI } from '../src/game/ai.js';
 import { createSoccerAI } from '../src/game/soccer-ai.js';
 import { BOTS, pickBot } from './bots.js';
 import * as store from './store.js';
+import { matchCoin } from '../src/state/quests.js';
 import { forfeit, setOff, resetForNextRound, newState } from '../src/game/sim.js';
 
 const PORT = process.env.PORT || 8080;
@@ -253,7 +254,7 @@ class Room {
         rows.push({
           uid: seat.uid, kind, result: win ? 'win' : 'lose',
           score: Math.max(0, before.score + delta),
-          streak, bot: !!seat.bot
+          streak, bot: !!seat.bot, slot: i
         });
         continue;
       }
@@ -271,12 +272,24 @@ class Room {
         score: Math.max(0, before.score + d.delta),      // [stated] 하한 0
         streak: res === 'win' ? before.streak + 1 : 0,
         // 봇에게는 코인을 주지 않는다 (`writeResults` 가 본다)
-        bot: !!seat.bot
+        bot: !!seat.bot, slot: i
       });
     }
     if (!rows.length) return;
     store.writeResults(rows)
-      .then(ok => { if (ok) store.queueRanks(kind); })
+      .then(ok => {
+        if (!ok) return;
+        store.queueRanks(kind);
+        // [stated] **결과 화면에 받은 코인을 보여준다** — 실제로 준 값(`writeResults` 와 같은 식)을
+        // 그 사람에게만 알린다. **쓰기가 끝난 뒤에** 보낸다(실패했으면 안 준 코인을 보여주지 않게)
+        for (const r of rows){
+          if (r.bot) continue;
+          const ws = this.seats[r.slot] && this.seats[r.slot].ws;
+          if (ws && ws.readyState === 1){
+            try { ws.send(JSON.stringify({ t: 'coin', n: matchCoin(r.result, r.streak) })); } catch { /* 무시 */ }
+          }
+        }
+      })
       .catch(() => {});
   }
 

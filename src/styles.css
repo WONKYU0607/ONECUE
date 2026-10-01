@@ -314,8 +314,8 @@ transform-origin:center;white-space:nowrap}
 .prof-av{display:block;flex:0 0 auto;
   height:calc((var(--h-rowH,20) - 4) * var(--u));
   width:calc((var(--h-rowH,20) - 4) * var(--u) * 0.875);
-  /* 캐릭터 시트는 24칸(6색 x 앞뒤 + 피격). 자리 계산은 profile.js 의 avatarPos() */
-  background:var(--chars) 0 0/2400% 100% no-repeat;image-rendering:pixelated}
+  /* 그림·자리는 ProfAvatar.jsx 가 준다 (프로필 전용 그림 av-base·av-gun·av-melee) */
+  background:0 0/100% 100% no-repeat;image-rendering:pixelated}
 /* [stated] PVP 메뉴의 종목 이름 — **진한 흰색으로, 3포인트 크게** */
 .pick-title{display:block;margin:6px 0 4px;font-family:var(--gf);font-weight:900;
   font-size:15px;letter-spacing:2px;color:#f2f6ff;text-align:center}
@@ -1127,7 +1127,7 @@ transform-origin:center;white-space:nowrap}
 .cost-row.base{overflow:visible;align-items:center;justify-content:space-between}
 /* 미리보기 얼굴 — 스킨 칸(56px)과 비슷한 크기로. 시트는 24칸이라 2400% */
 .cost-av{flex:0 0 auto;height:56px;width:49px;
-  background:var(--chars) 0 0/2400% 100% no-repeat;image-rendering:pixelated}
+  background:0 0/100% 100% no-repeat;image-rendering:pixelated}
 /* [stated] **버튼이 캐릭터와 겹치면 안 된다** → 얹지 않고 **아래에 자리를 따로 준다**.
    칸을 세로로 쌓아 그림과 버튼이 서로 침범하지 않게 한다 */
 .cost-item{flex:0 0 auto;min-width:0;
@@ -1143,7 +1143,7 @@ transform-origin:center;white-space:nowrap}
 /* [stated] **프로필 캐릭터** 고르기 — 칸 전체를 누른다. 그림 크기는 색 미리보기(`.cost-av`)와 같게 */
 .cost-avpick{cursor:pointer}
 .cost-pav{display:block;flex:0 0 auto;height:56px;width:49px;
-  background:var(--chars) 0 0/2400% 100% no-repeat;image-rendering:pixelated}
+  background:0 0/100% 100% no-repeat;image-rendering:pixelated}
 /* [stated] 안 가진 스킨은 **실루엣만** */
 .cost-item.lock i{filter:brightness(0) saturate(0);opacity:.45}
 .cost-item i{display:block}
@@ -1202,6 +1202,12 @@ transform-origin:center;white-space:nowrap}
 .coin-tag::before{content:'';width:15px;height:15px;flex:0 0 auto;image-rendering:pixelated;
   background:var(--iccoin) center/contain no-repeat}
 .coin-tag.big{height:30px;font-size:15px}
+/* [stated] 결과 화면 — 이번 판에 받은 코인. 숫자가 굴러 올라가는 동안 폭이 흔들리지 않게 고정폭 숫자 */
+.res-coin{display:flex;align-items:center;justify-content:center;gap:7px;padding:4px 0 2px;
+  font:900 22px/1 var(--gf);color:#ffd873;letter-spacing:1px;font-variant-numeric:tabular-nums;
+  text-shadow:0 2px 3px rgba(0,0,0,.8)}
+.res-coin-ico{width:24px;height:24px;flex:0 0 auto;image-rendering:pixelated;
+  background:var(--iccoin) center/contain no-repeat}
 /* 안 받은 우편 표시 */
 .room-btn.dot{position:relative}
 .room-btn.dot::after{content:'';position:absolute;top:3px;right:3px;width:8px;height:8px;

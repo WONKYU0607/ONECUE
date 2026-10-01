@@ -16,9 +16,13 @@ console.log('배치 규칙');
   assert(!canPlace(s, 0, ITEM.WALL, 2, foeRow(0)), '벽을 상대 영역에는 못 놓는다');
   assert(canPlace(s, 0, ITEM.DRUM, 2, foeRow(0)), '드럼통은 상대 영역에 놓는다');
   assert(!canPlace(s, 0, ITEM.DRUM, 2, myRow(0)), '드럼통을 내 영역에는 못 놓는다');
-  assert(!canPlace(s, 0, ITEM.DRUM, 2, GRID_MIDROW - 1), '중앙선에 붙은 칸에는 드럼통 금지');
-  assert(!canPlace(s, 1, ITEM.DRUM, 2, GRID_MIDROW), '반대편도 마찬가지');
-  assert(canPlace(s, 0, ITEM.DRUM, 2, GRID_MIDROW - 2), '한 칸 뒤부터는 가능');
+  // [stated] 1대1 가운데는 DMZ(아무도 못 들어감) — 아무것도 못 놓는다.
+  // DMZ 가 완충이라 드럼통은 상대 맨 앞줄(DMZ 바로 옆)까지 된다 (폭발이 내 진영에 안 닿는다)
+  assert(cellOwner(GRID_MIDROW) === -1, '가운데 줄은 DMZ');
+  assert(!canPlace(s, 0, ITEM.DRUM, 2, GRID_MIDROW) && !canPlace(s, 1, ITEM.DRUM, 2, GRID_MIDROW), 'DMZ 에 드럼통 금지');
+  assert(!canPlace(s, 0, ITEM.WALL, 2, GRID_MIDROW) && !canPlace(s, 1, ITEM.BARR, 2, GRID_MIDROW), 'DMZ 에 벽·바리 금지');
+  assert(canPlace(s, 0, ITEM.DRUM, 2, GRID_MIDROW - 1), 'DMZ 너머 첫 줄에 드럼통 가능');
+  assert(canPlace(s, 1, ITEM.DRUM, 2, GRID_MIDROW + 1), '반대편도 마찬가지');
   assert(!canPlace(s, 0, ITEM.WALL, GRID_COLS, myRow(0)), '격자 밖은 안 된다');
 
   step(s, IN({ place: { k: ITEM.WALL, c: 2, r: myRow(0) } }, {}));
@@ -278,7 +282,7 @@ console.log('items.test.js 통과');
 console.log('내 엄폐물 자리에 상대 드럼통을 겹쳐 놓을 수 있다');
 {
   const s = newState();
-  const mine = GRID_ROWS - 2;                  // 슬롯0의 영역 (중앙선 인접 칸은 드럼통 금지)
+  const mine = GRID_ROWS - 2;                  // 슬롯0의 영역
   step(s, IN({ place: { k: ITEM.WALL, c: 3, r: mine } }, {}));
   assert(s.items.length === 1, '내 벽 배치');
   assert(canPlace(s, 1, ITEM.DRUM, 3, mine), '상대는 같은 칸에 드럼통을 심을 수 있다');

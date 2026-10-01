@@ -79,8 +79,10 @@ console.log('상점 미리보기 창이 그림을 다 덮는다');
   // 미리보기 시트를 재서 가장 넓은 칸이 233px, 전체가 x33~265 안에 들어간다.
   // 상점은 칸 가운데에서 `chW + pad` 만큼만 잘라 쓰므로 그보다 넓으면 잘린다
   const WIDEST = 233, LEFT = 33, RIGHT = 265;
-  // **상점과 코스튬이 같은 시트를 같은 값으로 잘라 쓴다** — 한쪽만 고치면 다른 쪽이 잘린다
-  for (const path of ['src/ui/screens/Shop.jsx', 'src/ui/screens/Costume.jsx']){
+  // **상점과 코스튬이 같은 시트를 같은 창 크기로 잘라 쓴다** — 한쪽만 고치면 다른 쪽이 잘린다.
+  // [stated] 코스튬은 **스킨마다 칸 정가운데**로 바꿔 창을 칸 가운데가 아니라 그림 상자 가운데에 둔다
+  // (아래 따로 본다). 코스튬 칸이 안 잘리고 가운데인지는 `e2e-aibox` 가 실제 화면 픽셀로 본다
+  for (const path of ['src/ui/screens/Shop.jsx']){
     const sh = fs.readFileSync(path, 'utf8');
     const m = sh.match(/rows:\s*MEL_PREV_ROWS_N[\s\S]{0,160}?chH:\s*(\d+),\s*chW:\s*(\d+),\s*chY:\s*(\d+),\s*pad:\s*(\d+)/);
     assert(m, `  ${path} 에서 칼전 미리보기 크기를 찾았다`);
@@ -89,6 +91,19 @@ console.log('상점 미리보기 창이 그림을 다 덮는다');
     assert(cw >= WIDEST, `  ${path}: 창 ${cw} 이 가장 넓은 칸 ${WIDEST} 보다 넓다`);
     assert(off <= LEFT && off + cw >= RIGHT,
       `  ${path}: 창 x${off}~${off + cw} 이 그림 x${LEFT}~${RIGHT} 를 덮는다`);
+  }
+  {
+    const path = 'src/ui/screens/Costume.jsx';
+    const sh = fs.readFileSync(path, 'utf8');
+    const m = sh.match(/rows:\s*MEL_PREV_ROWS_N,\s*chH:\s*(\d+),\s*chW:\s*(\d+),\s*pad:\s*(\d+),[^\n]*bb:\s*\[([\s\S]*?)\]\s*\}/);
+    assert(m, `  ${path} 에서 칼전 미리보기 크기를 찾았다`);
+    const cw = +m[2] + +m[3], chh = +m[1] + +m[3];
+    const bbs = [...m[4].matchAll(/\[(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\]/g)].map(x => x.slice(1).map(Number));
+    assert(bbs.length === 10, `  ${path}: 칼전 10줄 모두 그림 상자가 있다 (${bbs.length})`);
+    assert(bbs.every(([x0, , x1]) => x1 - x0 <= cw), `  ${path}: 창 ${cw} 이 가장 넓은 그림(${Math.max(...bbs.map(b => b[2] - b[0]))})보다 넓다`);
+    assert(bbs.every(([, y0, , y1]) => y1 - y0 <= chh), `  ${path}: 창 높이 ${chh} 가 가장 긴 그림보다 길다`);
+    assert(Math.max(...bbs.map(b => b[2])) >= RIGHT - 1 && Math.min(...bbs.map(b => b[0])) <= LEFT,
+      `  ${path}: 그림 상자가 실제 그림 범위(x${LEFT}~${RIGHT})와 맞다`);
   }
 }
 

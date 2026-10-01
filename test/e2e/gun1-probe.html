@@ -1,0 +1,110 @@
+<!doctype html>
+<!-- 자산 주소가 `assets/...` 상대경로라 `base` 를 뿌리로 잡는다 -->
+<html><head><meta charset="UTF-8"><base href="/"><title>e2e gun 1v1 arena probe</title></head>
+<body style="margin:0;background:#000">
+<!-- **1대1 총격전 새 배경으로 실제 한 판.** 진짜 서버·진짜 렌더러로
+     벽을 따라 끝에서 끝까지 걸으며(서버가 확정한 자리만) 벽 그림과 맞는지,
+     DMZ(가운데 한 줄)에 못 들어가는지, 위쪽 팀 화면에서 배경이 뒤집혀 그려지는지 본다 -->
+<script type="module">
+import { connectAndWait, startRoom, onGo, getConnection } from '/src/net/connection.js';
+import { Client } from '/src/game/net.js';
+import { SELF, setArena, PH_PLAY, FP, ARENA, YMIN_S, YMAX_S, cellY, GRID_MIDROW } from '/src/game/config.js';
+import { createRenderer } from '/src/game/render.js';
+import { warmUp, keysFor, getImage, isReady } from '/src/game/assets.js';
+const E = window.E2E = { entered: null, code: null, rep: null, err: null, stage: '' };
+onGo(() => setTimeout(runGame, 50));
+window.start = (mode, code) => { connectAndWait({ mode, code, n: 2,
+  onCode: c => { E.code = c; E.entered = 'code'; }, onJoined: () => { E.entered = 'joined'; } })
+  .catch(e => { E.err = (e && e.message) || 'err'; }); };
+window.startRoom = startRoom;
+// 검사 쪽이 정하는 이동 (월드 기준 방향). 매 프레임 넣는다
+window.MV = [0, 0];
+async function runGame(){
+  await warmUp(keysFor({ n: 2 }));
+  await new Promise(r => setTimeout(r, 600));
+  const img = getImage('arena');
+  E.bgReady = isReady(img);
+  const conn = getConnection(), tr = conn.transport;
+  SELF.slot = conn.slot; SELF.n = 2;
+  setArena(2);
+  const cv = document.createElement('canvas'); cv.width = 540; cv.height = 1200;
+  cv.style.cssText = 'position:fixed;left:0;top:0;width:393px';
+  document.body.appendChild(cv);
+  const view = createRenderer(cv); view.resize(393, 760);
+  window.CV = cv;
+  // 원본 그림 픽셀 (벽 판정용)
+  const oc = document.createElement('canvas'); oc.width = 540; oc.height = 933;
+  const ox = oc.getContext('2d'); ox.drawImage(img, 0, 0, 540, 933);
+  const IMG = ox.getImageData(0, 0, 540, 933).data;
+  const grey = (x, y) => {                  // 회색 벽 테두리 (노란 줄무늬는 R>B 라 빠진다)
+    if (y < 0 || y >= 933) return false;
+    const i = (y * 540 + x) * 4, r = IMG[i], g = IMG[i + 1], b = IMG[i + 2];
+    return r + g + b > 250 && b >= r;
+  };
+  // **위아래로도 이어져야** 벽이다 — 바닥 타일 경계의 밝은 가로줄(1~2px)을 벽으로 잡지 않게
+  const bevel = (x, y) => grey(x, y) && grey(x, y - 1) && grey(x, y + 1);
+  // 그 픽셀 줄에서 **캐릭터 옆(from)부터 바깥으로** 훑어 처음 만나는 벽 테두리의 안쪽 끝.
+  // 바닥 쪽부터 훑으면 바닥 리벳·긁힌 자국을 벽으로 잡는다
+  const edgeL = (y, from) => { for (let x = from; x >= 20; x--) if (bevel(x, y) && bevel(x - 1, y) && bevel(x - 2, y)) return x + 1; return 0; };
+  const edgeR = (y, from) => { for (let x = from; x <= 520; x++) if (bevel(x, y) && bevel(x + 1, y) && bevel(x + 2, y)) return x; return 540; };
+  const client = new Client(tr, [conn.slot]);
+  const me = conn.slot;
+  let nextRd = 0, last = performance.now();
+  const rec = [];
+  window.REC = rec;
+  function loop(now){
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (client.s.phase !== PH_PLAY && now >= nextRd){ client.setReady(me); client.setGo(me); nextRd = now + 250; }
+    const s = client.s;
+    if (s.phase !== E.lastPh){ (E.phases = E.phases || []).push([s.tick, s.phase, E.stage, s.winner, s.p.map(q => q.hp), (s.off || []).slice()]); E.lastPh = s.phase; }
+    if (s.phase === PH_PLAY){
+      client.input(me, MV[0], MV[1], 0);
+      const p = s.p[me];
+      rec.push([s.tick, p.x / FP, p.y / FP, E.stage]);
+    }
+    client.ping(now); client.sendInputs(now); client.applyFrames(); client.predict();
+    client.updateRender(client.alpha(now), dt);
+    try { view.draw(client.pred || client.s, '', 0, client, { on: 0, nx: 0, ny: 0 }, null, 0, true, {}); }
+    catch (e){ if (!E.drawErr) E.drawErr = String(e).slice(0, 160); }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  // 벽에 붙어 있던 기록마다: 캐릭터 상자(월드)가 덮는 픽셀 줄에서 벽 테두리와의 틈
+  window.wallGaps = (stage, side) => {
+    const out = [];
+    for (const [t, x, y, st] of rec){
+      if (st !== stage) continue;
+      let worst = side === 'L' ? -1e9 : 1e9;
+      for (let py = Math.ceil(y * 3); py < Math.floor((y + ARENA.ph) * 3); py++){
+        if (py < 0 || py >= 933) continue;
+        // 캐릭터 상자 안쪽 4px 까지 봐야 "파고들었는지" 알 수 있다
+        worst = side === 'L' ? Math.max(worst, edgeL(py, Math.round(x * 3) + 4))
+                             : Math.min(worst, edgeR(py, Math.round((x + ARENA.pw) * 3) - 4));
+      }
+      // 왼쪽: 캐릭터 왼쪽 끝 - 벽 끝 / 오른쪽: 벽 시작 - 캐릭터 오른쪽 끝  (px, 음수면 벽을 파고듦)
+      const gap = side === 'L' ? x * 3 - worst : worst - (x + ARENA.pw) * 3;
+      out.push([Math.round(y), +gap.toFixed(1)]);
+    }
+    return out;
+  };
+  window.info = () => ({ me, flip: ARENA.flip, bgFlip: !!ARENA.bgFlip, ymin: YMIN_S.map(v => v / FP), ymax: YMAX_S.map(v => v / FP),
+    dmzTop: cellY(GRID_MIDROW), dmzBot: cellY(GRID_MIDROW + 1), ph: ARENA.ph, pw: ARENA.pw });
+  // 렌더된 화면이 그림(뒤집었으면 뒤집은 그림)과 같은지 — 벽 쪽 캐릭터가 없는 자리에서
+  window.bgMatch = () => {
+    const d = cv.getContext('2d').getImageData(0, 0, 540, 933).data;
+    let same = 0, flip = 0, n = 0;
+    for (let y = 40; y < 900; y += 7){
+      for (const x of [15, 40, 60, 480, 500, 525]){
+        const i = (y * 540 + x) * 4, j = ((932 - y) * 540 + x) * 4;
+        const c = [d[i], d[i + 1], d[i + 2]];
+        const a = [IMG[i], IMG[i + 1], IMG[i + 2]], b = [IMG[j], IMG[j + 1], IMG[j + 2]];
+        const da = Math.abs(c[0] - a[0]) + Math.abs(c[1] - a[1]) + Math.abs(c[2] - a[2]);
+        const db = Math.abs(c[0] - b[0]) + Math.abs(c[1] - b[1]) + Math.abs(c[2] - b[2]);
+        n++; if (da < 12) same++; if (db < 12) flip++;
+      }
+    }
+    return { same: same / n, flip: flip / n };
+  };
+}
+window.READY = true;
+</script></body></html>

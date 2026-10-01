@@ -193,6 +193,9 @@ try {
     .find(x => (x.textContent || '').includes('시작') && !x.disabled && x.offsetParent !== null); b && b.click(); });
   await wait(3000);
   assert(await endMatch(), '  판을 끝내고 결과 화면');
+  // [stated] 친구방은 코인을 안 준다 → 결과 화면에 코인 줄이 없다
+  await wait(1500);
+  assert(!(await A.$('.res-coin')), '  친구방 결과 화면엔 코인 줄이 없다');
   await wait(2000);
 
   const v = await api('');

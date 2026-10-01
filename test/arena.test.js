@@ -1,4 +1,4 @@
-// 아레나 전환: 1대1(6x14)과 2대2(9x19)가 같은 코드로 돌아가는지.
+// 아레나 전환: 1대1(6x15, 가운데 DMZ)과 2대2(9x19)가 같은 코드로 돌아가는지.
 // 전역 격자 상수를 setArena가 갈아끼우는 구조라, 한쪽을 고치면 다른 쪽이
 // 조용히 깨지기 쉽다. 1대1 값이 1FP라도 달라지면 결정론이 깨진다.
 import { newState, step, canPlace, checksum, NOIN } from '../src/game/sim.js';
@@ -14,23 +14,38 @@ const inp = n => Array.from({ length: n }, () => ({ ...NOIN }));
 
 console.log('1대1 기준값 (바뀌면 결정론이 깨진다)');
 const a = newState(2);
-assert(GRID_COLS === 6 && GRID_ROWS === 14 && GRID_MIDROW === 7, '격자 6x14, 중앙 7');
-// [stated] 1대1 배경이 화면을 꽉 채워 보인다 → **아레나를 88.4%로 줄이고 위아래 18씩 여백**.
-// 그림·격자·벽 표·캐릭터가 **같은 배율로 함께** 움직였다
-assert(PWf === 12 * FP && PHf === 14 * FP, '캐릭터 12x14 (아레나와 같은 비율로 줄임)');
-// **아레나가 화면 전체가 아니므로 H 가 아니라 격자 기준**이다.
-// 예전처럼 H/2·H-ph 를 쓰면 여백(아레나 밖)까지 걸어 나간다
+// [stated] **1대1 새 배경 — 7칸 + 가운데 DMZ 1칸(아무도 못 들어감) + 7칸 = 15줄.**
+// 칸 크기는 예전 그대로다(그림을 잘라 격자에 맞췄다)
+assert(GRID_COLS === 6 && GRID_ROWS === 15 && GRID_MIDROW === 7, '격자 6x15, 가운데 7행이 DMZ');
+assert(Math.abs(ARENA.cw - 19.1536) < 1e-9 && Math.abs(ARENA.ch - 19.6426) < 1e-9, '칸 크기는 예전 그대로');
+assert(PWf === 12 * FP && PHf === 14 * FP, '캐릭터 12x14 (그대로)');
+assert(ARENA.neutral === true && ARENA.bg === 'arena', '배경 arena · 중립 행 있음');
+assert(cellOwner(6) === 1 && cellOwner(7) === -1 && cellOwner(8) === 0, '7행은 아무도 못 쓰는 DMZ');
+assert(ROW_MIN[0] === 8 && ROW_MAX[0] === 14 && ROW_MIN[1] === 0 && ROW_MAX[1] === 6, '양쪽 7줄씩');
+// **아레나가 화면 전체가 아니므로 H 가 아니라 격자 기준**이다
 const cy1 = r => ARENA.y0 + ARENA.ch * r;
-assert(YMIN_S[0] === Math.round(cy1(7) * FP) && YMIN_S[1] === Math.round(ARENA.y0 * FP),
-  '세로 하한이 격자 기준');
-assert(YMAX_S[0] === Math.round((cy1(14) - 14) * FP) &&
-       YMAX_S[1] === Math.round((cy1(7) - 14) * FP), '세로 상한이 격자 기준');
+assert(YMIN_S[0] === Math.round(cy1(8) * FP) && YMIN_S[1] === Math.round(ARENA.y0 * FP),
+  '세로 하한이 격자 기준 (아래 팀은 DMZ 다음 줄부터)');
+assert(YMAX_S[0] === Math.round((cy1(15) - 14) * FP) &&
+       YMAX_S[1] === Math.round((cy1(7) - 14) * FP), '세로 상한이 격자 기준 (위 팀은 DMZ 앞까지)');
 assert(YMIN_S[1] > 0, '위쪽 팀도 여백 밖으로 못 나간다');
-assert(a.p[0].x === 23913 && a.p[0].y === 70701, '슬롯0 스폰 좌표 고정');
-assert(a.p[1].x === 23913 && a.p[1].y === 5330, '슬롯1 스폰 좌표 고정');
+assert(a.p[0].x === 23913 && a.p[0].y === 73216, '슬롯0 스폰 좌표 고정 (맨 뒷줄 14행)');
+assert(a.p[1].x === 23913 && a.p[1].y === 2816, '슬롯1 스폰 좌표 고정 (맨 뒷줄 0행)');
 // 위아래 여백이 같아야 화면 뒤집기(flip)가 그대로 맞는다
-assert(Math.abs((311 - cy1(14)) - ARENA.y0) < 0.05, '위아래 여백이 같다');
-assert(cellOwner(6) === 1 && cellOwner(7) === 0, '1대1은 중립 행이 없다');
+assert(Math.abs((311 - cy1(15)) - ARENA.y0) < 0.05 && ARENA.flip === 311, '위아래 여백이 같다');
+// 그림이 위아래 대칭이 아니라 위쪽 팀 화면은 배경을 뒤집어 그린다
+assert(ARENA.bgFlip === true, '1대1은 위쪽 팀 화면에서 배경을 뒤집는다');
+{
+  // 벽 표: 새 그림의 벽 안쪽 경계. 좁은 곳 28 / 돌출부 36, 좌우 대칭
+  const L = [...new Set(WALL_L)].map(v => v / FP);
+  assert(Math.min(...L) === 28 && Math.max(...L) === 36, `왼쪽 벽 28~36 (${Math.min(...L)}~${Math.max(...L)})`);
+  // 대칭축은 격자 가운데(89.8). 그림의 비스듬한 계단이 좌우 살짝 달라 합이 178~181 정도
+  assert(WALL_L.every((v, i) => Math.abs((v / FP) + (WALL_R[i] / FP + 12) - 179.7) <= 2), '거의 좌우 대칭');
+  assert(WALL_L.length === 311 && WALL_R.length === 311, '벽 표 311줄');
+  // 돌출부에서도 0열 가운데 서 있을 수 있다 (0열 가운데 = 35.9)
+  const col0 = ARENA.x0 + (ARENA.cw - ARENA.pw) / 2;
+  assert(Math.max(...L) <= Math.ceil(col0), `돌출부에서도 0열 가운데 (${col0.toFixed(1)})`);
+}
 
 console.log('2대2 아레나');
 const s = newState(4);
@@ -84,9 +99,11 @@ assert(canPlace(s, 0, ITEM.WALL, 1, ROW_MAX[0] - 1), '내 진영엔 벽을 놓�
 // 중립 행이 완충이라 2대2는 맨 앞줄까지 드럼통을 심어도 자폭하지 않는다
 assert(canPlace(s, 0, ITEM.DRUM, 1, GRID_MIDROW - 1), '아래 팀이 상대 맨 앞줄에 드럼통');
 assert(canPlace(s, 2, ITEM.DRUM, 1, GRID_MIDROW + 1), '위 팀이 상대 맨 앞줄에 드럼통');
-// 1대1은 예전대로 중앙선에 붙은 칸이 막혀 있어야 한다
-assert(!canPlace(a, 0, ITEM.DRUM, 0, 6) && !canPlace(a, 1, ITEM.DRUM, 0, 7),
-  '1대1은 중앙선 붙은 칸에 드럼통 금지');
+// 1대1도 이제 DMZ 가 완충이라 2대2 와 같다 — 상대 맨 앞줄까지 된다 (폭발이 내 진영에 안 닿는다)
+setArena(2);
+assert(canPlace(a, 0, ITEM.DRUM, 0, 6) && canPlace(a, 1, ITEM.DRUM, 0, 8),
+  '1대1도 DMZ 너머 맨 앞줄에 드럼통');
+assert(!canPlace(a, 0, ITEM.DRUM, 0, 7) && !canPlace(a, 0, ITEM.WALL, 0, 7), '1대1 DMZ 에는 아무것도 못 놓는다');
 
 console.log('아이템 종류');
 setArena(2);

@@ -8,7 +8,7 @@
 // 상대에게도 보이려면 `s.skin` 을 서버가 채워야 하고, 그건 소유 배선과 같이 붙인다.
 import { useState, useEffect } from 'react';
 import { setInnerBack } from '../../state/back.js';
-import { getColor, setColor, avatarPos, setAv } from '../../state/profile.js';
+import { getColor, setColor, setAv } from '../../state/profile.js';
 import ProfAvatar, { shownAv, avUsable } from '../ProfAvatar.jsx';
 import { tryOf, setTry, ownsSkin } from '../../state/tryskin.js';
 import { GUN_SKINS, MELEE_SKINS, SOCCER_SKINS, MELEE_ARENAS, coinSkinsOf, coinArenasOf,
@@ -18,28 +18,41 @@ import { GUN_SKINS, MELEE_SKINS, SOCCER_SKINS, MELEE_ARENAS, coinSkinsOf, coinAr
 import { t } from '../../i18n/index.js';
 
 // 상점과 같은 미리보기 시트를 쓴다. 여기서는 **대기 자세 한 칸**만 보여준다
+// [stated] **스킨이 칸 정가운데에** — 예전엔 창을 칸 가운데(고정 자리)에 두어, 그림마다 캐릭터가
+// 놓인 자리가 달라 실루엣이 칸마다 제각각 치우쳤다. 줄마다 **그림이 있는 상자**(bb, 첫 칸·알파 24 초과)를
+// 재 두고 창을 그 가운데에 놓는다. 창 크기(chW·chH)는 그대로라 크기는 전과 같다.
+// 시트를 바꾸면 다시 재야 한다 — `e2e-aibox` 검사가 실루엣이 칸 가운데인지 실제 화면 픽셀로 본다
 const SHEETS = {
   gun:    { img: GUN_PREV_IMG, fw: GUN_PREV_FW, fh: GUN_PREV_FH, cols: GUN_PREV_COLS,
-            rows: GUN_PREV_ROWS_N, chH: 162, chW: 229, chY: 22, pad: 6, list: GUN_SKINS },
+            rows: GUN_PREV_ROWS_N, chH: 162, chW: 229, pad: 6, list: GUN_SKINS, bb: [
+              [41, 37, 184, 182], [32, 20, 180, 181], [37, 35, 199, 183], [45, 37, 184, 181],
+              [52, 24, 187, 181], [28, 37, 211, 178], [34, 37, 206, 182], [39, 38, 201, 182]] },
   melee:  { img: MEL_PREV_IMG, fw: MEL_PREV_FW, fh: MEL_PREV_FH, cols: MEL_PREV_COLS,
             // 상점과 **같은 값이어야 한다** — 222 로는 새 5종의 앞모습이 잘린다(황소 투사 22px)
-            rows: MEL_PREV_ROWS_N, chH: 176, chW: 232, chY: 17, pad: 6, list: MELEE_SKINS },
+            rows: MEL_PREV_ROWS_N, chH: 176, chW: 232, pad: 6, list: MELEE_SKINS, bb: [
+              [76, 21, 242, 192], [78, 27, 243, 192], [37, 20, 246, 193], [71, 16, 246, 192], [78, 26, 242, 191],
+              [40, 21, 259, 192], [50, 21, 249, 192], [49, 21, 250, 192], [44, 21, 256, 192], [33, 21, 266, 192]] },
   soccer: { img: PREV_IMG, fw: PREV_FW, fh: PREV_FH, cols: PREV_COLS,
-            rows: PREV_ROWS_N, chH: 150, chW: 103, chY: 26, pad: 14, list: SOCCER_SKINS }
+            rows: PREV_ROWS_N, chH: 150, chW: 103, pad: 14, list: SOCCER_SKINS, bb: [
+              [24, 24, 108, 174], [24, 24, 109, 174], [20, 23, 112, 173], [23, 22, 108, 174], [24, 23, 109, 173]] }
 };
 const KINDS = ['gun', 'melee', 'soccer'];
 const H = 56;   // 화면에 그릴 캐릭터 키
 
 function Thumb({ sh, row }){
   const k = H / sh.chH;
-  const cw = sh.chW + sh.pad;
+  const cw = sh.chW + sh.pad, chh = sh.chH + sh.pad;
+  // 창을 **그림 상자 가운데**에 둔다 (칸 가운데가 아니라)
+  const [x0, y0, x1, y1] = sh.bb[row] || [0, 0, sh.fw, sh.fh];
+  const sx = (x0 + x1) / 2 - cw / 2, sy = row * sh.fh + (y0 + y1) / 2 - chh / 2;
   return (
     <i style={{
-      width: Math.round(cw * k), height: Math.round((sh.chH + sh.pad) * k),
+      width: Math.round(cw * k), height: Math.round(chh * k),
       backgroundImage: `url(${sh.img})`,
+      // 창이 시트 왼쪽 밖으로 조금 나갈 수 있다 — 반복되면 시트 오른쪽 끝 그림이 그 틈에 비친다
+      backgroundRepeat: 'no-repeat',
       backgroundSize: `${Math.round(sh.fw * sh.cols * k)}px ${Math.round(sh.fh * sh.rows * k)}px`,
-      backgroundPosition:
-        `-${Math.round((sh.fw - cw) / 2 * k)}px -${Math.round((row * sh.fh + sh.chY - sh.pad / 2) * k)}px`
+      backgroundPosition: `${-Math.round(sx * k)}px ${-Math.round(sy * k)}px`
     }} />
   );
 }
@@ -71,7 +84,8 @@ export default function Costume({ onBack }){
                       aria-label={t('cost.base') + ' ' + (c + 1)} />
             ))}
           </div>
-          <span className="cost-av" style={{ backgroundPositionX: avatarPos(color) }} />
+          {/* [stated] 기본 캐릭터도 **스킨과 같은 크기** — 프로필 캐릭터와 같은 곳에서 그린다 */}
+          <ProfAvatar av={{ k: 'base', id: 0 }} color={color} className="cost-av" />
         </div>
       </div>
 

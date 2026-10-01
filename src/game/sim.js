@@ -351,7 +351,7 @@ export function canPlace(s, slot, k, c, r, from){
   if (owner < 0) return false;                      // 가운데 중립 행은 비워둔다
   if (def.mine ? owner !== team : owner === team) return false;
   // 드럼통은 폭발 반경이 내 영역에 닿는 자리엔 못 심는다 (터뜨리면 자폭)
-  // 1대1은 중앙선에 붙은 한 칸, 2대2는 가운데 중립 행이 완충이라 맨 앞줄까지 된다
+  // 가운데 중립 행(DMZ)이 완충이라 1대1·2대2 모두 상대 맨 앞줄까지 된다
   if (k === ITEM.DRUM){
     for (let rr = r - DRUM_RADIUS; rr <= r + DRUM_RADIUS; rr++){
       if (rr >= 0 && rr < GRID_ROWS && cellOwner(rr) === team) return false;

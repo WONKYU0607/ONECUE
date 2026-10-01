@@ -20,19 +20,11 @@ globalThis.requestAnimationFrame = () => 1;
 globalThis.cancelAnimationFrame = () => {};
 
 const { createGame } = await import('../src/game/game.js');
-const { setColor, getColor, avatarPos } = await import('../src/state/profile.js');
-const { SELF, COLOR_COUNT } = await import('../src/game/config.js');
+const { setColor, getColor } = await import('../src/state/profile.js');
+const { SELF } = await import('../src/game/config.js');
 
-// 프로필 사진 자리. 시트는 24칸 = 6색 x (앞·뒤) + 피격 12칸이므로 색 c 는 c*2 번 칸.
-// **c*4 로 세면 3·4번 색이 피격 칸을 가리켜 화면에서 빈칸으로 보인다**
-for (let c = 0; c < COLOR_COUNT; c++){
-  setColor(c);
-  const want = (c * 2 * (100 / 23)).toFixed(6);
-  const got = parseFloat(avatarPos()).toFixed(6);
-  assert(got === want, `  색 ${c} 프로필 사진 자리 = ${c * 2}번 칸 (${got}%)`);
-  assert(parseFloat(avatarPos()) < 100 * (11 / 23) + 0.001,
-    `  색 ${c} 는 피격 칸(12번 이후)을 안 가리킨다`);
-}
+// 프로필 사진(기본 캐릭터)이 **고른 색의 앞모습**인지는 `e2e-aibox` 가 실제 화면 픽셀로 본다
+// (예전엔 24칸 시트에서 자리를 계산하다 3·4번 색이 피격 칸을 가리켰다 — 이제 프로필 전용 그림을 쓴다)
 
 // 로컬 판(AI·연습·칼전)에서 내 자리에 고른 색이 실린다
 for (const [kind, opt] of [['ai', { kind: 'ai', stage: 1 }],

@@ -221,6 +221,8 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
       if (m.t === 'again'){ try { againWatch?.(); } catch { /* 무시 */ } }
       if (m.t === 'againAsk'){ try { askWatch?.(m.from || ''); } catch { /* 무시 */ } }
       if (m.t === 'againNo'){ try { noWatch?.(); } catch { /* 무시 */ } }
+      // [stated] 빠른 매칭에서 **이번 판에 받은 코인** — 결과 화면이 보여준다
+      if (m.t === 'coin'){ try { coinWatch?.(m.n | 0); } catch { /* 무시 */ } }
       if (m.t === 'mode'){
         try { modeWatch?.({ melee: !!m.melee, ffa: !!m.ffa, soccer: !!m.soccer, n: m.n | 0 }); }
         catch { /* 무시 */ }
@@ -354,6 +356,10 @@ export function onAgainMsg(fn){ againWatch = fn; }
 /** [stated] **종목·인원이 바뀌었다** — 화면과 상관없이 불린다. **화면을 바꾸지는 않는다** */
 let modeWatch = null;
 export function onModeMsg(fn){ modeWatch = fn; }
+
+/** [stated] **판이 끝나고 서버가 코인을 주면 불린다** (빠른 매칭만) — 받은 코인 수 */
+let coinWatch = null;
+export function onMatchCoin(fn){ coinWatch = fn; }
 
 /** [stated] **강퇴당하면 불린다** — 홈으로 보내고 알린다 */
 let kickWatch = null;
