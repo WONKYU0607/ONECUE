@@ -146,6 +146,8 @@ export default function Shop({ onBack }){
   /** 서버 기준 보유 여부 */
   const hasIt = (kind, id) =>
     !!(own && Array.isArray(own[kind]) && own[kind].includes(id | 0));
+  // [stated] **산 것은 [장착]** (입고 있으면 [장착 중]). [입어보기] 는 디버그에서 안 산 걸 입어볼 때만
+  const wearLabel = (mine, on) => t(mine ? (on ? 'shop.equipped' : 'shop.equip') : (on ? 'shop.wearing' : 'shop.wear'));
   // [stated] **첫 구매만 50% 할인**
   const costNow = () => (bought === 0 ? Math.round(SKIN_COST * (100 - SKIN_FIRST_OFF) / 100) : SKIN_COST);
   const take = async (kind, id) => {
@@ -294,7 +296,7 @@ export default function Shop({ onBack }){
                         {(hasIt(sub, s2.id) || DEBUG_TRY_SKIN) && (
                           <button className={'shop-btn' + (tryOf(sub) === s2.id ? ' on' : '')}
                                   onClick={() => setWorn(setTry(sub, s2.id))}>
-                            {tryOf(sub) === s2.id ? t('shop.wearing') : t('shop.wear')}
+                            {wearLabel(hasIt(sub, s2.id), tryOf(sub) === s2.id)}
                           </button>
                         )}
                         {!hasIt(sub, s2.id) && (
@@ -305,7 +307,7 @@ export default function Shop({ onBack }){
                     ) : DEBUG_TRY_SKIN ? (
                       <button className={'shop-btn' + (tryOf(sub) === s2.id ? ' on' : '')}
                               onClick={() => setWorn(setTry(sub, s2.id))}>
-                        {tryOf(sub) === s2.id ? t('shop.wearing') : t('shop.wear')}
+                        {wearLabel(hasIt(sub, s2.id), tryOf(sub) === s2.id)}
                       </button>
                     ) : (
                       <button className="shop-btn" disabled>{t('shop.soon')}</button>
@@ -382,7 +384,7 @@ export default function Shop({ onBack }){
                         {(hasIt('arena', a.id) || DEBUG_TRY_SKIN) && (
                           <button className={'shop-btn' + (tryOf('arena') === a.id ? ' on' : '')}
                                   onClick={() => setWorn(setTry('arena', a.id))}>
-                            {tryOf('arena') === a.id ? t('shop.wearing') : t('shop.wear')}
+                            {wearLabel(hasIt('arena', a.id), tryOf('arena') === a.id)}
                           </button>
                         )}
                         {!hasIt('arena', a.id) && (
@@ -393,7 +395,7 @@ export default function Shop({ onBack }){
                     ) : DEBUG_TRY_SKIN ? (
                       <button className={'shop-btn' + (tryOf('arena') === a.id ? ' on' : '')}
                               onClick={() => setWorn(setTry('arena', a.id))}>
-                        {tryOf('arena') === a.id ? t('shop.wearing') : t('shop.wear')}
+                        {wearLabel(hasIt('arena', a.id), tryOf('arena') === a.id)}
                       </button>
                     ) : (
                       <button className="shop-btn" disabled>{t('shop.soon')}</button>

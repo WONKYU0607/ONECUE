@@ -19,6 +19,10 @@ export const SKIN_FIRST_OFF = 50;    // [stated] **첫 구매만 50% 할인**
 export const TICKET_COST = 500;      // [stated] 티켓 한 장
 export const BUY_TK_MAX = 3;         // 하루에 코인으로 살 수 있는 일반 티켓
 export const BUY_SOC_MAX = 2;        // 하루에 코인으로 살 수 있는 축구 티켓
+// [stated] **광고 보고 티켓 받기** — 하루 최대 5번, 일반·축구 **합쳐서** 센다.
+// 개인전 하루 판수 제한(3판)도 광고로 풀 수 있는데, 그건 **하루 3번까지** (5번 안에서 같이 센다)
+export const AD_DAY_MAX = 5;
+export const AD_FFA_MAX = 3;
 
 // [stated] **판이 끝나면 코인을 준다.** 이기면 100, 지면 50.
 // [stated] **연승이면 더 준다** — 2연승 1.2배, 3연승 1.3배 … 한 판 늘 때마다 0.1배씩.

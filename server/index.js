@@ -777,6 +777,12 @@ const http = createServer((req, res) => {
       // [stated] AI 모드 단계 보상 — `st=1,2,3` (깬 단계들). 안 받은 것만 준다
       if (act === 'ai')    return store.claimAi(me, String(q.get('st') || '').split(',').slice(0, 40).map(Number));
       if (act === 'time')  return { ok: await store.addPlayTime(me, +q.get('sec') || 0) };
+      // [stated] 광고를 끝까지 봤다 → 그 모드 티켓 한 장 (하루 5번, 개인전 판수 풀기는 3번)
+      if (act === 'ad')    return store.adReward(me, q.get('kind') || '');
+      // **검사 전용** — 가짜 저장소에 값을 얹는다. `E2E_DEBUG=1` 이고 가짜 저장소일 때만 (Render 에는 둘 다 없다)
+      if (act === '__put' && process.env.E2E_DEBUG === '1'){
+        try { return store.fakePut(me, JSON.parse(q.get('v') || '{}')); } catch { return { ok: false }; }
+      }
       if (act === 'buy'){
         if (q.get('what') === 'ticket') return store.buyTicket(me, q.get('soccer') === '1');
         return store.buySkin(me, q.get('kind') || '', +q.get('id') || 0);

@@ -12,12 +12,13 @@ import { Client } from '/src/game/net.js';
 import { SELF, setArena, PH_PLAY, FP, cellX, cellY, GRID_CW, GRID_CH, PWf, PHf } from '/src/game/config.js';
 import { checksum } from '/src/game/sim.js';
 import { createRenderer } from '/src/game/render.js';
-import { setTry, tryOf } from '/src/state/tryskin.js';
+import { setTry, tryOf, setOwned } from '/src/state/tryskin.js';
 import { warmUp, keysFor, getImage, isReady } from '/src/game/assets.js';
 const q = new URLSearchParams(location.search);
 const host = q.get('host') === '1';
 const skin = +(q.get('arena') || 0);
-if (skin) setTry('arena', skin);                 // 아레나 스킨 — 내 화면에만 보인다
+// 아레나 스킨 — 내 화면에만 보인다. 출시 설정에선 **가진 것만** 장착되므로 가진 것으로 둔다
+if (skin){ setOwned({ arena: [skin] }); setTry('arena', skin); }
 const E = window.E2E = { entered: null, code: null, rep: null, err: null, arena: tryOf('arena') };
 onGo(() => setTimeout(runGame, 50));
 window.start = (mode, code) => { connectAndWait({ mode, code, n: 2, melee: true,

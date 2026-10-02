@@ -33,6 +33,8 @@ if (!up){ kill(); skip('개발 서버가 안 뜸'); }
 for (let i = 0; i < 40; i++){ try { if ((await fetch(`http://127.0.0.1:${VP}/src/main.jsx`)).ok) break; } catch { /* 아직 */ } await wait(500); }
 
 const api = (u, q = '') => fetch(`http://127.0.0.1:${SP}/quest?token=e2e-user${u}${q}`).then(r => r.json());
+// 스킨 보유는 **서버가 쥔다** — 출시 설정에선 기기에 적힌 보유는 서버 값으로 갈아끼워진다
+const own = (u, v) => api(u, '&act=__put&v=' + encodeURIComponent(JSON.stringify({ own: v })));
 const b = await puppeteer.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
 // `seed` — 처음 켤 때 기기에 적혀 있을 값 (AI 진행도·보유 스킨)
 const dev = async (u, seed, w = 393, h = 851, lang = 'ko', dpr = 1) => {
@@ -163,6 +165,7 @@ try {
 
   // ── 프로필 캐릭터 ─────────────────────────────────────────
   console.log('프로필 캐릭터 — 기본이 기본값');
+  await own('av', { gun: [3], melee: [7] });
   const Q = await dev('av', { 'duel.tryskin': { gun: 0, melee: 0, soccer: 0, arena: 0, own: { gun: [3], melee: [7] } } });
   const avOf = sel => Q.evaluate(s => {
     const el = document.querySelector(s);
@@ -201,11 +204,8 @@ try {
   await Q.screenshot({ path: '/tmp/aibox_home.png', clip: { x: 0, y: 0, width: 393, height: 120 } });
 
   console.log('그 스킨을 더는 안 가지고 있으면 기본으로');
-  await Q.evaluate(() => {
-    const v = JSON.parse(localStorage.getItem('duel.tryskin'));
-    v.own = { gun: [3], melee: [] };
-    localStorage.setItem('duel.tryskin', JSON.stringify(v));
-  });
+  // 서버에서 빠지면 (기기에는 아직 남아 있어도) 앱이 서버 값을 받아 기본으로 돌아가야 한다
+  await own('av', { gun: [3], melee: [] });
   await toHome(Q);
   a = await avOf('.pbar .prof-av');
   assert(a.av === 'base:0', `  기본 캐릭터로 돌아간다 (${a.av})`);
@@ -221,7 +221,8 @@ try {
   for (const [w, h] of [[393, 851], [360, 640]]){
     console.log(`프로필 캐릭터 · 코스튬 스킨 칸 — 정가운데 · 같은 크기 (${w}px)`);
     // 실제 폰처럼 **화면 배율 3** 으로 찍는다 — 배율 1 이면 상단바 사진이 13px 이라 픽셀 하나가 테두리에 걸린다
-    const V = await dev('avall' + w, { 'duel.tryskin': { gun: 0, melee: 0, soccer: 0, arena: 0, own: ALL } }, w, h, 'ko', 3);
+    await own('avall' + w, ALL);
+    const V = await dev('avall' + w,{ 'duel.tryskin': { gun: 0, melee: 0, soccer: 0, arena: 0, own: ALL } }, w, h, 'ko', 3);
     await V.click('.home-row .cost-entry:nth-child(3)');
     await V.waitForSelector('.screen.cost', { timeout: 10000 }); await wait(800);
     await V.addStyleTag({ content: MAG });

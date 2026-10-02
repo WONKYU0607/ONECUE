@@ -19,10 +19,12 @@ globalThis.performance = globalThis.performance || { now: () => 0 };
 const { newState, step, checksum, NOIN } = await import('../src/game/sim.js');
 const CFG = await import('../src/game/config.js');
 const { setArena, ARENA, WALL_L, WALL_R } = CFG;
-const { setTry, tryOf } = await import('../src/state/tryskin.js');
+const { setTry, tryOf, setOwned } = await import('../src/state/tryskin.js');
 const { ARENA_FLOOR, arenaFloorOf } = await import('../src/game/skins.js');
 
 const SKINS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+// 출시 설정에선 **가진 것만** 장착된다 — 전부 가진 것으로 두고 잰다
+setOwned({ arena: SKINS.filter(Boolean) });
 
 // ── 1. 시뮬: 스킨을 바꿔도 판이 같다 ─────────────────────────────
 // 칼전 3대3 을 900틱(15초) 돌린다. 버프는 4초마다, 차원문은 7초마다 자리를 옮기므로

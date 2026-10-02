@@ -7,6 +7,7 @@
 import { serverUrl } from '../net/connection.js';
 import { PERIODS, questsOf, claimable, keyOf, AI_STAGE_MAX } from './quests.js';
 import { isCleared, modeKey } from './progress.js';
+import { setOwned } from './tryskin.js';
 
 const HTTP = serverUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
 
@@ -102,6 +103,9 @@ export function __resetAi(){ aiPaidList = null; }
 export const claimMail = (id = '') => ask({ act: 'mail', id });
 /** 코인으로 스킨을 산다 */
 export const buySkin = (kind, id) => ask({ act: 'buy', what: 'skin', kind, id: String(id) });
+/** [stated] **광고를 끝까지 봤다** → 그 모드 티켓 한 장. `kind`: 'tk' 일반 · 'soc' 축구 · 'ffa' 개인전.
+ *  하루 횟수·지급은 서버가 판정한다. 돌려받은 값(`tk`·`soc`·`ffa`·`ad`)으로 화면 사본을 맞춘다 */
+export const adTicket = kind => ask({ act: 'ad', kind });
 /** 코인으로 티켓을 산다 */
 export const buyTicket = (soccer = false) =>
   ask({ act: 'buy', what: 'ticket', soccer: soccer ? '1' : '0' });
@@ -184,6 +188,9 @@ export async function refreshCoin(){
   const r = await fetchQuest();
   if (r && r.ok){
     setCoin(r.coin, (r.mail || []).length);
+    // 스킨 보유도 서버 값으로 맞춘다 — 출시(입어보기 꺼짐)에선 **산 것만** 장착되므로,
+    // 상점에서 사고 바로 [입기] 를 눌러도 먹으려면 여기서 기기 사본을 갱신해야 한다
+    if (r.own && typeof r.own === 'object') { try { setOwned(r.own); } catch { /* 무시 */ } }
     // 깼는데 못 받은 AI 보상이 있으면 이때 받는다 (못 받아도 화면은 그대로)
     claimAiRewards().catch(() => {});
   }

@@ -1314,3 +1314,17 @@ font-family:var(--gf);font-size:12px;font-weight:700;cursor:pointer}
 .panelbtn.place.big .t{font-size:17px}
 .panelbtn.place.big .sub{font-size:10px;font-weight:700;letter-spacing:0;color:#b49a5c}
 .panelbtn.place.go.big .sub{color:#7fb3cf}
+
+/* [stated] **광고 보고 티켓 받기** — 티켓이 없을 때 [시작하기] 자리에 뜬다 (보상이라 금색) */
+.pvp-start.ad{background:rgba(70,48,10,.96);border-color:#f0c86e}
+.pvp-start.ad .t{font-size:15px;letter-spacing:1px}
+.pvp-start.ad .tkn{color:#f0c86e}
+.pvp-adnote{margin-top:4px;font:700 11px/1.3 var(--gf);color:#ffb08a;text-align:center}
+/* 웹에서 쓰는 테스트용 가짜 광고 — 진짜 광고처럼 화면을 다 덮는다 */
+.fake-ad{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+background:rgba(4,6,12,.94)}
+.fake-ad .fa-box{display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px 32px;
+border:1px solid #f0c86e;background:#141a28;font-family:var(--gf);color:#e8e8f0;text-align:center}
+.fake-ad .fa-t{font-weight:900;font-size:18px;color:#f0c86e;letter-spacing:2px}
+.fake-ad .fa-n{font-weight:900;font-size:44px;line-height:1}
+.fake-ad .fa-d{font-size:11px;color:#8a95b0}

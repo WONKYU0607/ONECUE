@@ -6,6 +6,8 @@
 import fs from 'fs';
 import { DEBUG_INF_HP } from '../src/game/config.js';
 import { DEBUG_INF_SOCCER } from '../src/state/tickets.js';
+import { DEBUG_INF_FFA } from '../src/ui/pvpTickets.js';
+import { DEBUG_TRY_SKIN } from '../src/state/tryskin.js';
 import { assert } from './harness.js';
 import { fileURLToPath } from 'url';
 // **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
@@ -13,7 +15,9 @@ process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
 const flags = [
   ['DEBUG_INF_HP', DEBUG_INF_HP, 'src/game/config.js', '무한 체력 — 판이 안 끝난다'],
-  ['DEBUG_INF_SOCCER', DEBUG_INF_SOCCER, 'src/state/tickets.js', '축구 티켓 무제한']
+  ['DEBUG_INF_SOCCER', DEBUG_INF_SOCCER, 'src/state/tickets.js', '축구 티켓 무제한'],
+  ['DEBUG_INF_FFA', DEBUG_INF_FFA, 'src/ui/pvpTickets.js', '개인전 판수·티켓 무제한'],
+  ['DEBUG_TRY_SKIN', DEBUG_TRY_SKIN, 'src/state/tryskin.js', '스킨 아무거나 입어보기']
 ];
 
 console.log('출시 전 꺼야 하는 스위치');

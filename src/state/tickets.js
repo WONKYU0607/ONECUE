@@ -5,6 +5,7 @@
 // (규칙에서도 `tk·at·ffa·day` 쓰기를 막아뒀다)
 //
 // 서버가 진짜 값을 알려주면 `syncTickets()` 로 기기 값을 맞춘다.
+import { AD_DAY_MAX, AD_FFA_MAX } from './quests.js';
 export const SERVER_BACKED = true;
 
 const KEY = 'duel.play.v2';
@@ -18,9 +19,9 @@ export const FFA_MAX = 3;
 // [stated] 축구 미니게임은 **전용 티켓 하루 3장.** 일반 티켓과 **별개 주머니**라
 // 축구를 해도 일반 티켓은 안 깎인다. **시간 충전도 없고** 다 쓰면 광고로만 받는다
 export const SOC_MAX = 3;
-// [stated] 디버깅 중에는 축구 티켓을 다 써서 게임을 못 하는 일이 없게 **무제한**.
-// **출시 전 반드시 false** — `DEBUG_INF_HP` 와 같은 부류다
-export const DEBUG_INF_SOCCER = true;
+// [stated] 디버깅 중에는 축구 티켓을 다 써서 게임을 못 하는 일이 없게 **무제한**이었다.
+// [stated] **출시 설정으로 꺼 둔다** (`false`) — `DEBUG_INF_HP` 와 같은 부류다
+export const DEBUG_INF_SOCCER = false;
 const today = () => new Date().toISOString().slice(0, 10);
 
 const empty = () => ({
@@ -111,8 +112,18 @@ export function useSoccer(){
   return true;
 }
 
+// ── [stated] 광고 보고 티켓 받기 — 오늘 남은 횟수 (서버가 알려준 값) ─────────
+// 서버가 쥔다(하루 5번 · 개인전 판수 풀기는 3번). 여기는 버튼을 어떻게 그릴지 정하는 사본이다.
+// 한 번도 못 받았으면 **남아 있는 것으로** 본다 — 실제로 막는 건 서버다
+let adInfo = null;                      // { day, left, ffaLeft }
+export const adLeft = () => (adInfo && adInfo.day === today() ? adInfo.left : AD_DAY_MAX);
+export const adFfaLeft = () => (adInfo && adInfo.day === today() ? adInfo.ffaLeft : AD_FFA_MAX);
+/** 개인전에서 지금 막힌 이유가 **하루 판수**인가 (티켓은 남았는데) */
+export const ffaCountOut = () => ffaLeft() <= 0;
+
 /** 서버가 알려준 값으로 기기 사본을 맞춘다. **서버 값이 진짜다** */
 export function syncTickets(v){
+  if (v && v.ad && typeof v.ad.left === 'number') adInfo = { day: v.ad.day, left: v.ad.left | 0, ffaLeft: v.ad.ffaLeft | 0 };
   if (!v || typeof v.tk !== 'number') return false;
   cur.tk = Math.max(0, v.tk | 0);                        // 산 티켓이 얹혀 있으면 5장을 넘는다
   cur.ffa = Math.max(0, Math.min(FFA_MAX, v.ffa | 0));

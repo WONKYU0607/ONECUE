@@ -11,6 +11,7 @@
     "lint": "eslint src server test --ext .js,.jsx --max-warnings 200"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.1.0",
     "@capacitor-firebase/authentication": "^8.4.0",
     "@capacitor/android": "^8.5.0",
     "@capacitor/app": "^8.1.1",

@@ -29,6 +29,12 @@ if (!db) console.log('[store] 꺼짐 —', why, '· 점수는 저장되지 않�
 // **검사 전용 가짜 저장소** — `E2E_FAKE_STORE=1` 일 때만. 파이어스토어 없이 점수 흐름을 확인한다
 const FAKE = process.env.E2E_FAKE_STORE === '1' ? new Map() : null;
 export const fakeGet = uid => (FAKE ? FAKE.get(uid) || null : null);
+/** **검사 전용** — 가짜 저장소 문서에 값을 얹는다 (티켓을 0 으로 만드는 등). 진짜 저장소에선 아무것도 안 한다 */
+export const fakePut = (uid, patch) => {
+  if (!FAKE || !uid || !patch || typeof patch !== 'object') return { ok: false };
+  FAKE.set(uid, { ...(FAKE.get(uid) || {}), ...patch });
+  return { ok: true };
+};
 export const isOn = () => !!db || !!FAKE;
 
 /** 로그인 증표 확인. **uid 를 그냥 믿으면 남의 이름을 바꿔버릴 수 있다** —
@@ -381,10 +387,72 @@ export async function readTickets(uid){
     const g = grown(v || { tk: TICKET_MAX, at: now, ffa: FFA_MAX, day: dayKey() }, now);
     // 축구 티켓도 같이 준다 — 코인으로 사면 기본 3장 위에 얹히므로
     // 화면이 서버 값을 안 받으면 **산 게 안 보인다**
-    return { ...g, soc: socOf(v || {}), max: TICKET_MAX, ffaMax: FFA_MAX, socMax: SOC_MAX };
+    return { ...g, soc: socOf(v || {}), max: TICKET_MAX, ffaMax: FFA_MAX, socMax: SOC_MAX, ad: adLeftOf(v) };
   } catch (e){
     console.log('[store] 티켓 읽기 실패', e && e.code);
     return null;
+  }
+}
+
+// ── [stated] 광고 보고 티켓 받기 ─────────────────────────────────────
+// 하루 최대 5번(일반·축구 합쳐서), 개인전 판수 풀기는 그중 3번까지. 날짜는 다른 하루 값과 같이 UTC
+// (= 한국 아침 9시에 바뀐다). `ad` 칸은 서버만 쓴다 — 보안 규칙의 클라 쓰기 목록에 없다
+function adOf(v, today = dayKey()){
+  const a = v && v.ad;
+  return (a && a.day === today) ? { day: today, n: a.n | 0, ffa: a.ffa | 0 } : { day: today, n: 0, ffa: 0 };
+}
+export function adLeftOf(v, today = dayKey()){
+  const a = adOf(v, today);
+  return { day: today, left: Math.max(0, AD_DAY_MAX - a.n), ffaLeft: Math.max(0, AD_FFA_MAX - a.ffa) };
+}
+/**
+ * 광고를 끝까지 봤다 → 그 모드 티켓 한 장. `kind`:
+ *   'tk'  일반 티켓 (총격전·칼전)
+ *   'soc' 축구 티켓
+ *   'ffa' 개인전 — **막힌 쪽을 풀어 준다**: 하루 판수가 0 이면 +1(하루 3번까지), 티켓이 0 이면 +1
+ * [stated] **티켓이 없어 막혔을 때만** 받는다 — 화면도 그때만 광고 버튼을 띄운다.
+ * 남아 있는데 오면(고친 클라·화면이 늦게 갱신됨) 안 주고 지금 값만 돌려준다
+ */
+export async function adReward(uid, kind){
+  const k = ['tk', 'soc', 'ffa'].includes(kind) ? kind : null;
+  if (!isOn() || !uid || !k) return { ok: false, why: 'bad' };
+  try {
+    return await withDoc(uid, async (tx, dbx) => {
+      const ref = dbx && dbx.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const v = d.exists ? d.data() : {};
+      const now = Date.now();
+      const today = dayKey();
+      const a = adOf(v, today);
+      const g = grown(v, now);                      // 항목이 없으면 처음 값(가득)으로 본다
+      let soc = socOf(v, today);
+      const state = () => ({ ...g, soc, ad: adLeftOf({ ad: a }, today) });
+      if (a.n >= AD_DAY_MAX) return { ok: false, why: 'capped', ...state() };
+      const patch = {};
+      if (k === 'soc'){
+        if (soc > 0) return { ok: false, why: 'notEmpty', ...state() };
+        soc += 1; patch.soc = soc; patch.socDay = today;
+      } else if (k === 'ffa'){
+        if (g.ffa > 0 && g.tk > 0) return { ok: false, why: 'notEmpty', ...state() };
+        if (g.ffa <= 0){
+          if (a.ffa >= AD_FFA_MAX) return { ok: false, why: 'ffaCapped', ...state() };
+          g.ffa += 1; a.ffa += 1;
+        }
+        if (g.tk <= 0) g.tk += 1;
+        Object.assign(patch, { tk: g.tk, at: g.at, ffa: g.ffa, day: g.day });
+      } else {
+        if (g.tk > 0) return { ok: false, why: 'notEmpty', ...state() };
+        g.tk += 1;
+        Object.assign(patch, { tk: g.tk, at: g.at, ffa: g.ffa, day: g.day });
+      }
+      a.n += 1;
+      patch.ad = { day: a.day, n: a.n, ffa: a.ffa };
+      tx.set(ref, patch, whole(patch));
+      return { ok: true, kind: k, ...state() };
+    });
+  } catch (e){
+    console.log('[store] 광고 티켓 실패', e && e.code);
+    return { ok: false, why: 'err' };
   }
 }
 
@@ -604,7 +672,8 @@ export async function buildRanks(kind = 'gun', top = 30){
 import {
   PAY, PERIODS, questsOf, keyOf, emptyPeriod, doneOf, allDone,
   claimable, bump as qbump, SKIN_COST, SKIN_FIRST_OFF, TICKET_COST,
-  BUY_TK_MAX, BUY_SOC_MAX, PLAY_DAY_MAX, countsOf as questCounts, matchCoin, aiStagePay
+  BUY_TK_MAX, BUY_SOC_MAX, PLAY_DAY_MAX, countsOf as questCounts, matchCoin, aiStagePay,
+  AD_DAY_MAX, AD_FFA_MAX
 } from '../src/state/quests.js';
 
 // **검사 전용** — `E2E_FAKE_STORE=1` 이면 파이어스토어 없이 같은 코드를 돌린다.
