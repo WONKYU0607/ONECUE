@@ -23,7 +23,8 @@ import { t, getLang } from '../i18n/index.js';
 const FW = 14 * RS, FH = 16 * RS;
 // 칼전 시트 규격 (melee.json)
 // 화면(CSS)과 같은 게임 글꼴. canvas는 CSS 변수를 못 읽어 여기에 한 번 더 적는다
-const GF = '"Arial Black","Helvetica Neue",Impact,"Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+// [stated] 전부 도현체 — `styles.css` 의 `--gf` 와 **같은 목록**이어야 한다 (`font.test.js` 가 본다)
+const GF = '"DoHyeon","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
 // [stated] **칼전 시트를 절반으로 줄였다** — 3872x1188 은 메모리에 17.5MB 로 풀려
 // 판이 시작될 때 이걸 올리느라 초반이 걸렸다. 화면엔 36px 로 그리는데 원본이 182px 이라
 // 절반(1936x594, 4.4MB)으로도 여전히 줄여 그린다 — 보이는 건 그대로다

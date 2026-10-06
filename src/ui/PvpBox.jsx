@@ -5,10 +5,10 @@
 // 방 만들기·코드 입력은 친구 대전 칸(`FriendBox.jsx`)에 있다
 import { useState } from 'react';
 import { getColor } from '../state/profile.js';
-import { tk, out, outSoccer, tkSoccer } from './pvpTickets.js';
+import { tk, out, outSoccer, tkSoccer, notFull, notFullSoccer } from './pvpTickets.js';
 import { showRewarded } from '../state/ads.js';
 import { adTicket } from '../state/questclient.js';
-import { syncTickets, adLeft, adFfaLeft, ffaCountOut } from '../state/tickets.js';
+import { syncTickets, adLeft, adFfaLeft, ffaAdUsesCount } from '../state/tickets.js';
 import { AD_DAY_MAX } from '../state/quests.js';
 import Plaque from './Plaque.jsx';
 import { t } from '../i18n/index.js';
@@ -34,7 +34,7 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch }){
   const [size, setSize] = useState(2);        // 2 | 4 | 6 | 'ffa'
   const [ffaN, setFfaN] = useState(3);
 
-  const pick = k => { setOpen(k); setSize(2); setFfaN(3); };
+  const pick = k => { setOpen(k); setSize(2); setFfaN(3); setAdNote(''); };
   // 찾는 중에 닫으면 찾기도 끝낸다 — 칸만 접히고 뒤에서 계속 찾으면 안 된다
   const close = () => { if (search) onCancelSearch?.(); setOpen(null); };
 
@@ -49,12 +49,15 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch }){
   const soccer = open === 'soccer';
   const blocked = soccer ? outSoccer() : out(ffa);
   // [stated] **티켓이 없으면 [시작하기] 자리가 [광고 보고 티켓 받기]** 로 바뀐다.
-  // 끝까지 보면 **그 모드 티켓** 한 장(축구면 축구 티켓, 개인전이면 막힌 쪽). 하루 5번 · 개인전 판수는 3번
+  // 끝까지 보면 **그 모드 티켓** 한 장(축구면 축구 티켓, 개인전이면 적은 쪽). 하루 5번 · 개인전 판수는 3번
+  // [stated] **꽉 차 있지 않으면 언제든** — "티켓이 4개인 경우에 광고 보면 5개로 되어야지".
+  // 남아 있을 땐 [시작하기] 를 그대로 두고 **옆에 작은 [광고 +1]** 을 붙인다
   const [adBusy, setAdBusy] = useState(false);
   const [adNote, setAdNote] = useState('');
   const [, redraw] = useState(0);
   const adKind = soccer ? 'soc' : (ffa ? 'ffa' : 'tk');
-  const adCan = adLeft() > 0 && !(ffa && ffaCountOut() && adFfaLeft() <= 0);
+  const adCan = adLeft() > 0 && !(ffa && ffaAdUsesCount() && adFfaLeft() <= 0);
+  const adPlus = !blocked && adCan && (soccer ? notFullSoccer() : notFull(ffa));
   const watchAd = async () => {
     if (adBusy || !adCan) return;
     setAdBusy(true); setAdNote('');
@@ -67,13 +70,13 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch }){
     const g = await adTicket(adKind);
     // 받았든 아니든 **서버가 알려준 값**으로 맞춘다 (남은 횟수·티켓)
     if (g && typeof g.tk === 'number') syncTickets(g);
-    if (!(g && g.ok) && !(g && g.why === 'notEmpty'))
+    if (!(g && g.ok) && !(g && g.why === 'full'))
       setAdNote(t(g && (g.why === 'capped' || g.why === 'ffaCapped') ? 'ad.capped' : 'q.fail'));
     setAdBusy(false);
     redraw(x => x + 1);
   };
   const start = () => {
-    if (!open || blocked) return;
+    if (!open || blocked || adBusy) return;
     const n = ffa ? curFfaN : curSize;
     onStart({ mode: 'queue', n, melee: open === 'melee', soccer, ffa, color: getColor() });
   };
@@ -120,12 +123,20 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch }){
               </div>
             )}
             {!search && !blocked && (
-              <button className="pvp-start" onClick={start}>
-                <span className="t">{t('home.startBattle')}</span>
-                <span className="tkn">
-                  <span className={'tk-ico' + (soccer ? ' soc' : '')} />{soccer ? tkSoccer() : tk(ffa)}
-                </span>
-              </button>
+              <div className="pvp-go">
+                <button className="pvp-start" disabled={adBusy} onClick={start}>
+                  <span className="t">{t('home.startBattle')}</span>
+                  <span className="tkn">
+                    <span className={'tk-ico' + (soccer ? ' soc' : '')} />{soccer ? tkSoccer() : tk(ffa)}
+                  </span>
+                </button>
+                {adPlus && (
+                  <button className="pvp-adplus" disabled={adBusy} onClick={watchAd}>
+                    <span className="t">{t('ad.plus')}</span>
+                    <span className="n">{t('ad.left', { n: adLeft(), max: AD_DAY_MAX })}</span>
+                  </button>
+                )}
+              </div>
             )}
             {!search && blocked && (
               <button className={'pvp-start ad' + (adCan && !adBusy ? '' : ' off')} disabled={adBusy || !adCan} onClick={watchAd}>
@@ -133,7 +144,7 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch }){
                 {adCan && !adBusy && <span className="tkn">{t('ad.left', { n: adLeft(), max: AD_DAY_MAX })}</span>}
               </button>
             )}
-            {!search && blocked && adNote && <div className="pvp-adnote">{adNote}</div>}
+            {!search && adNote && <div className="pvp-adnote">{adNote}</div>}
             {/* [stated] **로딩 화면 없이 여기서 찾는다.** 잡히면 VS 화면이 홈 위에 바로 뜬다 */}
             {search && (
               <div className="pvp-search">

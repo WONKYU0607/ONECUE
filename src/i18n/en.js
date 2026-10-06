@@ -184,6 +184,7 @@ export default {
   'ready.waitPeer': 'Waiting for reply {n}',
   'ad.get': 'Watch ad for a ticket',
   'ad.left': 'Today {n}/{max}',
+  'ad.plus': 'Ad +1',
   'ad.doneToday': 'No more ads today',
   'ad.loading': 'Loading ad…',
   'ad.skip': 'Watch the whole ad to get the ticket',

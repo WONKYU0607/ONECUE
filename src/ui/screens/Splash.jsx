@@ -41,9 +41,17 @@ export default function Splash({ onDone }){
       img.onload = img.onerror = res;
       img.src = `assets/splash-${ko ? 'ko' : 'en'}.webp`;
     });
+    // [stated] 게임 글꼴(도현체)도 여기서 받아 둔다 — 안 그러면 홈이 뜰 때 글씨가 잠깐 비거나
+    // 기본 글씨로 나왔다가 바뀐다. 캔버스 글씨도 받아 둔 뒤라야 처음부터 도현체로 그린다.
+    // 못 받아도 막지 않는다(3초) — 그때는 기본 글씨로 나올 뿐이다
+    const font = Promise.race([
+      (document.fonts && document.fonts.load) ? document.fonts.load('16px "DoHyeon"', '\uAC00A').catch(() => {}) : null,
+      new Promise(res => setTimeout(res, 3000))
+    ]);
     Promise.all([
       preloadAssets((done, total) => { if (alive) setPct(Math.round(done / total * 100)); }),
-      cover
+      cover,
+      font
     ]).then(() => {
       const wait = Math.max(0, MIN_MS - (performance.now() - t0));
       setTimeout(() => { if (alive) setReady(true); }, wait);

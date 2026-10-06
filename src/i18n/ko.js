@@ -184,6 +184,7 @@ export default {
   'ready.waitPeer': '상대 응답 대기 {n}',
   'ad.get': '광고 보고 티켓 받기',
   'ad.left': '오늘 {n}/{max}',
+  'ad.plus': '광고 +1',
   'ad.doneToday': '오늘 광고 보상 끝',
   'ad.loading': '광고 불러오는 중…',
   'ad.skip': '광고를 끝까지 봐야 받을 수 있어요',

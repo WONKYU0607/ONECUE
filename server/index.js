@@ -783,6 +783,8 @@ const http = createServer((req, res) => {
       if (act === '__put' && process.env.E2E_DEBUG === '1'){
         try { return store.fakePut(me, JSON.parse(q.get('v') || '{}')); } catch { return { ok: false }; }
       }
+      // **검사 전용** — 가짜 저장소 문서를 그대로 본다 (같은 조건)
+      if (act === '__get' && process.env.E2E_DEBUG === '1') return { ok: true, v: store.fakeGet(me) };
       if (act === 'buy'){
         if (q.get('what') === 'ticket') return store.buyTicket(me, q.get('soccer') === '1');
         return store.buySkin(me, q.get('kind') || '', +q.get('id') || 0);

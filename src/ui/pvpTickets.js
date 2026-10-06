@@ -16,3 +16,7 @@ export const out = (ffa = false) => left(ffa) <= 0;
 // [stated] 축구는 **전용 티켓 하루 3장** — 일반 티켓과 별개 주머니라 따로 센다
 export const outSoccer = () => socLeft() <= 0;
 export const tkSoccer = () => `${socLeft()}/3`;
+// [stated] **꽉 차 있지 않으면** 광고로 한 장 더 받을 수 있다 ("4개면 광고 보고 5개로").
+// 기본 상한까지만 — 코인으로 사서 상한 위에 있으면 꽉 찬 것으로 본다 (서버 `adReward` 와 같다)
+export const notFull = (ffa = false) => left(ffa) < maxFor(ffa);
+export const notFullSoccer = () => socLeft() < 3;

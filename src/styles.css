@@ -1,10 +1,21 @@
+/* [stated] **게임 글씨는 전부 도현체(배민 Do Hyeon).** 5가지를 실제 화면에 입혀 비교하고 2번을 골랐다.
+   OFL 1.1 — 상업용 무료 (`src/fonts/OFL.txt` 를 같이 둔다).
+   - 파일을 Vite 가 묶어 준다(빌드 결과 `assets/` 에 이름 붙어 들어간다) → 앱·웹 모두 기기 글씨와 무관하게 같다
+   - **굵기가 하나뿐이라 범위(100~900)로 연다.** 안 그러면 900 을 달라는 곳마다 브라우저가
+     가짜 굵게를 만들어 글자가 번진다 (화면 글씨 대부분이 700·900 이다). 아래 `font-synthesis:none` 도 같은 이유
+   - 한글 2,437자(완성형 2,350 포함). 없는 글자(드문 글자·‹ … · 등 몇몇 기호)는 다음 글꼴로 나온다 */
+@font-face{
+  font-family:"DoHyeon";
+  src:url("./fonts/DoHyeon-Regular.woff2") format("woff2");
+  font-weight:100 900;font-style:normal;font-display:block;
+}
 :root{
   /* CSS의 url()은 **CSS 파일 위치 기준**이라 개발 서버와 빌드 결과에서 경로가 갈린다.
      페이지 기준으로 잡아야 둘 다 맞으므로 main.jsx에서 이 값을 넣어준다 */
   --frame:none;
-  /* 게임 글꼴. 웹폰트 없이 시스템 글꼴만으로 최대한 두껍게.
-     한 곳에서만 바꾸면 화면 전체가 따라오도록 변수로 둔다 */
-  --gf:"Arial Black","Helvetica Neue",Impact,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  /* 게임 글꼴. 한 곳에서만 바꾸면 화면 전체가 따라오도록 변수로 둔다.
+     캔버스(`render.js` 의 `GF`)도 같은 목록을 쓴다 — 바꾸면 둘 다 */
+  --gf:"DoHyeon","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   /* **한 칸 단위.** 화면(세로 띠) 폭이 창 크기에 따라 달라지므로
      UI 수치를 절대 px로 두면 PC에서 작아 보인다. 폰 360px을 1로 잡고 비례시킨다.
      [stated] PC도 폰과 완전히 같은 화면으로 간다 */
@@ -24,6 +35,10 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:#07070d;overflow:hidden;touch-action:none;
 -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+/* [stated] **모든 글씨를 게임 글꼴로.** 화면(.screen) 밖에 뜨는 것(창·알림·광고 자리)과
+   버튼·입력칸(브라우저가 글꼴을 물려주지 않는다)까지 같은 글꼴을 쓰게 맨 위에서 건다 */
+html{font-family:var(--gf);font-synthesis:none}
+button,input,select,textarea{font-family:inherit}
 /* 게임 캔버스도 안전 영역 안에 둔다 (상단바 밑으로 밀려 들어가지 않게) */
 .wrap{height:100%;display:flex;align-items:center;justify-content:center;
   padding:var(--sat) var(--sar) var(--sab) var(--sal)}
@@ -1320,6 +1335,17 @@ font-family:var(--gf);font-size:12px;font-weight:700;cursor:pointer}
 .pvp-start.ad .t{font-size:15px;letter-spacing:1px}
 .pvp-start.ad .tkn{color:#f0c86e}
 .pvp-adnote{margin-top:4px;font:700 11px/1.3 var(--gf);color:#ffb08a;text-align:center}
+/* [stated] 티켓이 남아 있어도 꽉 차 있지 않으면 광고로 한 장 — [시작하기] 옆 작은 금색 버튼.
+   줄을 새로 만들지 않는다(칸 높이가 고정이라 위의 그림을 덮는다) */
+.pvp-go{display:flex;gap:6px;align-items:stretch}
+.pvp-go .pvp-start{flex:1 1 0;min-width:0}
+.pvp-adplus{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  padding:0 10px;cursor:pointer;color:#fff;white-space:nowrap;
+  background:rgba(70,48,10,.96);border:1px solid #f0c86e;border-radius:3px}
+.pvp-adplus .t{font:900 14px/1 var(--gf);letter-spacing:.5px;text-shadow:0 2px 3px rgba(0,0,0,.8)}
+.pvp-adplus .n{font:900 10px/1 var(--gf);color:#f0c86e}
+.pvp-adplus:active{filter:brightness(1.3)}
+.pvp-adplus:disabled,.pvp-go .pvp-start:disabled{opacity:.45;cursor:default}
 /* 웹에서 쓰는 테스트용 가짜 광고 — 진짜 광고처럼 화면을 다 덮는다 */
 .fake-ad{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
 background:rgba(4,6,12,.94)}

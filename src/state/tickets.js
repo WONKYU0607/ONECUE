@@ -118,8 +118,9 @@ export function useSoccer(){
 let adInfo = null;                      // { day, left, ffaLeft }
 export const adLeft = () => (adInfo && adInfo.day === today() ? adInfo.left : AD_DAY_MAX);
 export const adFfaLeft = () => (adInfo && adInfo.day === today() ? adInfo.ffaLeft : AD_FFA_MAX);
-/** 개인전에서 지금 막힌 이유가 **하루 판수**인가 (티켓은 남았는데) */
-export const ffaCountOut = () => ffaLeft() <= 0;
+/** 개인전 광고가 **하루 판수**를 늘리는가 — 서버 `adReward('ffa')` 와 같은 규칙
+ *  (티켓·판수 중 적은 쪽을 늘린다. 같으면 둘 다). 판수를 늘리는 건 하루 3번까지라 버튼을 그릴 때 본다 */
+export const ffaAdUsesCount = () => { const f = ffaLeft(); return f < FFA_MAX && f <= ticketsLeft(); };
 
 /** 서버가 알려준 값으로 기기 사본을 맞춘다. **서버 값이 진짜다** */
 export function syncTickets(v){

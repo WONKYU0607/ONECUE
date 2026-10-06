@@ -409,9 +409,11 @@ export function adLeftOf(v, today = dayKey()){
  * 광고를 끝까지 봤다 → 그 모드 티켓 한 장. `kind`:
  *   'tk'  일반 티켓 (총격전·칼전)
  *   'soc' 축구 티켓
- *   'ffa' 개인전 — **막힌 쪽을 풀어 준다**: 하루 판수가 0 이면 +1(하루 3번까지), 티켓이 0 이면 +1
- * [stated] **티켓이 없어 막혔을 때만** 받는다 — 화면도 그때만 광고 버튼을 띄운다.
- * 남아 있는데 오면(고친 클라·화면이 늦게 갱신됨) 안 주고 지금 값만 돌려준다
+ *   'ffa' 개인전 — **할 수 있는 판수(티켓·하루 판수 중 적은 쪽)를 한 판 늘린다**:
+ *         적은 쪽(같으면 둘 다)에 +1. 하루 판수를 늘리는 건 하루 3번까지
+ * [stated] **꽉 차 있지만 않으면 받는다** — "티켓이 4개인 경우에 광고 보면 5개로 되어야지".
+ * 한 장씩, **기본 상한까지만** (일반 5 · 축구 3 · 개인전 3판). 코인으로 사서 상한 위에 있으면 못 받는다.
+ * 꽉 찼는데 오면(고친 클라·화면이 늦게 갱신됨) 안 주고 지금 값만 돌려준다(`full`)
  */
 export async function adReward(uid, kind){
   const k = ['tk', 'soc', 'ffa'].includes(kind) ? kind : null;
@@ -430,18 +432,20 @@ export async function adReward(uid, kind){
       if (a.n >= AD_DAY_MAX) return { ok: false, why: 'capped', ...state() };
       const patch = {};
       if (k === 'soc'){
-        if (soc > 0) return { ok: false, why: 'notEmpty', ...state() };
+        if (soc >= SOC_MAX) return { ok: false, why: 'full', ...state() };
         soc += 1; patch.soc = soc; patch.socDay = today;
       } else if (k === 'ffa'){
-        if (g.ffa > 0 && g.tk > 0) return { ok: false, why: 'notEmpty', ...state() };
-        if (g.ffa <= 0){
-          if (a.ffa >= AD_FFA_MAX) return { ok: false, why: 'ffaCapped', ...state() };
-          g.ffa += 1; a.ffa += 1;
-        }
-        if (g.tk <= 0) g.tk += 1;
+        // 개인전은 한 판에 티켓과 하루 판수를 **둘 다** 쓴다 → 적은 쪽이 실제 할 수 있는 판수
+        if (Math.min(g.tk, g.ffa) >= Math.min(TICKET_MAX, FFA_MAX)) return { ok: false, why: 'full', ...state() };
+        const upFfa = g.ffa < FFA_MAX && g.ffa <= g.tk;
+        const upTk = g.tk < TICKET_MAX && g.tk <= g.ffa;
+        if (upFfa && a.ffa >= AD_FFA_MAX) return { ok: false, why: 'ffaCapped', ...state() };
+        if (upFfa){ g.ffa += 1; a.ffa += 1; }
+        if (upTk) g.tk += 1;
         Object.assign(patch, { tk: g.tk, at: g.at, ffa: g.ffa, day: g.day });
       } else {
-        if (g.tk > 0) return { ok: false, why: 'notEmpty', ...state() };
+        if (g.tk >= TICKET_MAX) return { ok: false, why: 'full', ...state() };
+        // 시간 충전 시계(`at`)는 그대로 — 4→5 로 차면 충전이 멈추고, 그 밑이면 하던 대로 계속 센다
         g.tk += 1;
         Object.assign(patch, { tk: g.tk, at: g.at, ffa: g.ffa, day: g.day });
       }

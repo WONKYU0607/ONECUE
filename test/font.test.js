@@ -40,4 +40,26 @@ assert(monoLeft === 0, '  캔버스 글씨에 monospace가 남아 있다 (' + mo
 const gfUse = (rj.match(/\+ GF/g) || []).length;
 assert(gfUse >= 10, '  캔버스도 게임 글꼴을 쓴다 (' + gfUse + '곳)');
 console.log('  ok  캔버스 monospace 0곳 / GF ' + gfUse + '곳');
+
+// [stated] **모든 글씨를 도현체로.** 화면·캔버스가 같은 목록이고, 파일이 실제로 있다
+console.log('전부 도현체');
+{
+  const gf = (css.match(/--gf:([^;]+);/) || [])[1] || '';
+  assert(/^"DoHyeon",/.test(gf.trim()), `  --gf 맨 앞이 도현체 (${gf.trim().slice(0, 30)})`);
+  const GF = (rj.match(/const GF = '([^']+)'/) || [])[1] || '';
+  assert(GF === gf.trim(), `  캔버스 GF 와 --gf 가 같은 목록 (${GF.slice(0, 30)})`);
+  const face = (css.match(/@font-face\{[^}]*\}/) || [])[0] || '';
+  assert(/font-family:"DoHyeon"/.test(face), '  @font-face 가 있다');
+  // 굵기가 하나뿐인 글꼴 — 범위로 열지 않으면 700·900 을 달라는 곳마다 가짜 굵게로 번진다
+  assert(/font-weight:100 900/.test(face), '  굵기 범위를 100~900 으로 연다 (가짜 굵게 방지)');
+  const url = (face.match(/url\("\.\/([^"]+)"\)/) || [])[1];
+  assert(url && fs.existsSync('src/' + url), `  글꼴 파일이 있다 (src/${url})`);
+  assert(fs.existsSync('src/fonts/OFL.txt'), '  라이선스(OFL) 파일을 같이 둔다');
+  assert(/html\{font-family:var\(--gf\)/.test(css), '  화면 밖(창·알림)도 물려받게 html 에 건다');
+  assert(/button,input,select,textarea\{font-family:inherit\}/.test(css), '  버튼·입력칸도 물려받는다');
+  // 다른 글꼴 이름이 따로 박힌 곳이 없다 (목록은 --gf 한 곳과 GF 한 곳)
+  const fam = [...css.matchAll(/font-family:([^;}]+)/g)].map(m => m[1].trim())
+    .filter(v => !/^var\(--gf\)$/.test(v) && v !== 'inherit' && v !== '"DoHyeon"');
+  assert(fam.length === 0, `  CSS 에 다른 글꼴 이름이 없다 (${fam.join(' | ')})`);
+}
 console.log('font.test.js 통과');
