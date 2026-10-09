@@ -7,7 +7,9 @@
 // 실패를 조용히 삼키면 "눌렀는데 아무 일도 안 일어난다"가 되어 사용자가 앱을 의심한다.
 import { useState, useEffect, useCallback } from 'react';
 import { listFriends, addFriend, acceptFriend, rejectFriend, removeFriend } from '../../state/friends.js';
-import { setInnerBack } from '../../state/back.js';
+import { setInnerBack, releaseInnerBack } from '../../state/back.js';
+// 이 화면 안에는 접을 단계가 없다 — 하단 뒤로가기는 App 이 홈으로 보낸다
+const NO_INNER = () => false;
 import { t } from '../../i18n/index.js';
 
 const WHY = { none: 'fr.none', self: 'fr.self', already: 'fr.already' };
@@ -18,8 +20,9 @@ export default function Friends({ onBack }){
   const [nick, setNick] = useState('');
   const [msg, setMsg] = useState('');
 
-  setInnerBack(() => false);
-  useEffect(() => () => setInnerBack(null), []);
+  setInnerBack(NO_INNER);
+  // **내가 건 것일 때만** 푼다 — 그냥 null 로 지우면 먼저 그려진 홈의 것까지 지워진다 (`back.js`)
+  useEffect(() => () => releaseInnerBack(NO_INNER), []);
 
   const load = useCallback(async () => {
     const r = await listFriends();

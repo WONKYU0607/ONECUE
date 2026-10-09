@@ -8,7 +8,9 @@
 // [stated] 미리보기는 **서있기 4칸 / 뛰기 4칸 두 줄**, 캐릭터를 크게.
 // [stated] 상품은 아래로 쌓지 않고 **옆으로 넘겨서** 본다 — 한 칸이 커졌기 때문
 import { useState, useEffect, useRef } from 'react';
-import { setInnerBack } from '../../state/back.js';
+import { setInnerBack, releaseInnerBack } from '../../state/back.js';
+// 이 화면 안에는 접을 단계가 없다 — 하단 뒤로가기는 App 이 홈으로 보낸다
+const NO_INNER = () => false;
 import { DEBUG_TRY_SKIN, tryOf, setTry } from '../../state/tryskin.js';
 import { coinSkinsOf, coinArenasOf } from '../../game/skins.js';
 import { buySkin, buyTicket, refreshCoin, coinNow, onCoin } from '../../state/questclient.js';
@@ -182,8 +184,9 @@ export default function Shop({ onBack }){
     if (el) el.scrollTo({ left: 0, behavior: 'auto' });
   };
 
-  setInnerBack(() => false);
-  useEffect(() => () => setInnerBack(null), []);
+  setInnerBack(NO_INNER);
+  // **내가 건 것일 때만** 푼다 — 그냥 null 로 지우면 먼저 그려진 홈의 것까지 지워진다 (`back.js`)
+  useEffect(() => () => releaseInnerBack(NO_INNER), []);
 
   // **번역은 그릴 때 부른다** — 최상단에서 부르면 언어가 정해지기 전에 굳는다
   const label = {

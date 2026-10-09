@@ -6,7 +6,7 @@
 // 예전엔 빠른 매칭·방 만들기·코드 입력이 **한 화면**을 쓰면서 안에서 `mode` 로 갈래를 나눴다.
 // 그래서 로비 조건을 하나 건드릴 때마다 빠른 매칭이 같이 샜다 — 여기는 오직 `접속 → VS → 게임`.
 import { useEffect, useRef, useState } from 'react';
-import { connectAndWait, disconnect } from '../../net/connection.js';
+import { connectAndWait, disconnect, sawVs } from '../../net/connection.js';
 import { spendFor, useSoccer } from '../../state/tickets.js';
 import VsIntro from '../VsIntro.jsx';
 import { sfx } from '../../game/audio.js';
@@ -15,7 +15,20 @@ import { SELF } from '../../game/config.js';
 
 export default function QuickMatch({ session, onStatus, onMatched }){
   const goneRef = useRef(false);
-  const go = () => { if (goneRef.current) return; goneRef.current = true; onMatched(); };
+  // [stated] **티켓은 VS 화면을 본 뒤에 쓴다** ("VS 이후는 티켓 빠져").
+  // 잡혔어도 VS 화면이 뜨기 전에 나가면 안 쓴다 — 서버도 이 신호(`vsSeen`)를 받고서야 깎는다.
+  // VS 정보가 늦어 화면 없이 바로 게임으로 갈 때도 여기서 쓴다. **한 번만**
+  const paidRef = useRef(false);
+  const pay = () => {
+    if (paidRef.current) return;
+    paidRef.current = true;
+    sawVs();
+    // 이제부터 뒤로가기는 바로 나가지 않고 묻는다 (App 이 'vs' 를 본다)
+    tell({ stage: 'vs' });
+    // 축구는 **전용 티켓**이라 일반 티켓을 안 건드린다
+    if (session?.soccer) useSoccer(); else spendFor(!!session?.ffa);
+  };
+  const go = () => { if (goneRef.current) return; goneRef.current = true; if (!SELF.watching) pay(); onMatched(); };
   const [vs, setVs] = useState(null);
   const [showVs, setShowVs] = useState(false);
   const vsRef = useRef(null);
@@ -28,6 +41,7 @@ export default function QuickMatch({ session, onStatus, onMatched }){
   useEffect(() => {
     alive.current = true;
     goneRef.current = false;
+    paidRef.current = false;
     let sec = 0;
     tell({ stage: 'waking', sec: 0, err: '' });
     const iv = setInterval(() => { sec++; tell({ sec }); }, 1000);
@@ -48,13 +62,10 @@ export default function QuickMatch({ session, onStatus, onMatched }){
         // [stated] **관전은 티켓을 안 쓴다** — 자리가 없으니 판에 낀 게 아니다
         const watching = !!(c && c.watching);
         if (watching){ SELF.watching = true; go(); return; }
-        // **상대를 만난 뒤에 티켓을 뺀다.** 매칭에 실패하거나 도중에 나가면 안 빠진다.
-        // 축구는 **전용 티켓**이라 일반 티켓을 안 건드린다
-        if (session?.soccer) useSoccer(); else spendFor(!!session?.ffa);
+        // 티켓은 여기서 안 뺀다 — **VS 화면이 뜰 때** 뺀다 (`pay`). 매칭에 실패하거나 VS 전에 나가면 안 빠진다
         sfx.matched?.();
         // [stated] **VS 화면 3초 동안 그림을 미리 준비한다** — 판이 시작될 때 올리면 그 순간이 걸린다
         warmUp(keysFor({ melee: SELF.melee, soccer: SELF.soccer, n: SELF.n }));
-        tell({ stage: 'vs' });
         setShowVs(true);
         // **VS 화면을 보여주고 넘어간다.** 정보가 안 오면 기다리지 않는다(0.6초)
         setTimeout(() => { if (alive.current && !vsRef.current) go(); }, 600);
@@ -73,6 +84,8 @@ export default function QuickMatch({ session, onStatus, onMatched }){
     };
   }, [session]);
 
+  // VS 화면이 실제로 뜨는 순간 티켓을 쓴다
+  useEffect(() => { if (showVs && vs) pay(); }, [showVs, !!vs]);
   // 찾는 동안에는 아무것도 안 그린다 — 홈이 그대로 보인다
   if (!showVs || !vs) return null;
   return (

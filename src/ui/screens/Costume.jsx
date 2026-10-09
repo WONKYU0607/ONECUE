@@ -7,7 +7,9 @@
 // 장착도 지금은 **내 화면에서만** 바뀐다(`tryskin` 이 그리기 단계만 건드린다).
 // 상대에게도 보이려면 `s.skin` 을 서버가 채워야 하고, 그건 소유 배선과 같이 붙인다.
 import { useState, useEffect } from 'react';
-import { setInnerBack } from '../../state/back.js';
+import { setInnerBack, releaseInnerBack } from '../../state/back.js';
+// 이 화면 안에는 접을 단계가 없다 — 하단 뒤로가기는 App 이 홈으로 보낸다
+const NO_INNER = () => false;
 import { getColor, setColor, setAv } from '../../state/profile.js';
 import ProfAvatar, { shownAv, avUsable } from '../ProfAvatar.jsx';
 import { tryOf, setTry, ownsSkin } from '../../state/tryskin.js';
@@ -61,8 +63,9 @@ export default function Costume({ onBack }){
   const [color, setC] = useState(getColor());
   const [, bump] = useState(0);
 
-  setInnerBack(() => false);
-  useEffect(() => () => setInnerBack(null), []);
+  setInnerBack(NO_INNER);
+  // **내가 건 것일 때만** 푼다 — 그냥 null 로 지우면 먼저 그려진 홈의 것까지 지워진다 (`back.js`)
+  useEffect(() => () => releaseInnerBack(NO_INNER), []);
 
   const label = { gun: t('shop.sub.gun'), melee: t('shop.sub.melee'), soccer: t('shop.sub.soccer') };
 

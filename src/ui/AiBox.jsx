@@ -28,7 +28,7 @@ function maxOpen(){
   return 1;
 }
 
-export default function AiBox({ onStart, regBack }){
+export default function AiBox({ onStart, regBack, act, onAct }){
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState(1);
   const [, bump] = useState(0);
@@ -38,10 +38,12 @@ export default function AiBox({ onStart, regBack }){
   const back = () => { if (!open) return false; setOpen(false); return true; };
   // 하단 뒤로가기는 홈이 한 곳에서 받아 칸마다 물어본다 (등록 자리가 하나뿐이라)
   regBack(back);
+  // [stated] **다른 칸을 열면 접힌다**
+  useEffect(() => { if (act && act !== 'ai' && open) setOpen(false); }, [act]);
 
   if (!open){
     return (
-      <button className="hbox hb-ai" onClick={() => { setStage(nextAiStage()); setOpen(true); }}>
+      <button className="hbox hb-ai" onClick={() => { setStage(nextAiStage()); setOpen(true); onAct?.('ai'); }}>
         <Plaque text={t('mode.ai')} icon="ai" />
       </button>
     );

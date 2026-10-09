@@ -18,16 +18,17 @@ import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings, setSetting } from './state/settings.js';
 import { onLangChange, t } from './i18n/index.js';
 import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
+import { updateBlocked } from './state/update.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
-import { startPlayClock, claimAiRewards } from './state/questclient.js';
+import { startPlayClock, claimAiRewards, aiPaidOf } from './state/questclient.js';
 import { playAgain, setRoomMode, getRoom, onRoom, onGo, onKicked, backToLobby,
          onAgainMsg, onModeMsg, askAgain, answerAgain, onAgainAsk, onAgainNo, onMatchCoin } from './net/connection.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
 import { recordResult, modeKey } from './state/progress.js';
-import { VIEW, SELF, HAND, teamOf } from './game/config.js';
+import { VIEW, SELF, HAND, teamOf, PH_READY, PH_PLAY } from './game/config.js';
 import { warmUp, keysFor } from './game/assets.js';
 
 // 화면 전환은 여기 한 곳에서만 한다.
@@ -86,6 +87,9 @@ export default function App(){
       onAgainAsk(null); onAgainNo(null); onMatchCoin(null); };
   }, []);
   useEffect(() => { if (screen === 'game') setGain(0); }, [screen]);
+  // 지금 판이 어느 단계인가 (게임 화면이 알려준다). 나가기 창이 전투 전인지 보고 안내를 바꾼다
+  const [gPhase, setGPhase] = useState(PH_READY);
+  useEffect(() => { if (screen === 'game') setGPhase(PH_READY); }, [screen]);
   // [stated] **빠른 매칭은 홈에서 찾는다** — 따로 로딩 화면이 없다. 찾는 중이면 {stage, sec, err}
   const [search, setSearch] = useState(null);
   const [summary, setSummary] = useState(null);   // 결과 창에 띄울 한 판 요약
@@ -146,6 +150,26 @@ export default function App(){
     disconnect();
     setSearch(null); setSession(null);
   }, []);
+  // [stated] **찾는 중에 앱 화면을 나가면 찾기를 취소한다** (홈 버튼·다른 앱으로 넘어감).
+  // 안 그러면 자리를 비운 사이 상대가 잡혀 VS 화면이 지나가고(티켓) 판이 그대로 진행된다.
+  // VS 화면이 뜬 뒤(이미 잡힌 판)는 건드리지 않는다 — 금방 돌아올 수 있고, 판을 나가는 건 묻고 한다
+  const searchNow = useRef(null);
+  searchNow.current = (search && screen === 'home' && session?.mode === 'queue') ? search : null;
+  useEffect(() => {
+    const away = () => { const s = searchNow.current; if (s && s.stage !== 'vs') cancelSearch(); };
+    const onVis = () => { if (document.visibilityState === 'hidden') away(); };
+    document.addEventListener('visibilitychange', onVis);
+    // 앱(Capacitor) — 화면이 가려지는 신호를 따로 준다. 웹에는 없으므로 전역에 있을 때만
+    let sub = null;
+    try {
+      const A = globalThis.Capacitor?.Plugins?.App;
+      if (A?.addListener) sub = A.addListener('appStateChange', st => { if (st && st.isActive === false) away(); });
+    } catch { /* 웹 — 무시 */ }
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      Promise.resolve(sub).then(h => { try { h && h.remove && h.remove(); } catch { /* 무시 */ } }).catch(() => {});
+    };
+  }, [cancelSearch]);
 
   // **`goHome` 아래에 두어야 한다.** const 는 정의 전에 읽을 수 없어(TDZ),
   // 위에 두면 화면이 뜨자마자 ReferenceError 로 앱이 통째로 죽는다
@@ -156,6 +180,8 @@ export default function App(){
   useEffect(() => { initBack(); }, []);
   useEffect(() => {
     setBackHandler(() => {
+      // [stated] **강제 업데이트 화면에서 뒤로가기는 앱 종료** — 업데이트 말고는 할 수 있는 게 없다
+      if (updateBlocked()){ exitApp(); return true; }
       // 게임에서 막 나온 직후의 뒤로가기는 흘려보낸다 (창을 닫은 그 입력이 또 오는 경우)
       if (Date.now() - quitAt.current < 700) return true;
       if (askExit){ setAskExit(false); return true; }
@@ -248,6 +274,29 @@ export default function App(){
     setSearch(null);
     setScreen('game');
   }, []);
+  // [stated] **AI 단계 보상이 결과 화면에 안 뜨고 다음 단계에서 합쳐 떴다** — 판이 끝날 때 보낸
+  // 보상 요청이 한 번 실패하면(서버가 덜 깼거나 망이 끊김) 다시 받는 장치가 없어, 다음 판을 이길 때
+  // 밀린 것까지 같이 받아졌다. → **못 받으면 잠깐씩 기다렸다 다시 받는다.**
+  // 받은 코인은 **그 판 결과 화면에 아직 있을 때만** 보여준다 (다음 판 화면에 섞이지 않게)
+  const claimSeq = useRef(0);
+  const showGainFor = useRef(0);       // 결과 화면에 코인을 보여줄 요청 번호 (결과 화면을 떠나면 0)
+  useEffect(() => { if (screen !== 'result') showGainFor.current = 0; }, [screen]);
+  const claimAiWithRetry = useCallback(stage => {
+    const my = ++claimSeq.current;
+    showGainFor.current = my;
+    const waits = [0, 2000, 4000, 8000, 15000, 30000];
+    const step = k => {
+      if (my !== claimSeq.current) return;            // 다음 판이 시작돼 새로 받는 중
+      claimAiRewards().then(x => {
+        if (my !== claimSeq.current) return;
+        if (x && x.ok && x.coin > 0 && showGainFor.current === my) setGain(g => g + x.coin);
+        // 이번 단계를 받았거나(이미 받은 단계 포함) 받을 게 없으면 끝
+        if (aiPaidOf(stage) === true || x === null || (x && x.why === 'none')) return;
+        if (k + 1 < waits.length) setTimeout(() => step(k + 1), waits[k + 1]);
+      }).catch(() => { if (k + 1 < waits.length) setTimeout(() => step(k + 1), waits[k + 1]); });
+    };
+    step(0);
+  }, []);
   const onFinish  = useCallback((r, summary, host) => {
     // **PVP만 점수를 매긴다.** AI·연습은 연습이므로 기록하지 않는다
     let sc = null;
@@ -295,9 +344,7 @@ export default function App(){
       recordResult(session.stage, r, modeKey(session.n || 2, !!session.melee));
       // [stated] **단계 첫 클리어 보상** — 이기면 바로 서버에 알려 받는다 (못 받으면 홈에 올 때 다시).
       // 받았으면 결과 화면에 보여준다 (이미 받은 단계면 0 이라 안 뜬다)
-      if (r === 'win') claimAiRewards()
-        .then(x => { if (x && x.ok && x.coin > 0) setGain(x.coin); })
-        .catch(() => {});
+      if (r === 'win') claimAiWithRetry(session.stage);
     }
     // [stated] **관전자는 판이 끝나면 로비로** — 결과 화면은 선수의 것이다
     if (SELF.watching){
@@ -405,7 +452,8 @@ export default function App(){
       {/* [stated] **방(로비)** — 판이 끝나면 여기로 돌아온다 */}
       {screen === 'room'     && <Room room={room || getRoom()} onLeave={() => setAskRoom(true)} />}
       {screen === 'game'     && <GameCanvas session={session} onExit={goHome}
-                                          onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} onTuto={goHome} />}
+                                          onBack={() => setAskQuit(true)} onFinish={onFinish} onAgain={onAgain} onMode={onMode} onTuto={goHome}
+                                          onPhaseChange={setGPhase} />}
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} gain={gain}
                                        waiting={againWait} paused={!!againAsk}
                                        onAuto={() => {
@@ -476,7 +524,12 @@ export default function App(){
       {askExit && <QuitAsk exit
                            onQuit={() => { setAskExit(false); exitApp(); }}
                            onStay={() => setAskExit(false)} />}
+      {/* [stated] **빠른 매칭에서 전투 전(VS·준비·카운트다운)에 나가면 패배가 아니다** — 쓴 티켓만 안 돌아온다 */}
       {askQuit && <QuitAsk pvp={session?.kind === 'pvp'} practice={session?.kind === 'practice'}
+                           room={session?.kind === 'pvp' && isRoomMode(session)}
+                           soccer={!!session?.soccer}
+                           pre={session?.kind === 'pvp' && session?.mode === 'queue'
+                                && (screen !== 'game' || gPhase < PH_PLAY)}
                            onQuit={() => {
                              setAskQuit(false);
                              // [stated] 나가기를 눌렀는데 **앱이 통째로 꺼졌다.**

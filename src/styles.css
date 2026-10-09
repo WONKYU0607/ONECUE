@@ -1087,6 +1087,18 @@ transform-origin:center;white-space:nowrap}
 .pvp-chip{flex:1 1 0;min-width:0;padding:7px 0;cursor:pointer;white-space:nowrap;
   font:900 13px/1 var(--gf);color:#cfe6f7;letter-spacing:.5px;
   background:rgba(12,24,40,.88);border:1px solid #3f6f94;border-radius:3px}
+.pvp-chip{position:relative}
+/* [stated] **"지금 N명 찾는 중"** — 접힌 판은 팻말 바로 위, 펼친 칸은 인원 단추 위 모서리.
+   `.pvp-wait-at` 은 판 팻말(.plq-pane)과 같은 자리·크기의 빈 틀이다 — 그 위(bottom:100%)에 띄운다 */
+.pvp-wait-at{position:absolute;left:8%;right:8%;bottom:6%;aspect-ratio:1099 / 280;pointer-events:none;z-index:3}
+.pvp-wait{position:absolute;left:50%;bottom:calc(100% + 3px);transform:translateX(-50%);
+  display:flex;align-items:center;gap:4px;white-space:nowrap;pointer-events:none;
+  padding:3px 7px;font:900 11px/1 var(--gf);color:#eaf7ff;letter-spacing:.3px;
+  background:rgba(6,14,26,.86);border:1px solid #8fd8ff;border-radius:9px}
+.pvp-wait::before{content:'';flex:0 0 6px;height:6px;border-radius:50%;background:#5dff9a}
+.pvp-chip .pvp-wait{left:auto;right:-3px;bottom:auto;top:-8px;transform:none;padding:2px 5px 2px 4px;font-size:10px;gap:3px}
+.pvp-chip .pvp-wait::before{flex-basis:5px;height:5px}
+.pvp-sizes + .pvp-sizes{margin-top:3px}   /* 둘째 줄(개인전 인원) 표시가 윗줄 단추에 겹치지 않게 */
 .pvp-chip.on{color:#fff;border-color:#8fd8ff;background:rgba(28,70,112,.95);
   box-shadow:0 0 0 1px rgba(143,216,255,.35) inset}
 .pvp-start{display:flex;align-items:center;justify-content:center;gap:10px;

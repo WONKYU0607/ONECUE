@@ -12,6 +12,13 @@ let armed = false;
 // 안 그러면 어느 단계에 있든 통째로 홈으로 나가버린다
 let inner = null;
 export function setInnerBack(fn){ inner = fn; }
+/** **내가 건 것일 때만** 푼다.
+ *  [stated] 상점·퀘스트·코스튬 등에서 홈으로 돌아온 뒤 PVP 칸을 열고 뒤로가기를 누르면
+ *  칸이 안 닫히고 **"앱을 나가시겠습니까"** 가 떴다. 원인: 새 화면(홈)은 **그리는 중에** 자기 것을 걸고,
+ *  떠나는 화면은 **그다음에** 정리하며 `setInnerBack(null)` 로 **남(홈)의 것까지 지웠다.**
+ *  홈이 다시 그려질 때까지(종료 창을 한 번 닫는 등) 칸 뒤로가기가 통째로 죽어 있었다 — 시간 문제가 아니었다.
+ *  → 정리할 때는 이것을 쓴다. 이미 다른 화면이 걸었으면 건드리지 않는다 */
+export function releaseInnerBack(fn){ if (inner === fn) inner = null; }
 
 /** 앱을 닫는다. 웹에서는 닫을 방법이 없어 아무 일도 안 일어난다 */
 export function exitApp(){

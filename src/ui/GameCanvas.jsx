@@ -12,7 +12,7 @@ import FitText from './FitText.jsx';
 // 게임 루프 상태는 ref에만 두고, React state는 "페이즈"처럼 드물게 바뀌는 것만 쓴다.
 // **화면 안 '‹' 와 하단 뒤로가기는 같은 동작이어야 한다.**
 // 예전엔 '‹' 가 확인 없이 바로 나가서, 나가기 창이 안 뜬다는 신고를 받았다
-export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain, onMode, onTuto }){
+export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain, onMode, onTuto, onPhaseChange }){
   const canvasRef = useRef(null);
   const gameRef = useRef(null);
   const [phase, setPhase] = useState(PH_READY);
@@ -96,7 +96,8 @@ export default function GameCanvas({ session, onExit, onBack, onFinish, onAgain,
     // 서버·루프가 두 개 생겨 총알이 두 배로 나오는 일이 없다
     const conn = session?.kind === 'pvp' ? getConnection() : null;
     const game = createGame(canvasRef.current, {
-      onPhase: setPhase,
+      // 판 단계를 앱에도 알린다 — 나가기 창이 전투 전/중에 따라 다른 안내를 띄운다
+      onPhase: p => { setPhase(p); onPhaseChange?.(p); },
       onCrash: e => setCrash(String(e && e.message || e)),
       session,
       transport: conn?.transport,

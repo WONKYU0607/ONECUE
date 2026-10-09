@@ -3,13 +3,14 @@
 //   접힘: 총격전 · 칼전 · 축구 세 판 (한 장짜리 그림 `home-pvp.webp` 를 셋으로 나눠 누른다)
 //   펼침: 누른 종목의 그림이 칸 전체로 커지고, 그 위에 인원 선택 + 시작하기
 // 방 만들기·코드 입력은 친구 대전 칸(`FriendBox.jsx`)에 있다
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getColor } from '../state/profile.js';
 import { tk, out, outSoccer, tkSoccer, notFull, notFullSoccer } from './pvpTickets.js';
 import { showRewarded } from '../state/ads.js';
 import { adTicket } from '../state/questclient.js';
 import { syncTickets, adLeft, adFfaLeft, ffaAdUsesCount } from '../state/tickets.js';
 import { AD_DAY_MAX } from '../state/quests.js';
+import { fetchSearching, qkeyOf } from '../state/searching.js';
 import Plaque from './Plaque.jsx';
 import { t } from '../i18n/index.js';
 
@@ -25,7 +26,7 @@ const FFA_SIZES = [3, 4, 5, 6];
 const STAGE = { waking: 'home.sWaking', connecting: 'home.sWaking', retrying: 'home.sWaking',
                 waiting: 'home.sSearch', matched: 'home.sFound', vs: 'home.sFound' };
 
-export default function PvpBox({ onStart, regBack, search, onCancelSearch }){
+export default function PvpBox({ onStart, regBack, search, onCancelSearch, act, onAct }){
   const [pick0, setOpen] = useState(null);    // null | 'gun' | 'melee' | 'soccer'
   // [stated] **찾는 중이면 그 종목 칸이 펼쳐진 채로** 상태를 보여준다 (결과 화면 '다시 하기' 로 돌아와도)
   const ss = search && search.session;
@@ -34,13 +35,37 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch }){
   const [size, setSize] = useState(2);        // 2 | 4 | 6 | 'ffa'
   const [ffaN, setFfaN] = useState(3);
 
-  const pick = k => { setOpen(k); setSize(2); setFfaN(3); setAdNote(''); };
+  const pick = k => { setOpen(k); setSize(2); setFfaN(3); setAdNote(''); onAct?.('pvp'); };
   // 찾는 중에 닫으면 찾기도 끝낸다 — 칸만 접히고 뒤에서 계속 찾으면 안 된다
   const close = () => { if (search) onCancelSearch?.(); setOpen(null); };
 
   // 하단 뒤로가기: 펼쳐져 있으면 **접기만** 한다(앱 종료 확인으로 안 간다).
   // 등록 자리가 하나뿐이라 홈이 받아서 칸마다 물어본다
   regBack(() => { if (!open) return false; close(); return true; });
+  // [stated] **다른 칸을 열면 접힌다** (찾는 중이었으면 뒤로가기와 같이 찾기도 끝낸다).
+  // 찾는 중으로 펼쳐진 채 돌아왔을 때(결과 화면 '다시 하기')는 이 칸이 열린 칸이다
+  useEffect(() => { if (act && act !== 'pvp' && open) close(); }, [act]);
+  useEffect(() => { if (searchKind) onAct?.('pvp'); }, [!!searchKind]);
+
+  // [stated] **"지금 N명 찾는 중"** — 같은 칸으로 모이면 사람끼리 잡히기 쉽다.
+  // 홈에 있는 동안 4초마다 서버에 묻는다. **내가 찾는 중이면 안 띄운다** (내가 섞여 세어진다)
+  const [wq, setWq] = useState({});
+  useEffect(() => {
+    let live = true;
+    const pull = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      fetchSearching().then(q => { if (live && q) setWq(q); }).catch(() => {});
+    };
+    pull();
+    const iv = setInterval(pull, 4000);
+    return () => { live = false; clearInterval(iv); };
+  }, []);
+  const keysOf = (kind, s) => (s === 'ffa' ? FFA_SIZES.map(k => qkeyOf(k, 'melee', true)) : [qkeyOf(s, kind)]);
+  const countOf = keys => (search ? 0 : keys.reduce((a, k) => a + (wq[k] | 0), 0));
+  const paneCount = kind => countOf(KINDS[kind].sizes.flatMap(s => keysOf(kind, s)));
+  const waitBadge = n => (n > 0 ? <span className="pvp-wait">{t('home.searchingN', { n })}</span> : null);
+  // 인원 단추에는 **수만** (단추가 좁아 글씨가 넘친다 — 무엇의 수인지는 접힌 판에서 이미 봤다)
+  const waitDot = n => (n > 0 ? <span className="pvp-wait n">{n}</span> : null);
 
   // 찾는 중에는 **찾고 있는 인원**을 켜 두고 바꾸지 못하게 한다
   const curSize = ss ? (ss.ffa ? 'ffa' : ss.n) : size;
@@ -95,6 +120,8 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch }){
             // [stated] 판 아래에 **작은 팻말로 종목 이름** — 누를 곳이라는 표시. 누르는 건 판 전체다
             <button key={k} className="pvp-pane" aria-label={t(KINDS[k].key)} onClick={() => pick(k)}>
               <Plaque size="pane" text={t(KINDS[k].key)} />
+              {/* 팻말 바로 위에 — 팻말과 같은 자리·크기의 틀을 두고 그 위에 띄운다 */}
+              {paneCount(k) > 0 && <span className="pvp-wait-at">{waitBadge(paneCount(k))}</span>}
             </button>
           ))}
         </div>
@@ -110,6 +137,7 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch }){
               {KINDS[open].sizes.map(s => (
                 <button key={s} className={'pvp-chip' + (curSize === s ? ' on' : '')} disabled={!!search} onClick={() => setSize(s)}>
                   {label(s)}
+                  {waitDot(countOf(keysOf(open, s)))}
                 </button>
               ))}
             </div>
@@ -118,6 +146,7 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch }){
                 {FFA_SIZES.map(k => (
                   <button key={k} className={'pvp-chip' + (curFfaN === k ? ' on' : '')} disabled={!!search} onClick={() => setFfaN(k)}>
                     {t('pvp.players', { n: k })}
+                    {waitDot(countOf([qkeyOf(k, 'melee', true)]))}
                   </button>
                 ))}
               </div>

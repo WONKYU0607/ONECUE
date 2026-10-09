@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { TUTO_STEPS, makeWatch, markTutoDone } from '../state/tutorial.js';
 import { t } from '../i18n/index.js';
+import { PH_PLAY } from '../game/config.js';
 
 /** 손가락이 훑는 길. `from` 에서 `to` 까지 반복해 움직인다 */
 function useHand(path){
@@ -151,6 +152,13 @@ export default function Tutorial({ getState, spotRect, onQuit }){
         const q = e.getBoundingClientRect();
         if (q.height > 0) zones.push({ top: q.top, bottom: q.bottom });
       });
+      // [stated] **전투 중엔 체력바 줄도 피한다** — 투척 단계(수류탄·섬광탄·화염병)에서 상자가 체력바를 덮었다.
+      // 배치 단계엔 그 자리에 신청 줄(`.pb-chip`)이 있어 위에서 이미 피한다
+      const g = getRef.current && getRef.current();
+      if (g && g.st && g.st.phase === PH_PLAY){
+        const hp = spotRect && spotRect('hp');
+        if (hp && hp.height > 0) zones.push({ top: hp.top, bottom: hp.top + hp.height });
+      }
       setAvoid(prev => (JSON.stringify(prev) === JSON.stringify(zones) ? prev : zones));
     };
     find();

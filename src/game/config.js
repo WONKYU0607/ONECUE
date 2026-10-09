@@ -13,7 +13,11 @@ export const TICK_HZ = 60, TICK_MS = 1000 / TICK_HZ;
 export const MIN_DELAY = 2, MAX_DELAY = 24;   // 공통 입력 지연 범위 (틱)
 export const JITTER_MS = 20;                  // 지터 여유 (틱 반올림 오차 포함)
 export const PING_MS = 500;
-export const NET = { oneway: 60 };   // 디버그용 편도 지연(ms). [ ] 키로 조절
+// 로컬 판(AI·연습·튜토리얼)의 통신 경계(`Loopback`)에 넣는 편도 지연(ms).
+// [stated] **출시 설정 0.** 예전엔 시험용으로 60(왕복 0.12초)이 켜져 있어 혼자 하는 판도
+// 봇 움직임·맞은 판정이 늦게 따라왔다. 온라인 판은 이 값을 안 쓴다(진짜 소켓).
+// 검사(`test/harness.js` 의 `makeNetGame`)는 필요한 값을 직접 넣는다
+export const NET = { oneway: 0 };
 export const DEBUG_LOCAL_BOTH = false; // PvP라 내 캐릭터만 조작 (상대는 서버가 보내주는 입력으로 움직임)
 
 // 캐릭터 크기. 2대2는 칸이 작아 축소된다. setArena가 갈아끼운다

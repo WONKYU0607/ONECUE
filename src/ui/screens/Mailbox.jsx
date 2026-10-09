@@ -3,7 +3,9 @@
 // 지금은 퀘스트 보상만 들어오지만, 나중에 쿠폰·이벤트 선물도 같은 자리를 쓴다.
 import { useState, useEffect, useCallback } from 'react';
 import { fetchQuest, claimMail, setCoin } from '../../state/questclient.js';
-import { setInnerBack } from '../../state/back.js';
+import { setInnerBack, releaseInnerBack } from '../../state/back.js';
+// 이 화면 안에는 접을 단계가 없다 — 하단 뒤로가기는 App 이 홈으로 보낸다
+const NO_INNER = () => false;
 import { t } from '../../i18n/index.js';
 import FitText from '../FitText.jsx';
 
@@ -15,8 +17,9 @@ export default function Mailbox({ onBack }){
   const [busy, setBusy] = useState(true);
   const [msg, setMsg] = useState('');
 
-  setInnerBack(() => false);
-  useEffect(() => () => setInnerBack(null), []);
+  setInnerBack(NO_INNER);
+  // **내가 건 것일 때만** 푼다 — 그냥 null 로 지우면 먼저 그려진 홈의 것까지 지워진다 (`back.js`)
+  useEffect(() => () => releaseInnerBack(NO_INNER), []);
 
   const load = useCallback(async () => {
     const r = await fetchQuest();

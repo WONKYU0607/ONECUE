@@ -12,7 +12,9 @@ import { getNick } from '../../state/profile.js';
 import { scoreOf } from '../../state/tickets.js';
 import { tierOf, tierName } from '../../state/rank.js';
 import TierIcon from '../TierIcon.jsx';
-import { setInnerBack } from '../../state/back.js';
+import { setInnerBack, releaseInnerBack } from '../../state/back.js';
+// 이 화면 안에는 접을 단계가 없다 — 하단 뒤로가기는 App 이 홈으로 보낸다
+const NO_INNER = () => false;
 import { t } from '../../i18n/index.js';
 
 export default function RankBoard({ kind: kind0 = 'gun', onBack }){
@@ -23,8 +25,9 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
   const [busy, setBusy] = useState(!cachedRank(kind));
 
   // 뒤로가기는 화면을 그냥 나간다 (안에 펼쳐지는 단계가 없다)
-  setInnerBack(() => false);
-  useEffect(() => () => setInnerBack(null), []);
+  setInnerBack(NO_INNER);
+  // **내가 건 것일 때만** 푼다 — 그냥 null 로 지우면 먼저 그려진 홈의 것까지 지워진다 (`back.js`)
+  useEffect(() => () => releaseInnerBack(NO_INNER), []);
 
   useEffect(() => {
     let live = true;

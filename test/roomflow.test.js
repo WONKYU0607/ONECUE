@@ -57,8 +57,9 @@ console.log('방장 규칙이 서버에 있다');
 console.log('티켓 — 친구방은 안 깎는다 (C안)');
 {
   const srv = fs.readFileSync('server/index.js', 'utf8');
-  assert(/if \(!this\.code && !reconnected/.test(srv),
-    '  코드가 있는 방(친구방)은 티켓을 건너뛴다');
+  // 티켓은 `charge` 한 곳에서만 깎는다 (VS 화면을 본 뒤) — 거기서 친구방을 건너뛴다
+  const ch = srv.slice(srv.indexOf('  charge(slot){'), srv.indexOf('  markGone('));
+  assert(/if \(this\.code\) return;/.test(ch), '  코드가 있는 방(친구방)은 티켓을 건너뛴다');
   // **`charged` 를 비우면 안 된다** — 빠른 매칭에서 다시 하기로 무한히 돌 수 있다
   const again = srv.slice(srv.indexOf('  again(){'), srv.indexOf('  dispose()'));
   assert(!/this\.charged = new Set\(\)/.test(again),

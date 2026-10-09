@@ -62,6 +62,17 @@ export function uiBoxRect(uiH){
   const x = (W - w) / 2;
   // 체력바 블록의 세로 범위. **render.js와 정확히 같아야** 버튼이 그 사이에 딱 들어간다.
   // 개인전은 상대가 n-1줄이라 내 편(1줄)보다 길다 — 긴 쪽을 따라간다
+  const { top, blockH } = hpBlock();
+  // **체력바 구간을 절대 안 벗어난다.** 예전엔 최소 18로 키워서 아래로 삐져나왔다.
+  // (개인전은 이제 상대 줄이 없어 구간이 짧다)
+  const h = Math.min(blockH, 22);
+  return { x, y: top + (blockH - h) / 2, w, h };
+}
+
+/** 체력바 블록의 세로 범위 (월드 좌표). **render.js와 정확히 같아야** 한다.
+ *  준비 버튼 자리와 [stated] **튜토리얼 안내 상자가 피할 자리**(투척 단계에서 체력바를 덮었다)가 같이 쓴다.
+ *  개인전은 상대가 n-1줄이라 내 편(1줄)보다 길다 — 긴 쪽을 따라간다 */
+export function hpBlock(){
   const n = ARENA.n || 2;
   const mineRows = ARENA.ffa ? 1 : n / 2;
   const foeRows  = ARENA.ffa ? 0 : n / 2;   // 개인전은 상대 체력바를 안 그린다
@@ -69,11 +80,7 @@ export function uiBoxRect(uiH){
   const BH = two ? 4 : 11, rowGap = 1.5;   // render.js와 같은 값
   const rows = Math.max(mineRows, foeRows);
   const top = H + (two ? 2.5 : 4.5);
-  // **체력바 구간을 절대 안 벗어난다.** 예전엔 최소 18로 키워서 아래로 삐져나왔다.
-  // (개인전은 이제 상대 줄이 없어 구간이 짧다)
-  const blockH = rows * BH + (rows - 1) * rowGap;
-  const h = Math.min(blockH, 22);
-  return { x, y: top + (blockH - h) / 2, w, h };
+  return { top, blockH: rows * BH + (rows - 1) * rowGap };
 }
 
 

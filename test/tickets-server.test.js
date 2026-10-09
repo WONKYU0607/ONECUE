@@ -39,10 +39,16 @@ console.log('서버가 깎는다');
   assert(/why: 'noTicket'/.test(body), '  없으면 못 쓴다고 알린다');
   assert(/ffa && g\.ffa <= 0/.test(body), '  개인전은 하루 횟수도 본다');
   assert(/ffa \? g\.ffa - 1 : g\.ffa/.test(body), '  개인전은 둘 다 깎는다');
-  // 자리에 앉을 때 한 번만 — 재접속으로 또 깎으면 안 된다
+  // [stated] **VS 화면을 본 뒤에 한 번만** — 자리에 앉는 순간(서버에서 잡힌 순간) 깎으면
+  // 화면엔 아직 "찾는 중" 인데 다른 화면으로 가도 티켓이 사라진다. 재접속으로 또 깎으면 안 된다
   assert(/this\.charged = new Set\(\)/.test(server), '  방마다 깎은 사람을 기억한다');
-  assert(/!reconnected && seat\.uid && !this\.charged\.has\(seat\.uid\)/.test(server),
-    '  재접속·중복 착석에는 안 깎는다');
+  const ch = server.slice(server.indexOf('  charge(slot){'), server.indexOf('\n  }', server.indexOf('  charge(slot){')));
+  assert(/this\.charged\.has\(seat\.uid\)/.test(ch) && /seat\.bot/.test(ch) && /if \(this\.code\) return/.test(ch),
+    '  한 사람에 한 번만 · 봇·친구방은 안 깎는다');
+  const jn = server.slice(server.indexOf('  join(ws, sid, team'), server.indexOf('  leave(slot){'));
+  assert(!/spendTicket|spendSoccer|charge\(/.test(jn), '  자리에 앉을 때는 안 깎는다');
+  assert(/m\.t === 'vsSeen'[\s\S]{0,80}charge\(ws\.slot\)/.test(server), '  VS 화면 신호에 깎는다');
+  assert(/m\.t === 'in' && !ws\.seen\)\{[^}]*charge\(ws\.slot\)/.test(server), '  게임 화면에 들어와도 깎는다 (VS 를 건너뛴 경우)');
 }
 
 console.log('클라·서버 규칙이 같다');

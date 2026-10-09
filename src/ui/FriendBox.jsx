@@ -4,13 +4,13 @@
 //   펼침: [방 만들기] [코드 입력]
 //   코드: 네 자리 칸 + [입장]
 // 새 화면으로 안 넘어간다 — PVP 칸과 같은 방식. 방 접속(서버 연결)도 이 칸 안에서 한다
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getColor } from '../state/profile.js';
 import Plaque from './Plaque.jsx';
 import FitText from './FitText.jsx';
 import { t } from '../i18n/index.js';
 
-export default function FriendBox({ onStart, regBack, joining, onCancel }){
+export default function FriendBox({ onStart, regBack, joining, onCancel, act, onAct }){
   const [step, setStep] = useState(null);     // null | 'menu' | 'code'
   const [code, setCode] = useState('');
   const ok = /^\d{4}$/.test(code);
@@ -22,6 +22,9 @@ export default function FriendBox({ onStart, regBack, joining, onCancel }){
   };
   // 하단 뒤로가기는 홈이 한 곳에서 받아 칸마다 물어본다 (등록 자리가 하나뿐이라)
   regBack(back);
+  // [stated] **다른 칸을 열면 접힌다.** 초대로 방에 들어가는 중이면 이 칸이 열린 칸이다
+  useEffect(() => { if (act && act !== 'friend' && step) setStep(null); }, [act]);
+  useEffect(() => { if (joining) onAct?.('friend'); }, [!!joining]);
 
   // [stated] **방 접속은 이 칸 안에서** — 따로 "서버에 연결하는 중" 화면이 없다.
   // 접속하는 동안 상태·초·취소를 보여주고, 들어가는 순간 곧장 방 화면으로 넘어간다.
@@ -52,7 +55,7 @@ export default function FriendBox({ onStart, regBack, joining, onCancel }){
 
   if (!step){
     return (
-      <button className="hbox hb-friend" onClick={() => setStep('menu')}>
+      <button className="hbox hb-friend" onClick={() => { setStep('menu'); onAct?.('friend'); }}>
         <Plaque text={t('home.friendBattle')} icon="friend" />
       </button>
     );

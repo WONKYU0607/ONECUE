@@ -158,7 +158,7 @@ export async function writeResults(rows){
       d[kind] = Math.max(0, r.score | 0);
       d['s' + kind] = Math.max(0, r.streak | 0);
       d.n = (d.n | 0) + 1;
-      if (!r.bot) d.coin = (d.coin | 0) + matchCoin(r.result, r.streak);
+      if (!r.bot && !r.noCoin) d.coin = (d.coin | 0) + matchCoin(r.result, r.streak);
       FAKE.set(r.uid, d);
     }
     return true;
@@ -179,8 +179,9 @@ export async function writeResults(rows){
       };
       // [stated] **판이 끝나면 코인.** 이 함수는 **빠른 매칭에서만** 불린다(친구방은
       // 점수를 안 써서 여기까지 안 온다) → 짜고 하는 벌이를 막는 자리가 이미 같다.
-      // 봇은 안 준다 — 쓸 데가 없고 쓰기만 늘어난다
-      if (!r.bot) patch.coin = FieldValue.increment(matchCoin(r.result, r.streak));
+      // 봇은 안 준다 — 쓸 데가 없고 쓰기만 늘어난다.
+      // [stated] **중간에 나간 사람도 안 준다** (`noCoin`) — 나가기만 해도 50 을 받았다
+      if (!r.bot && !r.noCoin) patch.coin = FieldValue.increment(matchCoin(r.result, r.streak));
       batch.set(db.doc('players/' + r.uid), patch, { merge: true });
     }
     await batch.commit();
@@ -797,6 +798,8 @@ export async function bumpQuest(uid, m){
   try {
     await withDoc(uid, async (tx, dbx) => {
       const ref = dbx && dbx.doc('players/' + uid);
+      // [stated] **전투 중에 나갔다** — 퀘스트는 안 센다. 진 판이므로 통합 연승만 끊는다
+      if (m.leave){ tx.set(ref, { sall: 0 }, { merge: true }); return; }
       const d = await tx.get(ref);
       const v = d.exists ? d.data() : {};
       const now = Date.now();

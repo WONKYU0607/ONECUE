@@ -96,6 +96,28 @@ try {
   s = await look();
   assert(/^6 \//.test(s.n) && s.hits.length === 0, `  6단계 · 안 가린다 (${s.n} ${s.hits})`);
   assert(/^스틱으로 움직이세요/.test(s.msg), `  "스틱으로 움직이세요" (${s.msg.slice(0, 16)})`);
+
+  // [stated] **투척 단계(7~9)에서 상자가 체력바를 덮었다.** 그 단계는 던질 때까지 판이 멈춰 있어
+  // 실제 피해는 없지만, 상자가 체력바 줄을 피하게 했다 (`spotRect('hp')`)
+  // 1대1 체력바 줄 = 월드 y 315.5 ~ 326.5 (`layout.js hpBlock`)
+  const hpTop = s2 => s2.ct + 315.5 * s2.k, hpBot = s2 => s2.ct + 326.5 * s2.k;
+  // 스틱을 움직여 6단계를 끝낸다
+  await p.mouse.move(s.hi.x, s.hi.y); await p.mouse.down();
+  for (let i = 1; i <= 10; i++){ await p.mouse.move(s.hi.x + i * 4, s.hi.y); await wait(30); }
+  await wait(400); await p.mouse.up();
+  for (const [n, nm] of [[7, '수류탄'], [8, '섬광탄'], [9, '화염병']]){
+    let ok = false;
+    for (let i = 0; i < 60 && !ok; i++){ await wait(250); ok = new RegExp('^' + n + ' /').test((await look()).n); }
+    s = await look();
+    assert(ok, `  ${n}단계(${nm})로 넘어갔다 (${s.n})`);
+    await wait(700);
+    s = await look();
+    assert(s.hits.length === 0, `  ${n}단계: 강조한 투척 칸을 안 가린다 (${s.hits})`);
+    assert(!overlaps(s.box, hpTop(s), hpBot(s)), `  ${n}단계: 체력바 줄을 안 덮는다 (상자 ${Math.round(s.box.top)}~${Math.round(s.box.bottom)} / 체력바 ${Math.round(hpTop(s))}~${Math.round(hpBot(s))})`);
+    assert(s.box.top >= 0 && s.box.bottom <= 851, '  화면 안');
+    // 던진다 (짧게 탭)
+    await p.mouse.move(s.hi.x, s.hi.y); await p.mouse.down(); await wait(80); await p.mouse.up();
+  }
   console.log('e2e-tutobox.test.js 통과');
 } finally {
   await b.close().catch(() => {});

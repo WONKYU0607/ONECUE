@@ -134,8 +134,23 @@ console.log('화면 안의 단계부터 돌아간다');
   for (const f of ['src/ui/screens/Home.jsx']){
     const src = fs.readFileSync(f, 'utf8');
     assert(/setInnerBack\(/.test(src), `  ${f} 가 자기 단계를 등록한다`);
-    assert(/setInnerBack\(null\)/.test(src), `  ${f} 가 떠날 때 지운다`);
+    assert(/releaseInnerBack\(/.test(src), `  ${f} 가 떠날 때 자기 것을 푼다`);
   }
+  // [stated] 상점 등에서 홈으로 돌아온 뒤 PVP 칸 뒤로가기가 "앱을 나가시겠습니까" 로 샜다 —
+  // 떠나는 화면이 null 로 **홈 것까지** 지웠다. 이제 아무 화면도 null 로 지우지 않는다
+  const all = fs.readdirSync('src/ui/screens').map(n => 'src/ui/screens/' + n);
+  const nulls = all.filter(f => /setInnerBack\(null\)/.test(fs.readFileSync(f, 'utf8')));
+  assert(nulls.length === 0, `  setInnerBack(null) 로 남의 것을 지우는 화면이 없다 (${nulls.join(', ')})`);
+  // 동작: 새 화면이 먼저 걸고 → 떠나는 화면이 나중에 정리해도 새 화면 것이 남는다
+  const B = await import('../src/state/back.js');
+  let hit = '';
+  const home = () => { hit = 'home'; return true; }, shop = () => { hit = 'shop'; return false; };
+  B.setInnerBack(shop);            // 상점이 떠 있다
+  B.setInnerBack(home);            // 홈이 그려지며 건다
+  B.releaseInnerBack(shop);        // 상점이 그다음 정리한다
+  assert(B.tryInnerBack() && hit === 'home', '  떠나는 화면이 나중에 정리해도 홈 것이 남는다');
+  B.releaseInnerBack(home);
+  assert(!B.tryInnerBack(), '  자기 것은 푼다');
 }
 
 console.log('문구가 두 언어에 다 있다');

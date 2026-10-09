@@ -1,5 +1,6 @@
 import { WsTransport } from '../game/net.js';
-import { SELF, PROTO_VER } from '../game/config.js';
+import { SELF } from '../game/config.js';
+import { verGap } from '../state/update.js';
 import { getNick } from '../state/profile.js';
 import { t } from '../i18n/index.js';
 // **firebase를 직접 부르면 안 된다.** 그러면 게임 본체에 SDK가 딸려 들어와
@@ -7,6 +8,15 @@ import { t } from '../i18n/index.js';
 let myUid = '';
 export const setUid = v => { myUid = String(v || ''); };
 const getUid = () => myUid;
+
+// [stated] 버전이 다를 때 **사용자 말로** 알린다 (예전엔 "서버 재배포 필요" 같은 개발자 문구였다).
+// `code` 로 화면이 [업데이트] 버튼을 붙일지 정한다
+function verError(serverVer){
+  const gap = verGap(serverVer);
+  const e = new Error(t(gap === 'update' ? 'err.update' : 'err.serverOld'));
+  e.code = gap;
+  return e;
+}
 
 // 서버 연결은 화면 전환보다 오래 살아야 한다 (매칭 화면 -> 게임 화면).
 // 그래서 React 밖 모듈에 두고, 게임을 나갈 때만 끊는다.
@@ -149,9 +159,7 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
     if (stale()) throw cancelled();     // 깨우는 동안 취소하면 소켓을 아예 안 연다
   }
   // 서버가 살아 있는데 버전이 다르면 소켓을 열어봐야 소용없다. 여기서 바로 알린다
-  if (health && (health.ver || 0) !== PROTO_VER){
-    throw new Error(t('err.version', { a: health.ver || t('err.none'), b: PROTO_VER }));
-  }
+  if (health && verGap(health.ver)) throw verError(health.ver);
 
   let transport = null;
   for (let i = 0; i < TRIES; i++){
@@ -236,13 +244,15 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
     transport.always = always;
     transport.toClient = m => {
       always(m);
+      // **방(로비·자리)에 들어왔다** — 이제 나갈 때는 서버에 '나간다' 고 알려야 자리가 바로 빈다
+      if (m.t === 'hello' || m.t === 'room' || m.t === 'lobby' || m.t === 'watch') transport.inRoom = true;
       if (m.t === 'hello'){
         // 서버가 옛 코드면 아이템·준비 같은 새 기능이 통째로 동작하지 않는다.
         // 조용히 멈추는 대신 원인을 알려준다
-        if ((m.ver || 0) !== PROTO_VER){
+        if (verGap(m.ver)){
           settled = true;
           transport.close();
-          reject(new Error(t('err.version', { a: m.ver || t('err.none'), b: PROTO_VER })));
+          reject(verError(m.ver));
           return;
         }
         slot = m.pid; room = m.room;
@@ -317,6 +327,8 @@ const line = () => (conn ? conn.transport : pending);
 const tell = msg => { const t = line(); if (t) t.clientSend(msg); };
 
 export function playAgain(){ tell({ t: 'again' }); }
+/** [stated] **VS 화면이 떴다** — 서버는 이때 티켓을 깎는다 (그 전에 나가면 안 깎는다) */
+export function sawVs(){ tell({ t: 'vsSeen' }); }
 /** [stated] **다시 하기는 묻고 시작한다** — 신청 / 수락 / 거절 */
 export function askAgain(){ tell({ t: 'againAsk' }); }
 export function answerAgain(ok){ tell({ t: ok ? 'againOk' : 'againNo' }); }
@@ -401,9 +413,15 @@ export function unpickTeam(){
 
 export function disconnect(){
   gen++;                                // 진행 중인 접속 시도를 모두 무효로
-  // **찾는 중인 연결도 끊는다.** 여기엔 'bye' 를 안 보낸다 — 대기열 연결에 'bye' 를 보내면
-  // 옛 서버는 대기열을 잘못 뒤지다(`waiting.indexOf`) 예외로 죽는다. 닫기만 해도 서버가 대기열에서 뺀다
-  if (pending && (!conn || conn.transport !== pending)){ try { pending.close(); } catch { /* 무시 */ } }
+  // **찾는 중인 연결도 끊는다.** 대기열에만 있는 연결엔 'bye' 를 안 보낸다 — 대기열 연결에 'bye' 를 보내면
+  // 옛 서버는 대기열을 잘못 뒤지다(`waiting.indexOf`) 예외로 죽는다. 닫기만 해도 서버가 대기열에서 뺀다.
+  // [stated] **방(로비)에 들어와 있으면 'bye' 를 보낸다** — 친구방은 시작하기 전까지 `conn` 이 없어
+  // 그냥 닫기만 했더니 서버가 '끊김' 으로 보고 자리를 10초 붙들었다(나간 사람이 로비에 남아 보이고,
+  // 그사이 들어온 사람은 관전으로 들어갔다)
+  if (pending && (!conn || conn.transport !== pending)){
+    if (pending.inRoom){ try { pending.clientSend({ t: 'bye' }); } catch { /* 무시 */ } }
+    try { pending.close(); } catch { /* 무시 */ }
+  }
   pending = null;
   if (!conn) return;
   try { conn.transport.clientSend({ t: 'bye' }); } catch { /* 이미 끊겼으면 무시 */ }

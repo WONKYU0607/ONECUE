@@ -5,7 +5,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchQuest, claimQuest, setCoin, withTime } from '../../state/questclient.js';
 import { questsOf, PAY, doneOf, allDone, claimable } from '../../state/quests.js';
-import { setInnerBack } from '../../state/back.js';
+import { setInnerBack, releaseInnerBack } from '../../state/back.js';
+// 이 화면 안에는 접을 단계가 없다 — 하단 뒤로가기는 App 이 홈으로 보낸다
+const NO_INNER = () => false;
 import { t } from '../../i18n/index.js';
 import FitText from '../FitText.jsx';
 
@@ -24,8 +26,9 @@ export default function Quests({ onBack }){
   // 서버에는 1분마다 몰아서 보내므로, 그 사이는 이번에 켠 뒤 쌓인 초를 더해 보여준다
   const [, tickNow] = useState(0);
 
-  setInnerBack(() => false);
-  useEffect(() => () => setInnerBack(null), []);
+  setInnerBack(NO_INNER);
+  // **내가 건 것일 때만** 푼다 — 그냥 null 로 지우면 먼저 그려진 홈의 것까지 지워진다 (`back.js`)
+  useEffect(() => () => releaseInnerBack(NO_INNER), []);
 
   const load = useCallback(async () => {
     const r = await fetchQuest();

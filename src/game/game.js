@@ -16,9 +16,9 @@ import {
   ARENA, PWf, PHf, itemQuota, itemKinds, isCover, coverBudget, coverUsed, coverCells, coverSizes,
   GRID_X0, GRID_Y0, GRID_MIDROW, cellOwner, cellX, cellY
 } from './config.js';
-import { paletteSlots, uiBoxRect, stickGeom, throwSlots, placeBar, placeBarOn } from './layout.js';
+import { paletteSlots, uiBoxRect, stickGeom, throwSlots, placeBar, placeBarOn, hpBlock } from './layout.js';
 import { uiPrompt, resultFor, matchSummary } from './ui-state.js';
-import { CHARGE_MAX_MS, PH_PLAY } from './config.js';
+import { CHARGE_MAX_MS, PH_PLAY, W } from './config.js';
 import { t } from '../i18n/index.js';
 
 // 이속 버프 배율. 시뮬과 **같은 값**을 써야 예측이 어긋나지 않는다
@@ -681,6 +681,11 @@ export function createGame(canvas, opts = {}){
         const i = +String(which).split(':')[1] | 0;
         const c = sl[Math.min(i, sl.length - 1)];
         return toScreen({ x: c.x, y: c.y, w: c.w, h: c.h });
+      }
+      // **체력바 줄** — 안내 상자가 덮지 않게 피할 자리 (가로는 화면 전체)
+      if (which === 'hp'){
+        const b = hpBlock();
+        return toScreen({ x: 0, y: b.top, w: W, h: b.blockH });
       }
       if (which === 'stick'){
         const g = stickGeom(view.uiH);

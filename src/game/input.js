@@ -1,4 +1,4 @@
-import { NET, ARENA } from './config.js';
+import { ARENA } from './config.js';
 import { stickVector, inStickZone, paletteSlots, throwSlots, shieldBtn, tackleBtn } from './layout.js';
 import { CHARGE_MS } from './ball.js';
 import { unlockAudio } from './audio.js';
@@ -129,8 +129,7 @@ export function attachInput(canvas, view, opts = {}){
   const onKeyDown = e => {
     const k = e.key.toLowerCase();
     keys[k] = true;
-    if (k === '[') NET.oneway = Math.max(0, NET.oneway - 20);   // 지연 시뮬 조절
-    if (k === ']') NET.oneway = Math.min(400, NET.oneway + 20);
+    // (예전 시험용 `[` `]` 지연 조절 키는 뺐다 — 출시 판에 남아 있으면 안 된다)
   };
   const onKeyUp = e => { keys[e.key.toLowerCase()] = false; };
 

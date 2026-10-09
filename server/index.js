@@ -30,6 +30,18 @@ const qkey = (n, melee, ffa, soccer) => `${n}:${soccer ? 'b' : (melee ? 'm' : 's
 // [stated] 사람이 모자랄 때 빈 자리를 AI 로 채우기까지 기다리는 시간 (7초)
 const BOT_FILL_MS = 4500;   // [stated] 7초 → 5초. 접속·왕복 시간을 더해도 5초를 안 넘게
 const queueOf = k => { if (!waiting.has(k)) waiting.set(k, []); return waiting.get(k); };
+// [stated] **사람끼리 잡히게 — 사람이 올 것 같으면 봇을 미룬다** (2026-10-08, 최대 10초).
+//  - 같은 종목을 다른 인원으로 찾는 사람이 있거나, 같은 대기열 판이 막 끝났거나 곧 끝나면
+//    ([다시 하기] 로 들어올 수 있다) → 최대 10초
+//  - 앱을 켜 둔 다른 사람이 있으면 → 8초
+//  - 아무도 없으면 → 지금처럼 4.5초
+const BOT_WAIT_MAX = 10_000;
+const BOT_WAIT_SOME = 8_000;
+// **앱을 켜 둔 사람** — 홈에는 소켓이 없어서, 앱이 보내는 요청(퀘스트·티켓·1분마다 오는 접속 시간)으로 본다.
+// 접속 시간은 1분마다 오므로 90초 안에 본 사람을 '켜 둔 사람' 으로 친다
+const seen = new Map();          // uid -> 마지막으로 본 시각
+const SEEN_MS = 90_000;
+const sawUid = uid => { if (uid) seen.set(uid, Date.now()); };
 const waitingCount = () => [...waiting.values()].reduce((a, q) => a + q.length, 0);
 
 // 헷갈리는 글자 없이 숫자 4자리
@@ -87,6 +99,13 @@ class Room {
     // [stated] **전원이 게임 화면에 들어올 때까지 준비 시간을 세지 않는다.**
     // 방이 차는 순간부터 세면 VS 화면(3초)만큼 이미 지나 있어 10 이 아니라 7 부터 보인다
     this.server.s.hold = true;
+    // [stated] **판이 열려 있는가** — 빠른 매칭은 자리가 다 차 시작 신호가 나간 뒤,
+    // 친구방은 방장이 [시작] 한 뒤부터 판이 끝나 로비로 돌아갈 때까지.
+    // 친구방 로비에서 나가는 것은 **판을 나가는 게 아니다** — 자리만 비운다 (`vacate`)
+    this.live = false;
+    // 판 전 점수를 읽는 중이면 그 약속 (점수를 쓰기 전에 기다린다)
+    this.primeP = null;
+    this.preOk = new Set();      // 판 전 점수를 실제로 읽어 온 자리
   }
   send(msg, pid){
     const raw = JSON.stringify(msg);
@@ -210,18 +229,49 @@ class Room {
   prime(){
     if (this.primed || this.server.s.phase !== PH_PLAY) return;
     this.primed = true;
+    // [stated] **VS 화면을 본 사람만 티켓을 쓴다** — 보통은 VS 화면이 뜰 때(`vsSeen`)나
+    // 게임 화면에 들어올 때 이미 깎였다. 그 신호 없이 전투까지 온 사람(앉아 있는 사람)도 여기서 깎는다
+    for (let i = 0; i < this.n; i++) if (this.seats[i] && this.seats[i].ws) this.charge(i);
     if (!store.isOn()) return;
+    this.primeP = this.loadPre().then(() => this.tuneBots()).catch(() => {});   // 사람 점수를 알았으니 봇 난이도를 맞춘다
+  }
+
+  /** 앉은 사람들의 **판 전 점수·연승**을 읽어 둔다. 읽어 온 자리는 `preOk` 에 적는다 */
+  loadPre(){
     const uids = this.seats.map(x => x && x.uid).filter(Boolean);
-    if (!uids.length) return;
+    if (!uids.length || !store.isOn()) return Promise.resolve();
     // 축구도 자기 종목 점수를 읽어야 한다 (안 그러면 총격전 점수로 계산된다)
     const kind = this.soccer ? 'soccer' : (this.melee ? 'melee' : 'gun');
-    store.readPlayers(uids).then(m => {
+    return store.readPlayers(uids).then(m => {
       this.seats.forEach((seat, i) => {
         const v = seat && seat.uid && m.get(seat.uid);
-        if (v) this.preScore[i] = { score: v.score[kind], streak: v.streak[kind] };
+        if (v){ this.preScore[i] = { score: v.score[kind], streak: v.streak[kind] }; this.preOk.add(i); }
       });
-      this.tuneBots();          // 사람 점수를 알았으니 봇 난이도를 맞춘다
-    }).catch(() => {});
+    });
+  }
+
+  /** [stated] **티켓은 VS 화면을 본 뒤에 깎는다** — 잡혔어도 VS 화면이 뜨기 전에 나가면 안 깎는다.
+   *  예전엔 자리에 앉는 순간(=서버에서 잡히는 순간) 깎아서, 화면엔 아직 "찾는 중" 인데
+   *  다른 화면으로 가면 판도 안 했는데 티켓이 사라졌다.
+   *  **한 사람에 한 번만** (재접속·VS 신호·게임 입력이 겹쳐도). 친구방은 안 깎는다 */
+  charge(slot){
+    if (this.code) return;
+    const seat = this.seats[slot];
+    if (!seat || !seat.uid || seat.bot || this.charged.has(seat.uid)) return;
+    this.charged.add(seat.uid);
+    // [stated] **축구는 전용 티켓**이라 일반 티켓을 안 건드린다 — 둘 다 빠지던 문제
+    const spend = this.soccer ? store.spendSoccer(seat.uid)
+                              : store.spendTicket(seat.uid, !!this.server.s.ffa);
+    spend.then(r => { if (r && !r.ok && r.why) console.log('[티켓]', seat.uid.slice(0, 6), r.why); })
+         .catch(() => {});
+  }
+
+  /** 이 자리를 **중간에 나간 사람**으로 적는다 — 처음 나간 순간 것만 남긴다.
+   *  `play`: 전투 중에 나갔는가 (전투 전이면 그 판은 그 사람에게 없던 판이다) */
+  markGone(slot){
+    const seat = this.seats[slot];
+    if (!seat || seat.gone) return;
+    seat.gone = { play: this.server.s.phase === PH_PLAY };
   }
 
   settle(){
@@ -233,16 +283,34 @@ class Room {
     // 순위를 얼마든지 만들 수 있다. 승패는 그 자리에서 보이고, **기록은 남기지 않는다**.
     // 빠른 매칭(코드 없는 방)만 점수·전적에 반영한다
     const kind = st.soccer ? 'soccer' : (st.melee ? 'melee' : 'gun');
+    // [stated] **판을 끝까지 하지 않은 사람** — 나갔거나, 끊긴 채 판이 끝났다.
+    // 퀘스트·코인을 안 준다. 전적·점수(패배)는 **전투 중에 나갔을 때만** — 전투 전이면 없던 판이다
+    const gone = this.seats.map((x, i) => (x && x.uid && !x.bot)
+      ? (x.gone || (st.off[i] ? { play: true } : null)) : null);
     // [stated] **퀘스트는 친구방도 인정한다** — 점수만 동결이다.
     // 점수 계산(`if (this.code) return`)보다 **먼저** 해야 친구방에서도 쌓인다
-    this.bumpQuests(kind);
+    this.bumpQuests(kind, gone);
     if (this.code) return;
+    // **판 전 점수를 읽은 뒤에 쓴다.** 점수는 '판 전 점수 + 변화량' 을 통째로 쓰는데,
+    // 전투 전에 끝난 판(기권)은 읽은 적이 없어 기본값(1000)으로 덮어 점수가 날아갔다
+    const snap = JSON.parse(JSON.stringify(st));
+    const seats = this.seats.map(x => (x ? { uid: x.uid, bot: !!x.bot } : null));
+    (this.primeP || this.loadPre()).catch(() => {}).then(() => this.writeRows(kind, snap, seats, gone));
+  }
+
+  writeRows(kind, st, seats, gone){
     const rows = [];
     for (let i = 0; i < this.n; i++){
-      const seat = this.seats[i];
+      const seat = seats[i];
       if (!seat || !seat.uid) continue;                 // 로그인 안 한 사람은 건너뛴다
+      // [stated] **전투 전에 나간 사람은 전적·점수 없음** (티켓은 VS 화면을 봤으면 이미 깎였다)
+      if (gone[i] && !gone[i].play) continue;
+      // **판 전 점수를 못 읽은 자리는 쓰지 않는다** — 기본값으로 덮으면 점수가 날아간다
+      if (!this.preOk.has(i)) continue;
       // 봇 계정은 점수를 쌓는다. 다만 **사람이 나가 AI 가 이어받은 자리**는 uid 가 없어 저절로 건너뛴다
-      const before = this.preScore[i] || { score: st.soccer ? 0 : 1000, streak: 0 };
+      const before = this.preScore[i];
+      // [stated] **중간에 나간 사람은 코인 없음** (`writeResults` 가 본다)
+      const noCoin = !!gone[i];
       // [stated] **축구는 점수 규칙이 다르다** — 이기면 골x100x연승, 지면 골x50.
       // 티어도 강약 차등도 없다
       if (st.soccer){
@@ -254,14 +322,14 @@ class Room {
         rows.push({
           uid: seat.uid, kind, result: win ? 'win' : 'lose',
           score: Math.max(0, before.score + delta),
-          streak, bot: !!seat.bot, slot: i
+          streak, bot: seat.bot, slot: i, noCoin
         });
         continue;
       }
       const d = scoreDelta(st, i, {
         streak: before.streak + 1,
         left: !!st.off[i],
-        teamLeft: this.teamHasLeaver(i),
+        teamLeft: this.teamHasLeaver(i, st),
         // [stated] 강약 차등 — 상대가 얼마나 센지를 넣는다
         myScore: before.score,
         foeScore: this.foeScoreOf(i)
@@ -272,7 +340,7 @@ class Room {
         score: Math.max(0, before.score + d.delta),      // [stated] 하한 0
         streak: res === 'win' ? before.streak + 1 : 0,
         // 봇에게는 코인을 주지 않는다 (`writeResults` 가 본다)
-        bot: !!seat.bot, slot: i
+        bot: seat.bot, slot: i, noCoin
       });
     }
     if (!rows.length) return;
@@ -283,7 +351,7 @@ class Room {
         // [stated] **결과 화면에 받은 코인을 보여준다** — 실제로 준 값(`writeResults` 와 같은 식)을
         // 그 사람에게만 알린다. **쓰기가 끝난 뒤에** 보낸다(실패했으면 안 준 코인을 보여주지 않게)
         for (const r of rows){
-          if (r.bot) continue;
+          if (r.bot || r.noCoin) continue;
           const ws = this.seats[r.slot] && this.seats[r.slot].ws;
           if (ws && ws.readyState === 1){
             try { ws.send(JSON.stringify({ t: 'coin', n: matchCoin(r.result, r.streak) })); } catch { /* 무시 */ }
@@ -295,12 +363,18 @@ class Room {
 
   /** [stated] 판이 끝나면 **퀘스트 진행도**를 올린다 (친구방 포함).
    *  이기고 지는 것만 알면 되므로 점수 계산과 따로 둔다 — 점수는 빠른 매칭에서만 돈다.
-   *  연승은 서버가 `sall` 로 통합해서 센다 */
-  bumpQuests(kind){
+   *  연승은 서버가 `sall` 로 통합해서 센다.
+   *  [stated] **판을 끝까지 한 사람만** — "경기를 모두 마쳐야 퀘스트를 깬 건데".
+   *  전투 중에 나간 사람은 진 판이라 통합 연승만 끊는다 (판수·승리는 안 센다) */
+  bumpQuests(kind, gone = []){
     const st = this.server.s;
     for (let i = 0; i < this.n; i++){
       const seat = this.seats[i];
       if (!seat || !seat.uid) continue;
+      if (gone[i]){
+        if (gone[i].play) store.bumpQuest(seat.uid, { leave: true }).catch(() => {});
+        continue;
+      }
       const team = teamOf(i, st.n);
       const goals = st.soccer ? ((st.score && st.score[team]) | 0) : 0;
       // `winner` 는 **팀+1**, 0 이면 무승부. 개인전은 이긴 자리+1 이라 같은 식으로 맞는다
@@ -327,8 +401,7 @@ class Room {
   }
 
   // 우리 편에 중도 이탈자가 있었는가 (있으면 져도 점수가 안 깎인다)
-  teamHasLeaver(slot){
-    const st = this.server.s;
+  teamHasLeaver(slot, st = this.server.s){
     for (let i = 0; i < this.n; i++){
       if (i === slot) continue;
       if (teamOf(i, this.n) !== teamOf(slot, this.n)) continue;
@@ -440,6 +513,9 @@ class Room {
     st.hold = true;
     this.settled = false;
     this.primed = false;                  // **판 시작 전 점수를 다시 읽는다**
+    this.primeP = null; this.preOk.clear();
+    this.live = true;                     // 같은 사람들로 새 판이 열린다
+    for (const x of this.seats) x.gone = null;
     // **`charged` 를 비우면 안 된다** — 빠른 매칭에서 다시 하기로 무한히 돌 수 있다.
     // 친구방은 애초에 안 깎으므로 그대로 두면 된다
     this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
@@ -468,6 +544,9 @@ class Room {
     st.hold = true;
     this.settled = false;
     this.primed = false;                  // 새 판이면 점수를 다시 읽는다
+    this.primeP = null; this.preOk.clear();
+    this.live = false;                    // 로비 — 여기서 나가는 건 자리만 비우는 것
+    for (const x of this.seats) x.gone = null;
     this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
     this.sendLobby();
     this.sendRoom();
@@ -524,6 +603,8 @@ class Room {
     for (const x of this.seats) if (x.ws) x.ws.seen = false;
     this.server.s.hold = true;
     this.primed = false;                  // 종목이 바뀌면 점수를 다시 읽는다
+    this.primeP = null; this.preOk.clear();
+    this.live = false;
     this.send({ t: 'mode', melee: this.melee, ffa: this.ffa, soccer: this.soccer, n: this.n });
     this.sendRoom();
     this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
@@ -552,20 +633,13 @@ class Room {
     seat.sid = sid; seat.ws = ws; seat.goneAt = 0;
     seat.uid = ws.uid || seat.uid || '';
     if (!this.hostSid) this.hostSid = sid;          // 먼저 들어온 사람이 방장
-    // [stated] 티켓을 서버가 쥔다. **자리에 앉을 때 한 번만** 깎는다 —
-    // 끊겼다 돌아오는 것(`reconnected`)이나 같은 방에 다시 앉는 것으로 또 깎으면 안 된다.
+    // 돌아왔으면 '나간 사람' 표시를 지운다 (끊겼다 유예 시간 안에 다시 붙은 경우)
+    seat.gone = null;
+    // [stated] 티켓을 서버가 쥔다. **자리에 앉을 때가 아니라 VS 화면을 본 뒤에** 깎는다 (`charge`).
     // 실패해도 판은 그대로 진행한다(서버가 자거나 저장소가 꺼져 있을 수 있다) —
     // 여기서 막으면 **첫 사람이 아무것도 못 한다**
     // [stated] **친구방(코드가 있는 방)은 티켓을 안 깎는다.** 빠른 매칭만 깎는다 —
     // 티켓은 서버 부하 조절과 광고 노출이 목적인데, 지인끼리 하는 방은 사람이 적다
-    if (!this.code && !reconnected && seat.uid && !this.charged.has(seat.uid)){
-      this.charged.add(seat.uid);
-      // [stated] **축구는 전용 티켓**이라 일반 티켓을 안 건드린다 — 둘 다 빠지던 문제
-      const spend = this.soccer ? store.spendSoccer(seat.uid)
-                                : store.spendTicket(seat.uid, !!this.server.s.ffa);
-      spend.then(r => { if (r && !r.ok && r.why) console.log('[티켓]', seat.uid.slice(0, 6), r.why); })
-           .catch(() => {});
-    }
     // 슬롯별 닉네임을 상태에 실어 모두에게 전달한다
     if (!Array.isArray(this.server.s.nick)) this.server.s.nick = new Array(this.n).fill('');
     if (nick) this.server.s.nick[slot] = nick;
@@ -593,6 +667,7 @@ class Room {
     // [stated] **방(코드가 있는 방)은 자리가 차도 자동으로 시작하지 않는다** —
     // 방장이 로비에서 [시작 하기] 를 눌러야 한다. 빠른 매칭만 자동으로 시작한다
     else if (!this.code && this.seats.every(x => x.ws || x.bot)){
+      this.live = true;
       this.send({ t: 'go' });
       this.sendVs();                       // [stated] 매칭되면 서로의 정보를 보여준다
     }
@@ -604,6 +679,9 @@ class Room {
   // 연결이 끊긴 경우: 자리는 그대로 두고 시간만 기록 (재접속 대기)
   leave(slot){
     const seat = this.seats[slot];
+    // 판이 열려 있을 때 끊긴 것만 '나간 사람' 후보로 적는다 — 유예 시간 안에 돌아오면 지워진다.
+    // 친구방 로비에서 끊긴 것은 판과 상관없다 (유예가 지나면 자리만 비운다)
+    if (!this.code || this.live) this.markGone(slot);
     seat.ws = null;
     seat.goneAt = Date.now();
     setOff(this.server.s, slot, true);        // 그 자리에 멈춰 선다. 화면엔 끊김 표시
@@ -653,6 +731,11 @@ class Room {
 
   quit(slot){
     const seat = this.seats[slot];
+    // [stated] **친구방 로비(판이 안 열렸거나 끝난 뒤)에서 나가면 자리만 비운다.**
+    // 예전엔 여기서도 기권으로 처리해 1대1 방이 '판 끝남' 이 되면서 ① 판도 안 했는데 둘 다
+    // 퀘스트가 오르고 ② 새 사람이 들어와 [시작] 을 눌러도 아무 일도 안 일어났다
+    if (this.code && (!this.live || this.server.s.phase === PH_OVER)){ this.vacate(slot); return; }
+    this.markGone(slot);
     this.pending.delete(seat.sid);
     seat.sid = null; seat.ws = null; seat.goneAt = 0;
     // [stated] **축구는 나간 자리를 AI 가 이어받는다** — 판이 끊기지 않게.
@@ -684,6 +767,25 @@ class Room {
       return true;
     }
     return false;
+  }
+
+  /** 친구방 로비에서 나간 자리를 **완전히 비운다** — 다른 사람이 바로 앉을 수 있게.
+   *  기권이 아니므로 판 상태는 건드리지 않는다. 방장이었으면 남은 사람에게 넘어간다 */
+  vacate(slot){
+    const st = this.server.s;
+    const seat = this.seats[slot];
+    this.pending.delete(seat.sid);
+    if (seat.sid === this.hostSid) this.hostSid = null;
+    seat.sid = null; seat.ws = null; seat.goneAt = 0; seat.bot = null; seat.uid = ''; seat.gone = null;
+    st.color[slot] = slot;                      // 색을 다시 고를 수 있게
+    if (st.nick) st.nick[slot] = '';
+    setOff(st, slot, false);
+    // 다 비었으면 정리 시계를 건다 — **이미 걸려 있으면 그대로** (끊긴 뒤 유예가 지나 비운 경우
+    // 시계를 다시 걸면 빈 방이 그만큼 더 남는다)
+    if (!this.emptyAt && this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
+    this.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+    this.sendLobby();
+    this.sendRoom();
   }
 
   /** [stated] **방장이 강퇴한다.** 로비(시작 전)에서만 — 판 중에 빼면 판이 깨진다.
@@ -720,6 +822,8 @@ class Room {
       const seat = this.seats[i];
       if (seat.bot) continue;                  // **봇은 소켓이 없다.** 나간 것으로 보면 안 된다
       if (seat.sid && !seat.ws && now - seat.goneAt > GRACE_MS){
+        // 친구방 로비에서 끊긴 채 안 돌아왔다 — 기권이 아니라 자리만 비운다 (`quit` 과 같은 규칙)
+        if (this.code && (!this.live || this.server.s.phase === PH_OVER)){ this.vacate(i); continue; }
         if (seat.sid === this.hostSid) this.hostSid = null;   // 방장이 나갔다 → 아래에서 넘긴다
         seat.sid = null; seat.goneAt = 0;
         // 축구는 자리를 비우지 않고 AI 가 이어받는다
@@ -757,7 +861,7 @@ const http = createServer((req, res) => {
     const q = new URL(req.url, 'http://x').searchParams;
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     store.uidFromToken(q.get('token'))
-      .then(me => (me ? store.readTickets(me) : null))
+      .then(me => { sawUid(me); return me ? store.readTickets(me) : null; })
       .then(v => res.end(JSON.stringify(v ? { ok: true, ...v } : { ok: false })))
       .catch(() => res.end(JSON.stringify({ ok: false })));
     return;
@@ -771,6 +875,7 @@ const http = createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     store.uidFromToken(q.get('token')).then(async me => {
       if (!me) return { ok: false, auth: true };
+      sawUid(me);                                  // 앱을 켜 둔 사람 (봇을 미룰지 정할 때 본다)
       // [stated] 퀘스트마다 [받기] — `id` 가 오면 그 하나만, `'all'` 이면 전부완료 보너스
       if (act === 'claim') return store.claimQuest(me, q.get('p') || 'd', q.get('id') || '');
       if (act === 'mail')  return store.claimMail(me, q.get('id') || '');
@@ -856,6 +961,19 @@ const http = createServer((req, res) => {
     return;
   }
 
+  // [stated] **홈 PVP 칸에 "지금 N명 찾는 중"** — 대기열마다 지금 찾고 있는 사람 수.
+  // 사람들이 같은 칸으로 모이게 해 서로 잡히기 쉽게 한다. 수만 준다 (누가 찾는지는 안 준다)
+  if (req.url && req.url.startsWith('/searching')){
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    const out = {};
+    for (const [k, q] of waiting){
+      const c = q.filter(w => w.readyState === 1).length;
+      if (c) out[k] = c;
+    }
+    res.end(JSON.stringify({ ok: true, q: out }));
+    return;
+  }
+
   if (req.url === '/' || req.url === '/health'){
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     // 서버가 실제로 무엇을 갖고 있는지 그대로 내보낸다.
@@ -914,6 +1032,30 @@ store.warmup();   // **첫 판이 아니라 부팅 때** Firestore 연결을 연
 // 오지 않을 사람을 기다리게 된다. 둘이 모였을 때만 방을 만든다.
 // 기다린 사람이 있으면 빈 자리를 봇으로 채워 판을 연다.
 // **봇인 걸 드러내지 않는다** — 이름도 사람과 같은 꼴로 짓는다
+/** 이 사람(`ws`)을 위해 봇을 얼마나 미룰지 (대기열에 들어온 때부터, 밀리초) */
+function botWaitFor(key, ws){
+  const mode = key.split(':')[1];          // s 총격전 · m 칼전 · b 축구
+  const me = ws.uid || '';
+  // ① 같은 종목을 다른 인원으로 찾는 사람
+  for (const [k, q] of waiting){
+    if (k === key || k.split(':')[1] !== mode) continue;
+    if (q.some(w => w !== ws && w.readyState === 1)) return BOT_WAIT_MAX;
+  }
+  // ② 같은 대기열 판(빠른 매칭)이 막 끝났거나(결과 화면) 10초 안에 끝난다 — 사람이 있는 판만
+  const now = Date.now();
+  for (const r of rooms.values()){
+    if (r.code || r.qkey !== key) continue;
+    if (!r.seats.some(x => x.ws && !x.bot && x.uid !== me)) continue;
+    const st = r.server.s;
+    if (st.phase === PH_OVER && r.overAt && now - r.overAt < 8000) return BOT_WAIT_MAX;
+    if (st.phase === PH_PLAY && st.clock > 0 && st.clock <= 10 * 60) return BOT_WAIT_MAX;
+  }
+  // ③ 앱을 켜 둔 다른 사람 (찾는 중·게임 중인 사람은 연결이 있다)
+  for (const u of online.keys()) if (u && u !== me) return BOT_WAIT_SOME;
+  for (const [u, t] of seen) if (u !== me && now - t < SEEN_MS) return BOT_WAIT_SOME;
+  return BOT_FILL_MS;
+}
+
 function fillWithBots(key){
   if (!serverWarm()) return;
   const q = queueOf(key);
@@ -923,7 +1065,13 @@ function fillWithBots(key){
   const soccer = parts[1] === 'b';   // 축구는 대기열이 따로다
   const now = Date.now();
   // 가장 오래 기다린 사람이 기준
-  if (!q.some(ws => ws.botAt && now >= ws.botAt)) return;
+  // **한 번 늘린 기다림은 줄이지 않는다** — 막 끝난 판의 사람을 기다리기로 했으면, 결과 화면이
+  // 지나 그 조건이 풀려도 끝까지(최대 10초) 기다린다. 조건이 깜빡일 때마다 시각이 흔들리지도 않는다
+  const due = ws => {
+    ws.waitFor = Math.max(ws.waitFor || BOT_FILL_MS, botWaitFor(key, ws));
+    return ws.botAt && now >= ws.botAt + (ws.waitFor - BOT_FILL_MS);
+  };
+  if (!q.some(due)) return;
   const picked = [];
   while (picked.length < n && q.length){
     const ws = q.shift();
@@ -932,6 +1080,7 @@ function fillWithBots(key){
   if (!picked.length) return;
   const room = new Room(nextRoomId++, null, n, melee, ffa, soccer);
   room.hasBots = true;
+  room.qkey = key;
   rooms.set(room.id, room);
   for (const ws of picked){ ws.room = room; }
   // **봇을 먼저 앉힌 뒤 사람을 앉힌다.** join 이 곧바로 상태를 내려보내므로,
@@ -991,6 +1140,7 @@ function pairUp(key){
     }
     if (picked.length < n){ q.unshift(...picked); return; }
     const room = new Room(nextRoomId++, null, n, melee, ffa, soccer);
+    room.qkey = key;
     rooms.set(room.id, room);
     for (const ws of picked){ ws.room = room; }
     if (n > 2 && !ffa){          // 개인전은 팀을 고를 게 없다
@@ -1268,6 +1418,8 @@ wss.on('connection', (ws, req) => {
       const st = room.server.s;
       if (st.phase !== PH_READY) return;
       for (const x of room.seats) if (x.ws) x.ws.seen = false;
+      for (const x of room.seats) x.gone = null;
+      room.live = true;                   // 이제부터 나가면 판을 나가는 것이다
       st.hold = true;                     // 전원이 화면에 들어오면 그때부터 센다
       room.send({ t: 'go' });             // 모두 게임 화면으로
       room.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
@@ -1356,6 +1508,11 @@ wss.on('connection', (ws, req) => {
       ws.close();
       return;
     }
+    // [stated] **VS 화면이 떴다** — 이때 티켓을 깎는다. 그 전에 나가면 안 깎는다
+    if (m.t === 'vsSeen'){
+      if (ws.room && ws.slot >= 0) ws.room.charge(ws.slot);
+      return;
+    }
     if (!ws.room || ws.slot === undefined || ws.slot < 0) return;   // 자리가 없으면 입력은 버린다
     // pid는 절대 클라이언트 말을 믿지 않는다 (남의 캐릭터를 조작할 수 있으므로)
     m.pid = ws.slot;
@@ -1363,7 +1520,8 @@ wss.on('connection', (ws, req) => {
     // 입력이 오기 시작했다 = 그 사람이 게임 화면에 있다는 뜻이다.
     // 서버는 방이 차는 순간부터 셌는데 사용자는 VS 화면 3초 뒤에 들어와,
     // 10 이 아니라 7 부터 보였다
-    if (m.t === 'in' && !ws.seen){ ws.seen = true; ws.room.checkHold(); }
+    // 게임 화면에 들어왔다 = VS 화면을 봤거나 건너뛰었다 → 티켓 (이미 깎였으면 그대로)
+    if (m.t === 'in' && !ws.seen){ ws.seen = true; ws.room.checkHold(); ws.room.charge(ws.slot); }
     ws.room.server.onMsg(m);
   });
 
@@ -1417,7 +1575,7 @@ setInterval(() => {
     room.prime();           // 전투가 시작되면 점수를 한 번 읽어둔다
     room.settle();          // 판이 끝났으면 점수를 쓴다 (한 번만)
     // 판이 끝난 순간 **방장이 누구인지 알린다** — 결과 화면에서 다시 시작 버튼을 그린다
-    if (room.server.s.phase === PH_OVER && !room.toldHost){ room.toldHost = true; room.sendHost(); }
+    if (room.server.s.phase === PH_OVER && !room.toldHost){ room.toldHost = true; room.overAt = Date.now(); room.sendHost(); }
     if (room.server.s.phase !== PH_OVER) room.toldHost = false;
   }
 }, TICK_MS);
@@ -1432,6 +1590,9 @@ setInterval(() => {
 }, 150);   // 0.5초마다 보면 그만큼 늦어져 7초를 넘긴다
 
 setInterval(() => {
+  // 오래 안 보인 '켜 둔 사람' 기록은 지운다 (계속 쌓이지 않게)
+  const old = Date.now() - SEEN_MS;
+  for (const [u, t] of seen) if (t < old) seen.delete(u);
   for (const ws of wss.clients){
     if (!ws.isAlive){ ws.terminate(); continue; }
     ws.isAlive = false;

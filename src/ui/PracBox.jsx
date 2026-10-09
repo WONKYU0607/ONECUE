@@ -2,7 +2,7 @@
 // [stated] **연습도 홈에서 끝낸다.** 칸을 누르면 그 자리에 총격전·칼전·축구가 나오고,
 // 고르면 **바로 시작**한다 — 중간에 새 화면(예전 `PracticeMenu`)을 안 연다.
 // 친구 대전 칸과 같은 방식이다
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Plaque from './Plaque.jsx';
 import { t } from '../i18n/index.js';
 
@@ -13,15 +13,17 @@ const KINDS = [
   ['mode.soccer', { melee: false, soccer: true }]
 ];
 
-export default function PracBox({ onStart, regBack }){
+export default function PracBox({ onStart, regBack, act, onAct }){
   const [open, setOpen] = useState(false);
   const back = () => { if (!open) return false; setOpen(false); return true; };
   // 하단 뒤로가기는 홈이 한 곳에서 받아 칸마다 물어본다 (등록 자리가 하나뿐이라)
   regBack(back);
+  // [stated] **다른 칸을 열면 접힌다**
+  useEffect(() => { if (act && act !== 'prac' && open) setOpen(false); }, [act]);
 
   if (!open){
     return (
-      <button className="hbox hb-prac" onClick={() => setOpen(true)}>
+      <button className="hbox hb-prac" onClick={() => { setOpen(true); onAct?.('prac'); }}>
         <Plaque text={t('mode.practice')} icon="prac" />
       </button>
     );

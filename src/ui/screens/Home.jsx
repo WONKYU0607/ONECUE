@@ -3,22 +3,28 @@ import PlayerBar from '../PlayerBar.jsx';
 import RankCards from '../RankCards.jsx';
 import CoinRow from '../CoinRow.jsx';
 import InviteBanner from '../InviteBanner.jsx';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import PvpBox from '../PvpBox.jsx';
 import FriendBox from '../FriendBox.jsx';
 import PracBox from '../PracBox.jsx';
 import AiBox from '../AiBox.jsx';
 import Plaque from '../Plaque.jsx';
-import { setInnerBack } from '../../state/back.js';
+import { setInnerBack, releaseInnerBack } from '../../state/back.js';
 import { t } from '../../i18n/index.js';
 
 export default function Home({ onStart, search, joining, onCancelSearch, onAi, onPractice, onSettings, onRanks, onJoin, onFriends, onShop, onCostume, onQuests, onMail }){
   // 하단 뒤로가기. **등록 자리(`setInnerBack`)는 하나뿐**이라 칸마다 따로 등록하면 서로 덮어쓴다.
   // 홈이 한 번 등록하고, 펼쳐진 칸이 있으면 그 칸이 접는다. 없으면 false → App 이 종료 확인을 띄운다
   const backs = useRef({});
-  setInnerBack(() => Object.values(backs.current).some(f => f && f()));
-  useEffect(() => () => setInnerBack(null), []);
+  // **함수 하나를 잡아 두고** 건다 — 정리할 때 "내가 건 것인가" 를 같은 함수로 확인한다 (`releaseInnerBack`)
+  const mine = useRef(null);
+  if (!mine.current) mine.current = () => Object.values(backs.current).some(f => f && f());
+  setInnerBack(mine.current);
+  useEffect(() => () => releaseInnerBack(mine.current), []);
   const reg = k => f => { backs.current[k] = f; };
+  // [stated] **칸은 하나만 펼친다** — 하나를 열면 나머지는 접힌다 (예전엔 넷이 다 같이 열려 있었다).
+  // 마지막으로 연 칸의 이름만 들고 있고, 칸마다 "내가 아니면 접는다"
+  const [act, setAct] = useState(null);
 
   return (
     <div className="screen home">
@@ -40,15 +46,15 @@ export default function Home({ onStart, search, joining, onCancelSearch, onAi, o
       <div className="home-grid">
         {/* [stated] **홈에서 바로 게임으로.** 종목 판을 누르면 이 칸이 그 종목 그림으로 커지고
             안에서 인원을 골라 시작한다 — 새 화면으로 안 넘어간다 */}
-        <PvpBox onStart={onStart} search={search} onCancelSearch={onCancelSearch} regBack={reg('pvp')} />
+        <PvpBox onStart={onStart} search={search} onCancelSearch={onCancelSearch} regBack={reg('pvp')} act={act} onAct={setAct} />
         {/* [stated] 자리 바꿈 — 가운데 줄: 친구 대전 · AI 모드 / 아래 줄: 연습 모드 · 상점.
             칸 크기는 그대로다(격자가 순서대로 채운다) */}
         {/* [stated] 방 접속도 **이 칸 안에서** — "서버에 연결하는 중" 화면으로 안 넘어간다 */}
-        <FriendBox onStart={onStart} joining={joining} onCancel={onCancelSearch} regBack={reg('friend')} />
+        <FriendBox onStart={onStart} joining={joining} onCancel={onCancelSearch} regBack={reg('friend')} act={act} onAct={setAct} />
         {/* [stated] AI 모드도 홈에서 — 누르면 칸 안에 ‹ N단계 › · 보상 · 시작하기, 누르면 바로 게임 */}
-        <AiBox onStart={onAi} regBack={reg('ai')} />
+        <AiBox onStart={onAi} regBack={reg('ai')} act={act} onAct={setAct} />
         {/* [stated] 연습도 홈에서 — 누르면 칸 안에 총격전·칼전·축구, 고르면 바로 시작 */}
-        <PracBox onStart={onPractice} regBack={reg('prac')} />
+        <PracBox onStart={onPractice} regBack={reg('prac')} act={act} onAct={setAct} />
         <button className="hbox hb-shop" onClick={onShop}>
           <Plaque text={t('shop.title')} icon="shop" />
         </button>

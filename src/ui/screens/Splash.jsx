@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { preloadAssets } from '../../game/assets.js';
 import { unlockAudio } from '../../game/audio.js';
 import { t } from '../../i18n/index.js';
+import { checkMustUpdate, setUpdateBlocked, startUpdate } from '../../state/update.js';
 
 // 진입창. 자산을 미리 받고, 다 받으면 TAP TO START를 띄운다.
 //
@@ -20,6 +21,8 @@ function isKorean(){
 export default function Splash({ onDone }){
   const [pct, setPct] = useState(0);
   const [ready, setReady] = useState(false);
+  // [stated] **플레이 스토어에 새 버전이 있으면 여기서 막는다** — 업데이트 말고는 아무것도 못 한다
+  const [mustUpd, setMustUpd] = useState(false);
   const [ko] = useState(isKorean);
 
   // [stated] **앱을 켜는 순간 서버를 깨우기 시작한다.** 자산 받는 동안 뒤에서 깬다.
@@ -51,8 +54,10 @@ export default function Splash({ onDone }){
     Promise.all([
       preloadAssets((done, total) => { if (alive) setPct(Math.round(done / total * 100)); }),
       cover,
-      font
-    ]).then(() => {
+      font,
+      checkMustUpdate()
+    ]).then(([, , , must]) => {
+      if (must){ setUpdateBlocked(true); if (alive) setMustUpd(true); return; }
       const wait = Math.max(0, MIN_MS - (performance.now() - t0));
       setTimeout(() => { if (alive) setReady(true); }, wait);
     });
@@ -60,7 +65,7 @@ export default function Splash({ onDone }){
   }, [ko]);
 
   const start = () => {
-    if (!ready) return;
+    if (!ready || mustUpd) return;
     unlockAudio();            // 이 터치가 소리를 여는 열쇠다
     onDone();
   };
@@ -74,8 +79,22 @@ export default function Splash({ onDone }){
       tabIndex={0}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') start(); }}
     >
+      {/* [stated] **강제 업데이트** — 버튼은 [업데이트] 하나뿐. 뒤로가기는 앱 종료(App) */}
+      {mustUpd && (
+        <div className="modal-back upd-gate" onPointerDown={e => e.stopPropagation()}>
+          <div className="modal ask">
+            <p className="ask-t">{t('upd.title')}</p>
+            <p className="ask-d">{t('upd.body')}</p>
+            <div className="ask-row">
+              <button className="menu-btn primary" onClick={() => { startUpdate(); }}>
+                <span className="t">{t('common.update')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="splash-foot">
-        {ready
+        {mustUpd ? null : ready
           ? <p className="tap">{ko ? t('splash.tap') : 'TAP TO START'}</p>
           : (
             <>
