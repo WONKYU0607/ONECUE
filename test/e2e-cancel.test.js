@@ -28,7 +28,7 @@ for (let i = 0; i < 60 && !up; i++){ try { up = (await fetch(`http://127.0.0.1:$
 if (!up){ kill(); skip('개발 서버가 안 뜸'); }
 for (let i = 0; i < 40; i++){ try { if ((await fetch(`http://127.0.0.1:${VP}/src/main.jsx`)).ok) break; } catch { /* 아직 */ } await wait(500); }
 
-const health = async () => (await fetch(`http://127.0.0.1:${SP}/health`)).json();
+const health = async () => (await fetch(`http://127.0.0.1:${SP}/health?d=1`)).json();
 const botRooms = async () => (await health()).rooms.filter(r => !r.code);      // 코드 없는 방 = 빠른 매칭
 const b = await puppeteer.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
 const dev = async () => {

@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { getColor } from '../state/profile.js';
 import { tk, out, outSoccer, tkSoccer, notFull, notFullSoccer } from './pvpTickets.js';
 import { showRewarded } from '../state/ads.js';
-import { adTicket } from '../state/questclient.js';
+import { adTicket, noadsNow, onNoads } from '../state/questclient.js';
 import { syncTickets, adLeft, adFfaLeft, ffaAdUsesCount } from '../state/tickets.js';
 import { AD_DAY_MAX } from '../state/quests.js';
 import { fetchSearching, qkeyOf } from '../state/searching.js';
@@ -25,6 +25,9 @@ const FFA_SIZES = [3, 4, 5, 6];
 // **칸 전용 짧은 문구** — 영어 'Looking for an opponent…' 는 360 폰에서 칸을 넘쳤다
 const STAGE = { waking: 'home.sWaking', connecting: 'home.sWaking', retrying: 'home.sWaking',
                 waiting: 'home.sSearch', matched: 'home.sFound', vs: 'home.sFound' };
+
+const NOADS_TXT = { 'ad.get': 'ad.getFree', 'ad.plus': 'ad.plusFree', 'ad.doneToday': 'ad.doneTodayFree',
+  'ad.loading': 'ad.loadingFree', 'ad.capped': 'ad.cappedFree' };
 
 export default function PvpBox({ onStart, regBack, search, onCancelSearch, act, onAct }){
   const [pick0, setOpen] = useState(null);    // null | 'gun' | 'melee' | 'soccer'
@@ -79,6 +82,11 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch, act, 
   // 남아 있을 땐 [시작하기] 를 그대로 두고 **옆에 작은 [광고 +1]** 을 붙인다
   const [adBusy, setAdBusy] = useState(false);
   const [adNote, setAdNote] = useState('');
+  // [stated] **광고 제거를 샀으면 광고 없이 바로 받는다** (하루 횟수는 그대로). 글자도 '광고' 를 뺀다
+  const [noads, setNoads] = useState(noadsNow());
+  useEffect(() => onNoads(v => setNoads(v)), []);
+  // **문구 열쇠를 이어붙이지 않는다** — 번역 검사가 못 찾는다
+  const A = k => t(noads ? NOADS_TXT[k] : k);
   const [, redraw] = useState(0);
   const adKind = soccer ? 'soc' : (ffa ? 'ffa' : 'tk');
   const adCan = adLeft() > 0 && !(ffa && ffaAdUsesCount() && adFfaLeft() <= 0);
@@ -86,7 +94,7 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch, act, 
   const watchAd = async () => {
     if (adBusy || !adCan) return;
     setAdBusy(true); setAdNote('');
-    const r = await showRewarded();
+    const r = noads ? { ok: true } : await showRewarded();
     if (!r || !r.ok){
       setAdNote(t(r && r.why === 'skip' ? 'ad.skip' : 'ad.loadFail'));
       setAdBusy(false);
@@ -96,7 +104,7 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch, act, 
     // 받았든 아니든 **서버가 알려준 값**으로 맞춘다 (남은 횟수·티켓)
     if (g && typeof g.tk === 'number') syncTickets(g);
     if (!(g && g.ok) && !(g && g.why === 'full'))
-      setAdNote(t(g && (g.why === 'capped' || g.why === 'ffaCapped') ? 'ad.capped' : 'q.fail'));
+      setAdNote(g && (g.why === 'capped' || g.why === 'ffaCapped') ? A('ad.capped') : t('q.fail'));
     setAdBusy(false);
     redraw(x => x + 1);
   };
@@ -161,7 +169,7 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch, act, 
                 </button>
                 {adPlus && (
                   <button className="pvp-adplus" disabled={adBusy} onClick={watchAd}>
-                    <span className="t">{t('ad.plus')}</span>
+                    <span className="t">{A('ad.plus')}</span>
                     <span className="n">{t('ad.left', { n: adLeft(), max: AD_DAY_MAX })}</span>
                   </button>
                 )}
@@ -169,7 +177,7 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch, act, 
             )}
             {!search && blocked && (
               <button className={'pvp-start ad' + (adCan && !adBusy ? '' : ' off')} disabled={adBusy || !adCan} onClick={watchAd}>
-                <span className="t">{adBusy ? t('ad.loading') : (adCan ? t('ad.get') : t('ad.doneToday'))}</span>
+                <span className="t">{adBusy ? A('ad.loading') : (adCan ? A('ad.get') : A('ad.doneToday'))}</span>
                 {adCan && !adBusy && <span className="tkn">{t('ad.left', { n: adLeft(), max: AD_DAY_MAX })}</span>}
               </button>
             )}

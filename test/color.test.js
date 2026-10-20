@@ -19,6 +19,18 @@ function conn(sid, opt = {}){
   t.last = k => [...t.msgs].reverse().find(m => m.t === k);
   all.push(t); return t;
 }
+// **고정 대기로 마지막 스냅샷을 보지 않는다.** 판이 열리기 전(앉는 순간)의 스냅샷에는 아직 안 앉은 자리가
+// 기본색으로 들어 있다 — 서버가 늦게 데워지면(묶어 돌릴 때) 정해진 시간 안에 다음 스냅샷이 안 와서
+// 그걸 보고 실패했다. **바라는 색이 될 때까지** 기다리고(최대 5초), 끝내 안 되면 마지막 것을 보여 준다
+async function settle(t, ok, ms = 5000){
+  const t0 = Date.now(); let sn = null;
+  while (Date.now() - t0 < ms){
+    sn = t.last('s');
+    if (sn && sn.st && ok(sn.st.color)) return sn;
+    await sleep(100);
+  }
+  return sn;
+}
 import { assert, waitPort } from './harness.js';
 import { fileURLToPath } from 'url';
 // **`.pathname` 을 쓰면 윈도우에서 `/C:/...` 가 되어 chdir 이 실패한다** → `fileURLToPath`
@@ -28,8 +40,7 @@ await waitPort(PORT);   // 뜰 때까지 기다린다 (고정 대기는 윈도�
 try {
   // 서로 다른 색
   const a = conn('c1', { color: 2 }), b = conn('c2', { color: 3 });
-  await sleep(1400);
-  let snap = [...a.msgs].reverse().find(m => m.t === 's');
+  let snap = await settle(a, c => c[0] === 2 && c[1] === 3);
   assert(snap && snap.st.color[0] === 2 && snap.st.color[1] === 3,
     `고른 색이 그대로 간다 (${snap?.st?.color?.slice(0,2)})`);
   all.forEach(t=>t.ws.close()); all.length = 0;
@@ -37,8 +48,7 @@ try {
   // [stated] 같은 색을 골라도 **서버는 그대로 둔다.** 화면에서 각자 다르게 그려 푼다.
   // 예전엔 서버가 빈 색으로 바꿔서, 둘 다 검정을 골랐는데 파랑·빨강이 됐다
   const c = conn('c3', { color: 1 }), d = conn('c4', { color: 1 });
-  await sleep(1400);
-  snap = [...c.msgs].reverse().find(m => m.t === 's');
+  snap = await settle(c, x => x[0] === 1 && x[1] === 1);
   assert(snap && snap.st.color[0] === 1 && snap.st.color[1] === 1,
     `1대1은 같은 색도 그대로 (${snap?.st?.color?.slice(0,2)})`);
   // 보라·검정도 받아야 한다 (예전엔 wantColor < 4 라 무시됐다)
@@ -46,8 +56,7 @@ try {
   await sleep(300);
   {
     const e = conn('c5', { color: 5 }), g = conn('c6', { color: 4 });
-    await sleep(1400);
-    const sn = [...e.msgs].reverse().find(m => m.t === 's');
+    const sn = await settle(e, x => x[0] === 5 && x[1] === 4);
     assert(sn && sn.st.color[0] === 5 && sn.st.color[1] === 4,
       `보라·검정도 고를 수 있다 (${sn?.st?.color?.slice(0,2)})`);
   }
@@ -55,8 +64,7 @@ try {
   await sleep(300);
   // 개인전 4인 — 서버는 고른 색을 그대로 둔다 (화면에서 각자 갈라 본다)
   const cs = [0,1,2,3].map(i => conn('f'+i, { n:4, melee:true, ffa:true, color: i%2 }));
-  await sleep(1600);
-  snap = [...cs[0].msgs].reverse().find(m => m.t === 's');
+  snap = await settle(cs[0], x => x.slice(0, 4).join() === '0,1,0,1');
   const col = snap?.st?.color?.slice(0,4);
   assert(col && col.join() === '0,1,0,1', `개인전도 고른 색 그대로 (${col})`);
   all.forEach(t=>t.ws.close()); all.length = 0;
@@ -86,9 +94,13 @@ try {
     ts.forEach((c, i) => c.ws.send(JSON.stringify({ t: 'team', team: i < 2 ? 0 : 1, color: want[i] })));
     await sleep(1500);
     const sn = [...ts[0].msgs].reverse().find(m => m.t === 's');
-    const tc = sn?.st?.color?.slice(0,4);
-    assert(tc && tc.join() === want.join(),
-      `팀전에서도 고른 색 그대로 — 보라·검정 포함 (원한 ${want} / 받은 ${tc})`);
+    // **사람마다 자기 자리의 색을 본다.** 같은 팀을 동시에 누르면 누가 먼저 앉을지는 정해져 있지 않다
+    // (서버는 압축된 메시지를 풀어 가며 받아서, 동시에 보낸 것의 순서가 바뀔 수 있다 — 2026-10-19 압축).
+    // 이 검사가 보려는 건 **고른 색이 바뀌지 않는가** 다
+    const mine = ts.map(c => (c.last('hello') || {}).pid);
+    const tc = mine.map(sl => sn?.st?.color?.[sl]);
+    assert(tc.join() === want.join(),
+      `팀전에서도 고른 색 그대로 — 보라·검정 포함 (원한 ${want} / 받은 ${tc} · 자리 ${mine})`);
   }
 
 console.log('화면에 쓸 색 — 겹치면 각자 다르게 보인다');

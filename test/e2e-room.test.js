@@ -138,7 +138,7 @@ try {
       // [stated] **종목만 바꿨는데 판이 저절로 시작됐다** — 저절로 시작되는 것은 알림이 없고
       // **서버 상태가 전투로 넘어가는 것**이라, 서버를 직접 본다 (0=준비, 2=전투)
       await wait(5000);
-      const ph = await (await fetch(`http://127.0.0.1:${SPORT}/health`)).json()
+      const ph = await (await fetch(`http://127.0.0.1:${SPORT}/health?d=1`)).json()
         .then(j => (j.rooms && j.rooms[0] ? j.rooms[0].phase : -1));
       assert(ph === 0, `  5초를 더 기다려도 준비 단계 그대로 (서버 단계 ${ph})`);
       assert(await E(A, 'window.E2E.go === false') && await E(D, 'window.E2E.go === false'),

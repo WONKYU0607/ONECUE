@@ -45,6 +45,9 @@ try {
 
   console.log('서버도 칼전 규칙으로 돈다');
   await sleep(1200);
+  // 스냅샷은 3초마다라 그사이 상태는 달라고 해서 본다 (앱도 그렇게 한다)
+  a.ws.send(JSON.stringify({ t: 'snap' }));
+  await sleep(400);
   const snap = [...a.msgs].reverse().find(m => m.t === 's');
   assert(snap && snap.st, '스냅샷을 받는다');
   assert(snap.st.melee === true, '서버 상태가 칼전');

@@ -1,5 +1,5 @@
 // [stated] **스킨 디버그(아무거나 입어보기)를 출시 설정으로 되돌린다.**
-//   - 상점 일반(결제) 스킨: [입어보기] 가 사라지고 [준비 중]
+//   - 상점 일반(결제) 스킨: [입어보기] 가 사라지고, 웹에서는 [앱에서 구매] (구글 결제는 앱에만 있다)
 //   - 상점 코인 스킨: 안 샀으면 [구매] 만. **사면 [장착]** 으로 바로 입을 수 있다
 //   - 코스튬: 산 것만 장착. 디버그 때 기기에 남은 입어보기·보유 기록은 효력이 없다
 // 예전 출시 설정은 꺼지면 무조건 기본 캐릭터라 **산 스킨도 못 입었다** — 그걸 여기서 막는다.
@@ -83,14 +83,14 @@ try {
   assert(c.lock === c.n && c.on === 0 && c.eq === 0, `  ${c.h}: 전부 실루엣 · 장착 버튼 없음 (${c.lock}/${c.n}, 장착 ${c.on})`);
   await backHome(p);
 
-  console.log('상점 — 일반(결제) 스킨은 [준비 중], 입어보기 없음');
+  console.log('상점 — 일반(결제) 스킨은 웹에서 [앱에서 구매], 입어보기 없음');
   await tap(p, '상점');
   await p.waitForSelector('.screen.shop', { timeout: 10000 }); await wait(1200);
   await tap(p, '일반', '.shop-tabs.pay'); await wait(300);
   await tap(p, '스킨', '.shop'); await wait(300);
   await tap(p, '총격전', '.shop-tabs.sub'); await wait(500);
   let bt = await cardBtns(p);
-  assert(bt && bt.length === 1 && bt[0].t === '준비 중' && bt[0].off, `  [준비 중] 하나 (${JSON.stringify(bt)})`);
+  assert(bt && bt.length === 1 && bt[0].t === '앱에서 구매' && bt[0].off, `  [앱에서 구매] 하나 (${JSON.stringify(bt)})`);
   const wears = await p.evaluate(() => [...document.querySelectorAll('.shop-btn')].filter(x => /입어보기|입는 중/.test(x.textContent)).length);
   assert(wears === 0, `  입어보기 버튼이 없다 (${wears})`);
 

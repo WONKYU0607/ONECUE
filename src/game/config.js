@@ -218,7 +218,9 @@ export const BLIND_TICKS = 120;       // 섬광 지속 (2초)
 export const BLIND_FULL  = 18;        // 이 구간은 완전히 하얗게
 
 export const ROUND_TICKS = 60 * 60;   // 한 판 60초. 시간 내 승부가 안 나면 체력 많은 쪽 승
-export const SNAP_EVERY = 30;          // 스냅샷 주기(틱)
+// 스냅샷 주기(틱). [stated] 0.5초(30) → 3초(180) (2026-10-19 보내는 양 줄이기) — 게임 전체 상태라
+// 판 도중 보내는 양의 큰 몫이었다. 이제 필요할 때(어긋남·화면 복귀·많이 밀림) 앱이 달라고 한다(`snap`)
+export const SNAP_EVERY = 180;
 export const clampi = (v,a,b) => v < a ? a : (v > b ? b : v);
 
 // 4인(2대2)까지 대비한 팀 컬러

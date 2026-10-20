@@ -1,8 +1,9 @@
 // 상점. [stated] 아레나 / 스킨 / 광고 제거 / 아이템 네 갈래.
 // [stated] 스킨 안에는 **총격전 / 칼전 / 축구** 세 하위 탭. 지금은 축구만 상품이 있다.
 //
-// [stated] 결제는 **현금 결제**(Google Play)이고 **앱에만 출시**한다. 다만 지금은 살 수 없다 —
-// Play Console 에 상품이 아직 없고, 소유는 점수·티켓과 같은 원칙으로 **서버가 쥐어야** 한다.
+// [stated] 결제는 **현금 결제**(Google Play)이고 **앱에서만** 산다 (2026-10-19 붙임 — `state/pay.js`).
+// 소유는 점수·티켓과 같은 원칙으로 **서버가 쥔다** — 서버가 구글에 확인한 뒤 준다.
+// 값은 **구글이 알려 준 그 나라 돈**으로 보인다 (전 세계 출시). 웹은 [앱에서 구매] 로 막는다
 //
 // [stated] **팀 이름은 넣지 않는다.** 그림과 값만 보여준다.
 // [stated] 미리보기는 **서있기 4칸 / 뛰기 4칸 두 줄**, 캐릭터를 크게.
@@ -13,7 +14,8 @@ import { setInnerBack, releaseInnerBack } from '../../state/back.js';
 const NO_INNER = () => false;
 import { DEBUG_TRY_SKIN, tryOf, setTry } from '../../state/tryskin.js';
 import { coinSkinsOf, coinArenasOf } from '../../game/skins.js';
-import { buySkin, buyTicket, refreshCoin, coinNow, onCoin } from '../../state/questclient.js';
+import { buySkin, buyTicket, refreshCoin, coinNow, onCoin, noadsNow, onNoads } from '../../state/questclient.js';
+import { buyCash, payInit, priceOf, payState, onPay } from '../../state/pay.js';
 import { SKIN_COST, SKIN_FIRST_OFF, TICKET_COST, BUY_TK_MAX, BUY_SOC_MAX } from '../../state/quests.js';
 import { SOCCER_SKINS, SOCCER_SET, PREV_IMG, PREV_FW, PREV_FH, PREV_COLS, PREV_ROWS_N,
   PREV_LINES, GUN_SKINS, GUN_SET, GUN_PREV_IMG, GUN_PREV_FW, GUN_PREV_FH, GUN_PREV_COLS,
@@ -122,13 +124,42 @@ export default function Shop({ onBack }){
   const [own, setOwn] = useState(null);
   // [stated] 티켓은 **하루에 몇 장까지만** 살 수 있다. 서버가 오늘 몇 장 샀는지 알려 준다
   const [buy, setBuy] = useState(null);
+  const apply = r => { if (r && r.ok){ setBought(r.bought | 0); setOwn(r.own || {}); setBuy(r.buy || {}); } };
   useEffect(() => {
     const off = onCoin(c => setCoinUi(c));
-    refreshCoin().then(r => {
-      if (r && r.ok){ setBought(r.bought | 0); setOwn(r.own || {}); setBuy(r.buy || {}); }
-    }).catch(() => {});
+    refreshCoin().then(apply).catch(() => {});
     return off;
   }, []);
+  // [stated] **현금 결제** — 가격(그 나라 돈)을 받고, 마무리 안 된 구매가 있으면 먼저 받는다
+  const [payS, setPayS] = useState(payState());
+  const [noads, setNoadsUi] = useState(noadsNow());
+  useEffect(() => {
+    const off = onPay(st => setPayS(st));
+    const off2 = onNoads(v => setNoadsUi(v));
+    payInit().then(() => refreshCoin()).then(apply).catch(() => {});
+    return () => { off(); off2(); };
+  }, []);
+  /** 구글 가격. 웹은 원래 값(원)을, 앱에서 아직 모르면 '…' */
+  const cashPrice = it => priceOf(it.sku)
+    || (payS === 'web' ? t('shop.price', { p: it.price.toLocaleString() }) : (payS === 'idle' ? '…' : '—'));
+  const takeCash = async sku => {
+    if (busy) return;
+    setBusy(true); setNote('');
+    const r = await buyCash(sku);
+    const why = r && r.ok ? 'ok' : (r && r.why) || 'fail';
+    // 창을 닫은 것(cancel)은 아무 말도 안 한다
+    setNote(why === 'cancel' ? '' : t({ ok: 'shop.bought', pending: 'shop.payPending', none: 'shop.payNo',
+      auth: 'shop.payFail', web: 'shop.appOnly', fail: 'shop.payFail' }[why] || 'shop.payFail'));
+    apply(await refreshCoin());
+    setBusy(false);
+  };
+  /** 현금 [구매] — 웹이면 [앱에서 구매] 로 막는다 */
+  const cashBtn = sku => (
+    <button className="shop-btn" disabled={busy || payS === 'web'} onClick={() => takeCash(sku)}>
+      {payS === 'web' ? t('shop.appOnly') : t('shop.coinBuy')}
+    </button>
+  );
+  const ownedBtn = () => <button className="shop-btn" disabled>{t('shop.owned')}</button>;
   /** 오늘 더 살 수 있는 장수 */
   const tkLeft = soc => Math.max(0,
     (soc ? BUY_SOC_MAX : BUY_TK_MAX) - ((buy && (soc ? buy.soc : buy.tk)) | 0));
@@ -233,6 +264,7 @@ export default function Shop({ onBack }){
       {pay === 'coin' && (note || bought === 0) && (
         <div className="shop-first">{note || t('shop.first50')}</div>
       )}
+      {pay === 'cash' && note && <div className="shop-first">{note}</div>}
 
       {/* [stated] **코인 / 일반** — 맨 위. 어느 쪽이냐에 따라 아래 갈래가 달라진다 */}
       <div className="shop-tabs pay">
@@ -290,7 +322,7 @@ export default function Shop({ onBack }){
                     <span className="nm">{skinName[s2.key]}</span>
                     <span className="pr">{s2.coin
                       ? t('shop.coinPrice', { p: costNow().toLocaleString() })
-                      : t('shop.price', { p: s2.price.toLocaleString() })}</span>
+                      : cashPrice(s2)}</span>
                     {s2.coin ? (
                       // [stated] **코인으로 사는 스킨.** 사면 서버가 소유에 넣는다.
                       // [stated] 아직 안 샀어도 **입어는 볼 수 있게** — 결제 스킨과 같다.
@@ -307,14 +339,13 @@ export default function Shop({ onBack }){
                                   onClick={() => take(sub, s2.id)}>{t('shop.coinBuy')}</button>
                         )}
                       </>
-                    ) : DEBUG_TRY_SKIN ? (
+                    ) : (DEBUG_TRY_SKIN || hasIt(sub, s2.id)) ? (
+                      // 산 것(또는 디버그 입어보기)은 [장착] — 코인 스킨과 같다
                       <button className={'shop-btn' + (tryOf(sub) === s2.id ? ' on' : '')}
                               onClick={() => setWorn(setTry(sub, s2.id))}>
                         {wearLabel(hasIt(sub, s2.id), tryOf(sub) === s2.id)}
                       </button>
-                    ) : (
-                      <button className="shop-btn" disabled>{t('shop.soon')}</button>
-                    )}
+                    ) : cashBtn(s2.sku)}
                   </div>
                 </div>
               </div>
@@ -344,8 +375,9 @@ export default function Shop({ onBack }){
               </div>
               <div className="shop-card-foot">
                 <span className="nm">{skinName[GOODS[sub].set.key]}</span>
-                <span className="pr">{t('shop.price', { p: GOODS[sub].set.price.toLocaleString() })}</span>
-                <button className="shop-btn" disabled>{t('shop.soon')}</button>
+                <span className="pr">{cashPrice(GOODS[sub].set)}</span>
+                {/* 다섯 벌을 다 가졌으면 [보유] — 또 사면 돈만 나간다 */}
+                {GOODS[sub].set.grants.every(id => hasIt(sub, id)) ? ownedBtn() : cashBtn(GOODS[sub].set.sku)}
               </div>
             </div>
           </div>
@@ -380,7 +412,7 @@ export default function Shop({ onBack }){
                     <span className="nm">{arenaName(a.key)}</span>
                     <span className="pr">{a.coin
                       ? t('shop.coinPrice', { p: costNow().toLocaleString() })
-                      : t('shop.price', { p: a.price.toLocaleString() })}</span>
+                      : cashPrice(a)}</span>
                     {a.coin ? (
                       // 스킨과 같다 — 안 샀어도 입어는 볼 수 있고, 사기 버튼도 남는다
                       <>
@@ -395,14 +427,12 @@ export default function Shop({ onBack }){
                                   onClick={() => take('arena', a.id)}>{t('shop.coinBuy')}</button>
                         )}
                       </>
-                    ) : DEBUG_TRY_SKIN ? (
+                    ) : (DEBUG_TRY_SKIN || hasIt('arena', a.id)) ? (
                       <button className={'shop-btn' + (tryOf('arena') === a.id ? ' on' : '')}
                               onClick={() => setWorn(setTry('arena', a.id))}>
                         {wearLabel(hasIt('arena', a.id), tryOf('arena') === a.id)}
                       </button>
-                    ) : (
-                      <button className="shop-btn" disabled>{t('shop.soon')}</button>
-                    )}
+                    ) : cashBtn(a.sku)}
                   </div>
                 </div>
               </div>
@@ -424,8 +454,8 @@ export default function Shop({ onBack }){
               </div>
               <div className="shop-card-foot">
                 <span className="nm">{arenaName(ARENA_SET.key)}</span>
-                <span className="pr">{t('shop.price', { p: ARENA_SET.price.toLocaleString() })}</span>
-                <button className="shop-btn" disabled>{t('shop.soon')}</button>
+                <span className="pr">{cashPrice(ARENA_SET)}</span>
+                {ARENA_SET.grants.every(id => hasIt('arena', id)) ? ownedBtn() : cashBtn(ARENA_SET.sku)}
               </div>
             </div>
           </div>
@@ -433,15 +463,15 @@ export default function Shop({ onBack }){
         </div>
         )}
       </>) : tab === 'noads' ? (
-        // [stated] **광고 제거 4,900원** — 결제가 붙기 전이라 보여주기만 한다
+        // [stated] **광고 제거 4,900원** — 사면 **광고 없이 바로 티켓을 받는다** (하루 횟수는 그대로)
         <div className="shop-wrap">
           <div className="shop-set">
             <div className="shop-card-in">
               <i className="noads-icon" style={{ backgroundImage: `url(${NOADS.img})` }} />
               <div className="shop-card-foot">
                 <span className="nm">{t(NOADS.key)}</span>
-                <span className="pr">{t('shop.price', { p: NOADS.price.toLocaleString() })}</span>
-                <button className="shop-btn" disabled>{t('shop.soon')}</button>
+                <span className="pr">{cashPrice(NOADS)}</span>
+                {noads ? ownedBtn() : cashBtn(NOADS.sku)}
               </div>
             </div>
           </div>
@@ -465,8 +495,7 @@ export default function Shop({ onBack }){
           </div>
         </div>
       ) : tab === 'money' ? (
-        // [stated] **재화 — 결제로 티켓 묶음 사기.** 3장에 300원.
-        // 결제가 붙기 전이라 광고 제거와 같이 보여주기만 한다
+        // [stated] **재화 — 결제로 티켓 묶음 사기.** 3장에 300원. 기본 장수 위에 얹는다
         <div className="shop-wrap">
           <div className="shop-list money">
             {TICKET_PACKS.map(p2 => (
@@ -474,9 +503,9 @@ export default function Shop({ onBack }){
                 <i className={'tk-ico' + (p2.soccer ? ' soc' : '')} />
                 <span className="money-nm">
                   <span className="nm">{t(p2.key)}</span>
-                  <span className="pr">{t('shop.price', { p: p2.price.toLocaleString() })}</span>
+                  <span className="pr">{cashPrice(p2)}</span>
                 </span>
-                <button className="shop-btn" disabled>{t('shop.soon')}</button>
+                {cashBtn(p2.sku)}
               </div>
             ))}
           </div>

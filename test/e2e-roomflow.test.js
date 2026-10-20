@@ -155,7 +155,7 @@ try {
   assert(await where(A) === 'room' && await where(B) === 'room', '  종목을 바꿔도 둘 다 로비');
   await tap(A, '2 vs 2'); await wait(2500);
   assert(await where(A) === 'room' && await where(B) === 'room', '  인원을 바꿔도 둘 다 로비');
-  const room1 = (await (await fetch(`http://127.0.0.1:${SP}/health`)).json()).rooms[0];
+  const room1 = (await (await fetch(`http://127.0.0.1:${SP}/health?d=1`)).json()).rooms[0];
   assert(room1.phase === 0, `  서버도 준비 단계 그대로 — 저절로 시작되지 않는다 (${room1.phase})`);
   assert(room1.mode === 'melee', `  바꾼 종목이 서버에도 반영된다 (${room1.mode})`);
 
@@ -167,7 +167,7 @@ try {
     .find(x => (x.textContent || '').includes('시작') && !x.disabled && x.offsetParent !== null); b && b.click(); });
   await wait(3500);
   assert(await where(A) === 'game' && await where(B) === 'game', '  시작하기를 눌러야 둘 다 게임으로 간다');
-  const room2 = (await (await fetch(`http://127.0.0.1:${SP}/health`)).json()).rooms[0];
+  const room2 = (await (await fetch(`http://127.0.0.1:${SP}/health?d=1`)).json()).rooms[0];
   assert(room2.mode === 'melee', `  바뀐 종목(칼전)으로 판이 열린다 (${room2.mode})`);
   assert(room2.phase !== 3, `  판이 살아 있다 (단계 ${room2.phase})`);
 

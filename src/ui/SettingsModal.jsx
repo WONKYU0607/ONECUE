@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getSettings, setSetting } from '../state/settings.js';
 import { resetTuto } from '../state/tutorial.js';
 import { unlockAudio, sfx, playMusic, stopMusic, applyBgmVolume } from '../game/audio.js';
 import { VIEW, HAND } from '../game/config.js';
 import { t, LANGS, getLang, setLang } from '../i18n/index.js';
+import { consentNow, onConsent, showAdPrivacy } from '../state/ads.js';
 
 // **열쇠만 담아둔다.** 문구를 여기서 미리 만들면 파일을 읽을 때 한 번만 계산돼
 // 언어를 바꿔도 그대로 남는다
@@ -18,9 +19,24 @@ const LABEL = {
   softFlash: 'set.softFlash'
 };
 
-export default function SettingsModal({ onClose, onTuto }){
+export default function SettingsModal({ onClose, onTuto, regBack }){
   const [s, setS] = useState(getSettings);
   const [lang, setL] = useState(getLang);
+  // [stated] **개인정보처리방침** — 구글 플레이 정책상 앱 안에서도 볼 수 있어야 한다.
+  // 웹 페이지(`public/privacy.html`)를 창 안에 그대로 띄운다 — 글을 한 곳에만 둔다.
+  // 하단 뒤로가기는 이 창부터 닫는다 (설정 창까지 한꺼번에 닫히지 않게)
+  const [doc, setDoc] = useState(false);
+  const docRef = useRef(false);
+  docRef.current = doc;
+  useEffect(() => {
+    regBack?.(() => { if (!docRef.current) return false; setDoc(false); return true; });
+    return () => regBack?.(null);
+  }, []);
+
+  // [stated] **광고 개인정보 설정** — 구글이 "동의를 바꿀 길"을 요구하는 사람(유럽 등)에게만 보인다.
+  // 누르면 구글 창이 뜬다. 한국 등 그 밖에서는 단추가 없다
+  const [adPriv, setAdPriv] = useState(() => consentNow().privacy);
+  useEffect(() => onConsent(c => setAdPriv(c.privacy)), []);
 
   // 음량 바 — 움직이는 즉시 반영된다 (흐르고 있는 곡에도)
   const setVol = (key, v) => {
@@ -91,6 +107,20 @@ export default function SettingsModal({ onClose, onTuto }){
             ))}
           </span>
         </div>
+
+        {adPriv && <button className="set-link ad-priv" onClick={() => showAdPrivacy()}>{t('set.adPrivacy')}</button>}
+        <button className="set-link" onClick={() => setDoc(true)}>{t('set.privacy')}</button>
+        {doc && (
+          <div className="modal-back doc-back" onClick={e => { e.stopPropagation(); if (e.target === e.currentTarget) setDoc(false); }}>
+            <div className="modal doc-view" onClick={e => e.stopPropagation()}>
+              <header className="bar-top">
+                <span className="title">{t('set.privacy')}</span>
+                <button className="icon-btn" onClick={() => setDoc(false)} aria-label={t('common.close')}>✕</button>
+              </header>
+              <iframe className="doc-frame" src={`privacy.html?lang=${lang === 'ko' ? 'ko' : 'en'}`} title={t('set.privacy')} />
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

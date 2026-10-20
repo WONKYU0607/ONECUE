@@ -34,6 +34,14 @@ export default function Splash({ onDone }){
       .catch(() => { /* 무시 */ });
   }, []);
 
+  // [stated] **광고 동의(구글 UMP)** — 전 세계 출시. 앱을 켤 때마다 묻고, 필요한 사람(유럽 등)에게만
+  // 구글 동의 창이 자산 받는 화면 위에 뜬다. 화면을 막지 않는다 (웹은 아무것도 안 한다)
+  useEffect(() => {
+    import('../../state/ads.js')
+      .then(m => m.gatherConsent())
+      .catch(() => { /* 무시 */ });
+  }, []);
+
   useEffect(() => {
     let alive = true;
     const t0 = performance.now();

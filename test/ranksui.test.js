@@ -34,7 +34,7 @@ console.log('내 등수는 서버가 세어 준다');
   assert(/export async function myRank/.test(store), '  store.myRank 가 있다');
   assert(/\.count\(\)\.get\(\)/.test(store), '  집계 쿼리로 센다 (문서를 전부 읽지 않는다)');
   assert(/where\(field, '>', score\)/.test(store), '  나보다 높은 사람만 센다 (동점은 같은 등수)');
-  assert(/total: total\.data\(\)\.count/.test(store), '  총 인원도 같이 준다');
+  assert(/rankCount\('total'[^\n]*count\(\)\.get\(\)/.test(store) && /return \{ rank: above \+ 1, total,/.test(store), '  총 인원도 같이 준다');
 }
 
 console.log('목록은 문서 하나만 읽는다');

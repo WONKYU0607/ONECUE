@@ -52,10 +52,10 @@ try {
       for (const w of [A, B]) for (let d = 3; d <= 8; d++)
         w.send(JSON.stringify({ t: 'in', tick: (w.tick | 0) + d, ready: 1, go: 1 }));
       await wait(100);
-      const j = await (await fetch(`http://127.0.0.1:${SP}/health`)).json();
+      const j = await (await fetch(`http://127.0.0.1:${SP}/health?d=1`)).json();
       if (j.rooms && j.rooms[0] && j.rooms[0].phase === 2) break;   // 전투 시작
     }
-    const j = await (await fetch(`http://127.0.0.1:${SP}/health`)).json();
+    const j = await (await fetch(`http://127.0.0.1:${SP}/health?d=1`)).json();
     assert(j.rooms && j.rooms[0] && j.rooms[0].phase === 2, `  ${round}판: 전투까지 들어갔다`);
     A.send(JSON.stringify({ t: '__end', win: 0 })); await wait(1200);
     got.push({ a: await scoreOf(A, 'userA'), b: await scoreOf(A, 'userB') });
@@ -89,7 +89,7 @@ try {
       for (const w of [H, G]) for (let d = 3; d <= 8; d++)
         w.send(JSON.stringify({ t: 'in', tick: (w.tick | 0) + d, ready: 1, go: 1 }));
       await wait(100);
-      const j = await (await fetch(`http://127.0.0.1:${SP}/health`)).json();
+      const j = await (await fetch(`http://127.0.0.1:${SP}/health?d=1`)).json();
       if ((j.rooms || []).some(r => r.code === H.code && r.phase === 2)) break;
     }
     H.send(JSON.stringify({ t: '__end', win: 0 })); await wait(1200);

@@ -6,6 +6,7 @@ import { initializeApp } from 'firebase/app';
 import {
   getAuth, onAuthStateChanged, signInAnonymously, linkWithCredential, linkWithPopup,
   GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut,
+  reauthenticateWithCredential, reauthenticateWithPopup,
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
@@ -176,10 +177,35 @@ export async function linkGoogle(){
   }
 }
 
+/** [stated] **계정 삭제 전 본인 확인** — 구글 계정은 구글 로그인을 한 번 더 한다.
+ *  폰을 잠깐 빌린 사람이 지우지 못하게. **같은 계정이어야** 통과한다(다른 계정을 고르면 `mismatch`).
+ *  게스트는 다시 확인할 방법이 없어 그대로 통과한다. 통과하면 **새 증표**(로그인 시각이 지금)를 준다 —
+ *  서버는 5분이 지난 증표로는 안 지운다
+ *  돌려주는 값: `{ok:true, token}` 또는 `{ok:false, reason:'cancel'|'mismatch'|'fail'}` */
+export async function reauthForDelete(){
+  const u = auth.currentUser;
+  if (!u) return { ok: false, reason: 'fail' };
+  try {
+    if (!u.isAnonymous){
+      if (await isNative()) await reauthenticateWithCredential(u, await nativeGoogleCredential());
+      else await reauthenticateWithPopup(u, new GoogleAuthProvider());
+    }
+    return { ok: true, token: await u.getIdToken(true) };
+  } catch (e){
+    const code = (e && e.code) || '';
+    const msg = String((e && e.message) || '');
+    if (code === 'auth/user-mismatch') return { ok: false, reason: 'mismatch' };
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request' || /cancel/i.test(msg))
+      return { ok: false, reason: 'cancel' };
+    console.warn('[firebase] 삭제 전 확인 실패', code || e);
+    return { ok: false, reason: 'fail' };
+  }
+}
+
 /** [stated] **로그아웃 — 일반 앱과 같게.** 계정에 붙은 기록은 기기에서 지우고
  *  기기 설정(소리·언어·화면 배치)은 남긴다. 다음에 같은 계정으로 들어오면 서버에서 다시 받는다.
  *  기기에 남겨 두면 **다른 계정으로 들어갈 때 기록이 섞인다** */
-const ACCOUNT_KEYS = ['duel.play.v2', 'duel.profile.v1', 'duel.progress.v2', 'duel.tryskin', 'duel.sid'];
+const ACCOUNT_KEYS = ['duel.play.v2', 'duel.profile.v1', 'duel.progress.v2', 'duel.tryskin', 'duel.sid', 'duel.noads'];
 export async function logOut(){
   await signOutAll();
   for (const k of ACCOUNT_KEYS){ try { localStorage.removeItem(k); } catch { /* 무시 */ } }

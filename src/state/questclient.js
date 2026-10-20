@@ -21,15 +21,42 @@ function e2eToken(){
   return q.get('e2e') === '1' ? 'e2e-user' + (q.get('u') || '') : '';
 }
 
+// [stated] **계정을 지우는 중·지운 뒤에는 서버에 아무것도 안 보낸다** — 1분마다 보내는 접속 시간 같은
+// 요청이 지운 계정의 문서를 다시 만들지 않게 (`account.js` 가 지우기 직전에 켠다)
+let halted = false;
+export function haltAsk(on = true){ halted = !!on; }
+
+/** 로그인 증표와 그 계정 uid. 로그인 전이면 null.
+ *  검사(개발 서버)에서는 증표가 곧 uid 다 — 서버의 가짜 저장소가 그렇게 본다 */
+export async function whoAmI(){
+  const e = e2eToken();
+  if (e) return { token: e, uid: e };
+  try {
+    const { auth } = await import('../cloud/firebase.js');
+    if (!auth.currentUser) return null;
+    return { token: await auth.currentUser.getIdToken(), uid: auth.currentUser.uid };
+  } catch { return null; }
+}
+
+// [stated] **같은 순간에 여러 화면이 받아 가던 것을 한 번으로** (2026-10-19 — DB 읽기 줄이기).
+// 홈에 올 때마다 코인 줄·위쪽 바·'서버 깸' 알림이 동시에 불러 같은 요청이 3번 갔다(서버가 매번 DB 를 읽는다).
+// 오는 중인 요청에 같이 타고, **방금(2초 안) 받은 값**도 같이 쓴다 — '서버 깸' 알림은 모듈을 불러온 뒤에
+// 울려서 첫 요청이 이미 끝난 뒤일 때가 있다.
+// 서버 값을 바꾸는 요청(받기·구매·광고·접속 시간…)이 그사이 시작되거나 끝났으면 같이 쓰지 않는다(새로 받는다).
+// 못 받은 값(서버가 자는 중 등)은 다시 쓰지 않는다
+const READ_SHARE_MS = 2000;
+let readGen = 0;
+let reading = null;            // { gen, p, doneAt }
+/** 서버 값이 바뀌었을 수 있다 — 지금 오는 중인 읽기에 같이 타지 않게 한다 (현금 결제 등 이 파일 밖의 요청) */
+export function questChanged(){ readGen++; }
+
 async function ask(params, ms = 8000){
-  let token = e2eToken();
-  if (!token){
-    try {
-      const { auth } = await import('../cloud/firebase.js');
-      if (!auth.currentUser) return { ok: false, auth: true };
-      token = await auth.currentUser.getIdToken();
-    } catch { return { ok: false, auth: true }; }
-  }
+  if (halted) return { ok: false, halted: true };
+  const writes = params.act !== 'read' && params.act !== 'here';
+  if (writes) readGen++;
+  const me = await whoAmI();
+  if (!me) return { ok: false, auth: true };
+  const token = me.token;
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), ms);
@@ -42,12 +69,23 @@ async function ask(params, ms = 8000){
     return { ok: false, net: true };
   } finally {
     clearTimeout(timer);
+    if (writes) readGen++;
   }
 }
 
 /** 지금 상태 — `{ coin, d, w, m, mail, own, bought, buy }`.
  *  **받을 때마다 퀘스트 진행도를 적어 둔다** — 홈 [퀘스트] 의 빨간 점이 이걸 본다 */
-export async function fetchQuest(){
+export function fetchQuest(){
+  if (reading && reading.gen === readGen && (!reading.doneAt || Date.now() - reading.doneAt < READ_SHARE_MS)) return reading.p;
+  const me = { gen: readGen, p: null, doneAt: 0 };
+  me.p = readQuestNow().then(r => {
+    if (reading === me){ if (r && r.ok) me.doneAt = Date.now(); else reading = null; }
+    return r;
+  });
+  reading = me;
+  return me.p;
+}
+async function readQuestNow(){
   const s0 = sentSec;
   const r = await ask({ act: 'read' });
   if (r && r.ok){
@@ -109,6 +147,21 @@ export const adTicket = kind => ask({ act: 'ad', kind });
 /** 코인으로 티켓을 산다 */
 export const buyTicket = (soccer = false) =>
   ask({ act: 'buy', what: 'ticket', soccer: soccer ? '1' : '0' });
+
+// ── [stated] 광고 제거 (현금 결제) — 샀으면 **광고 없이 바로 티켓을 받는다** (하루 횟수는 그대로) ──
+// 값은 서버가 쥔다(`noads`). 기기에는 마지막으로 받은 값만 적어 둔다 — 켜자마자 버튼 글이 맞게
+const NKEY = 'duel.noads';
+let noads = (() => { try { return localStorage.getItem(NKEY) === '1'; } catch { return false; } })();
+const noadsWatch = new Set();
+export const noadsNow = () => noads;
+export function onNoads(fn){ noadsWatch.add(fn); return () => noadsWatch.delete(fn); }
+export function setNoads(v){
+  v = !!v;
+  try { localStorage.setItem(NKEY, v ? '1' : '0'); } catch { /* 무시 */ }
+  if (v === noads) return;
+  noads = v;
+  for (const f of noadsWatch) { try { f(noads); } catch { /* 무시 */ } }
+}
 
 // ── 코인 잔액 (화면 여기저기가 본다) ─────────────────────────────
 //
@@ -191,6 +244,7 @@ export async function refreshCoin(){
     // 스킨 보유도 서버 값으로 맞춘다 — 출시(입어보기 꺼짐)에선 **산 것만** 장착되므로,
     // 상점에서 사고 바로 [입기] 를 눌러도 먹으려면 여기서 기기 사본을 갱신해야 한다
     if (r.own && typeof r.own === 'object') { try { setOwned(r.own); } catch { /* 무시 */ } }
+    setNoads(!!r.noads);
     // 깼는데 못 받은 AI 보상이 있으면 이때 받는다 (못 받아도 화면은 그대로)
     claimAiRewards().catch(() => {});
   }
@@ -201,8 +255,15 @@ export async function refreshCoin(){
 // **화면이 보일 때만 센다.** 앱을 켜두고 딴짓하는 동안은 세지 않는다.
 // 모아서 가끔 보낸다 — 매초 보내면 서버를 두드리는 꼴이 된다.
 // 서버가 한 번에 5분·하루 4시간까지만 인정하므로 크게 보내도 소용없다.
-const SEND_EVERY = 60;              // 1분마다 보낸다
-let acc = 0, pending = 0, timer = null, last = 0;
+// [stated] **4분마다 보낸다** (2026-10-19 — 예전 1분). 보낼 때마다 서버가 DB 에 한 번 쓰는데,
+// 켜 둔 사람마다 1분에 한 번이라 DB 쓰기의 대부분이었다. 서버가 한 번에 5분까지만 받으므로 4분.
+// 화면을 내릴 때·보상을 받기 전에는 바로 보낸다(`flush`) — 쌓인 시간은 안 잃는다.
+// 화면의 진행 표시는 안 보낸 초까지 더해 보여 주므로(`withTime`) 그대로다
+const SEND_EVERY = 240;
+// **'켜 둔 사람' 표시는 지금처럼 1분마다** — 서버가 이걸로 사람이 올 것 같으면 봇을 미룬다(botWaitFor).
+// DB 는 안 건드린다(`act=here`)
+const HERE_EVERY = 60;
+let acc = 0, pending = 0, timer = null, last = 0, hereAt = 0;
 
 const visible = () =>
   (typeof document === 'undefined') || document.visibilityState !== 'hidden';
@@ -216,7 +277,8 @@ function tick(){
   if (!visible() || dt <= 0) return;
   const add = Math.min(2, dt);
   acc += add; pending += add;
-  if (pending >= SEND_EVERY) flush();
+  if (pending >= SEND_EVERY){ flush(); hereAt = now; }
+  else if (now - hereAt >= HERE_EVERY * 1000){ hereAt = now; ask({ act: 'here' }).catch(() => {}); }
   checkDot();
 }
 
@@ -231,7 +293,7 @@ export function flush(){
 /** 앱이 켜질 때 한 번 부른다 */
 export function startPlayClock(){
   if (timer) return;
-  last = Date.now();
+  last = Date.now(); hereAt = last;
   timer = setInterval(tick, 1000);
   if (typeof document !== 'undefined'){
     document.addEventListener('visibilitychange', () => {

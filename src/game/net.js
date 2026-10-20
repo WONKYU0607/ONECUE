@@ -27,6 +27,13 @@ import {
   normalizeState,
   step } from './sim.js';
 import { t } from '../i18n/index.js';
+import { canonIn, frameDecoder, decodeFrame, encodeIn, W_FRAME, W_SNAP } from '../net/wire.js';
+
+// 압축 스냅샷 풀기 (브라우저 내장). zlib 형식 = 'deflate'
+async function inflateText(u8){
+  const ds = new DecompressionStream('deflate');
+  return await new Response(new Blob([u8]).stream().pipeThrough(ds)).text();
+}
 
 // ================= TRANSPORT (NET SEAM) =================
 // 시계 주입: 브라우저는 실제 시간, 테스트는 가상 시계를 넣어 결정론적으로 돌린다
@@ -60,6 +67,9 @@ export class WsTransport {
     this.pings = new Map();
     this.pingId = 1;
     this.pingTimer = null;
+    // [stated] **숫자로 묶은 꼴**(wire.js)을 쓰는가 — 주소에 `w=2` 를 붙인 연결만 (connection.js 가 붙인다)
+    this.bin = /[?&]w=2(&|$)/.test(url);
+    this.fdec = null;
   }
   // 접속되면 곧바로 재기 시작한다
   startPing(){
@@ -88,7 +98,30 @@ export class WsTransport {
   connect(){
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(this.url);
+      ws.binaryType = 'arraybuffer';
       this.ws = ws;
+      // **연결마다 새로** — 서버는 새 연결의 첫 틱 프레임을 전부 실어(키프레임) 보낸다
+      this.fdec = frameDecoder();
+      // [stated] **받은 순서 그대로 넘긴다** (2026-10-19 판 시작 데싱크).
+      // 압축 스냅샷은 푸는 데 시간이 걸린다(비동기). 그 사이 뒤에 온 틱 프레임을 먼저 넘기면
+      // 앱이 스냅샷 **다음 틱까지 이미 굴린 뒤에** 스냅샷이 도착해 쓸 수가 없다 —
+      // 서버가 판 밖에서 상태를 바꾸고(전원 입장·색·이름) 보낸 스냅샷을 놓치면 1초쯤 갈린다.
+      // → 푸는 중이면 뒤에 온 것은 줄을 세워 두었다가 풀린 다음에 차례로 넘긴다
+      const rq = [];
+      const deliver = m => { if (ws === this.ws && m && this.toClient) this.toClient(m); };
+      const drain = async () => {
+        while (rq.length){
+          const x = rq[0];
+          const m = x instanceof Promise ? await x.catch(() => null) : x;
+          rq.shift();
+          deliver(m);
+        }
+      };
+      const put = x => {
+        if (!rq.length && !(x instanceof Promise)){ deliver(x); return; }
+        rq.push(x);
+        if (rq.length === 1) drain();
+      };
       ws.onopen = () => {
         this.tries = 0;
         this.onStatus('open');
@@ -98,7 +131,20 @@ export class WsTransport {
         resolve();
       };
       ws.onmessage = e => {
-        let m; try { m = JSON.parse(e.data); } catch { return; }
+        if (ws !== this.ws) return;                 // 이미 갈아끼운 옛 연결
+        let m;
+        if (typeof e.data !== 'string'){
+          const u8 = new Uint8Array(e.data);
+          if (u8[0] === W_SNAP){
+            // 압축 스냅샷 — 푸는 건 비동기다. 풀릴 때까지 뒤에 온 메시지는 기다린다 (`put`)
+            put(inflateText(u8.subarray(1)).then(txt => { try { return JSON.parse(txt); } catch { return null; } }));
+            return;
+          }
+          if (u8[0] !== W_FRAME) return;
+          try { m = decodeFrame(this.fdec, u8); } catch { return; }
+        } else {
+          try { m = JSON.parse(e.data); } catch { return; }
+        }
         // 매칭 중에 보낸 ping 의 답. 여기서 미리 왕복 시간을 재둔다
         if (m.t === 'p' && this.pings.has(m.id)){
           const t0 = this.pings.get(m.id);
@@ -106,7 +152,7 @@ export class WsTransport {
           const r = CLOCK.now() - t0;
           this.rtt = this.rtt < 0 ? r : this.rtt * 0.6 + r * 0.4;
         }
-        if (this.toClient) this.toClient(m);
+        put(m);
       };
       ws.onclose = () => {
         this.onStatus('closed');
@@ -127,7 +173,8 @@ export class WsTransport {
     }, wait);
   }
   clientSend(msg){
-    const raw = JSON.stringify(msg);
+    // 조작 입력(1초에 60번)은 숫자로 묶어 보낸다 — 서버가 글자를 읽는 CPU 를 아낀다
+    const raw = (this.bin && msg.t === 'in') ? encodeIn(msg) : JSON.stringify(msg);
     if (this.ws && this.ws.readyState === 1) this.ws.send(raw);
     else if (this.queue.length < 200) this.queue.push(raw);   // 끊긴 동안 무한정 쌓지 않는다
   }
@@ -180,6 +227,8 @@ export class Server {
       this.recalcDelay(); return;
     }
     if (m.t === 'cfg'){ this.pendingCfg = Object.assign(this.pendingCfg || {}, m.cfg); return; }
+    // [stated] **스냅샷은 필요할 때 달라고 한다** (어긋났을 때·화면을 다시 볼 때) — 예전엔 0.5초마다 통째로 보냈다
+    if (m.t === 'snap'){ this.net.serverSend({ t:'s', tick: this.s.tick, st: cloneState(this.s) }, m.pid); return; }
     if (m.t !== 'in') return;
     this.lastIn[m.pid] = { tick: m.tick, at: this.s.tick, ready: m.ready ? 1 : 0, place: !!m.place };
     if (m.tick <= this.s.tick){                               // 마감 지난 입력은 폐기
@@ -342,6 +391,9 @@ export class Server {
       // 지연 보상은 **끈다**. 클라가 상대도 '현재'로 예측해 그리므로 서버가 되감으면
       // 오히려 화면과 어긋난다. (상대를 과거로 그리던 시절엔 필요했다)
       this.s.lag = 0;
+      // [stated] **보내는 꼴과 계산하는 꼴을 똑같이** — 숫자로 묶어 보낼 때(wire.js) 되살아나는 값으로
+      // 다듬고 나서 계산한다. 다르면 서버와 앱 계산이 갈린다 (2026-10-19 보내는 양 줄이기)
+      for (let i = 0; i < inp.length; i++) inp[i] = canonIn(inp[i]);
       step(this.s, inp);
       this.net.serverSend({ t:'f', tick: this.s.tick, inp, ck: checksum(this.s), d: this.delay, lg: this.s.lag,
                           ms: this.s.maxStep, bv: this.s.bulletV, ct: this.s.coolT });
@@ -375,6 +427,8 @@ const PRED_MAX = 12;
 const JUMP_TICKS = 60;
 // 화면 갱신이 이만큼 멈췄다 돌아오면(백그라운드) 밀린 양과 상관없이 건너뛴다
 const PAUSE_MS = 250;
+// 화면을 다시 볼 때 스냅샷을 기다리는 최대 시간 — 이 안에 안 오면 그냥 이어 간다
+const HOLD_SNAP_MS = 500;
 const CATCHUP_SKIP = 60;
 
 export class Client {
@@ -433,7 +487,9 @@ export class Client {
       // 서버가 정한 공통 지연과, 내 실측 RTT로 계산한 최소 안전 지연 중 큰 값
       const own = this.rtt < 0 ? MAX_DELAY
                 : clampi(Math.ceil((this.rtt/2 + JITTER_MS) / TICK_MS), MIN_DELAY, MAX_DELAY);
-      this.delay = Math.max(m.d, own);
+      // 묶어 보낼 때는 **바뀔 때만** 지연 값이 온다 (wire.js) — 마지막에 받은 값을 쓴다
+      if (typeof m.d === 'number') this.svD = m.d;
+      this.delay = Math.max(this.svD ?? MIN_DELAY, own);
       if (this.nextInputTick < 0 && this.rtt >= 0) this.nextInputTick = this.estServerTick(this.svAt) + this.delay;
     } else if (m.t === 'q'){
       const t0 = this.pings.get(m.id);
@@ -572,7 +628,14 @@ export class Client {
     const nowA = CLOCK.now();
     const paused = this.lastApply > 0 && nowA - this.lastApply > PAUSE_MS;
     this.lastApply = nowA;
-    if (sn0 && (sn0.tick - this.s.tick > JUMP_TICKS || (paused && sn0.tick > this.s.tick + 2))){
+    // [stated] **스냅샷은 이제 3초마다만 온다**(예전 0.5초 — 보내는 양 줄이기). 화면을 다시 볼 때는
+    // 최신 스냅샷을 **달라고 하고, 올 때까지 밀린 걸 재생하지 않고 기다린다**(최대 0.5초) —
+    // 기다리는 동안 굴리면 그게 곧 빨리 감기다. 1초 넘게 밀렸을 때도 달라고 한다
+    if (paused){ this.askSnap(nowA, true); this.holdTill = nowA + HOLD_SNAP_MS; }
+    else if (this.svTick - this.s.tick > JUMP_TICKS && !(sn0 && sn0.tick - this.s.tick > JUMP_TICKS)) this.askSnap(nowA);
+    const waiting = this.holdTill > nowA && !(sn0 && sn0.tick > this.s.tick + 2);
+    if (sn0 && (sn0.tick - this.s.tick > JUMP_TICKS || ((paused || this.holdTill > nowA) && sn0.tick > this.s.tick + 2))){
+      this.holdTill = 0;
       this.s = normalizeState(cloneState(sn0.st));
       this.pendingSnap = null;
       for (const k of [...this.frames.keys()]) if (k <= sn0.tick) this.frames.delete(k);
@@ -582,14 +645,27 @@ export class Client {
       this.mhist = []; this.mrt = null;
       this.jumps = (this.jumps | 0) + 1;
     }
+    if (waiting) return;
     let guard = 0;
     while (guard++ < 8){
+      // [stated] **지금 틱의 스냅샷이 와 있으면 그걸로 갈아 끼우고 나서 굴린다** (2026-10-19 판 시작 데싱크).
+      // 서버는 판 밖에서 상태를 바꾸면(전원이 화면에 들어옴·색·이름·자리) 그 자리에서 스냅샷을 보낸다.
+      // 그 바뀐 값은 다음 틱 프레임에 실리지 않으므로, 이걸 안 쓰고 굴리면 다음 틱부터 갈린다.
+      // 예전엔 0.5초마다 오는 스냅샷이 곧 덮어서 티가 덜 났다
+      const snNow = this.pendingSnap;
+      if (snNow && snNow.tick === this.s.tick){
+        this.s = normalizeState(cloneState(snNow.st));
+        this.pendingSnap = null;
+      }
       const f = this.frames.get(this.s.tick + 1);
       if (!f) break;
       this.frames.delete(this.s.tick + 1);
-      this.s.maxStep = f.ms;                 // 서버 값을 그대로 사용해야 결정론 유지
+      // 서버 값을 그대로 사용해야 결정론 유지. **묶어 보낼 때는 바뀔 때만 온다** —
+      // 안 왔으면 지금 상태(스냅샷이나 앞 프레임에서 받은 값)가 곧 서버 값이다
+      if (typeof f.ms === 'number') this.s.maxStep = f.ms;
       if (typeof f.lg === 'number') this.s.lag = f.lg;   // 지연 보정도 서버 값을 따른다
-      this.s.bulletV = f.bv; this.s.coolT = f.ct;
+      if (typeof f.bv === 'number') this.s.bulletV = f.bv;
+      if (typeof f.ct === 'number') this.s.coolT = f.ct;
       step(this.s, f.inp);
       this.lastInp = f.inp;
       // 상대를 그릴 재료. 확정된 위치만 모은다
@@ -600,8 +676,15 @@ export class Client {
         this.desync++;
         const sn = this.pendingSnap;
         if (sn && sn.tick >= this.s.tick){ this.s = normalizeState(cloneState(sn.st)); this.pendingSnap = null; }
+        else this.askSnap(CLOCK.now());          // 바로잡을 스냅샷이 없으면 달라고 한다
       }
     }
+  }
+  /** 최신 스냅샷을 서버에 달라고 한다 (0.5초에 한 번까지 · `force` 면 바로) */
+  askSnap(now, force = false){
+    if (!force && now - (this.snapAt || -1e9) < 500) return;
+    this.snapAt = now;
+    try { this.net.clientSend({ t:'snap', pid: this.controlled[0] }); } catch { /* 무시 */ }
   }
   alpha(now){
     const a = (now - this.tickAt) / TICK_MS;

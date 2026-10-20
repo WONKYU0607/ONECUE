@@ -112,6 +112,9 @@ export default function App(){
   const goHomeFirst = useCallback(() => {
     // [stated] **앱을 처음 켰을 때만** 튜토리얼을 물어본다
     if (!tutoDone()) setAskTuto(true);
+    // [stated] **현금 결제** — 가격을 받아 두고, 마무리 안 된 구매(앱이 죽었다·결제 대기가 끝났다)가
+    // 있으면 서버로 다시 보낸다. 화면을 막지 않는다 (웹은 아무것도 안 한다)
+    import('./state/pay.js').then(m => m.payInit()).catch(() => {});
   }, []);
 
   // [stated] **모든 버튼에 누르는 소리.** 화면마다 붙이면 빠뜨리는 곳이 생기므로
@@ -176,6 +179,7 @@ export default function App(){
   // 하단 뒤로가기. **위에 뜬 것부터 닫고**, 마지막에 홈에서 두 번 눌러야 나간다.
   // 한 번에 꺼지면 매칭 중이던 것도 날아가므로 반드시 두 단계로 둔다
   const exitAt = useRef(0);
+  const settingsBack = useRef(null);   // 설정 창이 걸어 두는 자기 뒤로가기 (안에 열린 창 닫기)
   const quitAt = useRef(0);   // 게임에서 나간 시각 — 직후 뒤로가기를 무시하는 데 쓴다
   useEffect(() => { initBack(); }, []);
   useEffect(() => {
@@ -187,7 +191,8 @@ export default function App(){
       if (askExit){ setAskExit(false); return true; }
       if (askQuit){ setAskQuit(false); return true; }
       if (askRoom){ setAskRoom(false); return true; }
-      if (showSettings){ setShowSettings(false); return true; }
+      // 설정 안에 열린 창(개인정보처리방침)이 있으면 그것부터 닫는다
+      if (showSettings){ if (settingsBack.current && settingsBack.current()) return true; setShowSettings(false); return true; }
       if (screen === 'game'){ setAskQuit(true); return true; }
       // [stated] 홈에서 찾는 중이면 뒤로가기는 **찾기 취소**. VS 화면이 떠 있으면(이미 잡힌 판) 홈으로 —
       // 그건 판을 나가는 것이라 서버가 기권으로 처리한다
@@ -463,7 +468,8 @@ export default function App(){
                                        }}
                                        onAgain={again} onMode={setRoomMode} onRoom={(session?.mode === 'create' || session?.mode === 'join') ? backToRoom : null}
         onNext={(session?.kind === 'ai' && result === 'win' && (session.stage || 1) < 30) ? nextStage : null} onHome={goHome} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto}
+                                      regBack={fn => { settingsBack.current = fn; }} />}
       {/* [stated] **다시 하기 신청을 받았다** — 예: 그 판 다시, 아니오: 모두 로비로 */}
       {againAsk && (
         <div className="modal-back">

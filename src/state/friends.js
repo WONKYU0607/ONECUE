@@ -62,7 +62,15 @@ export const clearInvite = uid => ask({ act: 'inviteClear', uid });
 // ── 티켓 ────────────────────────────────────────────────────────────
 // [stated] 티켓은 **서버가 쥔다.** 기기 값은 화면용 사본이라, 서버가 알려준 값으로 맞춘다.
 // 못 받으면 사본을 그대로 쓴다 — 서버가 자고 있어도 화면은 떠야 한다
-export async function pullTickets(){
+// [stated] 홈에 올 때 위쪽 바가 같은 순간에 두 번 불렀다(켤 때 + '서버 깸' 알림이 바로 울림) —
+// **아직 오는 중인 요청에 같이 탄다** (서버가 매번 DB 를 읽는다. 2026-10-19)
+let tkPull = null;
+export function pullTickets(){
+  if (tkPull) return tkPull;
+  tkPull = pullTicketsNow().finally(() => { tkPull = null; });
+  return tkPull;
+}
+async function pullTicketsNow(){
   let token = null;
   try {
     const { auth } = await import('../cloud/firebase.js');

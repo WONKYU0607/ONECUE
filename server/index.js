@@ -11,6 +11,13 @@ import { BOTS, pickBot } from './bots.js';
 import * as store from './store.js';
 import { matchCoin } from '../src/state/quests.js';
 import { forfeit, setOff, resetForNextRound, newState } from '../src/game/sim.js';
+import { alert, bug, hookProcess, setStatus, setTickProbe, startWatch, alarmWhy, alertStats } from './alert.js';
+import * as pay from './pay.js';
+import { deflateSync } from 'zlib';
+import { frameEncoder, encodeFrame, frameSent, decodeIn, W_IN, W_SNAP } from '../src/net/wire.js';
+
+// [stated] **장애 알림(디스코드)** — `DUEL_ALERT_URL` 이 없으면 아무것도 안 건다 (alert.js)
+hookProcess();
 
 const PORT = process.env.PORT || 8080;
 const WATCH_MAX = 10;   // [stated] 방 하나에 관전 최대 10명 (관전자마다 보내는 양이 늘어난다)
@@ -106,21 +113,64 @@ class Room {
     // 판 전 점수를 읽는 중이면 그 약속 (점수를 쓰기 전에 기다린다)
     this.primeP = null;
     this.preOk = new Set();      // 판 전 점수를 실제로 읽어 온 자리
+    this.fenc = frameEncoder();  // 틱 프레임을 숫자로 묶을 때 앞 틱 값 (wire.js)
   }
   send(msg, pid){
-    const raw = JSON.stringify(msg);
+    const pk = this.pack(msg);
     const targets = pid === undefined ? this.seats.map((_, i) => i) : [pid];
     for (const i of targets){
-      const ws = this.seats[i].ws;
-      if (ws && ws.readyState === 1) ws.send(raw);
+      const ws = this.seats[i] && this.seats[i].ws;
+      if (ws && ws.readyState === 1) pk.to(ws);
     }
     // [stated] **관전자에게도 같이 보낸다.** 한 사람에게만 보내는 것(`pid`)은 빼고
     if (pid === undefined) for (const w of this.watchers){
-      if (w.readyState === 1) w.send(raw); else this.watchers.delete(w);
+      if (w.readyState === 1) pk.to(w); else this.watchers.delete(w);
     }
+    pk.done();
+  }
+  /** 한 사람(소켓)에게만 — 방 메시지와 같은 꼴로 */
+  sendTo(ws, msg){
+    if (!ws || ws.readyState !== 1) return;
+    const pk = this.pack(msg); pk.to(ws);
+  }
+  /** [stated] **받는 쪽에 맞는 꼴로, 꼴마다 한 번만 만든다** (2026-10-19 보내는 양 줄이기, `src/net/wire.js`).
+   *  새 앱(`w=2`)에는 틱 프레임을 숫자로 묶어(앞 틱과 다른 것만), 스냅샷은 압축해서(`z=1`) 보낸다.
+   *  옛 앱·검사 도구는 예전처럼 글자(JSON) 그대로.
+   *  틱 프레임은 **바로 앞 틱을 받은 소켓에만 '바뀐 것만'** 보낸다 — 앞 틱을 못 받았으면(막 들어옴·자리 옮김)
+   *  전부 싣는다(키프레임). 안 그러면 받는 쪽이 모르는 값을 '같음' 으로 채워 계산이 갈린다 */
+  pack(msg){
+    const room = this;
+    let raw = null, bin = null, key = null, z = null;
+    return {
+      to(ws){
+        try {
+          if (msg.t === 'f' && ws.bin){
+            if (ws.lastF !== room.fenc.tick || !room.fenc.inp){ key = key || encodeFrame(room.fenc, msg, true); ws.send(key); }
+            else { bin = bin || encodeFrame(room.fenc, msg, false); ws.send(bin); }
+            ws.lastF = msg.tick;
+            return;
+          }
+          if (msg.t === 's' && ws.z){
+            if (!z){ const d = deflateSync(Buffer.from(JSON.stringify(msg)), { level: 6 }); z = Buffer.concat([Buffer.from([W_SNAP]), d]); }
+            ws.send(z);
+            return;
+          }
+          raw = raw || JSON.stringify(msg);
+          ws.send(raw);
+        } catch { /* 끊긴 소켓 — 정리는 close 가 한다 */ }
+      },
+      done(){ if (msg.t === 'f') frameSent(room.fenc, msg); }
+    };
   }
   snapshotTo(slot){
     this.send({ t: 's', tick: this.server.s.tick, st: JSON.parse(JSON.stringify(this.server.s)) }, slot);
+  }
+  /** [stated] **판 밖에서 상태를 바꿨으면 모두에게 그 틱의 스냅샷을 보낸다** (2026-10-19).
+   *  들어옴·나감·끊김·복귀·기권은 틱 프레임에 안 실린다. 예전엔 0.5초마다 오는 스냅샷이 곧 덮었는데,
+   *  스냅샷을 3초로 늘린 뒤로는 그사이 다른 사람 화면이 서버와 갈렸다(끊김 표시는 판정에도 들어간다).
+   *  앱은 그 틱에 닿으면 이걸로 갈아 끼우고 굴린다 (`net.js` applyFrames) */
+  syncAll(){
+    this.send({ t: 's', tick: this.server.s.tick, st: JSON.parse(JSON.stringify(this.server.s)) });
   }
   // 이 sid가 예약해 둔 자리 (재접속용)
   seatOf(sid){ return sid ? this.seats.findIndex(x => x.sid === sid) : -1; }
@@ -233,7 +283,7 @@ class Room {
     // 게임 화면에 들어올 때 이미 깎였다. 그 신호 없이 전투까지 온 사람(앉아 있는 사람)도 여기서 깎는다
     for (let i = 0; i < this.n; i++) if (this.seats[i] && this.seats[i].ws) this.charge(i);
     if (!store.isOn()) return;
-    this.primeP = this.loadPre().then(() => this.tuneBots()).catch(() => {});   // 사람 점수를 알았으니 봇 난이도를 맞춘다
+    this.primeP = this.loadPre().then(() => this.tuneBots()).catch(bug('판 전 점수 읽기'));   // 사람 점수를 알았으니 봇 난이도를 맞춘다
   }
 
   /** 앉은 사람들의 **판 전 점수·연승**을 읽어 둔다. 읽어 온 자리는 `preOk` 에 적는다 */
@@ -263,7 +313,7 @@ class Room {
     const spend = this.soccer ? store.spendSoccer(seat.uid)
                               : store.spendTicket(seat.uid, !!this.server.s.ffa);
     spend.then(r => { if (r && !r.ok && r.why) console.log('[티켓]', seat.uid.slice(0, 6), r.why); })
-         .catch(() => {});
+         .catch(bug('티켓 빼기'));
   }
 
   /** 이 자리를 **중간에 나간 사람**으로 적는다 — 처음 나간 순간 것만 남긴다.
@@ -295,18 +345,20 @@ class Room {
     // 전투 전에 끝난 판(기권)은 읽은 적이 없어 기본값(1000)으로 덮어 점수가 날아갔다
     const snap = JSON.parse(JSON.stringify(st));
     const seats = this.seats.map(x => (x ? { uid: x.uid, bot: !!x.bot } : null));
-    (this.primeP || this.loadPre()).catch(() => {}).then(() => this.writeRows(kind, snap, seats, gone));
+    (this.primeP || this.loadPre()).catch(() => {}).then(() => this.writeRows(kind, snap, seats, gone))
+      .catch(bug('점수 쓰기'));
   }
 
   writeRows(kind, st, seats, gone){
     const rows = [];
+    const missed = [];                                  // 판 전 점수를 못 읽어 못 적은 사람
     for (let i = 0; i < this.n; i++){
       const seat = seats[i];
       if (!seat || !seat.uid) continue;                 // 로그인 안 한 사람은 건너뛴다
       // [stated] **전투 전에 나간 사람은 전적·점수 없음** (티켓은 VS 화면을 봤으면 이미 깎였다)
       if (gone[i] && !gone[i].play) continue;
       // **판 전 점수를 못 읽은 자리는 쓰지 않는다** — 기본값으로 덮으면 점수가 날아간다
-      if (!this.preOk.has(i)) continue;
+      if (!this.preOk.has(i)){ if (!seat.bot) missed.push(seat.uid); continue; }
       // 봇 계정은 점수를 쌓는다. 다만 **사람이 나가 AI 가 이어받은 자리**는 uid 가 없어 저절로 건너뛴다
       const before = this.preScore[i];
       // [stated] **중간에 나간 사람은 코인 없음** (`writeResults` 가 본다)
@@ -343,11 +395,14 @@ class Room {
         bot: seat.bot, slot: i, noCoin
       });
     }
+    // [stated] 장애 알림 — 판 전 점수를 못 읽어 **조용히 건너뛰던** 사람. 그 판 점수·전적·코인이 없다
+    if (missed.length) alert('urgent', 'missed', '점수를 못 적음 — 판 전 점수를 못 읽어 이 판 결과를 건너뜀',
+      `${kind} 방 ${this.id}\n계정 ${missed.join(', ')}`);
     if (!rows.length) return;
     store.writeResults(rows)
       .then(ok => {
         if (!ok) return;
-        store.queueRanks(kind);
+        store.queueRanks(kind, rows);      // 상위 30명이 바뀔 수 있을 때만 다시 만든다
         // [stated] **결과 화면에 받은 코인을 보여준다** — 실제로 준 값(`writeResults` 와 같은 식)을
         // 그 사람에게만 알린다. **쓰기가 끝난 뒤에** 보낸다(실패했으면 안 준 코인을 보여주지 않게)
         for (const r of rows){
@@ -358,7 +413,7 @@ class Room {
           }
         }
       })
-      .catch(() => {});
+      .catch(bug('점수 쓰기'));
   }
 
   /** [stated] 판이 끝나면 **퀘스트 진행도**를 올린다 (친구방 포함).
@@ -370,9 +425,10 @@ class Room {
     const st = this.server.s;
     for (let i = 0; i < this.n; i++){
       const seat = this.seats[i];
-      if (!seat || !seat.uid) continue;
+      // [stated] 봇은 퀘스트가 없다 — 예전엔 봇 문서에도 진행도를 읽고 써서 판마다 DB 를 헛되이 썼다 (2026-10-19)
+      if (!seat || !seat.uid || seat.bot) continue;
       if (gone[i]){
-        if (gone[i].play) store.bumpQuest(seat.uid, { leave: true }).catch(() => {});
+        if (gone[i].play) store.bumpQuest(seat.uid, { leave: true }).catch(bug('퀘스트 갱신'));
         continue;
       }
       const team = teamOf(i, st.n);
@@ -380,7 +436,7 @@ class Room {
       // `winner` 는 **팀+1**, 0 이면 무승부. 개인전은 이긴 자리+1 이라 같은 식으로 맞는다
       const me = st.ffa ? i + 1 : team + 1;
       const res = (st.winner | 0) === 0 ? 'draw' : ((st.winner | 0) === me ? 'win' : 'lose');
-      store.bumpQuest(seat.uid, { kind, res, goals }).catch(() => {});
+      store.bumpQuest(seat.uid, { kind, res, goals }).catch(bug('퀘스트 갱신'));
     }
   }
 
@@ -659,8 +715,9 @@ class Room {
     this.emptyAt = 0;
 
     ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, soccer: this.soccer, back: reconnected, ver: PROTO_VER }));
-    // 방은 이미 돌고 있으므로 현재 상태를 먼저 보내 시작점을 맞춘다
-    this.snapshotTo(slot);
+    // 방은 이미 돌고 있으므로 현재 상태를 먼저 보내 시작점을 맞춘다.
+    // **다른 사람에게도** — 이름·색·끊김 표시가 바뀌었다 (`syncAll`)
+    this.syncAll();
     if (reconnected) this.send({ t: 'peer', slot, state: 'back' });
     // **봇 자리는 소켓이 없다.** `x.ws` 만 보면 봇이 낀 방은 영원히 안 차서
     // 클라가 매칭 화면에서 멈춘다 ("상대를 전혀 못 찾는다")
@@ -685,6 +742,7 @@ class Room {
     seat.ws = null;
     seat.goneAt = Date.now();
     setOff(this.server.s, slot, true);        // 그 자리에 멈춰 선다. 화면엔 끊김 표시
+    this.syncAll();                           // 끊김 표시는 판정에도 들어간다 — 남은 사람 화면도 맞춘다
     this.send({ t: 'peer', slot, state: 'gone', grace: GRACE_MS });
     if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
   }
@@ -711,7 +769,7 @@ class Room {
         record: (v && v.record && v.record[kind]) || null
       }));
       this.send({ t: 'vs', kind, ffa: !!st.ffa, rows });
-    }).catch(() => {});
+    }).catch(bug('VS 화면 정보'));
   }
 
   /** 나간 자리를 AI 가 이어받는다 (축구). 이름 뒤에 표시를 붙여 사람이 아님을 알린다 */
@@ -742,12 +800,14 @@ class Room {
     // 나간 사람은 점수를 못 받는다(그 클라가 결과를 기록하지 못하므로 저절로 그렇게 된다)
     if (this.soccer && this.server.s.phase !== PH_OVER){
       this.takeOver(slot);
+      this.syncAll();                         // 봇이 이어받았다 — 남은 사람 화면도 맞춘다
       this.send({ t: 'peer', slot, state: 'left' });
       if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
       return;
     }
     forfeit(this.server.s, slot);             // 1대1은 나간 사람 패배, 2대2는 계속 진행
     this.server.s.color[slot] = slot;        // 색을 다시 고를 수 있게
+    this.syncAll();                           // 기권은 틱 프레임에 안 실린다 — 남은 사람 화면도 맞춘다
     this.send({ t: 'peer', slot, state: 'left' });
     if (this.seats.every(x => !x.ws)) this.emptyAt = Date.now();
   }
@@ -848,7 +908,7 @@ const http = createServer((req, res) => {
     store.uidFromToken(q.get('token'))
       .then(uid => uid ? store.claimNick(uid, nick) : { ok: false, auth: true })
       .then(r => res.end(JSON.stringify(r)))
-      .catch(() => res.end(JSON.stringify({ ok: false, err: true })));
+      .catch(e => { bug('요청 /nick')(e); res.end(JSON.stringify({ ok: false, err: true })); });
     return;
   }
 
@@ -863,7 +923,7 @@ const http = createServer((req, res) => {
     store.uidFromToken(q.get('token'))
       .then(me => { sawUid(me); return me ? store.readTickets(me) : null; })
       .then(v => res.end(JSON.stringify(v ? { ok: true, ...v } : { ok: false })))
-      .catch(() => res.end(JSON.stringify({ ok: false })));
+      .catch(e => { bug('요청 /ticket')(e); res.end(JSON.stringify({ ok: false })); });
     return;
   }
 
@@ -882,6 +942,8 @@ const http = createServer((req, res) => {
       // [stated] AI 모드 단계 보상 — `st=1,2,3` (깬 단계들). 안 받은 것만 준다
       if (act === 'ai')    return store.claimAi(me, String(q.get('st') || '').split(',').slice(0, 40).map(Number));
       if (act === 'time')  return { ok: await store.addPlayTime(me, +q.get('sec') || 0) };
+      // [stated] **'켜 둔 사람' 표시만** (1분마다) — DB 는 안 건드린다. 접속 시간은 4분마다 'time' 으로 온다
+      if (act === 'here')  return { ok: true };
       // [stated] 광고를 끝까지 봤다 → 그 모드 티켓 한 장 (하루 5번, 개인전 판수 풀기는 3번)
       if (act === 'ad')    return store.adReward(me, q.get('kind') || '');
       // **검사 전용** — 가짜 저장소에 값을 얹는다. `E2E_DEBUG=1` 이고 가짜 저장소일 때만 (Render 에는 둘 다 없다)
@@ -898,7 +960,7 @@ const http = createServer((req, res) => {
       return v ? { ok: true, ...v } : { ok: false };
     })
       .then(r => res.end(JSON.stringify(r)))
-      .catch(() => res.end(JSON.stringify({ ok: false, err: true })));
+      .catch(e => { bug('요청 /quest')(e); res.end(JSON.stringify({ ok: false, err: true })); });
     return;
   }
 
@@ -928,7 +990,7 @@ const http = createServer((req, res) => {
       return { ok: true, friends: mark(v.friends), reqIn: mark(v.reqIn), reqOut: mark(v.reqOut) };
     })
       .then(r => res.end(JSON.stringify(r)))
-      .catch(() => res.end(JSON.stringify({ ok: false, why: 'err' })));
+      .catch(e => { bug('요청 /friend')(e); res.end(JSON.stringify({ ok: false, why: 'err' })); });
     return;
   }
 
@@ -939,7 +1001,7 @@ const http = createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     store.findByNick(q.get('nick') || '')
       .then(v => res.end(JSON.stringify(v ? { ok: true, ...v } : { ok: false, why: '없음' })))
-      .catch(() => res.end(JSON.stringify({ ok: false, why: '실패' })));
+      .catch(e => { bug('요청 /find')(e); res.end(JSON.stringify({ ok: false, why: '실패' })); });
     return;
   }
 
@@ -957,7 +1019,49 @@ const http = createServer((req, res) => {
     if (!uid){ res.end(JSON.stringify({ ok: false, why: 'uid 없음' })); return; }
     store.myRank(uid, kind)
       .then(r => res.end(JSON.stringify(r ? { ok: true, kind, ...r } : { ok: false, why: '기록 없음' })))
-      .catch(() => res.end(JSON.stringify({ ok: false, why: '실패' })));
+      .catch(e => { bug('요청 /rank')(e); res.end(JSON.stringify({ ok: false, why: '실패' })); });
+    return;
+  }
+
+  // [stated] **계정 삭제** — 앱 안 [계정 삭제]. 증표로 본인을 확인하고, 구글 계정은
+  // **5분 안에 다시 로그인한 증표**만 받는다 (앱이 삭제 직전에 구글 확인을 한 번 더 한다)
+  if (req.url && req.url.startsWith('/account')){
+    const q = new URL(req.url, 'http://x').searchParams;
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    store.tokenInfo(q.get('token')).then(async me => {
+      if (!me) return { ok: false, auth: true };
+      if (q.get('act') !== 'delete') return { ok: false, why: 'act' };
+      if (!me.anon && me.age > 300) return { ok: false, why: 'recent' };
+      const r = await store.deleteAccount(me.uid);
+      if (r && r.ok){ seen.delete(me.uid); }
+      return r;
+    })
+      .then(r => res.end(JSON.stringify(r)))
+      .catch(e => { bug('요청 /account')(e); res.end(JSON.stringify({ ok: false, why: 'err' })); });
+    return;
+  }
+
+  // [stated] **현금 결제 확인·지급** (2026-10-19). 앱이 구글 결제 창에서 받은 구매 증표를 보낸다.
+  // **서버가 구글에 직접 물어 확인한 뒤** 지급하고, 구글에 마무리(소모)까지 한다 (`pay.js`).
+  // 본문은 글자(text/plain)로 받는다 — JSON 형식으로 보내면 브라우저가 사전 요청(OPTIONS)을 한 번 더 한다
+  // **검사 전용** — 환불 확인을 지금 돌린다 (평소엔 6시간마다). Render 에는 E2E_DEBUG 가 없다
+  if (req.url === '/__voided' && process.env.E2E_DEBUG === '1'){
+    checkVoided().then(() => { res.writeHead(200); res.end('ok'); });
+    return;
+  }
+  if (req.url && req.url.startsWith('/pay')){
+    if (req.method !== 'POST'){ res.writeHead(405); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    readBody(req, 8192)
+      .then(async raw => {
+        let b = {};
+        try { b = JSON.parse(raw || '{}'); } catch { return { ok: false, why: 'bad' }; }
+        const me = await store.uidFromToken(b.token);
+        if (!me) return { ok: false, auth: true };
+        return payFlow(me, String(b.sku || ''), String(b.ptoken || ''));
+      })
+      .then(r => res.end(JSON.stringify(r)))
+      .catch(e => { bug('요청 /pay')(e); res.end(JSON.stringify({ ok: false, why: 'err' })); });
     return;
   }
 
@@ -974,8 +1078,29 @@ const http = createServer((req, res) => {
     return;
   }
 
-  if (req.url === '/' || req.url === '/health'){
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+  // [stated] **바깥 감시(UptimeRobot)용** — 5분마다 찌른다. 서버가 죽었거나(응답 없음) 문제가 있으면(503)
+  // UptimeRobot 이 메일·폰·디스코드로 알린다. **서버가 아예 죽으면 서버가 직접 알릴 수 없어서** 필요하다.
+  // 찌르는 것만으로 Render 무료 서버가 잠들지도 않는다(15분 무입력이면 잠든다). 몇 바이트만 돌려준다
+  if (req.url === '/alarm' || req.url.startsWith('/alarm?')){
+    const why = alarmWhy(store.brokenOff() ? 'store off' : '');
+    res.writeHead(why ? 503 : 200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(why || 'ok');
+    return;
+  }
+
+  if (req.url === '/' || req.url === '/health' || req.url.startsWith('/health?')){
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    // [stated] **앱은 켤 때·판을 찾을 때마다 여기로 서버를 깨운다** — 예전엔 방 목록 전체(방마다 수백 바이트)를
+    // 돌려줘서 사람이 늘수록 응답이 커졌다 (보내는 양 = 요금). 앱이 쓰는 건 버전뿐이라 **짧게** 준다.
+    // 방까지 다 보려면 `/health?d=1` (진단·검사용)
+    if (!/[?&]d=1(&|$)/.test(req.url)){
+      res.end(JSON.stringify({
+        ok: true, ver: PROTO_VER, warm: serverWarm(), tickLate: +tickLate.toFixed(1),
+        uptime: Math.round(process.uptime()), players: wss ? wss.clients.size : 0, rooms: rooms.size,
+        alert: alertStats()
+      }));
+      return;
+    }
     // 서버가 실제로 무엇을 갖고 있는지 그대로 내보낸다.
     // 클라 화면만 보면 양쪽이 서로 다른 말을 해도 누가 맞는지 알 수 없다
     const detail = [...rooms.values()].map(r => ({
@@ -1011,6 +1136,7 @@ const http = createServer((req, res) => {
       // 틱 루프 지각(ms). 갓 깬 인스턴스는 여기가 크고, 그동안은 판을 안 연다
       tickLate: +tickLate.toFixed(1),
       warm: serverWarm(),
+      alert: alertStats(),          // 디스코드 알림이 켜졌는지(on)·보낸 수·못 보낸 수
       players: wss ? wss.clients.size : 0,
       rooms: detail
     }));
@@ -1019,12 +1145,108 @@ const http = createServer((req, res) => {
   res.writeHead(404); res.end();
 });
 
-const wss = new WebSocketServer({ server: http });
+// [stated] **웹소켓 압축(permessage-deflate)은 기본으로 끈다** (2026-10-19).
+// 처음엔 이걸로 8~11배 줄였지만, 재 보니 **서버 CPU 를 2배 넘게** 먹었다(메시지마다 압축·풀기, 연결마다
+// zlib 메모리 수백 KB). 지금은 틱 프레임을 숫자로 묶고(앞 틱과 다른 것만) 스냅샷만 따로 한 번 압축해서
+// (`src/net/wire.js`, `Room.pack`) 그보다 작게 보낸다 — 압축이 더 줄여 줄 게 거의 없다.
+//  - 다시 켜기: Render 환경변수 `DUEL_WS_DEFLATE=1` (옛 앱·검사 도구처럼 글자로 받는 쪽만 이득)
+const DEFLATE = process.env.DUEL_WS_DEFLATE === '1' ? {
+  zlibDeflateOptions: { level: 1, memLevel: 8 },
+  serverMaxWindowBits: 15,
+  clientMaxWindowBits: 12,
+  threshold: 64
+} : false;
+/** 요청 본문 (길이 제한) */
+function readBody(req, max){
+  return new Promise((res, rej) => {
+    let b = '', n = 0;
+    req.on('data', c => { n += c.length; if (n > max){ rej(new Error('본문이 너무 큼')); req.destroy(); return; } b += c; });
+    req.on('end', () => res(b));
+    req.on('error', rej);
+  });
+}
+
+// ── [stated] 현금 결제 ──────────────────────────────────────────
+// 구글에 확인 → 지급(한 번만) → 구글에 마무리. 마무리를 못 하면 3일 뒤 구글이 환불하므로 [긴급] 으로 알리고,
+// 앱은 다음에 켤 때 마무리 안 된 구매를 다시 보낸다(이미 준 것은 다시 안 주고 마무리만 한다)
+async function payFlow(uid, sku, ptoken){
+  if (!pay.CATALOG.has(sku) || !ptoken || ptoken.length > 4000) return { ok: false, why: 'bad' };
+  if (!pay.payOn()){
+    alert('urgent', 'paykey', '결제 확인을 못 함 — 서비스 계정 키가 없음', 'Render 환경변수 FIREBASE_KEY 를 확인해야 한다.');
+    return { ok: false, why: 'err' };
+  }
+  let p;
+  try { p = await pay.lookup(ptoken); }
+  catch (e){
+    if (e.status === 400 || e.status === 404 || e.status === 410) return { ok: false, why: 'bad' };   // 없는 증표
+    const perm = e.status === 401 || e.status === 403;
+    alert('urgent', perm ? 'payperm' : 'paylookup',
+      perm ? '결제 확인 권한 없음 — 결제한 사람이 아무것도 못 받음' : '구글에 결제 확인 실패 — 결제한 사람이 아직 못 받음',
+      (perm ? '플레이 콘솔 > 사용자 및 권한 에서 서비스 계정에 "재무 데이터 보기"·"주문 및 구독 관리" 를 줬는지, ' +
+              '구글 클라우드에서 Google Play Android Developer API 를 켰는지 확인. 권한은 퍼지는 데 최대 하루 걸린다.\n' : '') +
+      `계정 ${uid} · 상품 ${sku}\n${e.message}\n앱을 다시 켜면 다시 확인한다.`);
+    return { ok: false, why: 'err' };
+  }
+  if (p.sku !== sku) return { ok: false, why: 'bad' };
+  if (p.state === 'PENDING') return { ok: false, why: 'pending' };      // 편의점 결제 등 — 끝나면 다음에 다시 온다
+  if (p.state !== 'PURCHASED') return { ok: false, why: 'cancel' };
+  if (p.acct && p.acct !== pay.acctOf(uid)) return { ok: false, why: 'other' };   // 다른 게임 계정으로 산 것
+  const g = await store.grantPurchase(uid, p, ptoken);
+  if (!g.ok) return g;
+  if (!g.done){
+    try { await pay.finish(sku, ptoken); await store.payDone(ptoken); }
+    catch (e){
+      alert('urgent', 'payfinish', '결제 마무리(소모) 실패 — 3일 안에 안 되면 구글이 자동 환불함',
+        `계정 ${uid} · 상품 ${sku} · 주문 ${p.order || '-'}\n${e.message}\n지급은 됐다. 앱을 다시 켜면 마무리를 다시 시도한다.`);
+      return { ok: true, again: !!g.again, grant: g.grant, finish: false };
+    }
+  }
+  if (!g.again) console.log(`[결제] ${uid.slice(0, 6)} ${sku}${p.test ? ' (시험)' : ''}`);
+  return { ok: true, again: !!g.again, grant: g.grant };
+}
+
+// [stated] **환불된 구매는 회수한다** — 6시간마다 구글의 환불 목록을 본다 (켜지고 1분 뒤 한 번)
+async function checkVoided(){
+  if (!pay.payOn() || !store.isOn()) return;
+  const startedAt = Date.now();
+  try {
+    const since = Math.max(await store.voidMark(), startedAt - 29 * 864e5);   // 구글은 30일 전까지만 준다
+    const list = await pay.voidedSince(since - 5 * 60_000);
+    for (const v of list){
+      const r = await store.revokePurchase(v.token);
+      if (r) alert('info', 'void:' + v.token.slice(-12), `환불된 구매를 회수함 (${r.sku})`, `계정 ${r.uid} · 주문 ${r.order || v.order || '-'}`);
+    }
+    await store.voidMark(startedAt);
+  } catch (e){
+    const perm = e.status === 401 || e.status === 403;
+    alert(perm ? 'urgent' : 'warn', 'voided', perm ? '환불 목록을 볼 권한 없음' : '환불 목록 확인 실패', errText2(e));
+  }
+}
+const errText2 = e => String((e && e.message) || e).slice(0, 500);
+setTimeout(() => { checkVoided(); setInterval(checkVoided, 6 * 3600_000).unref?.(); }, +process.env.DUEL_VOID_FIRST_MS || 60_000).unref?.();
+
+const wss = new WebSocketServer({ server: http, perMessageDeflate: DEFLATE });
 http.listen(PORT, () => {
   console.log(`듀얼 서버 대기중 :${PORT}`);
   // [stated] 봇 계정 50개를 심는다. **없는 것만** 만들고, 이미 있으면 그동안 쌓인 점수를 둔다
-  store.seedBots(BOTS).catch(() => {});
+  store.seedBots(BOTS).catch(bug('봇 계정 심기'));
+  // [stated] 장애 알림 — 켜질 때 한 번. **직전에 "꺼지는 중" 이 없었다면 갑자기 꺼진 것**(메모리 초과 등)이다
+  const commit = String(process.env.RENDER_GIT_COMMIT || '').slice(0, 7);
+  alert('info', 'boot', '서버 켜짐',
+    `버전 ${PROTO_VER}${commit ? ' · 커밋 ' + commit : ''} · 점수 저장소 ${store.isOn() ? '연결됨' : '꺼짐'}\n` +
+    '바로 앞에 "서버 꺼지는 중" 알림이 없었다면 갑자기 꺼졌다가 다시 켜진 것입니다(메모리 초과 등).');
+  if (store.brokenOff()) alert('urgent', 'storeoff', '점수 저장소(Firestore)에 못 붙음 — 점수·티켓·퀘스트가 전부 안 됨',
+    'Render 환경변수 FIREBASE_KEY 가 깨졌거나 잘못 들어갔다. 서비스 계정 키(JSON)를 다시 넣어야 한다.');
+  startWatch();
 });
+// 알림 밑줄에 붙일 서버 상태
+setStatus(() => {
+  let playing = 0;
+  for (const r of rooms.values()) for (const x of r.seats) if (x && x.ws && !x.bot) playing++;
+  return { rooms: rooms.size, playing, sockets: wss ? wss.clients.size : 0 };
+});
+// 10초 동안 가장 늦은 틱 (알림이 볼 때마다 새로 센다)
+setTickProbe(() => { const w = tickWorst; tickWorst = 0; return { worst: w, rooms: rooms.size }; });
 store.warmup();   // **첫 판이 아니라 부팅 때** Firestore 연결을 연다
 
 // 대기열: 새로 들어온 사람은 방에 바로 앉히지 않는다.
@@ -1097,6 +1319,7 @@ function fillWithBots(key){
 // 60ms 씩 막히는 상황에서도 EMA 는 10ms 언저리라 문턱을 아슬아슬하게 넘나들었다.
 // 서서히 잦아드는 최댓값이라 한 번 튀면 남고, 조용하면 0.7초쯤에 걸쳐 내려온다
 let tickLate = 0;          // 최근 최악의 지각 (ms)
+let tickWorst = 0;         // [stated] 장애 알림용 — 알림이 마지막으로 본 뒤 가장 늦은 틱 (ms)
 let lastTickAt = 0;
 let tickSeen = 0;
 const WARM_LATE_MS = 25;   // 정상일 때 실측 최대 16ms — 여유를 두고 25
@@ -1169,6 +1392,9 @@ wss.on('connection', (ws, req) => {
   const soccer = q.get('soccer') === '1';   // 축구 미니게임
   const wantColor = q.has('color') ? +q.get('color') : -1;
   ws.nick = nick;      // 모든 경로(대기열·방·팀 로비)가 같이 쓴다
+  // [stated] 새 앱은 **숫자로 묶은 틱 프레임**(`w=2`)과 **압축 스냅샷**(`z=1`, 앱이 풀 수 있을 때)을 받는다 (wire.js)
+  ws.bin = q.get('w') === '2';
+  ws.z = ws.bin && q.get('z') === '1';
   ws.uid = String(q.get('uid') || '').slice(0, 64);   // 로그인 계정. 점수는 이 값으로 저장
   // [stated] 친구 목록에 **접속 중인지 표시**한다. 소켓을 들고 있는 서버만 알 수 있다.
   // 같은 사람이 탭을 여러 개 열 수 있으므로 수를 세고, 0 이 되면 지운다
@@ -1225,8 +1451,7 @@ wss.on('connection', (ws, req) => {
       ws.slot = -1; ws.watching = true;
       ws.send(JSON.stringify({ t: 'watch', code: room.code, n: room.n,
                                melee: room.melee, ffa: room.ffa, soccer: room.soccer }));
-      ws.send(JSON.stringify({ t: 's', tick: room.server.s.tick,
-                               st: JSON.parse(JSON.stringify(room.server.s)) }));
+      room.sendTo(ws, { t: 's', tick: room.server.s.tick, st: JSON.parse(JSON.stringify(room.server.s)) });
       // [stated] **관전자가 들어와도 방장 화면 목록이 그대로였다** — 방 상태를 안 보냈다
       room.sendRoom();
       console.log(`관전 입장: ${code} (room ${room.id}, ${room.watchers.size}명)`);
@@ -1262,15 +1487,29 @@ wss.on('connection', (ws, req) => {
         const v = m.get(ws.uid);
         if (v) ws.qScore = (v.score && v.score[kind]);
         pairUp(key);
-      }).catch(() => pairUp(key));
+      }).catch(e => { bug('매칭 점수 읽기')(e); pairUp(key); });
     }
     pairUp(key);
     // [stated] **5초 안에 상대가 잡히게 한다.** 사람이 모자라면 빈 자리를 AI 로 채운다
     ws.botAt = Date.now() + BOT_FILL_MS;
   }
 
-  ws.on('message', raw => {
-    let m; try { m = JSON.parse(raw); } catch { return; }
+  ws.on('message', (raw, isBin) => {
+    let m;
+    try {
+      // 새 앱은 조작 입력을 숫자로 묶어 보낸다 (wire.js). 나머지는 글자(JSON)
+      if (isBin){ if (raw[0] !== W_IN) return; m = decodeIn(new Uint8Array(raw.buffer, raw.byteOffset, raw.length)); }
+      else m = JSON.parse(raw);
+    } catch { return; }
+    // [stated] **스냅샷은 앱이 필요할 때 달라고 한다** (어긋남·화면 복귀·많이 밀림) — 0.25초에 한 번까지
+    if (m.t === 'snap'){
+      const now = Date.now();
+      if (!ws.room || now - (ws.snapAt || 0) < 250) return;
+      ws.snapAt = now;
+      const st = ws.room.server.s;
+      ws.room.sendTo(ws, { t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+      return;
+    }
     // **매칭 중에 오는 왕복 측정용 ping.** 자리에 앉기 전에도 바로 답한다 —
     // 그래야 클라가 시작 전에 지연을 알고, 시작하자마자 렉이 안 걸린다
     if (m.t === 'p' && m.pre){
@@ -1440,6 +1679,8 @@ wss.on('connection', (ws, req) => {
       return;
     }
     // **검사 전용** — 저장된 점수를 돌려준다. `E2E_DEBUG=1` 일 때만
+    // **검사 전용** — 처리 못 한 오류를 일부러 낸다 (장애 알림이 꺼지기 전에 오는지 본다). Render 에는 E2E_DEBUG 가 없다
+    if (m.t === '__crash' && process.env.E2E_DEBUG === '1'){ setImmediate(() => { throw new Error('검사용 충돌'); }); return; }
     if (m.t === '__score' && process.env.E2E_DEBUG === '1'){
       ws.send(JSON.stringify({ t: '__score', uid: m.uid, v: store.fakeGet(m.uid) }));
       return;
@@ -1560,6 +1801,7 @@ setInterval(() => {
   if (lastTickAt){
     const late = Math.max(0, (now - lastTickAt) - TICK_MS);
     tickLate = Math.max(late, tickLate * 0.98);           // 서서히 잦아드는 최댓값
+    if (late > tickWorst) tickWorst = late;
     tickSeen++;
   }
   lastTickAt = now;

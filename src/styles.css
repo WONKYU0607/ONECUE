@@ -839,8 +839,10 @@ transform-origin:center;white-space:nowrap}
 .shop-tabs.pay .shop-btn{font-size:13px;letter-spacing:1px}
 
 /* [stated] 상품을 감싸는 네모 상자를 없앤다. 그림과 값만 보이게 */
+/* [stated] **짧은 폰(360x640)에서 세트 상자의 [구매] 가 화면 밑으로 잘렸다** (결제를 붙이며 실측) —
+   넘치면 이 안에서 위아래로 내려 본다. 긴 폰에선 넘치지 않아 그대로다 */
 .shop-wrap{position:relative;width:100%;flex:1 1 auto;min-width:0;min-height:0;
-  display:flex;flex-direction:column}
+  display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
 /* [stated] 점 다섯 개가 **상자 바로 밑**에 와야 한다 — 예전엔 남은 높이를 다 차지해
    점이 화면 맨 아래로 밀려 있었다 → 높이를 내용만큼만 쓴다 */
 /* [stated] 점 다섯 개로 충분하니 **스크롤 막대는 숨긴다** */
@@ -1190,6 +1192,23 @@ transform-origin:center;white-space:nowrap}
 .logout-row{display:flex;gap:8px;justify-content:center}
 .logout-row .logout-btn{margin:0;color:#cfe4ff;background:rgba(20,34,52,.9);border-color:rgba(110,170,220,.5)}
 .logout-row .logout-btn.go{color:#fff;background:rgba(150,40,40,.8);border-color:#f08a80}
+.logout-row .logout-btn:disabled{opacity:.6;cursor:default}
+/* [stated] 설정 맨 아래 개인정보처리방침 — 글자 단추. 누르면 그 페이지를 창 안에 띄운다 */
+.set-link{display:block;margin:12px auto 14px;padding:4px 10px;cursor:pointer;background:none;border:0;
+  font:700 12px/1.2 var(--gf);color:#8fa8c0;text-decoration:underline;text-underline-offset:2px}
+/* [stated] 광고 개인정보 설정(유럽 등에서만 보임) — 방침 단추 바로 위에 붙인다 */
+.set-link.ad-priv{margin-bottom:0}
+.doc-back{z-index:45}
+.modal.doc-view{width:min(560px,94vw);height:min(86dvh,760px);display:flex;flex-direction:column}
+.doc-frame{flex:1 1 auto;width:100%;min-width:0;min-height:0;border:0;background:#0d1420}
+/* [stated] 계정 삭제 — 로그아웃 밑에 작게. 실수로 누르기 어렵게 글자 단추로 둔다 */
+.acc-del{display:block;margin:6px auto 0;padding:4px 10px;cursor:pointer;background:none;border:0;
+  font:700 11px/1.2 var(--gf);color:rgba(240,138,128,.8);text-decoration:underline;text-underline-offset:2px}
+.del-ask p{text-wrap:balance}
+.del-ask .del-note{color:#8fa8c0}
+.del-ask .del-err{color:#ffb3a8}
+/* 프로필 창이 짧은 폰에서 넘치지 않게 — 넘치면 창 안에서 내린다 */
+.prof-tab{max-height:calc(100dvh - 24px);overflow-y:auto}
 
 /* [stated] 로그인 없이 시작 — 구글 버튼 밑에 작게 */
 .login-guest{display:block;margin:10px auto 0;padding:8px 20px;cursor:pointer;

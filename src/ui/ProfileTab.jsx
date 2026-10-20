@@ -32,6 +32,21 @@ export default function ProfileTab({ onClose, onFriends }){
     try { const m = await import('../cloud/firebase.js'); await m.logOut(); } catch { /* 무시 */ }
     location.reload();
   };
+  // [stated] **계정 삭제** — 로그아웃 밑. 한 번 묻고, 구글 계정이면 구글로 한 번 더 확인한 뒤 서버가 지운다.
+  // 지우면 앱을 새로 띄운다 (로그아웃과 같은 이유 — 메모리에 남은 값이 다음 계정에 섞이지 않게)
+  const [askDel, setAskDel] = useState(false);
+  const [delBusy, setDelBusy] = useState(false);
+  const [delMsg, setDelMsg] = useState('');
+  const doDelete = async () => {
+    if (delBusy) return;
+    setDelBusy(true); setDelMsg('');
+    let r = { ok: false, reason: 'fail' };
+    try { const m = await import('../state/account.js'); r = await m.deleteAccount(); } catch { /* 아래에서 알린다 */ }
+    if (r.ok){ location.reload(); return; }
+    setDelBusy(false);
+    if (r.reason === 'cancel') return;                    // 구글 확인 창을 닫았다 — 조용히
+    setDelMsg(t(r.reason === 'mismatch' ? 'acc.deleteMismatch' : 'acc.deleteFail'));
+  };
   const [accMsg, setAccMsg] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -184,13 +199,25 @@ export default function ProfileTab({ onClose, onFriends }){
 
         {/* [stated] **로그아웃은 프로필 맨 밑.** 다른 계정으로 바꾸려면 있어야 한다.
             실수로 안 누르게 한 번 더 묻는다 */}
-        <button className="logout-btn" onClick={() => setAskOut(true)}>{t('acc.logout')}</button>
+        <button className="logout-btn" onClick={() => { setAskDel(false); setAskOut(true); }}>{t('acc.logout')}</button>
         {askOut && (
           <div className="logout-ask">
             <p>{t('acc.logoutAsk')}</p>
             <div className="logout-row">
               <button className="logout-btn" onClick={() => setAskOut(false)}>{t('common.cancel')}</button>
               <button className="logout-btn go" onClick={doLogout}>{t('acc.logout')}</button>
+            </div>
+          </div>
+        )}
+        <button className="acc-del" onClick={() => { setAskOut(false); setDelMsg(''); setAskDel(true); }}>{t('acc.delete')}</button>
+        {askDel && (
+          <div className="logout-ask del-ask">
+            <p>{t('acc.deleteAsk')}</p>
+            {linked && <p className="del-note">{t('acc.deleteGoogle')}</p>}
+            {delMsg && <p className="del-err">{delMsg}</p>}
+            <div className="logout-row">
+              <button className="logout-btn" disabled={delBusy} onClick={() => { setAskDel(false); setDelMsg(''); }}>{t('common.cancel')}</button>
+              <button className="logout-btn go" disabled={delBusy} onClick={doDelete}>{delBusy ? t('acc.deleting') : t('acc.deleteGo')}</button>
             </div>
           </div>
         )}

@@ -95,7 +95,7 @@ try {
     for (let i = 0; i < 40 && !over; i++){
       p.send(JSON.stringify({ t: '__end', win: 0 }));
       await wait(250);
-      const h = await (await fetch(`http://127.0.0.1:${PORT}/health`)).json();
+      const h = await (await fetch(`http://127.0.0.1:${PORT}/health?d=1`)).json();
       over = h.rooms.some(r => !r.code && r.phase === 3);
     }
     assert(over, '  앞 판이 끝났다 (결과 화면)');
