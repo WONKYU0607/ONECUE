@@ -18,9 +18,17 @@ export function isNativeApp(){
   return false;
 }
 
-/** 이 화면에서 게임을 막는가. **개발 서버(검사·내 컴퓨터 확인)는 연다** — 빌드된 웹판만 막는다 */
+// [stated] **안전장치 — 웹판 주소(Vercel)일 때만 막는다** (2026-10-21 "걸어놔 그럼").
+// 앱 안의 주소는 `localhost` 라서, 앱 표시(위 `isNativeApp`)를 혹시 못 읽는 일이 생겨도 **앱은 절대 안 막힌다**.
+// 막을 주소만 적는다(허용 목록이 아니라). 나중에 웹판에 다른 주소(내 도메인 등)를 붙이면 여기에 더한다
+const WEB_HOSTS = /(^|\.)vercel\.app$/i;
+export function onWebHost(host){
+  try { return WEB_HOSTS.test(String(host != null ? host : globalThis.location?.hostname || '')); } catch { return false; }
+}
+
+/** 이 화면에서 게임을 막는가. **개발 서버(검사·내 컴퓨터 확인)는 연다** — 빌드된 웹판(Vercel 주소)만 막는다 */
 export function webBlocked(){
   if (WEB_PLAY || isNativeApp()) return false;
   if (import.meta.env && import.meta.env.DEV) return false;
-  return true;
+  return onWebHost();
 }

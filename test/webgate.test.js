@@ -83,20 +83,37 @@ try {
     assert(pv, '  빌드한 웹판이 떴다');
     const b = await puppeteer.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
     try {
-      const open = async (asApp, lang) => {
+      // **진짜 웹판 주소로 띄운다** — 막는 건 Vercel 주소일 때뿐이라(안전장치) 127.0.0.1 로 띄우면 안 막힌다.
+      // 브라우저가 그 주소로 가는 요청을 가로채 빌드한 웹판 내용으로 답한다
+      const WEBHOST = 'http://onecue-lac.vercel.app';
+      const open = async (asApp, lang, base = WEBHOST) => {
         const p = await (await b.createBrowserContext()).newPage();
         await p.setViewport({ width: 393, height: 851, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+        await p.setRequestInterception(true);
         const hits = [];
-        p.on('request', r => { const u = r.url(); if (!u.startsWith(`http://127.0.0.1:${VP}`) && !u.startsWith('data:')) hits.push(u); });
+        p.on('request', async r => {
+          const u = new URL(r.url());
+          if (/vercel\.app$/.test(u.hostname)){
+            try {
+              const res = await fetch(`http://127.0.0.1:${VP}${u.pathname}${u.search}`);
+              const body = Buffer.from(await res.arrayBuffer());
+              await r.respond({ status: res.status, headers: { 'content-type': res.headers.get('content-type') || 'text/html' }, body });
+            } catch { r.abort().catch(() => {}); }
+            return;
+          }
+          if (!r.url().startsWith(`http://127.0.0.1:${VP}`) && !r.url().startsWith('http://localhost:') && !r.url().startsWith('data:')) hits.push(r.url());
+          r.continue().catch(() => {});
+        });
         await p.evaluateOnNewDocument((app, l) => {
           try { localStorage.setItem('duel.lang', l); } catch { /* 무시 */ }
           // 앱(캐패시터)이 켜질 때 네이티브 쪽이 먼저 심어 두는 값 흉내
           if (app) window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android', Plugins: {} };
         }, asApp, lang);
-        await p.goto(`http://127.0.0.1:${VP}/`, { waitUntil: 'networkidle0', timeout: 30000 }).catch(() => {});
+        await p.goto(`${base}/`, { waitUntil: 'networkidle0', timeout: 30000 }).catch(() => {});
         await wait(1500);
         return { p, hits };
       };
+      const look = p => p.evaluate(() => ({ gate: !!document.querySelector('.web-only'), splash: !!document.querySelector('.screen.splash') }));
       for (const lang of ['ko', 'en']){
         const { p, hits } = await open(false, lang);
         const r = await p.evaluate(() => ({
@@ -114,9 +131,26 @@ try {
       console.log('③ 같은 빌드를 앱처럼 띄우면 게임이 뜬다');
       {
         const { p } = await open(true, 'ko');
-        const r = await p.evaluate(() => ({ gate: !!document.querySelector('.web-only'), splash: !!document.querySelector('.screen.splash') }));
-        assert(!r.gate && r.splash, `  앱: 게임 진입 화면 (${JSON.stringify(r)})`);
+        const r = await look(p);
+        assert(!r.gate && r.splash, `  앱 표시가 있으면 (웹판 주소여도) 게임 진입 화면 (${JSON.stringify(r)})`);
         await p.browserContext().close();
+      }
+      // [stated] 안전장치 (2026-10-21 "걸어놔 그럼") — **웹판 주소가 아니면 앱 표시가 없어도 안 막는다.**
+      // 앱 안의 주소는 localhost 다. 앱 표시를 못 읽는 일이 생겨도 앱이 "앱에서만" 에 갇히지 않는다
+      console.log('③-2 안전장치: 앱 표시가 없어도 웹판 주소가 아니면 안 막는다');
+      for (const base of [`http://localhost:${VP}`, `http://127.0.0.1:${VP}`]){
+        const { p } = await open(false, 'ko', base);
+        const r = await look(p);
+        assert(!r.gate && r.splash, `  ${base.replace(/:\d+$/, '')}: 게임 진입 화면 (${JSON.stringify(r)})`);
+        await p.browserContext().close();
+      }
+      {
+        const { onWebHost } = await import('../src/state/webgate.js').catch(() => ({}));
+        if (onWebHost){
+          assert(onWebHost('onecue-lac.vercel.app') && onWebHost('onecue-git-main-x.vercel.app'), '  Vercel 주소는 막는다');
+          assert(!onWebHost('localhost') && !onWebHost('127.0.0.1') && !onWebHost('') && !onWebHost('vercel.app.evil.com'),
+            '  localhost·빈 주소·비슷한 다른 주소는 안 막는다');
+        }
       }
 
       console.log('④ 안내 페이지는 그대로 열린다');

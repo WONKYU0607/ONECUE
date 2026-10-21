@@ -89,8 +89,8 @@ try {
     await tapSel(p, '.pvp-start');
     let st = '';
     // 봇은 다른 사람이 있으면 8초까지 미뤄진다 (앞 화면의 계정이 남아 있다) — 넉넉히 기다린다
-    for (let i = 0; i < 1500; i++){ st = await p.evaluate(() => document.querySelector('.pvp-status')?.textContent || ''); if (/찾았다/.test(st)) break; await wait(10); }
-    assert(/찾았다/.test(st) && !(await p.$('.vs-over')), `  ${what}: "상대를 찾았다" · VS 화면 전`);
+    for (let i = 0; i < 1500; i++){ st = await p.evaluate(() => document.querySelector('.pvp-status')?.textContent || ''); if (/찾았습니다/.test(st)) break; await wait(10); }
+    assert(/찾았습니다/.test(st) && !(await p.$('.vs-over')), `  ${what}: "상대를 찾았습니다" · VS 화면 전`);
     await tapSel(p, sel);
     await wait(11500);                                   // 서버 유예 시간이 지나도
     const v = await doc(u);

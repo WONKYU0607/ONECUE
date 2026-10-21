@@ -203,4 +203,12 @@ console.log('같은 것을 같은 말로 부른다 (영어)');
   assert(!/설정에서/.test(ko['acc.guestWhy']) && !/Settings/.test(en['acc.guestWhy']), '  계정 잇기 자리를 바르게 알린다');
 }
 
+// [stated] **"없는 방 코드다. 이건 대체 누가 씀"** (2026-10-21) — 한국어 문구는 존댓말로 끝낸다.
+// '…다' 로 끝나는 반말 글투(찾았다·없다·끊겼다)가 여덟 군데 섞여 있었다
+console.log('한국어 문구가 반말 글투로 끝나지 않는다');
+{
+  const bad = Object.entries(ko).filter(([, v]) => /(?<!니)다[.!?…]*$/.test(String(v).trim())).map(([k, v]) => `${k}: ${v}`);
+  assert(bad.length === 0, `반말 글투:\n    ${bad.join('\n    ')}`);
+}
+
 console.log('i18n.test.js 통과');
