@@ -111,8 +111,13 @@ console.log('화면에 한국어가 박혀 있지 않다');
     let src = fs.readFileSync(p, 'utf8');
     src = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
     src = src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+    // 개발용 네트워크 정보 칸(`SHOW_NETINFO`, 출시판은 꺼짐)은 번역하지 않는다
+    src = src.replace(/SHOW_NETINFO[\s\S]*?<\/div>/g, '');
     const pats = [
       />([^<>{}]*[가-힣][^<>{}]*)</g,          // JSX 텍스트 (여러 줄도)
+      // [stated] **"번역 안 된 거 전수조사"** (2026-10-21) — `{값}` 이 끼어든 JSX 글자를 놓쳤다.
+      // 프로필의 `영문 {NICK_MAX}자 · 한글 {NICK_MAX_KO}자까지` 가 영어판에도 한글로 나왔다
+      /[>}]([^<>{}]*[가-힣][^<>{}]*)[<{]/g,
       /`([^`]*[가-힣][^`]*)`/g,                // 템플릿 문자열
       /'([^'\n]*[가-힣][^'\n]*)'/g,           // 문자열 (캔버스 등)
       /"([^"\n]*[가-힣][^"\n]*)"/g
@@ -166,6 +171,36 @@ console.log('언어 자동 감지');
   assert(/setLang/.test(set), '설정에서 바꿀 수 있다');
   const app = fs.readFileSync('src/App.jsx', 'utf8');
   assert(/onLangChange/.test(app), '바뀌면 화면을 다시 그린다');
+}
+
+// [stated] **"개인정보 처리방침 영어로 했는데 맨 밑에 총칼대전 한글로 나옴. 영어로 건소드 아레나로 바꿔"** (2026-10-21)
+console.log('영어판 이름은 Gun Sword Arena');
+{
+  assert(ko['app.name'] === '총칼대전' && en['app.name'] === 'Gun Sword Arena', '  앱 이름 열쇠');
+  const idx = fs.readFileSync('src/i18n/index.js', 'utf8');
+  assert(/document\.title\s*=/.test(idx) && /app\.name/.test(idx), '  웹 탭 제목이 고른 말을 따른다');
+  for (const f of ['public/privacy.html', 'public/delete.html']){
+    const html = fs.readFileSync(f, 'utf8');
+    const a = html.indexOf('<section data-lang="en"'), b = html.indexOf('</section>', a);
+    const enPart = html.slice(a, b);
+    assert(a > 0 && !/[가-힣]/.test(enPart), `  ${f} 영어 칸에 한글이 없다`);
+    assert(!/%EC%B4%9D/.test(enPart), `  ${f} 영어 칸 메일 제목에도 한글 이름이 없다`);
+    assert(/Gun Sword Arena/.test(enPart), `  ${f} 영어 칸은 Gun Sword Arena 라고 쓴다`);
+    // 맨 밑 꼬리말도 언어마다 — 예전엔 영어로 봐도 '총칼대전'
+    assert(/<footer data-lang="en"[^>]*>Gun Sword Arena<\/footer>/.test(html), `  ${f} 영어 꼬리말`);
+    assert(/<footer data-lang="ko"[^>]*>총칼대전<\/footer>/.test(html), `  ${f} 한국어 꼬리말`);
+    assert(/querySelectorAll\('\[data-lang\]'\)/.test(html), `  ${f} 꼬리말도 언어 따라 숨긴다`);
+    assert(/document\.title\s*=/.test(html), `  ${f} 탭 제목도 언어를 따른다`);
+  }
+}
+
+console.log('같은 것을 같은 말로 부른다 (영어)');
+{
+  // 칼전 = Blades, 드럼통 = Barrel. 한 군데만 다른 말이면 다른 물건으로 읽힌다
+  assert(en['shop.sub.melee'] === en['mode.melee'], `  상점 칼전 칸 (${en['shop.sub.melee']})`);
+  assert(!/\bdrums?\b/i.test(en['tuto.drum']) && /barrel/i.test(en['tuto.drum']), `  튜토리얼 드럼통 (${en['tuto.drum']})`);
+  // 구글 계정 잇기는 설정이 아니라 프로필에 있다
+  assert(!/설정에서/.test(ko['acc.guestWhy']) && !/Settings/.test(en['acc.guestWhy']), '  계정 잇기 자리를 바르게 알린다');
 }
 
 console.log('i18n.test.js 통과');

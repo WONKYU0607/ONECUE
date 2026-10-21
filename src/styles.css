@@ -81,7 +81,10 @@ justify-content:center;gap:18px;color:#e8e8f0;font-family:var(--gf);font-weight:
 .screen.list{justify-content:flex-start;padding:0}
 .hint{font:700 12px var(--gf);color:#8b9db0;letter-spacing:2px}
 .big{font:900 17px var(--gf);letter-spacing:2px}
-.ver{position:fixed;bottom:calc(var(--sab) + 12px);font-size:11px;color:#4a4a63}
+/* [stated] 배포 확인 표시. 예전엔 틀 아래 **가운데 파란 장식 위**에 겹쳐 거의 안 보였다 (2026-10-21 점검)
+   → 장식을 피해 **오른쪽 민무늬 자리**로, 틀 위에서 읽히게 조금 밝게 */
+.ver{position:fixed;bottom:calc(var(--sab) + 15px);right:calc(var(--sar) + 62px);margin:0;
+  font-size:10px;line-height:1;color:#8592ab;letter-spacing:.5px;pointer-events:none}
 
 /* 틀 두께(좌우)와 화면 패딩을 빼고 남는 만큼만. 안 그러면 폰에서 틀 밖으로 넘친다 */
 .menu{display:flex;flex-direction:column;gap:12px;
@@ -720,8 +723,15 @@ transform-origin:center;white-space:nowrap}
 .rb-me .rb-tier{font-size:10px;color:var(--dim)}
 .rb-me .rb-rank{margin-left:auto;font-size:12px;color:#6cf}
 .rb-me .rb-score{font-size:13px;font-weight:900;min-width:44px;text-align:right}
+/* [stated] **폰에서 순위표 밑 부분이 하단바에 가려 잘렸다** (2026-10-21).
+   예전엔 `max-height:calc(100vh - 260px)` — 폰의 `100vh` 는 하단바 자리까지 넣은 높이라 화면 상자(`--vh`)
+   밑으로 넘쳤다. → 퀘스트 화면처럼 **남은 높이만큼만**(flex) 차지하고 넘치면 목록만 굴린다 */
+/* 간격(gap 12)·위쪽 자리는 예전 그대로 둔다 — 아래만 틀에 붙지 않게 조금 띄운다 */
+.rb-wrap{flex:1 1 auto;min-width:0;min-height:0;padding-bottom:10px}
+.rb-wrap > :not(.rb-list){flex:0 0 auto}
 .rb-list{display:flex;flex-direction:column;gap:3px;
-  max-height:calc(100vh - 260px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+  flex:0 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.rb-list > *{flex:0 0 auto}
 .rb-row{display:flex;align-items:center;gap:6px;padding:5px 8px;
   background:rgba(10,18,30,.7);border:1px solid rgba(90,140,190,.28);border-radius:3px}
 .rb-row.me{border-color:#5a96c8;background:rgba(16,32,54,.85)}
@@ -745,7 +755,10 @@ transform-origin:center;white-space:nowrap}
   color:var(--txt);font:inherit;cursor:pointer}
 .rank-card .rc-nm{font-size:10px;font-weight:700;white-space:nowrap}
 .rank-card .rc-rank{margin-left:auto;font-size:10px;color:#6cf;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* [stated] **영어·작은 폰에서 "No record" 가 "No rec…" 로 잘렸다** (2026-10-21 점검) →
+   넘치면 글씨를 줄여 담는다(`FitText`). 줄이는 건 `transform` 이라 블록이어야 먹는다 */
+.rank-card .rc-rank > span{display:block;transform-origin:left center}
 .prof-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
 .prof-row{display:flex;align-items:center;gap:10px;font:900 14px var(--gf);color:#c8d8e6}
 .prof-row .nm{flex:0 0 auto}
@@ -1198,8 +1211,10 @@ transform-origin:center;white-space:nowrap}
   font:700 12px/1.2 var(--gf);color:#8fa8c0;text-decoration:underline;text-underline-offset:2px}
 /* [stated] 광고 개인정보 설정(유럽 등에서만 보임) — 방침 단추 바로 위에 붙인다 */
 .set-link.ad-priv{margin-bottom:0}
-.doc-back{z-index:45}
-.modal.doc-view{width:min(560px,94vw);height:min(86dvh,760px);display:flex;flex-direction:column}
+/* [stated] **작은 폰에서 창 아래가 하단바 쪽으로 넘쳤다** (2026-10-21 점검) — 높이를 화면 전체(86dvh)로 잡고
+   한가운데 놓아서다. → 위아래 바를 뺀 자리(`--sat`·`--sab`) 안에서 가운데, 높이도 그 안(`--vh`)으로 */
+.doc-back{z-index:45;padding:var(--sat,0) 0 var(--sab,0);box-sizing:border-box}
+.modal.doc-view{width:min(560px,94vw);height:min(calc(var(--vh, 100dvh) - 24px),760px);display:flex;flex-direction:column}
 .doc-frame{flex:1 1 auto;width:100%;min-width:0;min-height:0;border:0;background:#0d1420}
 /* [stated] 계정 삭제 — 로그아웃 밑에 작게. 실수로 누르기 어렵게 글자 단추로 둔다 */
 .acc-del{display:block;margin:6px auto 0;padding:4px 10px;cursor:pointer;background:none;border:0;
@@ -1310,7 +1325,9 @@ transform-origin:center;white-space:nowrap}
 /* `.shop-card-in` 이 **세로 배치**라 그대로 쓰면 그림이 폭 0 으로 찌그러진다 → 가로로 돌린다.
    [stated] 한 줄에 그림 · 이름 · 값 · 맨 오른쪽 [구매] */
 .money-row{width:100%;flex-direction:row;align-items:center;gap:10px;padding:12px 12px 12px 10px}
-.money-nm{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:8px;
+/* [stated] **영어·작은 폰에서 "Soccer Ticket x3" 의 값이 잘려 "₩" 만 보였다** (2026-10-21 점검).
+   한 줄에 안 들어가면 **값을 다음 줄로** 내린다 — 값은 잘리면 안 된다 */
+.money-nm{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;row-gap:2px;
   white-space:nowrap;overflow:hidden}
 .money-row .nm,
 .money-row .pr{font-size:14px;white-space:nowrap}
@@ -1385,3 +1402,11 @@ border:1px solid #f0c86e;background:#141a28;font-family:var(--gf);color:#e8e8f0;
 .fake-ad .fa-t{font-weight:900;font-size:18px;color:#f0c86e;letter-spacing:2px}
 .fake-ad .fa-n{font-weight:900;font-size:44px;line-height:1}
 .fake-ad .fa-d{font-size:11px;color:#8a95b0}
+
+/* [stated] 웹판 안내 — "앱에서만 할 수 있습니다" (2026-10-21, `state/webgate.js`) */
+.web-only{gap:16px;text-align:center;padding:24px}
+.web-only .big{font-size:24px;letter-spacing:4px;color:#ffd873}
+.web-only .wo-msg{max-width:280px;font:700 14px/1.6 var(--gf);color:#cfe0f0;word-break:keep-all}
+.web-only .wo-go{text-decoration:none;min-width:240px}
+.web-only .wo-go .t{white-space:nowrap;font-size:17px}
+.web-only .wo-link{font:700 12px var(--gf);color:#8fa8c0}

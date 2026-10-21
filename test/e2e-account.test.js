@@ -89,7 +89,7 @@ try {
   }
 
   console.log('설정 → 개인정보처리방침 (창 안에 띄운다)');
-  for (const [w, h, lang, title] of [[360, 640, 'ko', '총칼대전 개인정보처리방침'], [393, 851, 'en', '총칼대전 Privacy Policy']]){
+  for (const [w, h, lang, title] of [[360, 640, 'ko', '총칼대전 개인정보처리방침'], [393, 851, 'en', 'Gun Sword Arena Privacy Policy']]){
     const p = await page('pv' + w, w, h, lang);
     await p.evaluate(() => [...document.querySelectorAll('.pcell.pico')].pop().click());   // 설정 (소리 단추 다음)
     await p.waitForSelector('.set-link', { timeout: 5000 });
@@ -111,13 +111,17 @@ try {
   {
     const p = await (await b.createBrowserContext()).newPage();
     await p.setViewport({ width: 360, height: 640, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
-    for (const [path, ko, en] of [['privacy.html', '총칼대전 개인정보처리방침', '총칼대전 Privacy Policy'], ['delete.html', '총칼대전 계정 삭제', 'Delete your 총칼대전 account']]){
+    // [stated] **영어판 이름은 Gun Sword Arena** — 맨 밑 꼬리말까지 (2026-10-21, 예전엔 영어로 봐도 '총칼대전')
+    for (const [path, ko, en] of [['privacy.html', '총칼대전 개인정보처리방침', 'Gun Sword Arena Privacy Policy'], ['delete.html', '총칼대전 계정 삭제', 'Delete your Gun Sword Arena account']]){
       await p.goto(`http://127.0.0.1:${VP}/${path}?lang=ko`, { waitUntil: 'load' });
       const a = await p.evaluate(() => [...document.querySelectorAll('section')].find(s => !s.hidden)?.querySelector('h1')?.textContent);
       await p.click('.lang button[data-l="en"]'); await wait(100);
       const e = await p.evaluate(() => [...document.querySelectorAll('section')].find(s => !s.hidden)?.querySelector('h1')?.textContent);
       const over = await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
       assert(a === ko && e === en && !over, `  ${path}: "${a}" / "${e}" · 가로로 안 넘친다`);
+      const foot = await p.evaluate(() => [...document.querySelectorAll('footer')].filter(f => !f.hidden && f.offsetParent).map(f => f.textContent));
+      const tt = await p.title();
+      assert(foot.join() === 'Gun Sword Arena' && tt === en, `  ${path}: 영어로 바꾸면 꼬리말·탭 제목도 영어 (${foot.join()} · ${tt})`);
     }
     await p.browserContext().close();
   }

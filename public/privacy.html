@@ -69,14 +69,14 @@
         <a href="https://policies.google.com/privacy">구글 개인정보처리방침</a> ·
         <a href="https://firebase.google.com/support/privacy">Firebase</a></li>
       <li><b>Render</b> (render.com) — 게임 서버. <a href="https://render.com/privacy">개인정보처리방침</a></li>
-      <li><b>Vercel</b> (vercel.com) — 웹 버전 제공. <a href="https://vercel.com/legal/privacy-notice">개인정보처리방침</a></li>
+      <li><b>Vercel</b> (vercel.com) — 이 방침과 계정 삭제 안내 페이지 제공. <a href="https://vercel.com/legal/privacy-notice">개인정보처리방침</a></li>
     </ul>
 
     <h2>5. 보관 기간과 파기</h2>
     <p>계정을 삭제할 때까지 보관합니다. 계정을 삭제하면 지체 없이 지웁니다. 다른 이용자의 친구 목록에 남은 내 정보와 구매 기록도 함께 지우고, 순위표에서는 다음 갱신 때(약 15초 안) 빠집니다. 결제 내역은 구글 플레이가 구글의 방침에 따라 따로 보관합니다.</p>
 
     <h2>6. 계정 삭제</h2>
-    <p>앱에서 <b>홈 화면 위쪽 내 프로필 → 맨 아래 [계정 삭제]</b>로 지울 수 있습니다. 앱을 쓸 수 없으면 <a href="delete.html">계정 삭제 안내</a>를 보세요.</p>
+    <p>앱에서 <b>홈 화면 위쪽 내 프로필 → 맨 아래 [계정 삭제]</b>로 지울 수 있습니다. 앱을 쓸 수 없으면 <a href="delete.html?lang=ko">계정 삭제 안내</a>를 보세요.</p>
 
     <h2>7. 이용자의 권리</h2>
     <p>자신의 정보를 보거나, 고치거나, 지워 달라고 요청할 수 있습니다. 닉네임은 앱에서 바로 바꿀 수 있고, 그 밖의 요청은 아래 이메일로 보내 주세요.</p>
@@ -95,9 +95,9 @@
   </section>
 
   <section data-lang="en" hidden>
-    <h1>총칼대전 Privacy Policy</h1>
+    <h1>Gun Sword Arena Privacy Policy</h1>
     <p class="date">Effective: October 19, 2026</p>
-    <p>This explains what "총칼대전" (the "Game") collects and how it is used.</p>
+    <p>This explains what "Gun Sword Arena" (the "Game") collects and how it is used.</p>
 
     <h2>1. What we collect</h2>
     <ul>
@@ -131,7 +131,7 @@
         <a href="https://policies.google.com/privacy">Google Privacy Policy</a> ·
         <a href="https://firebase.google.com/support/privacy">Firebase</a></li>
       <li><b>Render</b> (render.com) — game server. <a href="https://render.com/privacy">Privacy policy</a></li>
-      <li><b>Vercel</b> (vercel.com) — web version. <a href="https://vercel.com/legal/privacy-notice">Privacy notice</a></li>
+      <li><b>Vercel</b> (vercel.com) — hosting this policy and the account deletion page. <a href="https://vercel.com/legal/privacy-notice">Privacy notice</a></li>
     </ul>
 
     <h2>5. Retention and deletion</h2>
@@ -156,7 +156,9 @@
     <p><a href="mailto:dnjsrb980607@gmail.com">dnjsrb980607@gmail.com</a></p>
   </section>
 
-  <footer>총칼대전</footer>
+  <!-- [stated] 영어로 볼 때 맨 밑 이름이 한글로 나왔다 (2026-10-21) → 꼬리말·탭 제목도 언어마다 -->
+  <footer data-lang="ko">총칼대전</footer>
+  <footer data-lang="en" hidden>Gun Sword Arena</footer>
 </main>
 <script>
   (function(){
@@ -165,7 +167,9 @@
     var lang = q === 'en' || q === 'ko' ? q : (/^ko/i.test(nav) ? 'ko' : 'en');
     function show(l){
       document.documentElement.lang = l;
-      document.querySelectorAll('section[data-lang]').forEach(function(s){ s.hidden = s.getAttribute('data-lang') !== l; });
+      document.querySelectorAll('[data-lang]').forEach(function(s){ s.hidden = s.getAttribute('data-lang') !== l; });
+      var h = document.querySelector('section[data-lang="' + l + '"] h1');
+      if (h) document.title = h.textContent;
       document.querySelectorAll('.lang button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-l') === l); });
     }
     document.querySelectorAll('.lang button').forEach(function(b){

@@ -17,7 +17,7 @@ import { tutoDone, markTutoDone } from './state/tutorial.js';
 import GameCanvas from './ui/GameCanvas.jsx';
 import { getSettings, setSetting } from './state/settings.js';
 import { onLangChange, t } from './i18n/index.js';
-import { initBack, setBackHandler, tryInnerBack, exitApp } from './state/back.js';
+import { initBack, setBackHandler, tryInnerBack, tryOverlayBack, exitApp } from './state/back.js';
 import { updateBlocked } from './state/update.js';
 import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
@@ -191,6 +191,9 @@ export default function App(){
       if (askExit){ setAskExit(false); return true; }
       if (askQuit){ setAskQuit(false); return true; }
       if (askRoom){ setAskRoom(false); return true; }
+      if (kickedNote){ setKickedNote(false); return true; }
+      // [stated] **위에 뜬 창(프로필 등)부터 닫는다** — 프로필에서 뒤로가기를 누르면 "게임 종료" 창이 떴다
+      if (tryOverlayBack()) return true;
       // 설정 안에 열린 창(개인정보처리방침)이 있으면 그것부터 닫는다
       if (showSettings){ if (settingsBack.current && settingsBack.current()) return true; setShowSettings(false); return true; }
       if (screen === 'game'){ setAskQuit(true); return true; }
@@ -218,7 +221,7 @@ export default function App(){
       if (screen === 'home'){ setAskExit(true); return true; }
       return true;
     });
-  }, [screen, showSettings, askQuit, askExit, askRoom, goHome, search, cancelSearch]);
+  }, [screen, showSettings, askQuit, askExit, askRoom, kickedNote, goHome, search, cancelSearch]);
   const beginPvp  = useCallback(opt => {
     disconnect();
     // kind는 게임 종류(pvp/ai), mode는 접속 방식(queue/create/join).
@@ -461,6 +464,7 @@ export default function App(){
                                           onPhaseChange={setGPhase} />}
       {screen === 'result'   && <Result result={result} summary={summary} score={score} session={session} host={isHost} gain={gain}
                                        waiting={againWait} paused={!!againAsk}
+                                       autoHome={!(getRoom() && (session?.mode === 'create' || session?.mode === 'join'))}
                                        onAuto={() => {
                                          // [stated] **5초가 지나면 결판난다** — 수락 창이 떠 있으면 거절과 같게
                                          if (againAsk){ setAgainAsk(null); answerAgain(false); return; }

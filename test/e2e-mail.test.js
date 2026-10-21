@@ -146,6 +146,14 @@ try {
     const body = () => p.evaluate(() => document.body.innerText);
 
     assert(/퀘스트 보상/.test(await body()), '  우편 한 줄이 보인다');
+    // [stated] **퀘스트의 [보상 한번에 받기] 와 같은 버튼** (2026-10-21)
+    const allBtn = () => p.evaluate(() => {
+      const b = document.querySelector('.mailbox .q-takeall');
+      return b && { text: b.textContent.trim(), on: !b.disabled, frame: getComputedStyle(b).borderImageSource };
+    });
+    const ab = await allBtn();
+    assert(ab && ab.text === '보상 한번에 받기' && ab.on && ab.frame === 'none',
+      `  한번에 받기 버튼이 퀘스트와 같은 꼴로 켜져 있다 (${JSON.stringify(ab)})`);
     const before = await coinTag();
 
     await tap('받기');
@@ -164,6 +172,8 @@ try {
     const after = await coinTag();
     assert(after === before + mailCoin, `  위쪽 코인이 올랐다 (${before} → ${after})`);
     assert(/받을 우편이 없습니다/.test(txt), '  받은 줄은 목록에서 사라졌다');
+    const ab2 = await allBtn();
+    assert(ab2 && !ab2.on, '  받을 게 없으면 한번에 받기 버튼이 꺼진다');
 
     // 다 받으면 홈의 빨간 점도 사라진다
     await p.evaluate(() => {

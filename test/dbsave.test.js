@@ -6,6 +6,7 @@
 //  2. 내 등수: 세 종목을 한꺼번에 물어도 내 문서는 한 번, 전체 인원은 10분에 한 번,
 //     '이 점수보다 높은 사람' 은 종목·점수별로 5분 같이 쓴다. 값은 정확하다. 실패는 담아 두지 않는다
 //  3. 봇 자리에는 퀘스트 진행도를 안 쓴다 (진짜 서버 + 가짜 저장소로 한 판)
+//  4. 켤 때 연결 미리 열기 — `__이름__` 꼴 문서는 파이어스토어가 예약해 거절한다 (2026-10-20 디스코드 알림으로 드러남)
 import { spawn } from 'child_process';
 import wsPkg from '../server/node_modules/ws/index.js';
 import { assert, waitPort } from './harness.js';
@@ -64,6 +65,18 @@ const fake = {
 };
 S.__useDb(fake, async () => {});
 for (let i = 0; i < 100; i++) data.set('players/p' + i, { nick: 'p' + i, score: { gun: i * 10, melee: 1000, soccer: 0 } });
+
+console.log('켤 때 연결 미리 열기 — 예약된 문서 이름을 안 쓴다');
+{
+  const seen = [];
+  const doc0 = fake.doc;
+  fake.doc = p => { seen.push(p); return doc0(p); };
+  S.warmup();
+  await sleep(50);
+  fake.doc = doc0;
+  const bad = seen.filter(p => /^__.*__$/.test(p.split('/').pop()));
+  assert(seen.length === 1 && bad.length === 0, `  읽는 문서: ${seen.join(', ')} (예약된 이름 아님)`);
+}
 
 console.log('순위표 — 상위 30명이 바뀔 수 있을 때만 다시 만든다');
 {

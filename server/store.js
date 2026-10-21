@@ -164,7 +164,9 @@ export async function findByNick(nick){
  *  없는 문서를 한 번 읽어 그 비용을 부팅 쪽으로 옮긴다 (실패해도 무시) */
 export function warmup(){
   if (!db) return;
-  db.doc('players/__warmup__').get()
+  // [stated] **`__이름__` 꼴 문서 이름은 파이어스토어가 예약해 둬서 거절한다** (2026-10-20 디스코드 알림으로 드러남).
+  // 예전엔 로그에만 남아 몰랐다. 연결은 열렸지만 매번 실패로 찍혔다 → 실제로 있는 순위표 문서를 읽는다(읽기 1회)
+  db.doc('ranks/gun').get()
     .then(() => console.log('[store] 연결 미리 열어둠'))
     .catch(e => fail('warn', 'warmup', 'Firestore 연결 미리 열기 실패', e));
 }
@@ -993,8 +995,15 @@ export async function bumpQuest(uid, m){
 
 /** [stated] 게임 누적 접속 시간 — 클라가 **화면이 보일 때만** 세어 보낸다.
  *  **하루 상한으로 자른다** — 안 자르면 큰 값을 보내 한 번에 채울 수 있다 */
+const PLAY_ONE = 300;           // 한 번에 받는 최대 (초) — 앱은 4분마다 보낸다
+const PLAY_SLACK = 20;          // 접속 시간 보고의 통신 지연 여유 (초)
+// **검사 전용** — 예전처럼 보고를 그대로 믿는다. 검사들이 시간 퀘스트를 채우려고 5분 보고를 연달아 보낸다.
+// `E2E_DEBUG` 와 가짜 저장소가 둘 다 켜진 검사 서버에서만 (Render 에는 둘 다 없다).
+// 진짜 규칙을 보는 검사는 `E2E_TIME_REAL=1` 로 끈다
+const playTrust = () => process.env.E2E_DEBUG === '1' && process.env.E2E_FAKE_STORE === '1'
+  && process.env.E2E_TIME_REAL !== '1';
 export async function addPlayTime(uid, sec){
-  const add = Math.max(0, Math.min(300, sec | 0));      // 한 번에 5분까지만
+  const add = Math.max(0, Math.min(PLAY_ONE, sec | 0));      // 한 번에 5분까지만
   if (!isOn() || !uid || !add) return false;
   try {
     await withDoc(uid, async (tx, dbx) => {
@@ -1005,8 +1014,19 @@ export async function addPlayTime(uid, sec){
       const today = dayKey();
       const had = (v.sec && v.sec.day === today) ? (v.sec.n | 0) : 0;
       const room = Math.max(0, PLAY_DAY_MAX - had);
-      const give = Math.min(add, room);
+      // [stated] **"N초 했다"는 앱의 말을 그대로 믿지 않는다** (2026-10-21 점검에서 찾음).
+      // 예전엔 요청만 연달아 보내면 하루 4시간치를 바로 채워 시간 퀘스트 코인을 받을 수 있었다.
+      // → **실제로 흐른 시간**까지만 인정한다. `sec.at` 은 "여기까지는 인정해 줬다" 는 시각이다 —
+      //   인정한 초만큼만 앞으로 민다. 그래서 요청을 아무리 연달아 보내도 **합계가 흐른 시간(+여유 20초)을 못 넘는다**.
+      //   앱은 화면이 보이는 동안 1초씩 세어 4분마다 보내므로 정상이면 늘 그 안쪽이다.
+      //   **쌓아 둘 수 있는 몫은 한 번 몫(5분)까지** — 어제 마지막으로 보고했다고 오늘 한꺼번에 몇 시간을 받으면 안 된다.
+      //   처음 보고도 앞이 없으니 한 번 몫까지
+      const lastAt = v.sec && Number.isFinite(v.sec.at) ? v.sec.at : 0;
+      const base = Math.max(lastAt, now - PLAY_ONE * 1000);
+      const real = Math.max(0, Math.floor((now - base) / 1000) + PLAY_SLACK);
+      const give = Math.min(add, room, playTrust() ? add : real);
       if (!give) return;
+      const nextAt = playTrust() ? now : base + give * 1000;
       const { per, mail } = rollAll(v, now);
       // 시간 퀘스트는 **쌓이는 값**이라 초를 그대로 더한다
       for (const p of PERIODS)
@@ -1014,7 +1034,7 @@ export async function addPlayTime(uid, sec){
           if (q.time) per[p].v[q.id] = Math.min(q.goal, (per[p].v[q.id] | 0) + give);
       const box = [...(Array.isArray(v.mail) ? v.mail : []), ...mail].slice(-MAIL_KEEP);
       if (!per.d.full && allDone('d', per.d)){ per.d.full = true; qbump(per.w, 'w', 'dDone', 1); }
-      const patch = { qd: per.d, qw: per.w, qm: per.m, mail: box, sec: { day: today, n: had + give } };
+      const patch = { qd: per.d, qw: per.w, qm: per.m, mail: box, sec: { day: today, n: had + give, at: nextAt } };
       tx.set(ref, patch, whole(patch));
     });
     return true;

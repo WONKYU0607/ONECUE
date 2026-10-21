@@ -7,6 +7,7 @@ import ProfAvatar from './ProfAvatar.jsx';
 import { loadAllRanks, cachedRank, fmtRank } from '../state/ranks.js';
 import { resyncAccount } from '../cloud/sync.js';
 import { t } from '../i18n/index.js';
+import useOverlayBack from './useOverlayBack.js';
 
 // 프로필 탭. 캐릭터 옆에 닉네임, 오른쪽 위에 수정 버튼
 export default function ProfileTab({ onClose, onFriends }){
@@ -116,6 +117,17 @@ export default function ProfileTab({ onClose, onFriends }){
     }
   };
 
+  // [stated] **뒤로가기 = 프로필 닫기** (2026-10-21 — 바로 "게임 종료" 창이 떴다).
+  // 안에 열린 것부터 닫는다: 계정 삭제 확인 → 로그아웃 확인 → 이름 고치기 → 프로필.
+  // 지우는 중·이름 확인 중에는 받기만 하고 아무것도 안 한다 (도중에 닫히면 결과를 못 본다)
+  useOverlayBack(true, () => {
+    if (askDel){ if (!delBusy){ setAskDel(false); setDelMsg(''); } return true; }
+    if (askOut){ setAskOut(false); return true; }
+    if (edit){ if (!nickBusy){ setEdit(false); setNickMsg(''); } return true; }
+    onClose?.();
+    return true;
+  });
+
   return (
     <div className="modal-back" onClick={e => e.target === e.currentTarget && onClose?.()}>
       <div className="modal prof-tab">
@@ -140,7 +152,8 @@ export default function ProfileTab({ onClose, onFriends }){
           )}
         </div>
 
-        {edit && <p className="hint nick-hint">영문 {NICK_MAX}자 · 한글 {NICK_MAX_KO}자까지</p>}
+        {/* 영어판에서도 한글로 나왔다 (2026-10-21 번역 전수조사) */}
+        {edit && <p className="hint nick-hint">{t('nick.limit', { en: NICK_MAX, ko: NICK_MAX_KO })}</p>}
         {nickMsg && <p className="hint nick-hint">{nickMsg}</p>}
 
         {/* [stated] **기본 색 고르기는 코스튬으로 옮겼다** — 겉모습은 한곳에 모은다 */}

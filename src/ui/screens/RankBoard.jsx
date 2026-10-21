@@ -77,7 +77,8 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
         <span className="spacer" />
       </header>
 
-      <div className="menu wide-menu">
+      {/* [stated] **폰에서 밑 부분이 하단바에 가려 잘렸다** (2026-10-21) → 남은 높이만큼만 쓰고 목록만 굴린다 */}
+      <div className="menu wide-menu rb-wrap">
         {/* [stated] **한 줄에 셋** — 총격전 · 칼전 · 친구.
             앞의 둘은 전체 순위표, `친구` 는 친구끼리만 보는 순위표로 넘어간다 */}
         <div className="pick-row rb-tabs">

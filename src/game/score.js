@@ -16,6 +16,7 @@
 //   이탈   나간 사람 −100 / 남은 사람은 져도 0
 //   하한   0 밑으로 안 내려간다
 import { teamOf, MAXHP } from './config.js';
+import { ffaRanks, ffaResult } from './ffa.js';
 
 export const LEAVE_PENALTY = -100;
 export const STREAK_STEP = 0.10;    // 한 단계마다
@@ -57,18 +58,8 @@ export function ffaSkillMul(myScore, foeScore, n, rank){
   const lo = rawMul(myScore, foeScore, false);
   return clampMul(lo + (hi - lo) * perf);             // 두 값의 합이 2라 한가운데는 정확히 1.0
 }
-// 개인전 등수: 살아남은 순서. 체력이 남은 사람이 위, 같으면 피해가 많은 쪽이 위
-function ffaRanks(st){
-  const idx = st.p.map((_, i) => i);
-  idx.sort((a, b) => {
-    const ha = Math.max(0, st.p[a].hp), hb = Math.max(0, st.p[b].hp);
-    if (ha !== hb) return hb - ha;
-    return ((st.dealt || [])[b] || 0) - ((st.dealt || [])[a] || 0);
-  });
-  const rank = new Array(st.n).fill(0);
-  idx.forEach((slot, i) => { rank[slot] = i + 1; });
-  return rank;
-}
+// 개인전 등수·결과는 `ffa.js` 한 곳에서 정한다 — 시뮬의 승자 판정·결과 화면·서버 퀘스트와 같은 것을 쓴다.
+// (예전엔 여기 따로 등수를 매겨, 시간 만료 때 화면과 다른 사람이 1등이 됐다)
 
 /**
  * 한 사람의 점수 변화를 계산한다.
@@ -96,8 +87,9 @@ export function scoreDelta(st, slot, opt = {}){
     const byRank = n > 1 ? 40 * (n - rank) / (n - 1) : 40;
     const byDmg = out.total > 0 ? 60 * (out.mine / out.total) : 0;
     out.base = byRank + byDmg;
-    out.result = rank === 1 ? 'win' : 'lose';
-    out.streakMul = rank === 1 ? streakMul(opt.streak) : 1;
+    // 이겼는지는 **시뮬이 정한 승자**를 따른다 (공동 1등이면 무승부 — 연승 배율 없음)
+    out.result = ffaResult(st, slot);
+    out.streakMul = out.result === 'win' ? streakMul(opt.streak) : 1;
     // [stated] 개인전도 강약 차등을 맞춘다. 승패가 갈리는 판이 아니라 **등수가 연속적**이므로
     // 성적 비율(1등 1.0 ~ 꼴찌 0)로 이길 때 배율과 질 때 배율 사이를 잇는다.
     // 두 배율의 합이 2 라서 **한가운데 등수는 정확히 1.0** 으로 떨어진다

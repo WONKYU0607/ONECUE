@@ -5,6 +5,8 @@ import { WebSocketServer } from 'ws';
 import { Server } from '../src/game/net.js';
 import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY, PH_OVER, PH_READY, readyLimit } from '../src/game/config.js';
 import { scoreDelta } from '../src/game/score.js';
+import { ffaResult } from '../src/game/ffa.js';
+import { fromWeb } from './webgate.js';
 import { createAI } from '../src/game/ai.js';
 import { createSoccerAI } from '../src/game/soccer-ai.js';
 import { BOTS, pickBot } from './bots.js';
@@ -433,9 +435,11 @@ class Room {
       }
       const team = teamOf(i, st.n);
       const goals = st.soccer ? ((st.score && st.score[team]) | 0) : 0;
-      // `winner` 는 **팀+1**, 0 이면 무승부. 개인전은 이긴 자리+1 이라 같은 식으로 맞는다
-      const me = st.ffa ? i + 1 : team + 1;
-      const res = (st.winner | 0) === 0 ? 'draw' : ((st.winner | 0) === me ? 'win' : 'lose');
+      // `winner` 는 **팀+1**, 0 이면 무승부.
+      // [stated] 개인전은 결과 화면·코인과 **같은 판정**(`ffa.js`)을 쓴다 — 예전엔 시간 만료 때
+      // 승리 퀘스트가 화면에 승리로 뜬 엉뚱한 사람에게 올라갔다 (2026-10-21)
+      const res = st.ffa ? ffaResult(st, i)
+        : ((st.winner | 0) === 0 ? 'draw' : ((st.winner | 0) === team + 1 ? 'win' : 'lose'));
       store.bumpQuest(seat.uid, { kind, res, goals }).catch(bug('퀘스트 갱신'));
     }
   }
@@ -898,6 +902,12 @@ class Room {
 // 웹소켓만 열어두면 브라우저로 살아있는지 확인할 방법이 없다.
 // Render 무료 플랜은 HTTP 요청으로도 깨어나므로 상태 확인용 엔드포인트를 둔다.
 const http = createServer((req, res) => {
+  // [stated] **웹판에서 온 요청은 받지 않는다** — 출시 후 게임은 앱으로만 (`webgate.js`)
+  if (fromWeb(req.headers.origin)){
+    res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, web: true }));
+    return;
+  }
   res.setHeader('Access-Control-Allow-Origin', '*');   // 브라우저 fetch로 깨울 수 있어야 함
   // [stated] 닉네임은 **유일**해야 한다 (친구를 이름으로 찾는다).
   // **쓰기라서 증표(token)로 본인 확인을 한다** — uid 만 받으면 남의 이름을 바꿀 수 있다
@@ -1377,6 +1387,8 @@ function pairUp(key){
 }
 
 wss.on('connection', (ws, req) => {
+  // [stated] **웹판에서 온 접속은 끊는다** — 출시 후 게임은 앱으로만 (`webgate.js`)
+  if (fromWeb(req.headers.origin)){ try { ws.close(4403, 'app only'); } catch { /* 무시 */ } return; }
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
 
@@ -1675,7 +1687,16 @@ wss.on('connection', (ws, req) => {
       if (typeof m.win === 'number'){
         const wt = teamOf(m.win | 0, st.n);
         for (let i = 0; i < st.n; i++) if (teamOf(i, st.n) !== wt) st.p[i].hp = 0;
-      } else st.clock = 1;
+      } else {
+        // `hp` 를 주면 자리마다 그 체력으로 두고 **시간 만료**로 끝낸다 — 개인전 시간 만료 승자 검사용 (2026-10-21).
+        // 상태를 직접 바꿨으니 스냅샷을 보내 클라도 같은 값에서 끝나게 한다
+        if (Array.isArray(m.hp)){
+          m.hp.forEach((v, i) => { if (st.p[i]) st.p[i].hp = v | 0; });
+          if (Array.isArray(m.dealt)) st.dealt = st.p.map((_, i) => +m.dealt[i] || 0);
+        }
+        st.clock = 1;
+        if (Array.isArray(m.hp)) ws.room.send({ t: 's', tick: st.tick, st: JSON.parse(JSON.stringify(st)) });
+      }
       return;
     }
     // **검사 전용** — 저장된 점수를 돌려준다. `E2E_DEBUG=1` 일 때만

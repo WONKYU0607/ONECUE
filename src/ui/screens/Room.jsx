@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { t } from '../../i18n/index.js';
 import InviteFriends from '../InviteFriends.jsx';
+import useOverlayBack from '../useOverlayBack.js';
 import { getColor } from '../../state/profile.js';
 import { pickTeam, unpickTeam, setRoomMode, startRoom, watchRoom, kickPlayer, kickWatcher } from '../../net/connection.js';
 
@@ -23,6 +24,8 @@ export default function Room({ room, onLeave }){
   const [, tick] = useState(0);
   // [stated] 강퇴 확인 창 — 누구를 뺄지 ({slot, nick})
   const [kickWho, setKickWho] = useState(null);
+  // 강퇴 확인이 떠 있으면 뒤로가기는 그 창만 닫는다 (방 나가기 확인보다 먼저)
+  useOverlayBack(!!kickWho, () => { setKickWho(null); return true; });
   useEffect(() => {
     // 방 상태는 소켓으로 흘러온다. 바뀌면 다시 그린다
     const id = setInterval(() => tick(v => v + 1), 300);

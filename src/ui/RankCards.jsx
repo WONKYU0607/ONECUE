@@ -10,6 +10,7 @@ import TierIcon from './TierIcon.jsx';
 import { loadAllRanks, cachedRank, fmtRank } from '../state/ranks.js';
 import { onServerAwake } from '../net/connection.js';
 import { t } from '../i18n/index.js';
+import FitText from './FitText.jsx';
 
 export default function RankCards({ onOpen }){
   const [ranks, setRanks] = useState(() => ({
@@ -40,7 +41,7 @@ export default function RankCards({ onOpen }){
         <button key={k} className="rank-card" onClick={() => onOpen && onOpen(k)}>
           <TierIcon score={scoreOf(k)} />
           <span className="rc-nm">{nm}</span>
-          <span className="rc-rank">{line(ranks[k])}</span>
+          <span className="rc-rank"><FitText>{line(ranks[k])}</FitText></span>
         </button>
       ))}
     </div>

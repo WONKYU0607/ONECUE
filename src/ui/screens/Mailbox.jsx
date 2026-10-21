@@ -65,11 +65,11 @@ export default function Mailbox({ onBack }){
         {box && !box.length && <p className="res-wait">{t('mail.empty')}</p>}
       </div>
 
-      {!!total && (
-        <button className="menu-btn primary" disabled={busy} onClick={() => take('')}>
-          <span className="t">{t('mail.takeAll', { n: total })}</span>
-        </button>
-      )}
+      {/* [stated] **퀘스트의 [보상 한번에 받기] 와 같은 버튼으로** (2026-10-21 — 예전엔 금속 틀 [전부 받기 (N 코인)]).
+          목록 바로 밑에 늘 있고, 받을 게 없으면 꺼진다 */}
+      <button className="q-takeall" disabled={busy || !total} onClick={() => take('')}>
+        {t('q.takeAll')}
+      </button>
       {msg && <p className="res-wait">{msg}</p>}
       </div>
     </div>

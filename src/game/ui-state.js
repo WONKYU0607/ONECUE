@@ -6,6 +6,7 @@
 //   - 상태 갱신 루프가 PH_READY에서만 돌아 칼전(카운트다운)에선 버튼이 안 뜸
 // 여기로 옮기면 평범한 상태 객체만 있으면 검사할 수 있다. JSX는 받은 대로 그리기만 한다.
 import { PH_READY, PH_COUNT, teamOf } from './config.js';
+import { ffaResult } from './ffa.js';
 import { t } from '../i18n/index.js';
 
 // 이 판의 결과가 나에게 무엇인가.
@@ -52,6 +53,8 @@ export function matchSummary(st, slot){
 
 export function resultFor(st, slot){
   if (!st) return 'lose';
+  // 개인전은 코인·점수와 같은 판정(`ffa.js`) — 공동 1등만 무승부, 나머지는 패배
+  if (st.ffa) return ffaResult(st, slot);
   const w = st.winner | 0;
   if (w === 0) return 'draw';
   return w === teamOf(slot, st.n || 2) + 1 ? 'win' : 'lose';

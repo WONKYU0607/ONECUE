@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { TEAMS } from '../../game/config.js';
+import { ffaRanks } from '../../game/ffa.js';
 import { t } from '../../i18n/index.js';
 import { sfx } from '../../game/audio.js';
 import { leftFor, socLeft } from '../../state/tickets.js';
@@ -49,7 +50,7 @@ function CoinGain({ n }){
   );
 }
 
-export default function Result({ result, summary, score, session, host, waiting, paused, onAuto,
+export default function Result({ result, summary, score, session, host, waiting, paused, onAuto, autoHome,
                                 onAgain, onMode, onRoom, onNext, onHome, gain = 0 }){
   // [stated] **결과 화면에서 아무것도 안 누르면 다음 판을 못 한다** → 5초 뒤 저절로 로비로.
   // 다시 하기 신청을 받았거나(수락 창) 상대 응답을 기다리는 동안에는 **세지 않는다**
@@ -106,8 +107,10 @@ export default function Result({ result, summary, score, session, host, waiting,
   const rows = summary?.rows || [];
   const total = summary?.totalDealt || 0;
   // 개인전은 팀이 없으니 한 줄로, 팀전은 우리 편 먼저
+  // 개인전 줄 순서 = 등수. 승자·코인과 **같은 등수**(`ffa.js`)를 쓴다 — 화면이 따로 정렬하면 또 어긋난다
+  const rk = summary?.ffa && summary.state ? ffaRanks(summary.state) : null;
   const ordered = summary?.ffa
-    ? [...rows].sort((a, b) => b.hp - a.hp || b.dealt - a.dealt)
+    ? [...rows].sort((a, b) => (rk ? rk[a.slot] - rk[b.slot] : 0) || b.hp - a.hp || b.dealt - a.dealt || a.slot - b.slot)
     : [...rows].sort((a, b) => (b.mine - a.mine) || (b.hp - a.hp));
 
   return (
@@ -219,7 +222,9 @@ export default function Result({ result, summary, score, session, host, waiting,
         )}
         {/* [stated] 버튼 밑에 남은 시간 */}
         {auto && !waiting && (
-          <p className="res-auto">{t('res.autoBack', { s: left })}</p>
+          // [stated] **빠른 매칭은 홈으로 간다** — 예전엔 늘 "로비로 돌아갑니다" 라고 해 놓고 홈으로 갔다 (2026-10-21).
+          // 어디로 갈지는 App 이 `onAuto`·`backToRoom` 과 같은 조건(방 + 만든·들어간 방)으로 정해 준다
+          <p className="res-auto">{t(autoHome ? 'res.autoHome' : 'res.autoBack', { s: left })}</p>
         )}
         {!onRoom && (<>
         {/* [stated] **방장은 종목도 바꿀 수 있다** — 인원수는 그대로라 자리가 안 흔들린다.

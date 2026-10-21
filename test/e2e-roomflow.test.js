@@ -108,6 +108,11 @@ try {
 
   console.log('판이 끝나면 둘 다 결과 화면');
   assert(await endMatch(), '  결과 화면까지 온다');
+  // 2026-10-21 점검: 빠른 매칭은 "로비로" 라고 해 놓고 홈으로 갔다 → 방에서 친 판만 "로비로"
+  {
+    const autoTxt = await A.evaluate(() => document.querySelector('.res-auto')?.textContent || '');
+    assert(/로비로/.test(autoTxt), `  방에서 친 판은 "로비로 돌아갑니다" (${autoTxt})`);
+  }
 
   // [stated] **다시 하기는 묻고 시작한다** — 신청 → 상대에게 수락 창 → 예면 새 판
   console.log('[다시 하기] — 상대에게 묻고, 수락하면 둘 다 새 판으로');

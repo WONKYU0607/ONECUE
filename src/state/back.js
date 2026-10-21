@@ -20,6 +20,23 @@ export function setInnerBack(fn){ inner = fn; }
  *  → 정리할 때는 이것을 쓴다. 이미 다른 화면이 걸었으면 건드리지 않는다 */
 export function releaseInnerBack(fn){ if (inner === fn) inner = null; }
 
+// [stated] **프로필을 열고 뒤로가기를 누르면 프로필이 닫혀야 한다** (2026-10-21 — 바로 "게임 종료" 창이 떴다).
+// 프로필은 화면이 아니라 홈 위에 뜬 창이라 App 의 목록 어디에도 없었다.
+// → **위에 뜬 창은 여기에 쌓는다.** 나중에 뜬 것부터 묻고, true 를 돌려준 것에서 멈춘다.
+// `inner` 는 한 칸뿐이라 홈의 칸 뒤로가기와 겹치면 서로 지운다 — 그래서 따로 둔다
+const overlays = [];
+/** 위에 뜬 창의 뒤로가기를 쌓는다. 돌려받은 함수를 부르면 내린다 */
+export function pushOverlayBack(fn){
+  overlays.push(fn);
+  return () => { const i = overlays.lastIndexOf(fn); if (i >= 0) overlays.splice(i, 1); };
+}
+export function tryOverlayBack(){
+  for (let i = overlays.length - 1; i >= 0; i--){
+    try { if (overlays[i]()) return true; } catch { /* 무시 */ }
+  }
+  return false;
+}
+
 /** 앱을 닫는다. 웹에서는 닫을 방법이 없어 아무 일도 안 일어난다 */
 export function exitApp(){
   try {

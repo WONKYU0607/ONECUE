@@ -6,6 +6,9 @@
 // 진행도·코인은 **서버가 쥔다** — 기기에 두면 저장을 고쳐서 무한이 된다.
 // 여기서는 가짜 저장소(`E2E_FAKE_STORE`)로 진짜와 **같은 코드**를 돌린다.
 process.env.E2E_FAKE_STORE = '1';
+// 시간 퀘스트를 채우려고 5분 보고를 연달아 보낸다 → 검사 서버처럼 보고를 그대로 믿게 둔다.
+// "흐른 시간까지만 인정" 하는 진짜 규칙은 `playtime.test.js` 가 따로 본다 (2026-10-21)
+process.env.E2E_DEBUG = '1';
 import fs from 'fs';
 import { assert } from './harness.js';
 import { fileURLToPath } from 'url';

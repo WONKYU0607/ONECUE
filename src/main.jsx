@@ -1,6 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import WebOnly from './ui/screens/WebOnly.jsx';
+import { webBlocked } from './state/webgate.js';
 import { startSync } from './cloud/sync.js';
 import { apply as applyHomeUI, watchHomeBar } from './state/homeLayout.js';
 import { measureSafeArea, watchSafeArea } from './state/safearea.js';
@@ -47,16 +49,18 @@ watchHomeBar();
 // 거기서 1분을 기다렸다. 앱을 켠 순간 두드려 두면 사용자가 홈·프로필을 보는 동안
 // 서버가 일어나서, PVP 를 누를 때는 이미 데워져 있다.
 // **답을 안 기다린다** — 화면은 그대로 뜬다
-import('./net/connection.js').then(m => m.wakeServer(20000)).catch(() => {});
+// [stated] **웹판은 게임을 막는다** (`state/webgate.js`) — 서버도 깨우지 않고 로그인도 안 한다
+const blocked = webBlocked();
+if (!blocked) import('./net/connection.js').then(m => m.wakeServer(20000)).catch(() => {});
 // 익명 로그인 + 구름 기록 내려받기. **첫 화면을 막지 않는다** —
 // Firebase는 따로 받아오고, 실패해도 기기 저장으로 게임이 돌아간다
-setTimeout(() => { startSync().catch(() => {}); }, 0);
+if (!blocked) setTimeout(() => { startSync().catch(() => {}); }, 0);
 // **검사 전용 — 개발 서버에서만.** StrictMode 는 화면을 두 번 붙였다 뗀다.
 // 그러면 접속도 두 번 열려 **서버가 "한 명 나갔다"로 보고 방을 끝낸다** —
 // 화면 흐름 검사에서는 끈다. `import.meta.env.DEV` 라 빌드에는 안 들어간다
 const e2e = import.meta.env.DEV && new URLSearchParams(location.search).get('e2e') === '1';
 createRoot(document.getElementById('root')).render(
-  e2e ? <App /> : (
+  blocked ? <WebOnly /> : e2e ? <App /> : (
   <React.StrictMode>
     <App />
   </React.StrictMode>)

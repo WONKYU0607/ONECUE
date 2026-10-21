@@ -1,4 +1,5 @@
 // 첫 화면: 모드 선택 + 설정
+/* global __BUILD_STAMP__ */
 import PlayerBar from '../PlayerBar.jsx';
 import RankCards from '../RankCards.jsx';
 import CoinRow from '../CoinRow.jsx';
@@ -25,6 +26,18 @@ export default function Home({ onStart, search, joining, onCancelSearch, onAi, o
   // [stated] **칸은 하나만 펼친다** — 하나를 열면 나머지는 접힌다 (예전엔 넷이 다 같이 열려 있었다).
   // 마지막으로 연 칸의 이름만 들고 있고, 칸마다 "내가 아니면 접는다"
   const [act, setAct] = useState(null);
+  // 앱이면 **스토어 버전**(versionName · versionCode)을 앱에게 묻는다 — 웹에는 없다
+  const [appVer, setAppVer] = useState('');
+  useEffect(() => {
+    let live = true;
+    try {
+      const A = globalThis.Capacitor?.Plugins?.App;
+      if (A?.getInfo && globalThis.Capacitor?.isNativePlatform?.())
+        A.getInfo().then(i => { if (live && i && i.version) setAppVer(`v${i.version}${i.build ? ` (${i.build})` : ''}`); }).catch(() => {});
+    } catch { /* 웹 — 무시 */ }
+    return () => { live = false; };
+  }, []);
+  const stamp = typeof __BUILD_STAMP__ === 'string' ? __BUILD_STAMP__ : '';
 
   return (
     <div className="screen home">
@@ -60,9 +73,10 @@ export default function Home({ onStart, search, joining, onCancelSearch, onAi, o
         </button>
       </div>
 
-      {/* **배포됐는지 눈으로 확인하는 표시.** 고칠 때마다 올린다 —
-          "덮었는데도 안 된다"가 옛 빌드 때문인지 바로 가려낼 수 있다 */}
-      <p className="ver">v0.2.6</p>
+      {/* **배포됐는지 눈으로 확인하는 표시.** "덮었는데도 안 된다"가 옛 빌드 때문인지 바로 가려낼 수 있다.
+          [stated] 예전엔 `v0.2.6` 을 손으로 올렸다 → 이제 **빌드 시각이 저절로** 찍힌다(웹·앱 모두).
+          앱이면 앞에 스토어 버전도 붙는다 */}
+      <p className="ver">{[appVer, stamp].filter(Boolean).join(' · ')}</p>
     </div>
   );
 }

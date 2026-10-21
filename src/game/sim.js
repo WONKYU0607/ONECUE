@@ -93,6 +93,8 @@ import {
   TACKLE_SLIDE, faceVec, SOC_STUN, RELEASE_TICKS, TACKLE_HIT, TACKLE_BOX,
   TACKLE_V
 } from './ball.js';
+// [stated] 개인전 등수·승자는 **한 곳에서** 정한다 — 화면·코인·점수·퀘스트가 같은 사람을 1등으로 치게 (2026-10-21)
+import { ffaWinner } from './ffa.js';
 
 // ================= SIM (pure, deterministic) =================
 export function newItems(){ return []; }
@@ -521,7 +523,8 @@ export function forfeit(s, slot){
   const left = alive.filter(v => v > 0);
   if (left.length <= 1){
     s.over = true; s.phase = PH_OVER;
-    s.winner = left.length === 0 ? 0 : alive.findIndex(v => v > 0) + 1;
+    // 개인전은 다 쓰러져도(동시) 등수로 가린다 — 코인·점수와 같은 사람을 1등으로 친다 (`ffa.js`)
+    s.winner = s.ffa ? ffaWinner(s) : (left.length === 0 ? 0 : alive.findIndex(v => v > 0) + 1);
   }
 }
 export function canThrow(s, slot, k){
@@ -1205,7 +1208,9 @@ export function step(s, inp){
     // [stated] **튜토리얼은 판이 안 끝난다** — 상대가 죽어도 되살아나 계속 배운다
     if (left.length <= 1 && !s.tuto){
       s.over = true; s.phase = PH_OVER;
-      s.winner = left.length === 0 ? 0 : alive.findIndex(v => v > 0) + 1;
+      // [stated] 개인전에서 마지막 둘이 **동시에** 쓰러지면 화면은 무승부인데 코인·점수는 한 명을 승리로 쳤다.
+      // → 개인전은 등수(체력 → 준 피해)로 가린다. 그래도 같으면 무승부 (`ffa.js`)
+      s.winner = s.ffa ? ffaWinner(s) : (left.length === 0 ? 0 : alive.findIndex(v => v > 0) + 1);
     }
   }
 
@@ -1446,9 +1451,14 @@ export function step(s, inp){
   if (!s.soccer && !s.solo && !s.tuto && !s.over && s.phase === PH_PLAY && s.clock > 0 && --s.clock === 0){
     s.over = true; s.phase = PH_OVER;
     // 시간이 다 되면 팀 체력 합이 많은 쪽 승
-    const sum = [0, 0];
-    for (let i = 0; i < s.n; i++) sum[teamOf(i, s.n)] += Math.max(0, s.p[i].hp);
-    s.winner = sum[0] === sum[1] ? 0 : (sum[0] > sum[1] ? 1 : 2);
+    // [stated] **개인전은 팀이 자리마다 따로다.** 예전엔 여기서도 두 칸(`sum[0]`, `sum[1]`)만 더해
+    // 1·2번 자리만 비교하고 3번부터는 빠졌다 → 결과 화면이 엉뚱한 사람에게 승리를 띄웠다 (2026-10-21)
+    if (s.ffa) s.winner = ffaWinner(s);
+    else {
+      const sum = [0, 0];
+      for (let i = 0; i < s.n; i++) sum[teamOf(i, s.n)] += Math.max(0, s.p[i].hp);
+      s.winner = sum[0] === sum[1] ? 0 : (sum[0] > sum[1] ? 1 : 2);
+    }
   }
 
 }

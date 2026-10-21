@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>총칼대전 계정 삭제</title>
 <!-- [stated] 계정 삭제 안내 (2026-10-12). 플레이 콘솔 데이터 보안 양식의 '계정 삭제 웹 주소'에 넣는다.
-     앱을 지웠거나 쓸 수 없는 사람도 지울 길이 있어야 한다 — 웹 버전에서 지우거나 이메일로 요청.
+     앱을 지웠거나 쓸 수 없는 사람도 지울 길이 있어야 한다 — 이메일로 요청.
+     [stated] 웹 버전은 막았다(2026-10-21 "출시 후 웹으로는 못 들어가야지") → 웹에서 지우는 길은 뺐다.
      앱 안 경로·지우는 것이 바뀌면 여기도 같이 고친다. ?lang=en 이면 영어 -->
 <style>
   :root{color-scheme:dark}
@@ -43,8 +44,7 @@
 
     <h2>앱을 쓸 수 없을 때</h2>
     <ul>
-      <li><b>웹 버전</b> <a href="https://onecue-lac.vercel.app">onecue-lac.vercel.app</a>에서 같은 구글 계정으로 로그인한 뒤 같은 방법으로 지울 수 있습니다. 게스트 계정은 처음 쓴 기기에서만 지울 수 있습니다.</li>
-      <li>또는 <a href="mailto:dnjsrb980607@gmail.com?subject=%5B%EC%B4%9D%EC%B9%BC%EB%8C%80%EC%A0%84%5D%20%EA%B3%84%EC%A0%95%20%EC%82%AD%EC%A0%9C%20%EC%9A%94%EC%B2%AD">dnjsrb980607@gmail.com</a>으로 요청해 주세요. 닉네임과 로그인에 쓴 구글 이메일을 적어 주시면 영업일 기준 7일 안에 지우고 알려 드립니다.</li>
+      <li><a href="mailto:dnjsrb980607@gmail.com?subject=%5B%EC%B4%9D%EC%B9%BC%EB%8C%80%EC%A0%84%5D%20%EA%B3%84%EC%A0%95%20%EC%82%AD%EC%A0%9C%20%EC%9A%94%EC%B2%AD">dnjsrb980607@gmail.com</a>으로 요청해 주세요. 닉네임과 (구글로 로그인했다면) 로그인에 쓴 구글 이메일을 적어 주시면 영업일 기준 7일 안에 지우고 알려 드립니다.</li>
     </ul>
 
     <h2>지워지는 것</h2>
@@ -64,11 +64,11 @@
       <li>광고 식별자는 게임 계정이 아니라 기기에 딸린 값입니다. 안드로이드 <b>설정 → 보안 및 개인정보 보호 → 기타 개인정보 설정 → 광고</b>(기종마다 다를 수 있음)에서 초기화하거나 지울 수 있습니다.</li>
     </ul>
 
-    <p>자세한 내용은 <a href="privacy.html">개인정보처리방침</a>을 보세요.</p>
+    <p>자세한 내용은 <a href="privacy.html?lang=ko">개인정보처리방침</a>을 보세요.</p>
   </section>
 
   <section data-lang="en" hidden>
-    <h1>Delete your 총칼대전 account</h1>
+    <h1>Delete your Gun Sword Arena account</h1>
 
     <h2>In the app</h2>
     <ol>
@@ -79,8 +79,7 @@
 
     <h2>If you cannot use the app</h2>
     <ul>
-      <li>Sign in with the same Google account on the <b>web version</b> at <a href="https://onecue-lac.vercel.app">onecue-lac.vercel.app</a> and delete it the same way. Guest accounts can only be deleted on the device they were created on.</li>
-      <li>Or email <a href="mailto:dnjsrb980607@gmail.com?subject=%5B%EC%B4%9D%EC%B9%BC%EB%8C%80%EC%A0%84%5D%20Account%20deletion%20request">dnjsrb980607@gmail.com</a> with your nickname and the Google email you signed in with. We will delete the account and reply within 7 business days.</li>
+      <li>Email <a href="mailto:dnjsrb980607@gmail.com?subject=%5BGun%20Sword%20Arena%5D%20Account%20deletion%20request">dnjsrb980607@gmail.com</a> with your nickname (and the Google email you signed in with, if any). We will delete the account and reply within 7 business days.</li>
     </ul>
 
     <h2>What is deleted</h2>
@@ -103,7 +102,9 @@
     <p>See the <a href="privacy.html?lang=en">Privacy Policy</a> for details.</p>
   </section>
 
-  <footer>총칼대전</footer>
+  <!-- [stated] 영어로 볼 때 맨 밑 이름이 한글로 나왔다 (2026-10-21) → 꼬리말·탭 제목도 언어마다 -->
+  <footer data-lang="ko">총칼대전</footer>
+  <footer data-lang="en" hidden>Gun Sword Arena</footer>
 </main>
 <script>
   (function(){
@@ -112,7 +113,9 @@
     var lang = q === 'en' || q === 'ko' ? q : (/^ko/i.test(nav) ? 'ko' : 'en');
     function show(l){
       document.documentElement.lang = l;
-      document.querySelectorAll('section[data-lang]').forEach(function(s){ s.hidden = s.getAttribute('data-lang') !== l; });
+      document.querySelectorAll('[data-lang]').forEach(function(s){ s.hidden = s.getAttribute('data-lang') !== l; });
+      var h = document.querySelector('section[data-lang="' + l + '"] h1');
+      if (h) document.title = h.textContent;
       document.querySelectorAll('.lang button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-l') === l); });
     }
     document.querySelectorAll('.lang button').forEach(function(b){

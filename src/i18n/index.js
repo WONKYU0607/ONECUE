@@ -38,11 +38,23 @@ function read(){
 let cur = read();
 const subs = new Set();
 
+// [stated] **영어로 볼 때 이름은 Gun Sword Arena** (2026-10-21). 웹 탭 제목(`index.html` 의 '총칼대전')과
+// 문서 언어도 고른 말을 따른다 — 안 그러면 영어 웹판 탭에 한글 이름이 뜬다
+function applyDoc(){
+  if (typeof document === 'undefined') return;
+  try {
+    document.documentElement.lang = cur;
+    document.title = (TABLE[cur] && TABLE[cur]['app.name']) || ko['app.name'];
+  } catch { /* 무시 */ }
+}
+applyDoc();
+
 export const getLang = () => cur;
 export function setLang(v){
   if (!TABLE[v] || v === cur) return cur;
   cur = v;
   try { localStorage.setItem(KEY, v); } catch { /* 무시 */ }
+  applyDoc();
   subs.forEach(f => { try { f(v); } catch { /* 무시 */ } });
   return cur;
 }

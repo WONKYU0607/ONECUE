@@ -174,4 +174,34 @@ console.log('AI 단계 이름이 숫자다');
   }
 }
 
+// [stated] **프로필을 열고 뒤로가기를 누르면 바로 "게임 종료" 창이 떴다** (2026-10-21).
+// 위에 뜬 창은 쌓아 두고, 나중에 뜬 것부터 닫는다
+console.log('위에 뜬 창 쌓기');
+{
+  const m = await import('../src/state/back.js');
+  const log = [];
+  const offA = m.pushOverlayBack(() => { log.push('A'); return true; });
+  const offB = m.pushOverlayBack(() => { log.push('B'); return false; });   // 안 받음 → 다음으로
+  assert(m.tryOverlayBack() === true && log.join() === 'B,A', `  나중 것부터 묻고 받은 데서 멈춘다 (${log.join()})`);
+  offA(); offB();
+  assert(m.tryOverlayBack() === false, '  다 내리면 아무도 안 받는다');
+  const offC = m.pushOverlayBack(() => { throw new Error('x'); });
+  assert(m.tryOverlayBack() === false, '  던져도 앱이 안 죽는다');
+  offC();
+
+  const body = backBody(app);
+  const iOv = body.indexOf('tryOverlayBack()'), iGame = body.indexOf("screen === 'game'");
+  const iRoom = body.indexOf("if (screen === 'room')"), iHome = body.indexOf("if (screen === 'home')");
+  assert(iOv > body.indexOf('if (askRoom)') && iOv < iGame && iOv < iRoom && iOv < iHome,
+    '  App 은 화면 처리보다 위에 뜬 창을 먼저 묻는다');
+  assert(/if \(kickedNote\)\{ setKickedNote\(false\)/.test(body), '  강퇴 알림 창도 뒤로가기로 닫힌다');
+
+  const prof = fs.readFileSync('src/ui/ProfileTab.jsx', 'utf8');
+  assert(/useOverlayBack\(true,/.test(prof), '  프로필이 자기 뒤로가기를 건다');
+  const room = fs.readFileSync('src/ui/screens/Room.jsx', 'utf8');
+  assert(/useOverlayBack\(!!kickWho,/.test(room), '  방의 강퇴 확인도 건다');
+  // 훅은 `if (!room) return null` 보다 위에 있어야 한다 (훅 순서 규칙)
+  assert(room.indexOf('useOverlayBack(!!kickWho') < room.indexOf('if (!room) return null'), '  훅은 일찍 끝나는 return 보다 위');
+}
+
 console.log('back.test.js 통과');

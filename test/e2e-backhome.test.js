@@ -82,6 +82,38 @@ try {
     await tryBoxes(nm + '(기다렸다)', 2500);      // 기다려도 같아야 한다
   }
 
+  // [stated] **프로필 버튼을 누르고 뒤로가기를 누르면 바로 "게임 종료" 창이 떴다** (2026-10-21)
+  console.log('프로필을 열고 뒤로가기');
+  {
+    const profOpen = () => p.evaluate(() => !!document.querySelector('.modal.prof-tab'));
+    const quitAsk = () => p.evaluate(() => !!document.querySelector('.modal.ask'));
+    await tapEl('.prof-btn'); await wait(500);
+    assert(await profOpen(), '  프로필이 열렸다');
+    await back();
+    assert(!(await profOpen()) && !(await quitAsk()), '  뒤로가기 한 번에 프로필만 닫힌다 (종료 창 없음)');
+
+    // 안에 열린 것부터 닫는다: 로그아웃 확인 → 프로필
+    await tapEl('.prof-btn'); await wait(500);
+    await p.evaluate(() => document.querySelector('.prof-tab .logout-btn').click()); await wait(200);
+    assert(await p.$('.prof-tab .logout-ask'), '  로그아웃 확인이 떴다');
+    await back();
+    assert(!(await p.$('.prof-tab .logout-ask')) && await profOpen(), '  뒤로가기는 로그아웃 확인만 닫는다');
+    // 계정 삭제 확인 → 프로필
+    await p.evaluate(() => document.querySelector('.prof-tab .acc-del').click()); await wait(200);
+    assert(await p.$('.prof-tab .del-ask'), '  계정 삭제 확인이 떴다');
+    await back();
+    assert(!(await p.$('.prof-tab .del-ask')) && await profOpen(), '  뒤로가기는 삭제 확인만 닫는다');
+    // 이름 고치기 → 프로필
+    await p.evaluate(() => document.querySelector('.prof-tab .prof-edit').click()); await wait(200);
+    assert(await p.$('.prof-tab .nick-input'), '  이름 고치기 칸이 열렸다');
+    await back();
+    assert(!(await p.$('.prof-tab .nick-input')) && await profOpen(), '  뒤로가기는 이름 고치기만 닫는다');
+    await back();
+    assert(!(await profOpen()) && !(await quitAsk()), '  한 번 더 누르면 프로필이 닫힌다 (종료 창 없음)');
+    // 닫은 뒤에도 칸 뒤로가기가 살아 있다
+    await tryBoxes('프로필 닫은 뒤', 150);
+  }
+
   console.log('칸이 다 접힌 홈에서 뒤로가기는 종료 확인');
   await back();
   assert(await exitAsk(), '  종료 확인 창이 뜬다');
