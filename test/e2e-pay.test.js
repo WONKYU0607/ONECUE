@@ -73,9 +73,21 @@ async function page(u, w = 360, h = 740, lang = 'ko'){
         localStorage.setItem('duel.lang', l); localStorage.setItem('duel.settings.v1', JSON.stringify({ tutoDone: true }));
       }
     } catch { /* 무시 */ }
+    // **진짜 Capacitor 플러그인처럼 감싼다** (`@capacitor/core` registerPlugin 의 Proxy 와 같은 동작).
+    // 모르는 이름은 **`then` 까지** 함수로 보이고, 부르면 "not implemented" 로 실패한다.
+    // 그래서 이 객체를 async 함수에서 return 하거나 Promise 로 넘기면 영영 안 끝난다
+    // — 동물의 왕국 1.0.9 (10) 에서 결제가 통째로 멈춘 원인. 평범한 객체로 흉내 내면 그걸 못 잡는다
+    const capProxy = (name, impl) => new Proxy({}, {
+      get(_, prop){
+        if (prop === '$$typeof') return undefined;
+        if (prop === 'toJSON') return () => ({});
+        if (typeof prop === 'string' && typeof impl[prop] === 'function') return impl[prop];
+        return () => Promise.reject(new Error(`"${name}.${String(prop)}()" is not implemented on android`));
+      }
+    });
     window.__e2ePay = {
       PURCHASE_TYPE: { INAPP: 'inapp' },
-      NativePurchases: {
+      NativePurchases: capProxy('NativePurchases', {
         configure: async o => { window.__payCfg = o; },
         isBillingSupported: async () => ({ isBillingSupported: true }),
         getProducts: async ({ productIdentifiers }) => ({ products: productIdentifiers.map(id => ({ identifier: id, priceString: id === 'no_ads' ? 'US$3.99' : 'US$0.99' })) }),
@@ -87,7 +99,7 @@ async function page(u, w = 360, h = 740, lang = 'ko'){
         },
         getUnfinishedTransactions: async () => ({ transactions: await window.__e2eUnfinished() }),
         acknowledgePurchase: async () => { window.__acked = true; }
-      }
+      })
     };
   }, lang);
   await p.goto(`http://127.0.0.1:${VP}/?e2e=1&u=${u}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
