@@ -87,6 +87,16 @@ export const whenSignedIn = () =>
 //        **여기서 JS SDK 로 해야** Firestore·서버 증표가 같은 계정을 본다
 //  - 웹: 그냥 팝업
 
+/** [stated] **구글 창을 닫은 것(취소)인가** (2026-11-01). 웹 팝업은 오류 코드로 오지만, 앱(안드로이드)의
+ *  구글 로그인 플러그인은 취소에 **코드 없이 글자만** 준다("... cancelled by the user", "Authorization canceled." 등).
+ *  예전엔 코드만 봐서 앱에서 창을 닫기만 해도 "로그인 실패" 가 떴다 — 계정 삭제 확인(`reauthForDelete`)만 글자를 봤다 */
+export const isCancel = e => {
+  const code = String((e && e.code) || ''), msg = String((e && e.message) || e || '');
+  // 옛 구글 로그인 방식(Credential Manager 를 끈 경우)은 취소를 상태 번호 12501 로만 준다
+  return code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'
+    || /cancel/i.test(msg) || /^12501\b/.test(msg);
+};
+
 const isNative = async () => {
   try {
     const { Capacitor } = await import('@capacitor/core');
@@ -124,8 +134,7 @@ export async function signInGoogle(){
     return { ok: true, mergeFrom: null };
   } catch (e){
     const code = (e && e.code) || '';
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request')
-      return { ok: false, reason: 'cancel' };
+    if (isCancel(e)) return { ok: false, reason: 'cancel' };
     console.warn('[firebase] 구글 로그인 실패', code || e);
     return { ok: false, reason: 'fail' };
   }
@@ -177,8 +186,7 @@ export async function linkGoogle(){
     const code = (e && e.code) || '';
     if (code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use')
       return { ok: false, reason: 'taken' };
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request')
-      return { ok: false, reason: 'cancel' };
+    if (isCancel(e)) return { ok: false, reason: 'cancel' };
     console.warn('[firebase] 구글 잇기 실패', code || e);
     return { ok: false, reason: 'fail' };
   }
