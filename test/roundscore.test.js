@@ -31,6 +31,8 @@ const open = q => new Promise(res => {
     if (m.t === 'f' || m.t === 's') w.tick = Math.max(w.tick | 0, m.tick | 0); });
   w.on('open', () => res(w));
 });
+// 지금 두 사람이 붙어 있는 빠른 매칭 방 (1판 방은 둘이 나간 뒤에도 30초 남는다)
+const live = j => (j.rooms || []).filter(r => !r.code && (r.seats || []).every(x => x === 'on')).pop();
 const scoreOf = async (w, uid) => {
   w.last.__score = null; w.send(JSON.stringify({ t: '__score', uid }));
   for (let i = 0; i < 20; i++){ await wait(100); if (w.last.__score) return w.last.__score.v; }
@@ -38,13 +40,28 @@ const scoreOf = async (w, uid) => {
 };
 try {
   // 빠른 매칭: 둘이 대기열에 서면 서버가 방을 만든다 (코드 없는 방 = 점수에 반영)
-  const A = await open('sid=SA&uid=userA&nick=A&mode=queue&n=2');
-  await wait(300);
-  const B = await open('sid=SB&uid=userB&nick=B&mode=queue&n=2');
-  await wait(1200);
+  // [stated] 2026-11-01 — **빠른 매칭 방에서는 [다시 하기](`again`)가 안 먹는다**(앱도 새 상대를 찾는다).
+  // 그래서 2판은 둘이 **다시 대기열에 서서** 새 방에서 한다. 점수·연승·코인이 사람 기준으로 이어지는지 본다
+  let A = null, B = null;
+  const pair = async round => {
+    A = await open(`sid=SA${round}&uid=userA&nick=A&mode=queue&n=2`);
+    await wait(300);
+    B = await open(`sid=SB${round}&uid=userB&nick=B&mode=queue&n=2`);
+    await wait(1200);
+  };
+  await pair(1);
   assert(A.last.hello, '  빠른 매칭으로 방이 잡힌다');
   const got = [];
   for (let round = 1; round <= 2; round++){
+    if (round === 2){
+      const before = (await (await fetch(`http://127.0.0.1:${SP}/health?d=1`)).json()).rooms.find(r => !r.code);
+      A.send(JSON.stringify({ t: 'again' })); await wait(800);
+      const after = (await (await fetch(`http://127.0.0.1:${SP}/health?d=1`)).json()).rooms.find(r => !r.code);
+      assert(before && after && before.phase === 3 && after.phase === 3, `  빠른 매칭 방에서 [다시 하기]는 판을 다시 열지 않는다 (${after && after.phase})`);
+      A.close(); B.close(); await wait(500);
+      await pair(2);
+      assert(A.last.hello, '  2판: 다시 대기열에 서서 새 방이 잡힌다');
+    }
     for (const w of [A, B]) w.send(JSON.stringify({ t: 'seen' }));
     await wait(200);
     // 입력 메시지 이름은 **`in`** 이고 틱은 **서버 시계보다 앞**이어야 한다 (지난 틱은 버려진다)
@@ -53,13 +70,12 @@ try {
         w.send(JSON.stringify({ t: 'in', tick: (w.tick | 0) + d, ready: 1, go: 1 }));
       await wait(100);
       const j = await (await fetch(`http://127.0.0.1:${SP}/health?d=1`)).json();
-      if (j.rooms && j.rooms[0] && j.rooms[0].phase === 2) break;   // 전투 시작
+      if (live(j) && live(j).phase === 2) break;   // 전투 시작
     }
     const j = await (await fetch(`http://127.0.0.1:${SP}/health?d=1`)).json();
-    assert(j.rooms && j.rooms[0] && j.rooms[0].phase === 2, `  ${round}판: 전투까지 들어갔다`);
+    assert(live(j) && live(j).phase === 2, `  ${round}판: 전투까지 들어갔다`);
     A.send(JSON.stringify({ t: '__end', win: 0 })); await wait(1200);
     got.push({ a: await scoreOf(A, 'userA'), b: await scoreOf(A, 'userB') });
-    A.send(JSON.stringify({ t: 'again' })); await wait(800);
   }
   console.log('두 번째 판이 첫 판 결과에서 이어진다');
   assert(got[0].a && got[1].a, '  두 판 모두 점수가 쓰였다');

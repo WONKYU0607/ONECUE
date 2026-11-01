@@ -69,8 +69,8 @@ console.log('사람이 봇보다 먼저다');
   const srv = fs.readFileSync('server/index.js', 'utf8');
   assert(/pairUp\(key\)/.test(srv), '  대기열에 들어가면 곧바로 사람끼리 붙여 본다');
   assert(/ws\.botAt = Date\.now\(\) \+ BOT_FILL_MS/.test(srv), '  봇은 시간이 지나야 채운다');
-  const i = srv.indexOf('pairUp(key);\n    // [stated] **5초');
-  assert(i > 0, '  붙여 보기가 봇 예약보다 앞에 있다');
+  // 들여쓰기는 보지 않는다 (2026-11-01 티켓 확인 뒤 들이는 `enter()` 안으로 옮겨져 한 칸 깊어졌다)
+  assert(/pairUp\(key\);\s*\n\s*\/\/ \[stated\] \*\*5초[^\n]*\n\s*ws\.botAt = /.test(srv), '  붙여 보기가 봇 예약보다 앞에 있다');
 }
 
 console.log('matchscore.test.js 통과');
