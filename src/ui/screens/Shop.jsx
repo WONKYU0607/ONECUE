@@ -149,7 +149,8 @@ export default function Shop({ onBack }){
     const why = r && r.ok ? 'ok' : (r && r.why) || 'fail';
     // 창을 닫은 것(cancel)은 아무 말도 안 한다
     setNote(why === 'cancel' ? '' : t({ ok: 'shop.bought', pending: 'shop.payPending', none: 'shop.payNo',
-      auth: 'shop.payFail', web: 'shop.appOnly', fail: 'shop.payFail' }[why] || 'shop.payFail'));
+      auth: 'shop.payFail', web: 'shop.appOnly', fail: 'shop.payFail',
+      guest: 'shop.payGuest', checking: 'shop.payChecking' }[why] || 'shop.payFail'));
     apply(await refreshCoin());
     setBusy(false);
   };

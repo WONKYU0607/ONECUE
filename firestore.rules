@@ -5,9 +5,19 @@ service cloud.firestore {
 
     // 클라이언트가 만들 때 담을 수 있는 항목. 서버가 쥔 값은 하나도 없다.
     // 함수는 반드시 service 안에 있어야 한다 (밖에 두면 문법 오류로 게시가 안 된다)
+    // 프로필 그림(av): 종류는 기본·총격전·칼전, 번호는 0~20 (앱 profile.js okAv 와 같은 범위)
+    function avOk(d){
+      return !('av' in d) || (d.av is map && d.av.keys().hasOnly(['k','id'])
+        && d.av.k in ['base','gun','melee'] && d.av.id is int && d.av.id >= 0 && d.av.id <= 20);
+    }
+    // AI 단계 기록(aip): 모드별 묶음. 서버는 이 값으로 보상을 주지 않는다 (보상 기록 aiPaid 는 서버만)
+    function aipOk(d){
+      return !('aip' in d) || (d.aip is map && d.aip.size() <= 16);
+    }
     function mine(d){
-      return d.keys().hasOnly(['nick','color','updatedAt'])
-        && (!('nick' in d) || (d.nick is string && d.nick.size() <= 16));
+      return d.keys().hasOnly(['nick','color','updatedAt','aip','av'])
+        && (!('nick' in d) || (d.nick is string && d.nick.size() <= 16))
+        && aipOk(d) && avOk(d);
     }
     // 고칠 때: **클라가 고쳐도 되는 것만** 적는다 (허용 목록).
     //
@@ -21,7 +31,7 @@ service cloud.firestore {
     // 값이 그대로면 affectedKeys 에 안 들어오므로, 바꾸려 할 때만 걸린다
     function keepsScore(){
       return request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['color','updatedAt']);
+             .hasOnly(['color','updatedAt','aip','av']);
     }
 
     match /players/{uid} {
@@ -31,7 +41,8 @@ service cloud.firestore {
                     && mine(request.resource.data);
 
       allow update: if request.auth != null && request.auth.uid == uid
-                    && keepsScore();
+                    && keepsScore()
+                    && aipOk(request.resource.data) && avOk(request.resource.data);
 
       allow delete: if false;
     }

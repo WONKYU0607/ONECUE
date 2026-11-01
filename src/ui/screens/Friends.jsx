@@ -19,6 +19,7 @@ export default function Friends({ onBack }){
   const [busy, setBusy] = useState(true);
   const [nick, setNick] = useState('');
   const [msg, setMsg] = useState('');
+  const [off, setOff] = useState(false);   // 서버에 못 붙었다 — '친구 없음' 이 아니라 그렇다고 알린다
 
   setInnerBack(NO_INNER);
   // **내가 건 것일 때만** 푼다 — 그냥 null 로 지우면 먼저 그려진 홈의 것까지 지워진다 (`back.js`)
@@ -26,7 +27,8 @@ export default function Friends({ onBack }){
 
   const load = useCallback(async () => {
     const r = await listFriends();
-    setData(r && r.ok ? r : { friends: [], reqIn: [], reqOut: [] });
+    setData(d => (r && r.ok ? r : (d || { friends: [], reqIn: [], reqOut: [] })));
+    setOff(!(r && r.ok));
     setBusy(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -89,7 +91,7 @@ export default function Friends({ onBack }){
         )}
 
         <p className="hint fr-head">{t('fr.list')}</p>
-        {d.friends.length === 0 && <p className="hint">{busy ? '' : t('fr.empty')}</p>}
+        {d.friends.length === 0 && <p className="hint">{busy ? '' : t(off ? 'err.offline' : 'fr.empty')}</p>}
         {d.friends.map(p => row(p, (
           <span className="fr-acts">{btn(t('fr.remove'), removeFriend, p.uid)}</span>
         )))}

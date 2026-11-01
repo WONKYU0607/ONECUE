@@ -8,6 +8,15 @@ import { t } from '../i18n/index.js';
 let myUid = '';
 export const setUid = v => { myUid = String(v || ''); };
 const getUid = () => myUid;
+// [stated] **게임 소켓도 로그인 증표를 같이 보낸다** (2026-11-01) — 서버는 이제 주소의 uid 를 믿지 않고
+// 이 증표로 계정을 확인한다. 증표를 꺼내는 함수도 sync 가 넣어 준다(여기서 firebase 를 부르지 않으려고)
+let tokOf = async () => '';
+export const setTokenSource = fn => { tokOf = typeof fn === 'function' ? fn : (async () => ''); };
+/** 증표를 받아 온다. **늦으면(3초) 증표 없이 간다** — 계정 없는 판이 될 뿐 판은 열린다 */
+const freshTok = () => Promise.race([
+  Promise.resolve().then(() => tokOf()).then(v => String(v || '')).catch(() => ''),
+  new Promise(r => setTimeout(() => r(''), 3000))
+]);
 
 // [stated] 버전이 다를 때 **사용자 말로** 알린다 (예전엔 "서버 재배포 필요" 같은 개발자 문구였다).
 // `code` 로 화면이 [업데이트] 버튼을 붙일지 정한다
@@ -63,11 +72,13 @@ export function getSid(){
 
 // **닉네임도 같이 보낸다.** 게임 중 상대 이름은 서버가 뿌려야 한다 —
 // 저장소(Firebase)를 조회해서는 상대가 누군지 알 수도, 실시간으로 받을 수도 없다
-const wsUrl = (mode = 'queue', code = '', resume = false, n = 2, melee = false, ffa = false, color = -1, soccer = false) =>
+const wsUrl = (mode = 'queue', code = '', resume = false, n = 2, melee = false, ffa = false, color = -1, soccer = false, tok = '') =>
   BASE + '?sid=' + encodeURIComponent(getSid()) +
   '&nick=' + encodeURIComponent(getNick()) +
-  // 점수는 **서버가** 이 계정으로 쓴다. 클라가 쓰면 자기 점수를 자기가 올릴 수 있다
+  // 점수는 **서버가** 이 계정으로 쓴다. 클라가 쓰면 자기 점수를 자기가 올릴 수 있다.
+  // 계정은 **증표(`tok`)로 서버가 확인한다** — `uid` 는 검사용 서버만 본다
   (getUid() ? '&uid=' + encodeURIComponent(getUid()) : '') +
+  (tok ? '&tok=' + encodeURIComponent(tok) : '') +
   '&mode=' + mode + (code ? '&code=' + encodeURIComponent(code) : '') +
   (n !== 2 ? '&n=' + n : '') + (melee ? '&melee=1' : '') + (ffa ? '&ffa=1' : '') +
   (soccer ? '&soccer=1' : '') +
@@ -165,9 +176,13 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
   if (health && verGap(health.ver)) throw verError(health.ver);
 
   let transport = null;
+  // 로그인 증표 — 서버가 이걸로 계정을 확인한다. 자동 재접속 주소에도 같은 것을 싣는다
+  // (증표가 만료돼도 재접속은 접속 아이디로 원래 자리를 찾으므로 계정이 바뀌지 않는다)
+  const tok = await freshTok();
+  if (stale()) throw cancelled();
   for (let i = 0; i < TRIES; i++){
     onStage?.(i === 0 ? 'connecting' : 'retrying', i + 1, TRIES);
-    transport = new WsTransport(wsUrl(mode, code, false, n, melee, ffa, color, soccer));
+    transport = new WsTransport(wsUrl(mode, code, false, n, melee, ffa, color, soccer, tok));
     try { await openOnce(transport); }
     catch { transport.close(); transport = null; await sleep(GAP_MS); if (stale()) throw cancelled(); continue; }
     // 여는 동안 취소했으면 방금 연 소켓을 닫는다 — 안 닫으면 대기열에 들어가 봇 판이 열린다
@@ -196,7 +211,7 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
       transport.auto = true;                // 이제부터 끊기면 자동으로 다시 붙는다
       // 자동 재접속은 '복귀'로 표시해야 서버가 원래 자리로 되돌려준다.
       // 반대로 사용자가 직접 새 매칭을 시작할 땐 이 표시가 없어야 새 방을 받는다
-      transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer);
+      transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer, tok);
       conn = { transport, slot, room, watching };
       onStage?.('matched');
       resolve(conn);
@@ -243,6 +258,12 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
         transport.auto = false;
         try { kickWatch?.(); } catch { /* 무시 */ }
       }
+      // [stated] **서버가 이 판(방)에서 오류를 만나 그 방만 닫았다** (2026-11-01) — 다시 붙지 않고 홈으로.
+      // 다른 방은 그대로 돈다. 다시 붙으면 없는 방 대신 새 판에 끌려 들어간다
+      if (m.t === 'roomgone'){
+        transport.auto = false;
+        try { goneWatch?.(); } catch { /* 무시 */ }
+      }
     };
     transport.always = always;
     transport.toClient = m => {
@@ -267,7 +288,7 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
         // 방에 들어온 순간부터 자동 재접속을 켠다. 2대2는 팀을 고르기 전엔 자리가 없어서
         // done()까지 기다리면 팀 선택 중 끊겼을 때 아예 안 돌아온다
         transport.auto = true;
-        transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer);
+        transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer, tok);
         onStage?.('waiting');
         if (m.back && m.pid >= 0) done();    // 자리까지 돌려받은 재접속. 서버가 go를 다시 보내지 않는다
         // [stated] **코드로 들어간 사람이 "서버에 연결하는 중" 에서 안 넘어갔다.**
@@ -282,7 +303,7 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
         SELF.ffa = !!m.ffa; SELF.soccer = !!m.soccer;
         SELF.watching = true;
         transport.auto = true;
-        transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer);
+        transport.url = wsUrl(mode, code, true, n, melee, ffa, color, soccer, tok);
         onStage?.('watching');
         watching = true;
         done();                      // 관전도 접속 완료로 본다 — 화면이 게임으로 넘어간다
@@ -379,6 +400,9 @@ export function onMatchCoin(fn){ coinWatch = fn; }
 /** [stated] **강퇴당하면 불린다** — 홈으로 보내고 알린다 */
 let kickWatch = null;
 export function onKicked(fn){ kickWatch = fn; }
+/** [stated] **서버가 이 방을 오류로 닫았으면 불린다** — 홈으로 보내고 알린다 */
+let goneWatch = null;
+export function onRoomGone(fn){ goneWatch = fn; }
 
 /** [stated] **방장이 강퇴한다** — 방장 확인·대상 확인은 서버가 한다 */
 export function kickPlayer(slot){

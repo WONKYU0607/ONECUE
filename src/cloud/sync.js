@@ -9,7 +9,7 @@ import { setOwned } from '../state/tryskin.js';
 // 구름의 보유 목록을 기기에 옮긴다 (없으면 빈 목록 — 산 게 없다는 뜻)
 function hydrateOwn(v){ try { setOwned(v && v.own); } catch { /* 무시 */ } }
 import { nickSnapshot, hydrateNick, setNickSaveHook } from '../state/profile.js';
-import { setUid } from '../net/connection.js';
+import { setUid, setTokenSource } from '../net/connection.js';
 import { progressSnapshot, hydrateProgress, setProgressSaveHook } from '../state/progress.js';
 
 // [stated] AI 단계 기록(`aip`)은 **구름 값을 먼저 받아 합친 뒤에만** 올린다.
@@ -32,6 +32,8 @@ export async function startSync(){
   started = true;
   const m = await load();
   // 접속할 때 서버에 보낼 계정. 서버가 이 값으로 점수를 쓴다
+  // [stated] 계정은 **증표로** 서버가 확인한다 — 접속할 때마다 새 증표를 꺼내 쓰게 꺼내는 함수를 넘긴다
+  setTokenSource(() => m.token());
   setUid(await m.uid());
   m.flushOnHide(gather);
   // 기기에 저장될 때마다 구름에도 올린다 (push가 몰아서 보낸다)

@@ -22,6 +22,9 @@ export default function Quests({ onBack }){
   const [tab, setTab] = useState('d');
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(true);
+  // [stated] **서버에 못 붙었으면 그렇다고 보여 준다** (2026-11-01) — 예전엔 0/목표·코인 0 으로 그려
+  // 진행이 날아간 것처럼 보였다
+  const [off, setOff] = useState(false);
   // [stated] 접속 시간은 **창을 보고 있는 동안 초 단위로 올라간다**.
   // 서버에는 1분마다 몰아서 보내므로, 그 사이는 이번에 켠 뒤 쌓인 초를 더해 보여준다
   const [, tickNow] = useState(0);
@@ -32,8 +35,8 @@ export default function Quests({ onBack }){
 
   const load = useCallback(async () => {
     const r = await fetchQuest();
-    if (r && r.ok){ setData(r); setCoin(r.coin, (r.mail || []).length); }
-    else setData({ d: { v: {}, got: [] }, w: { v: {}, got: [] }, m: { v: {}, got: [] }, coin: 0 });
+    if (r && r.ok){ setData(r); setCoin(r.coin, (r.mail || []).length); setOff(false); }
+    else { setData(d => d || { d: { v: {}, got: [] }, w: { v: {}, got: [] }, m: { v: {}, got: [] }, coin: 0 }); setOff(true); }
     setBusy(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -68,7 +71,7 @@ export default function Quests({ onBack }){
       <header className="bar-top">
         <button className="icon-btn" onClick={onBack} aria-label={t('common.back')}>‹</button>
         <span className="title ic"><i className="head-ic q" />{t('q.title')}</span>
-        <span className="coin-tag">{(data ? data.coin : 0).toLocaleString()}</span>
+        <span className="coin-tag">{off && !(data && data.ok) ? '-' : (data ? data.coin : 0).toLocaleString()}</span>
       </header>
 
       <div className="menu wide-menu q-wrap">
@@ -82,6 +85,7 @@ export default function Quests({ onBack }){
       </div>
 
       <div className="q-list">
+        {off && <p className="hint q-off">{t('err.offline')}</p>}
         {list.map(q => {
           const v = valOf(q);
           const done = doneOf(q, { [q.id]: v });
@@ -94,7 +98,7 @@ export default function Quests({ onBack }){
                 <span>{q.time ? `${mmss(v)} / ${mmss(q.goal)}` : `${v} / ${q.goal}`}</span>
               </div>
               <div className="q-pay">{`+${pay.each}`}</div>
-              <button className="q-get" disabled={busy || !done || got}
+              <button className="q-get" disabled={busy || off || !done || got}
                       onClick={() => take(q.id)}>{got ? t('q.done') : t('q.get')}</button>
             </div>
           );

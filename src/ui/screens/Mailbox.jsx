@@ -16,6 +16,7 @@ export default function Mailbox({ onBack }){
   const [coin, setC] = useState(0);
   const [busy, setBusy] = useState(true);
   const [msg, setMsg] = useState('');
+  const [off, setOff] = useState(false);   // 서버에 못 붙었다 (그때는 '비어 있음' 이 아니라 그렇다고 알린다)
 
   setInnerBack(NO_INNER);
   // **내가 건 것일 때만** 푼다 — 그냥 null 로 지우면 먼저 그려진 홈의 것까지 지워진다 (`back.js`)
@@ -23,8 +24,8 @@ export default function Mailbox({ onBack }){
 
   const load = useCallback(async () => {
     const r = await fetchQuest();
-    if (r && r.ok){ setBox(r.mail || []); setC(r.coin | 0); setCoin(r.coin, (r.mail || []).length); }
-    else setBox([]);
+    if (r && r.ok){ setBox(r.mail || []); setC(r.coin | 0); setCoin(r.coin, (r.mail || []).length); setOff(false); }
+    else { setBox(b => b || []); setOff(true); }
     setBusy(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -47,11 +48,12 @@ export default function Mailbox({ onBack }){
       <header className="bar-top">
         <button className="icon-btn" onClick={onBack} aria-label={t('common.back')}>‹</button>
         <span className="title ic"><i className="head-ic m" />{t('mail.title')}</span>
-        <span className="coin-tag">{coin.toLocaleString()}</span>
+        <span className="coin-tag">{off && !coin ? '-' : coin.toLocaleString()}</span>
       </header>
 
       <div className="menu wide-menu q-wrap">
       <div className="q-list">
+        {off && <p className="hint q-off">{t('err.offline')}</p>}
         {/* [stated] 없으면 **그냥 비운다** — '비어 있음' 을 크게 띄우지 않는다 */}
         {(box || []).map(m => (
           <div key={m.id} className="q-row">

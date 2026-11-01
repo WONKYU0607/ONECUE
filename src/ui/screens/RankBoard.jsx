@@ -121,7 +121,8 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
           <span className="rb-nick">{myNick}</span>
           <span className="rb-tier">{tierName(tierOf(myScore))}</span>
           <span className="rb-rank">
-            {busy ? t('rank.loading') : (me ? t('rank.mine', { r: me.rank, n: me.total }) : t('rank.none'))}
+            {busy ? t('rank.loading') : (me ? t('rank.mine', { r: me.rank, n: me.total })
+              : t(data && data.err ? 'err.offline' : 'rank.none'))}
           </span>
           {/* [stated] **위 칸과 목록의 점수가 달랐다** — 위 칸은 기기에 쌓인 값,
               목록은 서버가 만든 값이라 따로 자랐다. **서버 값이 있으면 그것을 쓴다** */}
@@ -130,7 +131,8 @@ export default function RankBoard({ kind: kind0 = 'gun', onBack }){
 
         <div className="rb-list">
           {list.length === 0 && (
-            <p className="hint">{(onlyFriends ? fr === null : busy) ? t('rank.loading') : t('rank.none')}</p>
+            <p className="hint">{(onlyFriends ? fr === null : busy) ? t('rank.loading')
+              : t(!onlyFriends && data && data.err ? 'err.offline' : 'rank.none')}</p>
           )}
           {list.map(row => (
             <div key={row.rank + '-' + (row.nick || '')}

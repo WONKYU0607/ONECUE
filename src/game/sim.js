@@ -62,7 +62,7 @@ import {
   bulletFP,
   cellOwner,
   cellUsable,
-  setArena,
+  setArena, ARENA,
   itemQuota,
   itemKinds,
   isCover,
@@ -486,7 +486,9 @@ export function throwCol(p){
 }
 // 차징(0~1) -> 착탄 행. 0이면 중앙선 건너 첫 칸, 1이면 상대 맨 뒷줄
 export function throwRow(slot, charge, n = 2, melee = false){
-  setArena(n, melee);
+  // [stated] **이미 맞는 아레나면 건드리지 않는다** (2026-11-01). 예전엔 늘 `setArena(n, melee)` 로
+  // 개인전·축구·2대1 표시까지 지워서, 판 진행 도중 던지기가 들어온 틱의 나머지는 개인전을 팀전으로 판정했다
+  if (ARENA.n !== n || (!ARENA.soccer && !!ARENA.melee !== !!melee)) setArena(n, melee);
   const ch = Math.max(0, Math.min(1, charge));
   const tm = teamOf(slot, n);
   // 중앙선(중립 행이 있으면 그 너머) 건너 첫 칸 ~ 상대 맨 뒷줄

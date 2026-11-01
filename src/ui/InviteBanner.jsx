@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { myInvites, clearInvite } from '../state/friends.js';
 import { t } from '../i18n/index.js';
+import { getColor } from '../state/profile.js';
 
 const EVERY_MS = 20 * 1000;
 
@@ -31,7 +32,9 @@ export default function InviteBanner({ onJoin }){
   const take = async () => {
     await clearInvite(v.from).catch(() => {});
     setList(l => l.slice(1));
-    onJoin({ mode: 'join', code: v.code, n: v.n, melee: v.melee, ffa: v.ffa });
+    // [stated] **고른 색을 실어야 한다** (2026-11-01) — 코드로 들어갈 때(`FriendBox`)는 싣는데 초대로 들어갈 때만
+    // 빠져서, 서버가 빈 색을 배정했다
+    onJoin({ mode: 'join', code: v.code, n: v.n, melee: v.melee, ffa: v.ffa, color: getColor() });
   };
   const drop = async () => {
     await clearInvite(v.from).catch(() => {});

@@ -3,7 +3,7 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { Server } from '../src/game/net.js';
-import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY, PH_OVER, PH_READY, readyLimit } from '../src/game/config.js';
+import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY, PH_OVER, PH_READY, readyLimit, setArena } from '../src/game/config.js';
 import { scoreDelta } from '../src/game/score.js';
 import { ffaResult } from '../src/game/ffa.js';
 import { fromWeb } from './webgate.js';
@@ -52,6 +52,41 @@ const seen = new Map();          // uid -> 마지막으로 본 시각
 const SEEN_MS = 90_000;
 const sawUid = uid => { if (uid) seen.set(uid, Date.now()); };
 const waitingCount = () => [...waiting.values()].reduce((a, q) => a + q.length, 0);
+
+// [stated] **방 하나·사람 하나의 문제로 서버 전체가 꺼지면 안 된다** (2026-11-01 출시 전 검증).
+// 예전엔 소켓으로 `null` 한 줄만 보내도, 이상한 주소로 접속해도 서버가 통째로 꺼졌다(재현함) —
+// 방이 전부 한 프로그램 안에서 돌아서, 처리 못 한 오류 하나가 모든 판을 끊었다.
+// → 받은 것은 모양부터 보고(`cleanIn`), 방마다 오류를 가둔다(`Room.fail`)
+
+/** [stated] **종목·인원 조합이 말이 되는가** — `setMode` 와 같은 규칙.
+ *  예전엔 접속 주소의 `n=3`(팀전)을 그대로 받아 팀 범위가 1.5 같은 값이 되고, 팀을 고르는 순간 서버가 꺼졌다 */
+function validMode(n, melee, ffa, soccer){
+  if (![2, 3, 4, 5, 6].includes(n)) return false;
+  if (soccer && n > 4) return false;               // 축구는 1대1·2대2 뿐
+  if (ffa && (!melee || soccer)) return false;     // 개인전은 칼전만
+  if (!ffa && n % 2) return false;                 // 팀전은 짝수여야 반으로 갈린다
+  return true;
+}
+
+const int = v => (Number.isFinite(+v) ? Math.trunc(+v) : 0);
+/** [stated] **조작 입력은 모양을 다시 만든다** — 앱이 보낸 객체를 그대로 시뮬에 넣지 않는다.
+ *  놓기(`place`)·던지기(`thr`)는 아는 칸만, 틱은 지금 근처만(먼 미래 틱을 보내 서버 메모리를 채우지 못하게) */
+const IN_AHEAD = 600;      // 10초 앞까지. 앱의 입력 지연은 최대 몇십 틱이다
+function cleanIn(m, s){
+  const tick = Number(m.tick);
+  if (!Number.isInteger(tick) || tick > s.tick + IN_AHEAD) return null;
+  const pl = m.place && typeof m.place === 'object' ? m.place : null;
+  const th = m.thr && typeof m.thr === 'object' ? m.thr : null;
+  const from = pl && pl.from && typeof pl.from === 'object' ? { c: int(pl.from.c), r: int(pl.from.r) } : null;
+  return {
+    t: 'in', pid: m.pid, tick,
+    dx: int(m.dx), dy: int(m.dy), fire: m.fire ? 1 : 0, fch: m.fch == null ? 100 : int(m.fch),
+    tkl: m.tkl ? 1 : 0, sh: m.sh ? 1 : 0, ready: m.ready ? 1 : 0, go: m.go ? 1 : 0,
+    place: pl ? { k: int(pl.k), c: int(pl.c), r: int(pl.r), from } : null,
+    thr: th ? { k: int(th.k), ch: Math.max(0, Math.min(100, int(th.ch))) } : null,
+    fastReq: int(m.fastReq), fastAns: int(m.fastAns), bareReq: int(m.bareReq), bareAns: int(m.bareAns)
+  };
+}
 
 // 헷갈리는 글자 없이 숫자 4자리
 function newCode(){
@@ -173,6 +208,38 @@ class Room {
    *  앱은 그 틱에 닿으면 이걸로 갈아 끼우고 굴린다 (`net.js` applyFrames) */
   syncAll(){
     this.send({ t: 's', tick: this.server.s.tick, st: JSON.parse(JSON.stringify(this.server.s)) });
+  }
+  /** [stated] **팀 판정(`teamOf`)은 '지금 아레나' 를 본다 — 방마다 먼저 맞춘다** (2026-11-01).
+   *  아레나는 프로그램 전체에 하나라, 마지막으로 돈 방(예: 칼전 개인전)의 설정이 남아 있으면
+   *  2대2 점수가 엉뚱하게 계산됐다(이긴 두 명이 +110/+110 이 아니라 +210/-20 — 재현함).
+   *  점수·퀘스트·팀 이동·봇 AI 처럼 틱 밖에서 팀을 보는 곳은 전부 이걸 먼저 부른다 */
+  arena(st = this.server.s){ setArena(st.n, st.melee, st.ffa, st.soccer, st.vsAll); }
+  /** 이 자리의 봇(AI)을 뺀다. 자리를 사람에게 돌려줄 때 — 안 빼면 AI 가 그 사람 입력을 계속 덮어썼다 */
+  dropBot(slot){
+    if (this.server.bots) this.server.bots = this.server.bots.filter(b => b.slot !== slot);
+  }
+  /** 방 안에 **연결된 사람**이 있는가 — 앉은 사람·팀 고르는 사람·관전자 (봇은 안 센다) */
+  occupied(){
+    const on = w => w && w.readyState === 1;
+    return this.seats.some(x => x && !x.bot && on(x.ws))
+      || this.waitingList.some(on) || [...this.watchers].some(on);
+  }
+  /** [stated] **이 방에서 처리 못 한 오류가 났다 — 이 방만 닫는다.** 다른 방은 그대로 돈다.
+   *  안에 있던 사람에게는 판이 끝났다고 알리고(`roomgone`, 앱은 다시 붙지 않고 홈으로) 연결을 끊는다 */
+  fail(where, e){
+    if (this.failed) return;
+    this.failed = true;
+    alert('urgent', 'roomfail:' + where, `방 하나에서 오류 — 그 방만 닫음 (${where})`,
+      `방 ${this.id}${this.code ? ' · 코드 ' + this.code : ''} · ${this.n}인 ${this.soccer ? '축구' : (this.melee ? '칼전' : '총격전')}` +
+      `${this.ffa ? ' 개인전' : ''}\n${String((e && e.stack) || e).slice(0, 900)}`);
+    const people = new Set([...this.seats.map(x => x && x.ws), ...this.waitingList, ...this.watchers].filter(Boolean));
+    for (const w of people){
+      try { if (w.readyState === 1) w.send(JSON.stringify({ t: 'roomgone' })); } catch { /* 무시 */ }
+      w.room = null; w.slot = -1; w.watching = false;
+      try { w.close(4500, 'room error'); } catch { /* 무시 */ }
+    }
+    this.dispose();
+    rooms.delete(this.id);
   }
   // 이 sid가 예약해 둔 자리 (재접속용)
   seatOf(sid){ return sid ? this.seats.findIndex(x => x.sid === sid) : -1; }
@@ -352,6 +419,7 @@ class Room {
   }
 
   writeRows(kind, st, seats, gone){
+    this.arena(st);                                     // 점수를 기다리는 사이 다른 방이 아레나를 바꿨다
     const rows = [];
     const missed = [];                                  // 판 전 점수를 못 읽어 못 적은 사람
     for (let i = 0; i < this.n; i++){
@@ -425,6 +493,7 @@ class Room {
    *  전투 중에 나간 사람은 진 판이라 통합 연승만 끊는다 (판수·승리는 안 센다) */
   bumpQuests(kind, gone = []){
     const st = this.server.s;
+    this.arena(st);
     for (let i = 0; i < this.n; i++){
       const seat = this.seats[i];
       // [stated] 봇은 퀘스트가 없다 — 예전엔 봇 문서에도 진행도를 읽고 써서 판마다 DB 를 헛되이 썼다 (2026-10-19)
@@ -653,6 +722,14 @@ class Room {
     const keepOff = (st.off || []).slice();
     const fresh = newState(this.n, this.melee, this.ffa, this.soccer);
     for (const k of Object.keys(fresh)) st[k] = fresh[k];
+    // [stated] **엔진(인원·봇)도 새 인원·종목에 맞춘다** (2026-11-01, 재현함).
+    // 예전엔 상태만 갈아 끼워서 ① 1대1 → 2대2 면 새 자리가 못 움직였고 ② 축구에서 나간 사람 자리를
+    // AI 가 이어받은 뒤 방장이 총격전으로 바꾸면 **축구 AI 가 총격전에서 돌다 서버가 꺼졌다**
+    // ③ 2대2 → 1대1 로 줄이면 없는 자리의 봇을 굴리다 꺼졌다
+    this.server.resize(this.n);
+    const keepBots = (this.server.bots || []).filter(b => b.slot < this.n && this.seats[b.slot] && this.seats[b.slot].bot);
+    for (const b of keepBots) b.ai = this.soccer ? createSoccerAI(b.slot, 0) : createAI(b.stage || 5, true);
+    this.server.bots = keepBots;
     // **길이를 맞춘다** — 인원이 바뀌면 옛 배열이 남거나 모자란다
     const fit = (arr, fill) => Array.from({ length: this.n }, (_, i) => (arr[i] === undefined ? fill : arr[i]));
     st.nick = fit(keepNick, ''); st.color = fit(keepColor, 0); st.off = fit(keepOff, false);
@@ -691,7 +768,9 @@ class Room {
     if (seat.ws && seat.ws !== ws) seat.ws.close();   // 같은 sid로 중복 접속하면 옛 소켓을 끊는다
 
     seat.sid = sid; seat.ws = ws; seat.goneAt = 0;
-    seat.uid = ws.uid || seat.uid || '';
+    // [stated] **앞사람 계정을 물려받지 않는다** — 같은 사람이 돌아온 것(`reconnected`)만 원래 계정을 지킨다
+    // (돌아올 때 증표가 만료돼 계정을 못 읽었어도 자리 주인은 접속 아이디로 확인된다)
+    seat.uid = reconnected ? (ws.uid || seat.uid || '') : (ws.uid || '');
     if (!this.hostSid) this.hostSid = sid;          // 먼저 들어온 사람이 방장
     // 돌아왔으면 '나간 사람' 표시를 지운다 (끊겼다 유예 시간 안에 다시 붙은 경우)
     seat.gone = null;
@@ -840,6 +919,7 @@ class Room {
     const seat = this.seats[slot];
     this.pending.delete(seat.sid);
     if (seat.sid === this.hostSid) this.hostSid = null;
+    this.dropBot(slot);
     seat.sid = null; seat.ws = null; seat.goneAt = 0; seat.bot = null; seat.uid = ''; seat.gone = null;
     st.color[slot] = slot;                      // 색을 다시 고를 수 있게
     if (st.nick) st.nick[slot] = '';
@@ -863,7 +943,10 @@ class Room {
     this.kicked.add(seat.sid);
     if (ws && ws.uid) this.kickedUid.add(ws.uid);
     this.pending.delete(seat.sid);
-    seat.sid = null; seat.ws = null; seat.goneAt = 0; seat.bot = null;
+    // [stated] **AI 가 이어받은 자리를 빼면 AI 도 같이 뺀다** — 안 빼면 그 자리에 앉은 친구 입력을 AI 가 덮어썼다.
+    // 계정도 지운다 — 남겨 두면 그 자리에 계정 없이 앉은 사람의 판이 앞사람 계정으로 적혔다
+    this.dropBot(slot);
+    seat.sid = null; seat.ws = null; seat.goneAt = 0; seat.bot = null; seat.uid = '';
     this.server.s.color[slot] = slot;          // 색을 다시 고를 수 있게
     if (this.server.s.nick) this.server.s.nick[slot] = '';
     if (ws){
@@ -901,7 +984,15 @@ class Room {
 
 // 웹소켓만 열어두면 브라우저로 살아있는지 확인할 방법이 없다.
 // Render 무료 플랜은 HTTP 요청으로도 깨어나므로 상태 확인용 엔드포인트를 둔다.
+// [stated] **요청 하나 처리하다 난 오류로 서버를 끄지 않는다** — 그 요청에만 500 을 돌려준다
 const http = createServer((req, res) => {
+  try { onHttp(req, res); }
+  catch (e){
+    bug('HTTP 요청')(e);
+    try { if (!res.headersSent) res.writeHead(500); res.end(); } catch { /* 무시 */ }
+  }
+});
+function onHttp(req, res){
   // [stated] **웹판에서 온 요청은 받지 않는다** — 출시 후 게임은 앱으로만 (`webgate.js`)
   if (fromWeb(req.headers.origin)){
     res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1068,6 +1159,12 @@ const http = createServer((req, res) => {
         try { b = JSON.parse(raw || '{}'); } catch { return { ok: false, why: 'bad' }; }
         const me = await store.uidFromToken(b.token);
         if (!me) return { ok: false, auth: true };
+        // [stated] **현금 결제는 구글 계정만** (2026-11-01). 게스트 구매는 받지 않는다 — 마무리를 안 하므로
+        // 구글이 3일 뒤 자동 환불한다. 확인이 실패하면 거절하지 않고 다음에 다시 받는다
+        let g;
+        try { g = await store.isGoogle(me); }
+        catch (e){ bug('결제 — 계정 확인')(e); return { ok: false, why: 'err' }; }
+        if (!g) return { ok: false, why: 'guest' };
         return payFlow(me, String(b.sku || ''), String(b.ptoken || ''));
       })
       .then(r => res.end(JSON.stringify(r)))
@@ -1153,7 +1250,7 @@ const http = createServer((req, res) => {
     return;
   }
   res.writeHead(404); res.end();
-});
+}
 
 // [stated] **웹소켓 압축(permessage-deflate)은 기본으로 끈다** (2026-10-19).
 // 처음엔 이걸로 8~11배 줄였지만, 재 보니 **서버 CPU 를 2배 넘게** 먹었다(메시지마다 압축·풀기, 연결마다
@@ -1220,13 +1317,20 @@ async function checkVoided(){
   if (!pay.payOn() || !store.isOn()) return;
   const startedAt = Date.now();
   try {
-    const since = Math.max(await store.voidMark(), startedAt - 29 * 864e5);   // 구글은 30일 전까지만 준다
-    const list = await pay.voidedSince(since - 5 * 60_000);
+    const since = Math.max(await store.voidMark(), startedAt - 28 * 864e5);   // 구글은 30일 전까지만 준다 (아래서 하루 더 겹쳐 본다)
+    // [stated] **겹쳐 보는 폭을 하루로** (2026-11-01) — 회수는 같은 것을 두 번 해도 한 번만 먹으므로(이미 회수한 건
+    // 건너뛴다) 넓게 봐도 손해가 없다. 구글이 환불을 목록에 늦게 올려도 놓치지 않는다
+    const list = await pay.voidedSince(since - 24 * 3600_000);
+    let failed = 0;
     for (const v of list){
       const r = await store.revokePurchase(v.token);
+      if (r && r.err){ failed++; continue; }
       if (r) alert('info', 'void:' + v.token.slice(-12), `환불된 구매를 회수함 (${r.sku})`, `계정 ${r.uid} · 주문 ${r.order || v.order || '-'}`);
     }
-    await store.voidMark(startedAt);
+    // [stated] **하나라도 실패했으면 '어디까지 봤는지' 를 옮기지 않는다** — 다음 확인(6시간 뒤)에 다시 본다.
+    // 예전엔 실패해도 옮겨서 그 환불은 영영 회수되지 않았다
+    if (!failed) await store.voidMark(startedAt);
+    else alert('warn', 'voidretry', `환불 회수 ${failed}건 실패 — 다음 확인 때 다시 시도`, '');
   } catch (e){
     const perm = e.status === 401 || e.status === 403;
     alert(perm ? 'urgent' : 'warn', 'voided', perm ? '환불 목록을 볼 권한 없음' : '환불 목록 확인 실패', errText2(e));
@@ -1235,7 +1339,9 @@ async function checkVoided(){
 const errText2 = e => String((e && e.message) || e).slice(0, 500);
 setTimeout(() => { checkVoided(); setInterval(checkVoided, 6 * 3600_000).unref?.(); }, +process.env.DUEL_VOID_FIRST_MS || 60_000).unref?.();
 
-const wss = new WebSocketServer({ server: http, perMessageDeflate: DEFLATE });
+// [stated] **한 메시지 최대 64KB** — 기본값(100MB)이면 큰 덩어리 하나로 서버 메모리를 채울 수 있다.
+// 앱이 보내는 것은 조작 입력·짧은 명령뿐이라 1KB 도 안 된다
+const wss = new WebSocketServer({ server: http, perMessageDeflate: DEFLATE, maxPayload: 64 * 1024 });
 http.listen(PORT, () => {
   console.log(`듀얼 서버 대기중 :${PORT}`);
   // [stated] 봇 계정 50개를 심는다. **없는 것만** 만들고, 이미 있으면 그동안 쌓인 점수를 둔다
@@ -1386,32 +1492,79 @@ function pairUp(key){
   }
 }
 
+/** [stated] **게임 소켓도 본인 확인을 한다** (2026-11-01 출시 전 검증).
+ *  예전엔 접속 주소의 `uid=` 를 그대로 믿었다 — 이름 검색(`/find`)으로 남의 계정 번호를 알아내면
+ *  그 사람 계정으로 빠른 매칭을 돌려 **그 사람 티켓을 쓰고, 일부러 져서 점수를 깎을 수 있었다.**
+ *  → 앱이 로그인 증표(`tok`)를 같이 보내고, 서버가 구글(Firebase)에 물어 계정을 정한다.
+ *  증표가 없거나 틀리면 계정 없는 사람으로 본다(점수·티켓·퀘스트 없음). 늦으면 8초에서 끊는다 */
+const WHO_MS = 8000;
+async function whoIs(q){
+  const tok = String(q.get('tok') || '');
+  if (tok && store.isOn()){
+    const uid = await Promise.race([store.uidFromToken(tok.slice(0, 4096)), new Promise(r => setTimeout(() => r(null), WHO_MS))]);
+    return uid || '';
+  }
+  // **검사 전용** — 저장소가 아예 없을 때(점수·티켓을 아무 데도 안 쓴다), 또는 가짜 저장소에 증표 없이 붙을 때만
+  // 주소의 uid 를 그대로 믿는다. Render 는 저장소가 켜져 있으므로 증표만 받는다
+  return (store.isFake() || !store.isOn()) ? String(q.get('uid') || '').slice(0, 64) : '';
+}
+
 wss.on('connection', (ws, req) => {
+  // [stated] **오류 처리는 맨 먼저 건다** — 아래에서 일찍 끝나는 길(웹 차단·없는 방·강퇴)에도 걸려 있어야 한다.
+  // 예전엔 맨 끝에 걸어서, 그 길로 끝난 소켓에 이상한 데이터가 오면 처리 못 한 오류로 서버가 꺼질 수 있었다
+  ws.on('error', () => { try { ws.close(); } catch { /* 무시 */ } });
   // [stated] **웹판에서 온 접속은 끊는다** — 출시 후 게임은 앱으로만 (`webgate.js`)
   if (fromWeb(req.headers.origin)){ try { ws.close(4403, 'app only'); } catch { /* 무시 */ } return; }
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
 
-  const q = new URL(req.url, 'http://x').searchParams;
+  // [stated] **이상한 주소(예: `//`)로 접속하면 주소 읽기가 실패해 서버가 꺼졌다**(재현함) → 그 연결만 끊는다
+  let q;
+  try { q = new URL(req.url || '/', 'http://x').searchParams; }
+  catch { try { ws.close(1008, 'bad url'); } catch { /* 무시 */ } return; }
+
+  // 본인 확인이 끝날 때까지 온 메시지는 모아 뒀다가 확인 뒤에 차례대로 처리한다
+  const early = [];
+  const hold = (raw, isBin) => { if (early.length < 64) early.push([raw, isBin]); };
+  ws.on('message', hold);
+  whoIs(q).catch(() => '').then(uid => {
+    ws.off('message', hold);
+    if (ws.readyState !== 1) return;            // 확인하는 사이 끊겼다
+    try { start(uid); }
+    catch (e){ bug('접속 처리')(e); try { ws.close(1011, 'error'); } catch { /* 무시 */ } return; }
+    for (const [raw, isBin] of early) ws.emit('message', raw, isBin);
+  });
+
+  function start(uid){
   const sid = q.get('sid') || String(Math.random());
   // 닉네임. 길이를 서버에서도 자른다 (클라만 믿으면 안 된다)
   const nick = String(q.get('nick') || '').slice(0, 16);
   const mode = q.get('mode') || 'queue';      // queue | create | join
   const code = (q.get('code') || '').trim();
   const resume = q.get('resume') === '1';    // 끊겼다 자동으로 다시 붙는 경우에만 true
-  const want = [2, 3, 4, 5, 6].includes(+q.get('n')) ? +q.get('n') : 2;   // 원하는 인원수
-  const ffa = q.get('ffa') === '1';         // 개인전
+  let want = [2, 3, 4, 5, 6].includes(+q.get('n')) ? +q.get('n') : 2;   // 원하는 인원수
+  let ffa = q.get('ffa') === '1';           // 개인전
   const soccer = q.get('soccer') === '1';   // 축구 미니게임
+  const melee = q.get('melee') === '1';      // 칼전인가
+  // 말이 안 되는 조합(팀전 3명, 총격전 개인전, 축구 6명)은 1대1 로 받는다
+  if (!validMode(want, melee, ffa, soccer)){ want = 2; ffa = false; }
   const wantColor = q.has('color') ? +q.get('color') : -1;
   ws.nick = nick;      // 모든 경로(대기열·방·팀 로비)가 같이 쓴다
   // [stated] 새 앱은 **숫자로 묶은 틱 프레임**(`w=2`)과 **압축 스냅샷**(`z=1`, 앱이 풀 수 있을 때)을 받는다 (wire.js)
   ws.bin = q.get('w') === '2';
   ws.z = ws.bin && q.get('z') === '1';
-  ws.uid = String(q.get('uid') || '').slice(0, 64);   // 로그인 계정. 점수는 이 값으로 저장
+  ws.uid = uid || '';   // 로그인 계정 — **서버가 증표로 확인한 값**. 점수는 이 값으로 저장
   // [stated] 친구 목록에 **접속 중인지 표시**한다. 소켓을 들고 있는 서버만 알 수 있다.
-  // 같은 사람이 탭을 여러 개 열 수 있으므로 수를 세고, 0 이 되면 지운다
-  if (ws.uid) online.set(ws.uid, (online.get(ws.uid) || 0) + 1);
-  const melee = q.get('melee') === '1';      // 칼전인가
+  // 같은 사람이 탭을 여러 개 열 수 있으므로 수를 세고, 0 이 되면 지운다.
+  // **세는 순간 빼는 것도 건다** — 예전엔 빼는 처리가 맨 끝에 있어서, 없는 방 코드·강퇴·관전 꽉 참으로
+  // 일찍 끝난 접속은 영영 안 빠졌다(친구 목록에 계속 '접속 중', 봇 대기가 4.5초 → 8초)
+  if (ws.uid){
+    online.set(ws.uid, (online.get(ws.uid) || 0) + 1);
+    ws.once('close', () => {
+      const n = (online.get(ws.uid) || 1) - 1;
+      if (n > 0) online.set(ws.uid, n); else online.delete(ws.uid);
+    });
+  }
   ws.sid = sid;
 
   // 예약석 복귀는 '자동 재접속'일 때만. 사용자가 직접 매칭/방만들기를 눌렀는데
@@ -1467,9 +1620,9 @@ wss.on('connection', (ws, req) => {
       // [stated] **관전자가 들어와도 방장 화면 목록이 그대로였다** — 방 상태를 안 보냈다
       room.sendRoom();
       console.log(`관전 입장: ${code} (room ${room.id}, ${room.watchers.size}명)`);
-      return;
-    }
-    if (room.n > 2 && !room.ffa){
+      // [stated] **여기서 `return` 하면 안 된다** (2026-11-01) — 예전엔 끝내 버려서 아래의 메시지·끊김 처리가
+      // 안 걸렸다. 관전으로 들어온 사람은 자리가 나도 팀으로 못 옮기고, [나가기]도 서버에 안 닿았다
+    } else if (room.n > 2 && !room.ffa){
       // 팀전(2대2·3대3)은 팀을 직접 고른다. 고를 때까지는 자리를 주지 않는다.
       // **개인전은 팀이 없으므로 바로 앉힌다** — 안 그러면 팀 로비에서 자리를 영영 못 받는다
       room.waitJoin(ws, sid);
@@ -1506,13 +1659,24 @@ wss.on('connection', (ws, req) => {
     ws.botAt = Date.now() + BOT_FILL_MS;
   }
 
+  // [stated] **메시지 하나 처리하다 난 오류는 그 메시지(그 방)에서 끝낸다** — 서버 전체를 끄지 않는다
   ws.on('message', (raw, isBin) => {
+    try { onMessage(raw, isBin); }
+    catch (e){
+      const room = ws.room;
+      if (room && rooms.get(room.id) === room) room.fail('메시지 처리', e);   // 방 상태가 반쯤 바뀌었을 수 있다
+      else bug('메시지 처리')(e);
+    }
+  });
+  const onMessage = (raw, isBin) => {
     let m;
     try {
       // 새 앱은 조작 입력을 숫자로 묶어 보낸다 (wire.js). 나머지는 글자(JSON)
       if (isBin){ if (raw[0] !== W_IN) return; m = decodeIn(new Uint8Array(raw.buffer, raw.byteOffset, raw.length)); }
       else m = JSON.parse(raw);
     } catch { return; }
+    // [stated] **객체가 아닌 것(`null`·숫자·글자·배열)은 버린다** — 예전엔 `null` 한 줄에 서버가 꺼졌다(재현함)
+    if (!m || typeof m !== 'object' || Array.isArray(m) || typeof m.t !== 'string') return;
     // [stated] **스냅샷은 앱이 필요할 때 달라고 한다** (어긋남·화면 복귀·많이 밀림) — 0.25초에 한 번까지
     if (m.t === 'snap'){
       const now = Date.now();
@@ -1594,6 +1758,7 @@ wss.on('connection', (ws, req) => {
         ws.watching = false;
       }
       if (ws.slot >= 0 && room.server.s.phase === PH_READY){
+        room.arena();                                // 팀 판정은 이 방 기준으로
         const cur = teamOf(ws.slot, room.n);
         if (cur === team) return;                    // 같은 팀이면 할 일 없음
         const dst = room.freeSeatIn(team);
@@ -1685,6 +1850,7 @@ wss.on('connection', (ws, req) => {
       if (st.phase === PH_READY){ st.rdy = 1; }
       // `win` 을 주면 **그 팀이 이기게** 상대 체력을 0 으로 (시계만 줄이면 무승부라 점수가 안 움직인다)
       if (typeof m.win === 'number'){
+        ws.room.arena();
         const wt = teamOf(m.win | 0, st.n);
         for (let i = 0; i < st.n; i++) if (teamOf(i, st.n) !== wt) st.p[i].hp = 0;
       } else {
@@ -1702,6 +1868,12 @@ wss.on('connection', (ws, req) => {
     // **검사 전용** — 저장된 점수를 돌려준다. `E2E_DEBUG=1` 일 때만
     // **검사 전용** — 처리 못 한 오류를 일부러 낸다 (장애 알림이 꺼지기 전에 오는지 본다). Render 에는 E2E_DEBUG 가 없다
     if (m.t === '__crash' && process.env.E2E_DEBUG === '1'){ setImmediate(() => { throw new Error('검사용 충돌'); }); return; }
+    // **검사 전용** — 방 하나에서 오류를 일부러 낸다: 그 방만 닫히고 서버·다른 방은 그대로인지 본다.
+    // `tick: 1` 이면 판 진행(틱) 도중에, 아니면 메시지 처리 도중에 낸다. `E2E_DEBUG=1` 일 때만
+    if (m.t === '__roomfail' && ws.room && process.env.E2E_DEBUG === '1'){
+      if (m.tick) { ws.room.boom = true; return; }
+      throw new Error('검사용 방 오류 (메시지)');
+    }
     if (m.t === '__score' && process.env.E2E_DEBUG === '1'){
       ws.send(JSON.stringify({ t: '__score', uid: m.uid, v: store.fakeGet(m.uid) }));
       return;
@@ -1784,17 +1956,33 @@ wss.on('connection', (ws, req) => {
     // 10 이 아니라 7 부터 보였다
     // 게임 화면에 들어왔다 = VS 화면을 봤거나 건너뛰었다 → 티켓 (이미 깎였으면 그대로)
     if (m.t === 'in' && !ws.seen){ ws.seen = true; ws.room.checkHold(); ws.room.charge(ws.slot); }
+    // [stated] **앱이 보낸 설정값(`cfg`)은 받지 않는다** (2026-11-01) — 예전엔 그대로 판 상태에 덮어써서
+    // `{over:true, winner:1}` 한 줄로 그 판을 이긴 것으로 만들 수 있었다(재현함). 이동 상한·총알 속도·발사 간격은
+    // 서버가 같은 코드(`newState`)로 이미 정해 두었고, 판마다 앱에 내려보낸다
+    if (m.t === 'cfg') return;
+    if (m.t === 'rtt'){
+      const r = Number(m.rtt);
+      if (!Number.isFinite(r) || r < 0) return;
+      m = { t: 'rtt', pid: ws.slot, rtt: Math.min(r, 5000) };
+    } else if (m.t === 'in'){
+      m = cleanIn(m, ws.room.server.s);
+      if (!m) return;
+    }
     ws.room.server.onMsg(m);
-  });
+  };
 
   ws.on('close', () => {
+    try { onClose(); }
+    catch (e){
+      const room = ws.room;
+      if (room && rooms.get(room.id) === room) room.fail('끊김 처리', e); else bug('끊김 처리')(e);
+    }
+  });
+  const onClose = () => {
     // [stated] **다시 하기 신청 중에 상대가 끊기면** 신청한 사람이 계속 기다린다 → 거절로 친다
     if (ws.room && !ws.watching) ws.room.dropAgainAsk();
     if (ws.room && ws.watching) ws.room.watchers.delete(ws);
-    if (ws.uid){
-      const n = (online.get(ws.uid) || 1) - 1;
-      if (n > 0) online.set(ws.uid, n); else online.delete(ws.uid);
-    }
+    // ('접속 중' 수 빼기는 세는 순간 같이 걸었다 — 위 `online`)
     const q = ws.qkey ? queueOf(ws.qkey) : null;
     const i = q ? q.indexOf(ws) : -1;
     if (i >= 0){ q.splice(i, 1); return; }
@@ -1808,12 +1996,14 @@ wss.on('connection', (ws, req) => {
       return;
     }
     const room = ws.room;
-    if (room && room.seats[ws.slot].ws === ws){
+    // [stated] **자리가 없어졌을 수 있다** — 나간 사람의 끊김 신호는 30초까지 늦게 오는데, 그사이 방장이
+    // 인원을 줄이면 `seats[3]` 이 없어 서버가 꺼졌다. 자리가 있고 그 자리 주인이 이 소켓일 때만
+    if (room && room.seats[ws.slot] && room.seats[ws.slot].ws === ws){
       room.leave(ws.slot);
       console.log(`끊김: room ${room.id} slot ${ws.slot} (${GRACE_MS / 1000}초 대기)`);
     }
-  });
-  ws.on('error', () => ws.close());
+  };
+  }   // start
 });
 
 // 모든 방을 한 타이머로 굴린다. 방마다 setInterval을 두면 방이 늘수록 흔들린다
@@ -1827,19 +2017,30 @@ setInterval(() => {
   }
   lastTickAt = now;
   for (const [id, room] of rooms){
-    room.sweep(wall);
-    if (room.emptyAt && wall - room.emptyAt > EMPTY_ROOM_TTL){
-      room.dispose();
-      rooms.delete(id);
-      console.log(`방 정리: ${id}`);
-      continue;
-    }
-    room.server.update(now);
-    room.prime();           // 전투가 시작되면 점수를 한 번 읽어둔다
-    room.settle();          // 판이 끝났으면 점수를 쓴다 (한 번만)
-    // 판이 끝난 순간 **방장이 누구인지 알린다** — 결과 화면에서 다시 시작 버튼을 그린다
-    if (room.server.s.phase === PH_OVER && !room.toldHost){ room.toldHost = true; room.overAt = Date.now(); room.sendHost(); }
-    if (room.server.s.phase !== PH_OVER) room.toldHost = false;
+    // [stated] **방 하나에서 난 오류는 그 방만 닫는다** — 예전엔 처리 못 한 오류 하나가 서버를 꺼서
+    // 그 순간 모든 판이 끊겼다 (`Room.fail`)
+    try {
+      room.sweep(wall);
+      // [stated] **연결된 사람이 하나도 없을 때부터 30초 뒤에 지운다** (2026-11-01).
+      // 예전엔 '앉은 사람이 나갈 때' 만 시계를 걸어서 ① 팀을 안 고르고 나간 방은 영영 안 지워져 계속 돌았고
+      // ② 팀 고르는 중·관전 중인 사람이 남아 있어도 마지막으로 앉은 사람이 나가면 30초 뒤 방이 사라졌다
+      if (room.occupied()) room.emptyAt = 0;
+      else if (!room.emptyAt) room.emptyAt = wall;
+      if (room.emptyAt && wall - room.emptyAt > EMPTY_ROOM_TTL){
+        room.dispose();
+        rooms.delete(id);
+        console.log(`방 정리: ${id}`);
+        continue;
+      }
+      if (room.boom) throw new Error('검사용 방 오류 (틱)');   // 검사 전용 (`__roomfail`)
+      room.arena();           // 봇 AI 가 시뮬보다 먼저 팀을 본다 — 이 방 기준으로 맞춰 둔다
+      room.server.update(now);
+      room.prime();           // 전투가 시작되면 점수를 한 번 읽어둔다
+      room.settle();          // 판이 끝났으면 점수를 쓴다 (한 번만)
+      // 판이 끝난 순간 **방장이 누구인지 알린다** — 결과 화면에서 다시 시작 버튼을 그린다
+      if (room.server.s.phase === PH_OVER && !room.toldHost){ room.toldHost = true; room.overAt = Date.now(); room.sendHost(); }
+      if (room.server.s.phase !== PH_OVER) room.toldHost = false;
+    } catch (e){ room.fail('판 진행', e); }
   }
 }, TICK_MS);
 
@@ -1849,7 +2050,10 @@ setInterval(() => {
   // **`pairUp` 도 여기서 다시 시도해야 한다.** 예전엔 사람이 대기열에 들어올 때만
   // 불렀는데, 서버가 아직 안 데워져 그때 걸러지면 **다시 부르는 곳이 없어서**
   // 둘이 이미 기다리고 있어도 봇 채우기 시각(6.5초)까지 안 붙었다
-  for (const key of [...waiting.keys()]){ pairUp(key); fillWithBots(key); }
+  for (const key of [...waiting.keys()]){
+    try { pairUp(key); fillWithBots(key); }
+    catch (e){ bug('매칭')(e); }      // 서버를 끄지 않는다 — 다음 0.15초에 다시 본다
+  }
 }, 150);   // 0.5초마다 보면 그만큼 늦어져 7초를 넘긴다
 
 setInterval(() => {

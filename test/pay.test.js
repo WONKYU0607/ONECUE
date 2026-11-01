@@ -65,6 +65,18 @@ try {
     assert((await post('uA', 'skin_gun_5', 'T4')).why === 'used', '  이미 소모된 증표(우리가 준 기록 없음) → 안 준다');
   }
 
+  // [stated] **현금 결제는 구글 계정만** (2026-11-01 결정) — 게스트(익명) 증표면 받지 않는다.
+  // 마무리를 안 하므로 구글이 3일 뒤 자동 환불한다. 검사용 저장소는 `e2e-anon` 으로 시작하는 계정을 게스트로 본다
+  console.log('게스트(구글 미연결)는 현금 결제를 못 받는다');
+  {
+    buy('TG1', 'skin_gun_4', 'e2e-anon1');
+    const r = await post('e2e-anon1', 'skin_gun_4', 'TG1');
+    assert(r.why === 'guest', `  게스트 증표 → 'guest' (${JSON.stringify(r)})`);
+    assert(!g.consumed.includes('TG1'), '  구글에 마무리하지 않는다 (자동 환불되게)');
+    const q = await quest('e2e-anon1');
+    assert(!(q.own && q.own.gun && q.own.gun.includes(4)), '  보유에 안 들어간다');
+  }
+
   console.log('결제 대기 · 취소');
   {
     buy('T5', 'skin_soccer_1', 'uA', { state: 'PENDING' });

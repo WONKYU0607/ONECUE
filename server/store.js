@@ -39,6 +39,8 @@ export const fakePut = (uid, patch) => {
   return { ok: true };
 };
 export const isOn = () => !!db || !!FAKE;
+/** **검사 전용 저장소로 도는가** — 이때만 게임 소켓 주소의 uid 를 증표 없이 믿는다 (Render 에는 그 설정이 없다) */
+export const isFake = () => !!FAKE;
 /** [stated] 장애 알림용 — 저장소가 **꺼져 있으면 안 되는데 꺼졌는가** (키를 넣었는데 못 붙음) */
 export const brokenOff = () => !db && !FAKE && offKind === 'badkey';
 
@@ -86,6 +88,17 @@ function notGone(uid){
   if (at && Date.now() - at < GONE_MS) return null;
   if (at) gone.delete(uid);
   return uid;
+}
+
+/** [stated] **현금 결제는 구글 계정만** (2026-11-01 결정) — 게스트(익명)로 산 것은 앱을 지우거나 데이터를
+ *  지우면 되살릴 길이 없다(구매는 전부 '소모' 로 마무리해 구글에 기록이 안 남는다). 계정에 구글이 붙어 있는지
+ *  **계정 정보로** 본다(증표의 로그인 방식은 게스트에서 구글로 옮긴 뒤에도 옛 값일 수 있어 믿지 않는다).
+ *  확인 자체가 실패하면 예외 — 결제를 거절하지 않고 '나중에 다시' 로 돌린다 */
+export async function isGoogle(uid){
+  if (FAKE) return !!uid && !String(uid).startsWith('e2e-anon');
+  if (!db || !uid) return false;
+  const u = await getAuth().getUser(String(uid));
+  return (u.providerData || []).some(p => p && p.providerId === 'google.com');
 }
 
 /** [stated] **계정 삭제용 본인 확인.** 증표의 주인과 **언제 로그인했는지**(auth_time)를 같이 준다.
@@ -1299,8 +1312,10 @@ export async function revokePurchase(token){
   let uid = '';
   if (FAKE) uid = (FAKE_PAYS.get(h) || {}).uid || '';
   else if (db){
+    // [stated] **실패는 '우리 구매 아님(null)' 과 구분한다** (2026-11-01) — 예전엔 둘 다 null 이라
+    // 환불 확인이 '어디까지 봤는지' 를 그대로 앞으로 옮겨, 한 번 실패한 환불은 **영영 다시 안 봤다**
     try { const s = await db.doc('pays/' + h).get(); uid = s.exists ? s.data().uid || '' : ''; }
-    catch (e){ fail('warn', 'revoke', '환불 회수 실패 (읽기)', e); return null; }
+    catch (e){ fail('warn', 'revoke', '환불 회수 실패 (읽기)', e); return { err: true }; }
   }
   if (!uid) return null;                              // 우리가 지급한 적 없는 구매
   try {
@@ -1326,7 +1341,7 @@ export async function revokePurchase(token){
     });
   } catch (e){
     fail('warn', 'revoke', '환불 회수 실패', e, `계정 ${uid}`);
-    return null;
+    return { err: true };
   }
 }
 

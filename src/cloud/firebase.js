@@ -39,6 +39,13 @@ function e2eUid(){
   return q.get('e2e') === '1' ? 'e2e-user' + (q.get('u') || '') : '';
 }
 export const getUid = () => uid || e2eUid();
+/** [stated] **게임 소켓에 실을 로그인 증표** (2026-11-01) — 서버가 이걸로 계정을 확인한다.
+ *  로그인 전이면 빈 값(계정 없는 판). 검사에서는 계정 이름을 그대로 증표로 쓴다(검사용 서버가 그렇게 받는다) */
+export async function idToken(){
+  const e = e2eUid();
+  if (e) return e;
+  try { return auth.currentUser ? await auth.currentUser.getIdToken() : ''; } catch { return ''; }
+}
 
 /** **이미 로그인돼 있으면 그 계정을 쓴다. 없으면 그냥 없는 채로 둔다.**
  *
@@ -205,7 +212,10 @@ export async function reauthForDelete(){
 /** [stated] **로그아웃 — 일반 앱과 같게.** 계정에 붙은 기록은 기기에서 지우고
  *  기기 설정(소리·언어·화면 배치)은 남긴다. 다음에 같은 계정으로 들어오면 서버에서 다시 받는다.
  *  기기에 남겨 두면 **다른 계정으로 들어갈 때 기록이 섞인다** */
-const ACCOUNT_KEYS = ['duel.play.v2', 'duel.profile.v1', 'duel.progress.v2', 'duel.tryskin', 'duel.sid', 'duel.noads'];
+// [stated] **코인·등수 기록도 지운다** (2026-11-01) — 계정 삭제(`account.js`)는 지우는데 로그아웃은 빠뜨려,
+// 다음 계정 화면에 앞 계정의 코인·우편 빨간 점·등수가 서버 답이 올 때까지(서버가 자면 계속) 남았다
+const ACCOUNT_KEYS = ['duel.play.v2', 'duel.profile.v1', 'duel.progress.v2', 'duel.tryskin', 'duel.sid',
+                      'duel.coin.v1', 'duel.rank.v1', 'duel.noads'];
 export async function logOut(){
   await signOutAll();
   for (const k of ACCOUNT_KEYS){ try { localStorage.removeItem(k); } catch { /* 무시 */ } }

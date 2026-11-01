@@ -23,7 +23,7 @@ import QuitAsk from './ui/QuitAsk.jsx';
 import { preloadSfx, playMusic, stopMusic, unlockAudio, sfx } from './game/audio.js';
 import { startPlayClock, claimAiRewards, aiPaidOf } from './state/questclient.js';
 import { playAgain, setRoomMode, getRoom, onRoom, onGo, onKicked, backToLobby,
-         onAgainMsg, onModeMsg, askAgain, answerAgain, onAgainAsk, onAgainNo, onMatchCoin } from './net/connection.js';
+         onAgainMsg, onModeMsg, askAgain, answerAgain, onAgainAsk, onAgainNo, onMatchCoin, onRoomGone } from './net/connection.js';
 import { scoreDelta } from './game/score.js';
 import { recordMatch, streakOf, soccerDelta } from './state/tickets.js';
 import { disconnect } from './net/connection.js';
@@ -56,7 +56,8 @@ export default function App(){
   const [isHost, setIsHost] = useState(false);   // [stated] 방장이면 결과 화면에 '다시 하기'
   // [stated] **방(로비)** — 소켓으로 흘러오는 방 상태를 그대로 담는다
   const [room, setRoom] = useState(null);
-  const [kickedNote, setKickedNote] = useState(false);   // 강퇴 알림
+  // 강퇴 알림 · 방이 서버 오류로 닫힘 알림 — 띄울 문구의 열쇠(없으면 '')
+  const [kickedNote, setKickedNote] = useState('');
   // [stated] **다시 하기는 묻고 시작한다** — 신청 받은 사람에게 뜨는 창 / 신청한 사람의 대기 표시
   const [againAsk, setAgainAsk] = useState(null);        // { from }
   const [againWait, setAgainWait] = useState(false);
@@ -80,10 +81,18 @@ export default function App(){
     onKicked(() => {
       disconnect();
       setRoom(null);
-      setKickedNote(true);
+      setKickedNote('room.kickedMsg');
       setScreen('home');
     });
-    return () => { onRoom(null); onGo(null); onKicked(null); onAgainMsg(null); onModeMsg(null);
+    // [stated] **서버가 이 방을 오류로 닫았다** (2026-11-01) — 다른 방은 그대로 돈다. 홈으로 보내고 알린다
+    onRoomGone(() => {
+      disconnect();
+      setRoom(null);
+      setAgainAsk(null); setAgainWait(false); setResult(null); setSearch(null);
+      setKickedNote('err.roomGone');
+      setScreen('home');
+    });
+    return () => { onRoom(null); onGo(null); onKicked(null); onRoomGone(null); onAgainMsg(null); onModeMsg(null);
       onAgainAsk(null); onAgainNo(null); onMatchCoin(null); };
   }, []);
   useEffect(() => { if (screen === 'game') setGain(0); }, [screen]);
@@ -144,6 +153,9 @@ export default function App(){
     disconnect();
     SELF.watching = false;          // **반드시 끈다** — 안 끄면 다음 판에서 조작이 막힌다
     setSearch(null);
+    // [stated] **[다시 하기] 신청·수락 창을 같이 지운다** (2026-11-01) — 예전엔 방에서 [다시 하기]를 누르고
+    // 답이 오기 전에 홈으로 나가면 '기다리는 중' 이 남아, 그 뒤 모든 결과 화면이 멈추고 자동으로 안 돌아갔다
+    setAgainWait(false); setAgainAsk(null);
     setSession(null); setResult(null); setScreen('home');
   }, []);
   // [stated] 찾는 도중 **홈을 떠나면**(상점·AI 등) 찾기도 끝낸다. 찾는 컴포넌트가 사라지며 연결을 끊는다
@@ -180,6 +192,8 @@ export default function App(){
   // 한 번에 꺼지면 매칭 중이던 것도 날아가므로 반드시 두 단계로 둔다
   const exitAt = useRef(0);
   const settingsBack = useRef(null);   // 설정 창이 걸어 두는 자기 뒤로가기 (안에 열린 창 닫기)
+  // [방으로] 와 같은 동작 — 아래에서 정의되므로 참조로 건다 (여기서 바로 쓰면 정의 전에 읽혀 화면이 터진다)
+  const backToRoomRef = useRef(null);
   const quitAt = useRef(0);   // 게임에서 나간 시각 — 직후 뒤로가기를 무시하는 데 쓴다
   useEffect(() => { initBack(); }, []);
   useEffect(() => {
@@ -191,7 +205,10 @@ export default function App(){
       if (askExit){ setAskExit(false); return true; }
       if (askQuit){ setAskQuit(false); return true; }
       if (askRoom){ setAskRoom(false); return true; }
-      if (kickedNote){ setKickedNote(false); return true; }
+      if (kickedNote){ setKickedNote(''); return true; }
+      // [stated] **처음 켰을 때 튜토리얼 질문에서 뒤로가기 = [건너뛰기]** (2026-11-01) — 예전엔 목록에 없어
+      // 그 위에 '게임 종료' 창이 겹쳐 떴다
+      if (askTuto){ markTutoDone(); setAskTuto(false); return true; }
       // [stated] **위에 뜬 창(프로필 등)부터 닫는다** — 프로필에서 뒤로가기를 누르면 "게임 종료" 창이 떴다
       if (tryOverlayBack()) return true;
       // 설정 안에 열린 창(개인정보처리방침)이 있으면 그것부터 닫는다
@@ -211,6 +228,8 @@ export default function App(){
       // 새 화면을 만들 때 여기 목록에 넣지 않으면 앱이 그냥 닫힌다
       // [stated] PVP·연습은 **홈 칸 안에서** 고른다 — 따로 화면이 없다 (옛 `PvpMenu`·`PracticeMenu` 삭제)
       // 순위·친구 화면이 이 목록에서 빠져 있어 **하단 뒤로가기를 눌러도 아무 일도 안 났다**
+      // [stated] **친구방 결과 화면에서 뒤로가기 = [방으로]** (2026-11-01) — 예전엔 홈으로 가서 확인 없이 방을 나갔다
+      if (screen === 'result' && getRoom() && backToRoomRef.current){ backToRoomRef.current(); return true; }
       if (screen === 'result' || screen === 'ranks' || screen === 'friends'
           || screen === 'shop' || screen === 'costume' || screen === 'quests' || screen === 'mail'){
         goHome(); return true;
@@ -221,7 +240,7 @@ export default function App(){
       if (screen === 'home'){ setAskExit(true); return true; }
       return true;
     });
-  }, [screen, showSettings, askQuit, askExit, askRoom, kickedNote, goHome, search, cancelSearch]);
+  }, [screen, showSettings, askQuit, askExit, askRoom, kickedNote, askTuto, goHome, search, cancelSearch]);
   const beginPvp  = useCallback(opt => {
     disconnect();
     // kind는 게임 종류(pvp/ai), mode는 접속 방식(queue/create/join).
@@ -372,6 +391,7 @@ export default function App(){
   // [stated] **판이 끝나면 방으로 돌아온다** — 친구방이면 로비 화면으로
   const backToRoom = useCallback(() => {
     setResult(null);
+    setAgainWait(false); setAgainAsk(null);   // 신청을 걸어 둔 채 로비로 와도 '기다리는 중' 이 남지 않게 (goHome 과 같은 이유)
     // **방으로 들어온 경우에만** 방으로 돌아간다 (빠른 매칭은 방이 없다)
     if (session?.mode === 'create' || session?.mode === 'join'){
       // [stated] **한 판 뒤 방으로 돌아와 강퇴하니 안 먹었다.** 내 화면만 로비로 바뀌고
@@ -380,6 +400,7 @@ export default function App(){
       setScreen('room');
     } else goHome();
   }, [goHome, session]);
+  backToRoomRef.current = backToRoom;
   const again     = useCallback(() => {
     setResult(null);
     // [stated] **빠른 매칭의 '다시 하기' 는 새 상대를 찾는 것이다.**
@@ -491,9 +512,9 @@ export default function App(){
         </div>
       )}
       {kickedNote && (
-        <div className="modal-back" onClick={() => setKickedNote(false)}>
-          <div className="kick-ask"><p>{t('room.kickedMsg')}</p>
-            <button className="room-btn" onClick={() => setKickedNote(false)}>{t('common.ok')}</button>
+        <div className="modal-back" onClick={() => setKickedNote('')}>
+          <div className="kick-ask"><p>{t(kickedNote)}</p>
+            <button className="room-btn" onClick={() => setKickedNote('')}>{t('common.ok')}</button>
           </div>
         </div>
       )}

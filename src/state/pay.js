@@ -76,7 +76,9 @@ async function acctOf(uid){
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function send(sku, ptoken, ms = 20000){
+// [stated] **40초까지 기다린다** (2026-11-01) — 서버는 구글에 세 번(각 10초까지) 물을 수 있어 20초로는
+// 실제로 받은 결제를 '실패' 로 보여 줄 수 있었다
+async function send(sku, ptoken, ms = 40000){
   const me = await whoAmI();
   if (!me) return { ok: false, auth: true };
   const ac = new AbortController();
@@ -89,6 +91,12 @@ async function send(sku, ptoken, ms = 20000){
     return await r.json();
   } catch { return { ok: false, net: true }; }
   finally { clearTimeout(timer); questChanged(); }
+}
+
+/** 지금 게스트(구글 미연결)인가. 검사(개발 서버)·웹에서는 로그인이 없으므로 false */
+async function guestNow(){
+  try { const fb = await import('../cloud/firebase.js'); return !!(fb.isGuest && fb.isGuest()); }
+  catch { return false; }
 }
 
 let recovering = null;
@@ -123,6 +131,9 @@ export async function buyCash(sku){
   const m = await plugin();
   const me = await whoAmI();
   if (!me) return { ok: false, why: 'auth' };
+  // [stated] **현금 결제는 구글 로그인한 사람만** (2026-11-01 결정) — 게스트로 산 것은 앱을 지우거나 데이터를
+  // 지우면 되살릴 수 없다. 결제 창을 열기 전에 막는다 (서버도 한 번 더 막는다)
+  if (await guestNow()) return { ok: false, why: 'guest' };
   let tx;
   try {
     tx = await m.NativePurchases.purchaseProduct({
@@ -146,6 +157,13 @@ export async function buyCash(sku){
   await refreshCoin().catch(() => {});
   if (r && r.ok) return { ok: true };
   if (r && r.why === 'pending') return { ok: false, why: 'pending' };
+  if (r && r.why === 'guest') return { ok: false, why: 'guest' };
+  // [stated] **서버 답을 못 받았으면 '실패' 가 아니라 '확인 중'** — 돈은 이미 나갔을 수 있다.
+  // 마무리 안 된 구매는 곧 다시 보내 받는다 (앱을 다시 켤 때도)
+  if (!r || r.net || r.why === 'err'){
+    setTimeout(() => { recover().then(rs => { if (rs.some(x => x && x.ok)) refreshCoin().catch(() => {}); }).catch(() => {}); }, 15000);
+    return { ok: false, why: 'checking' };
+  }
   return { ok: false, why: 'fail' };
 }
 

@@ -4,7 +4,7 @@
 // 항상 기기에 먼저 쓰고, 성공하면 구름에 올린다(그리고 켤 때 구름 값으로 덮는다).
 // 점수는 나중에 **서버만 쓰게** 규칙을 걸 것이므로 여기서는 읽기만 하게 된다.
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db, whenSignedIn } from './firebase.js';
+import { db, whenSignedIn, idToken } from './firebase.js';
 
 const COL = 'players';
 let loaded = false;          // 구름에서 한 번 읽어왔는가
@@ -62,6 +62,8 @@ export function push(data, delay = 1500){
 }
 
 export const uid = () => whenSignedIn();
+/** 게임 소켓에 실을 로그인 증표 (서버가 계정을 확인한다) */
+export const token = () => idToken();
 
 // 앱을 닫기 전에 밀린 걸 밀어 넣는다 (모바일은 조용히 죽는다)
 export function flushOnHide(getData){

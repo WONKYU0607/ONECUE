@@ -210,6 +210,20 @@ export class Server {
     this.start = CLOCK.now();
     net.toServer = m => this.onMsg(m);
   }
+  /** [stated] **방에서 인원을 바꾸면 엔진도 그 인원으로** (2026-11-01). 예전엔 상태(`s`)만 새로 차리고
+   *  엔진의 인원(`n`)·자리별 배열은 옛 값이라, 1대1 → 2대2 로 늘리면 새 자리 입력이 버려져 못 움직였다 */
+  resize(n){
+    const fit = (a, fill) => Array.from({ length: n }, (_, i) => (a && a[i] !== undefined ? a[i] : fill()));
+    this.n = n;
+    this.heldIn = fit([], () => undefined); this.heldMiss = fit([], () => 0);
+    this.rtt = fit(this.rtt, () => 0); this.rttHist = [];
+    this.dropBy = fit([], () => 0);
+    this.rxBy = fit([], () => ({}));
+    this.lastIn = fit([], () => null);
+    this.inbox.clear();
+    this.pendingCfg = null;
+    this.recalcDelay();
+  }
   onMsg(m){
     if (m.pid >= 0 && m.pid < this.n){
       const b = (this.rxBy[m.pid] = this.rxBy[m.pid] || {});

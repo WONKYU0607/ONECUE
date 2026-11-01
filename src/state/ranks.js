@@ -98,7 +98,7 @@ export function loadRank(kindRaw, force = false){
       if (!bad){ cache[kind] = v; saveMine(); }
       return bad && cache[kind] ? cache[kind] : v;
     })
-    .catch(() => ({ at: Date.now(), ...empty() }))
+    .catch(() => ({ at: Date.now(), ...empty(), err: true }))   // 못 받았다 — 화면이 '기록 없음' 대신 그렇다고 알린다
     .finally(() => { inflight[kind] = null; });
   return inflight[kind];
 }

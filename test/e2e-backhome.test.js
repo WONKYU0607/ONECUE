@@ -119,6 +119,26 @@ try {
   assert(await exitAsk(), '  종료 확인 창이 뜬다');
   await back();
   assert(!(await exitAsk()), '  한 번 더 누르면 창이 닫힌다');
+  // [stated] **처음 켰을 때 튜토리얼 질문에서 뒤로가기 = [건너뛰기]** (2026-11-01) — 예전엔 목록에 없어
+  // 질문 창 위에 '게임 종료' 창이 겹쳐 떴다
+  console.log('처음 켰을 때 튜토리얼 질문에서 뒤로가기');
+  {
+    const q = await (await b.createBrowserContext()).newPage();
+    await q.setViewport({ width: 393, height: 851, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+    await q.evaluateOnNewDocument(() => { try { localStorage.setItem('duel.lang', 'ko'); } catch { /* 무시 */ } });
+    await q.goto(`http://127.0.0.1:${VP}/?e2e=1&u=backtuto`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await q.waitForSelector('.screen.splash.ready', { timeout: 30000 }); await q.click('.screen.splash');
+    await q.waitForSelector('.screen.home', { timeout: 20000 }); await wait(1500);
+    const asking = () => q.evaluate(() => /튜토리얼/.test(document.querySelector('.modal.ask')?.innerText || ''));
+    assert(await asking(), '  튜토리얼을 할지 묻는다');
+    await q.evaluate(() => window.dispatchEvent(new PopStateEvent('popstate'))); await wait(500);
+    assert(!(await asking()), '  뒤로가기로 질문이 닫힌다');
+    assert(!(await q.evaluate(() => !!document.querySelector('.modal.ask, .modal-back'))), '  종료 창이 겹쳐 뜨지 않는다');
+    await q.reload({ waitUntil: 'domcontentloaded' });
+    await q.waitForSelector('.screen.splash.ready', { timeout: 30000 }); await q.click('.screen.splash');
+    await q.waitForSelector('.screen.home', { timeout: 20000 }); await wait(1500);
+    assert(!(await asking()), '  [건너뛰기] 와 같아서 다음에 켜도 다시 묻지 않는다');
+  }
   console.log('e2e-backhome.test.js 통과');
 } finally {
   await b.close().catch(() => {});
