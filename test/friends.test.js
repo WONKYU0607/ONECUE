@@ -86,9 +86,11 @@ console.log('화면 배선');
   assert(/fr-dot/.test(ui), '  접속 중 표시가 있다');
   for (const k of ['fr.accept', 'fr.reject', 'fr.remove', 'fr.empty'])
     assert(ui.includes(k), `  ${k} 문구를 쓴다`);
-  // **못 받아도 화면은 떠야 한다** — 서버가 자고 있을 수 있다
-  assert(/setData\(r && r\.ok \? r : \{ friends: \[\], reqIn: \[\], reqOut: \[\] \}\)/.test(ui),
-    '  실패해도 빈 목록으로 그린다');
+  // **못 받아도 화면은 떠야 한다** — 서버가 자고 있을 수 있다.
+  // [stated] 다만 '친구 없음' 처럼 보이면 안 된다 (2026-11-01) — 못 붙었다고 알린다 (`e2e-offline` 이 실제 화면으로 본다)
+  assert(/setData\(d => \(r && r\.ok \? r : \(d \|\| \{ friends: \[\], reqIn: \[\], reqOut: \[\] \}\)\)\)/.test(ui),
+    '  실패해도 화면은 그린다 (받아 둔 목록이 있으면 그대로)');
+  assert(/t\(off \? 'err\.offline' : 'fr\.empty'\)/.test(ui), "  못 붙었으면 '친구 없음' 대신 그렇다고 알린다");
   assert(/net: true/.test(cli), '  서버에 못 닿은 것을 이유로 알려준다');
 }
 

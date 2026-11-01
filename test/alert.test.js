@@ -240,9 +240,11 @@ console.log('진짜 서버 안에서 — 판 전 점수를 못 읽은 판은 건
   process.env.PORT = '9436';
   process.env.DUEL_ALERT_GROUP_MS = '300000';
   S.__useDb(P, () => boom());        // 서버가 쓸 저장소 = 전부 실패하는 흉내
+  // 게임 소켓은 **증표로** 계정을 정한다 (2026-11-01) — 흉내 저장소에서는 증표를 그대로 계정으로 본다
+  S.__useTokens(t => t);
   await import('../server/index.js');
   await waitPort(9436);
-  const ws = new WebSocket('ws://127.0.0.1:9436/?sid=m1&mode=queue&n=2&nick=a&uid=UMISS');
+  const ws = new WebSocket('ws://127.0.0.1:9436/?sid=m1&mode=queue&n=2&nick=a&uid=UMISS&tok=UMISS');
   let slot = 0, f = 0, phase = -1;
   ws.on('message', d => {
     let m; try { m = JSON.parse(d); } catch { return; }

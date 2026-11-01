@@ -194,7 +194,7 @@ console.log('위에 뜬 창 쌓기');
   const iRoom = body.indexOf("if (screen === 'room')"), iHome = body.indexOf("if (screen === 'home')");
   assert(iOv > body.indexOf('if (askRoom)') && iOv < iGame && iOv < iRoom && iOv < iHome,
     '  App 은 화면 처리보다 위에 뜬 창을 먼저 묻는다');
-  assert(/if \(kickedNote\)\{ setKickedNote\(false\)/.test(body), '  강퇴 알림 창도 뒤로가기로 닫힌다');
+  assert(/if \(kickedNote\)\{ setKickedNote\(''\)/.test(body), '  강퇴·방 닫힘 알림 창도 뒤로가기로 닫힌다');
 
   const prof = fs.readFileSync('src/ui/ProfileTab.jsx', 'utf8');
   assert(/useOverlayBack\(true,/.test(prof), '  프로필이 자기 뒤로가기를 건다');

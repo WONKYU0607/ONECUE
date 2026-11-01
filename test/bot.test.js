@@ -41,7 +41,8 @@ console.log('7초 안에 채운다');
   assert(/fillWithBots/.test(srv), '채우는 함수가 있다');
   // **`pairUp` 도 같은 타이머에서 돌아야 한다.** 서버가 아직 안 데워져 한 번 걸러지면
   // 다시 부르는 곳이 없어 둘이 기다리고 있어도 봇 채우기 시각까지 안 붙는다
-  assert(/for \(const key of \[\.\.\.waiting\.keys\(\)\]\)\s*\{\s*pairUp\(key\);\s*fillWithBots\(key\);/.test(srv),
+  // (2026-11-01 오류가 나도 서버를 끄지 않게 try 로 감쌌다 — 그 안에서 둘 다 부른다)
+  assert(/for \(const key of \[\.\.\.waiting\.keys\(\)\]\)\s*\{\s*(try \{\s*)?pairUp\(key\);\s*fillWithBots\(key\);/.test(srv),
     '주기적으로 대기열을 훑는다 (pairUp + fillWithBots)');
 }
 

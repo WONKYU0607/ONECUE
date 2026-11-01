@@ -65,6 +65,10 @@ let deleteAuthUser = uid => getAuth().deleteUser(uid);
 /** **검사 전용** — 파이어스토어를 흉내 낸 것과 계정 지우기를 끼운다 (계정 삭제가 무엇을 지우는지 보려고).
  *  Render 에서는 아무도 부르지 않는다 */
 export function __useDb(x, delUser){ db = x; if (delUser) deleteAuthUser = delUser; }
+// **검사 전용** — 흉내 저장소(`__useDb`)로 진짜 서버를 돌릴 때 증표 확인을 끼운다(구글에 물어볼 수 없어서).
+// Render 에서는 아무도 부르지 않는다
+let tokHook = null;
+export function __useTokens(fn){ tokHook = fn; }
 
 /** 로그인 증표 확인. **uid 를 그냥 믿으면 남의 이름을 바꿔버릴 수 있다** —
  *  이름 바꾸기처럼 쓰기가 일어나는 곳은 반드시 이걸로 본인인지 확인한다 */
@@ -72,6 +76,7 @@ export async function uidFromToken(idToken){
   // **검사 전용** — 가짜 저장소로 돌 때는 구글에 물어볼 수 없다.
   // `E2E_FAKE_STORE=1` 일 때만 증표를 그대로 uid 로 쓴다 (Render 에는 그 설정이 없다)
   if (FAKE) return idToken ? notGone(String(idToken).slice(0, 64)) : null;
+  if (tokHook) return idToken ? notGone(String(await tokHook(idToken) || '') || null) : null;
   if (!db || !idToken) return null;
   try { return notGone((await getAuth().verifyIdToken(String(idToken))).uid || null); }
   catch (e){ tokenFail(e); return null; }
