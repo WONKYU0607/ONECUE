@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { getColor } from '../state/profile.js';
 import { tk, out, outSoccer, tkSoccer, notFull, notFullSoccer } from './pvpTickets.js';
 import { showRewarded } from '../state/ads.js';
-import { adTicket, noadsNow, onNoads } from '../state/questclient.js';
+import { adTicket, noadsNow, onNoads, whoAmI } from '../state/questclient.js';
 import { syncTickets, adLeft, adFfaLeft, ffaAdUsesCount } from '../state/tickets.js';
 import { AD_DAY_MAX } from '../state/quests.js';
 import { fetchSearching, qkeyOf } from '../state/searching.js';
@@ -94,13 +94,31 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch, act, 
   const watchAd = async () => {
     if (adBusy || !adCan) return;
     setAdBusy(true); setAdNote('');
-    const r = noads ? { ok: true } : await showRewarded();
+    // [stated] **AdMob 이 서버로 직접 알려 준 것만 티켓이 된다** (2026-11-01) — 광고 한 편마다 번호를 붙여
+    // (`종류.번호`) 계정과 함께 광고에 싣고, 다 본 뒤 그 번호로 "받았나" 를 묻는다
+    const me = noads ? null : await whoAmI().catch(() => null);
+    const nonce = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+    const r = noads ? { ok: true }
+      : await showRewarded(me ? { userId: me.uid, customData: `${adKind}.${nonce}` } : null);
     if (!r || !r.ok){
       setAdNote(t(r && r.why === 'skip' ? 'ad.skip' : 'ad.loadFail'));
       setAdBusy(false);
       return;
     }
-    const g = await adTicket(adKind);
+    let g = await adTicket(adKind, nonce);
+    // AdMob 알림은 보통 몇 초 안에 온다 — 그동안 '확인 중' 을 보여 주며 1초마다 다시 묻는다 (최대 15초)
+    for (let i = 0; i < 15 && g && g.why === 'wait'; i++){
+      setAdNote(t('ad.checking'));
+      await new Promise(res => setTimeout(res, 1000));
+      g = await adTicket(adKind, nonce);
+    }
+    if (g && g.why === 'wait'){
+      if (typeof g.tk === 'number') syncTickets(g);
+      setAdNote(t('ad.late'));
+      setAdBusy(false);
+      redraw(x => x + 1);
+      return;
+    }
     // 받았든 아니든 **서버가 알려준 값**으로 맞춘다 (남은 횟수·티켓)
     if (g && typeof g.tk === 'number') syncTickets(g);
     if (!(g && g.ok) && !(g && g.why === 'full'))

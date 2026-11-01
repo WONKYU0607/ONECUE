@@ -15,7 +15,9 @@ export const setTokenSource = fn => { tokOf = typeof fn === 'function' ? fn : (a
 /** 증표를 받아 온다. **늦으면(3초) 증표 없이 간다** — 계정 없는 판이 될 뿐 판은 열린다 */
 const freshTok = () => Promise.race([
   Promise.resolve().then(() => tokOf()).then(v => String(v || '')).catch(() => ''),
-  new Promise(r => setTimeout(() => r(''), 3000))
+  // 증표가 만료돼(앱을 1시간 넘게 쉬었다 켬) 새로 받아야 할 때 느린 망에서 3초를 넘길 수 있다 —
+  // 빈 증표로 붙으면 서버가 빠른 매칭을 '로그인 확인 안 됨' 으로 거절하므로 넉넉히 기다린다
+  new Promise(r => setTimeout(() => r(''), 8000))
 ]);
 
 // [stated] 버전이 다를 때 **사용자 말로** 알린다 (예전엔 "서버 재배포 필요" 같은 개발자 문구였다).
@@ -262,8 +264,10 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
       // 다른 방은 그대로 돈다. 다시 붙으면 없는 방 대신 새 판에 끌려 들어간다
       if (m.t === 'roomgone'){
         transport.auto = false;
-        try { goneWatch?.(); } catch { /* 무시 */ }
+        try { goneWatch?.(m.why === 'seat' ? 'seat' : ''); } catch { /* 무시 */ }   // seat = 오래 끊겨 자리가 풀렸다
       }
+      // 티켓 거절은 다시 붙어도 또 거절된다 — 어느 화면에서 받든 자동 재접속을 끈다
+      if (m.t === 'noticket') transport.auto = false;
     };
     transport.always = always;
     transport.toClient = m => {
@@ -329,6 +333,16 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
           reject(new Error(m.reason === 'full' ? t('err.roomFull')
             : m.reason === 'watchFull' ? t('err.watchFull') : t('err.noRoom')));
         }
+      } else if (m.t === 'noticket'){
+        // [stated] **서버가 티켓을 보고 막았다** (2026-11-01) — 앱 화면의 티켓 수가 서버보다 늦었을 때 등.
+        // 다시 붙지 않고 까닭을 알린다. 화면은 서버 티켓 수로 다시 맞춘다(`code`)
+        settled = true;
+        transport.auto = false;
+        transport.close();
+        const e = new Error(t(m.why === 'login' ? 'err.needLogin'
+          : m.why === 'noSoccer' ? 'err.noSocTicket' : m.why === 'noFfa' ? 'err.noFfa' : 'err.noTicket'));
+        e.code = 'noticket';
+        reject(e);
       } else if (m.t === 'queued'){
         onStage?.('waiting', m.ahead);
       } else if (m.t === 'vs'){

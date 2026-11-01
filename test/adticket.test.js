@@ -170,11 +170,14 @@ console.log('엉뚱한 종류는 안 받는다');
   assert(!r.ok && r.why === 'bad', '  tk·soc·ffa 만');
 }
 
-console.log('/quest?act=ad 가 본인 확인 뒤 adReward 로 간다 (코드 검사)');
+console.log('/quest?act=ad 가 본인 확인 뒤 adClaim 으로 간다 (코드 검사)');
 {
+  // [stated] 2026-11-01 — AdMob 확인(DUEL_AD_SSV=1)이 켜지면 알림으로 받은 것만 준다. 꺼져 있으면 adClaim 이 adReward 로 넘긴다
   const fs = await import('fs');
   const src = fs.readFileSync('server/index.js', 'utf8');
-  assert(/act === 'ad'\)\s*return store\.adReward\(me,/.test(src), '  me(증표로 확인한 uid)로 부른다');
+  assert(/act === 'ad'\)\s*return store\.adClaim\(me,/.test(src), '  me(증표로 확인한 uid)로 부른다');
+  const st = fs.readFileSync('server/store.js', 'utf8');
+  assert(/if \(!ssv\) return adReward\(uid, k\)/.test(st), '  확인이 꺼져 있으면 예전 adReward 그대로');
 }
 globalThis.Date = RealDate;
 console.log('adticket.test.js 통과');

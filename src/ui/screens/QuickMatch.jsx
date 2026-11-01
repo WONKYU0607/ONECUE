@@ -73,6 +73,8 @@ export default function QuickMatch({ session, onStatus, onMatched }){
       .catch(e => {
         clearInterval(iv);
         if (alive.current && e?.message !== 'cancelled') tell({ stage: 'error', err: e?.message || '' });
+        // 서버가 티켓이 없다고 막았으면 화면의 티켓 수를 서버 값으로 다시 맞춘다
+        if (e && e.code === 'noticket') import('../../state/friends.js').then(m => m.pullTickets()).catch(() => {});
       });
 
     return () => {

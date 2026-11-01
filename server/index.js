@@ -7,6 +7,7 @@ import { PROTO_VER, COLOR_COUNT, teamOf, PH_PLAY, PH_OVER, PH_READY, readyLimit,
 import { scoreDelta } from '../src/game/score.js';
 import { ffaResult } from '../src/game/ffa.js';
 import { fromWeb } from './webgate.js';
+import { verifySsv } from './adssv.js';
 import { createAI } from '../src/game/ai.js';
 import { createSoccerAI } from '../src/game/soccer-ai.js';
 import { BOTS, pickBot } from './bots.js';
@@ -26,6 +27,12 @@ const WATCH_MAX = 10;   // [stated] 방 하나에 관전 최대 10명 (관전자
 const TICK_MS = 1000 / 60;
 const EMPTY_ROOM_TTL = 30_000;   // 둘 다 나간 방을 정리하기까지
 const GRACE_MS = 10_000;         // 끊긴 사람을 기다리는 시간. 판이 1~2분이라 30초는 너무 길었다
+// [stated] **광고 보상은 AdMob 서버 확인으로만** (2026-11-01). AdMob 콘솔에 확인 주소를 넣고 알림이 오는 걸 본 뒤
+// Render 환경변수 `DUEL_AD_SSV=1` 로 켠다. 켜기 전에는 예전처럼 앱이 다 봤다고 하면 준다
+// (AdMob 설정 전에 켜면 광고를 봐도 티켓이 안 들어온다 — 그래서 스위치로 둔다)
+const AD_SSV = process.env.DUEL_AD_SSV === '1';
+// 우리 보상형 광고 단위 번호(`ca-app-pub-…/` 뒤). 다른 단위로 온 알림은 안 받는다
+const AD_UNIT = String(process.env.DUEL_AD_UNIT || '7007383086');
 
 let nextRoomId = 1;
 const rooms = new Map();         // id -> Room
@@ -1045,8 +1052,9 @@ function onHttp(req, res){
       if (act === 'time')  return { ok: await store.addPlayTime(me, +q.get('sec') || 0) };
       // [stated] **'켜 둔 사람' 표시만** (1분마다) — DB 는 안 건드린다. 접속 시간은 4분마다 'time' 으로 온다
       if (act === 'here')  return { ok: true };
-      // [stated] 광고를 끝까지 봤다 → 그 모드 티켓 한 장 (하루 5번, 개인전 판수 풀기는 3번)
-      if (act === 'ad')    return store.adReward(me, q.get('kind') || '');
+      // [stated] 광고를 끝까지 봤다 → 그 모드 티켓 한 장 (하루 5번, 개인전 판수 풀기는 3번).
+      // AdMob 확인이 켜져 있으면 **AdMob 이 이 광고 번호(`n`)로 알려 온 것만** 준다 (`adClaim`)
+      if (act === 'ad')    return store.adClaim(me, q.get('kind') || '', q.get('n') || '', AD_SSV);
       // **검사 전용** — 가짜 저장소에 값을 얹는다. `E2E_DEBUG=1` 이고 가짜 저장소일 때만 (Render 에는 둘 다 없다)
       if (act === '__put' && process.env.E2E_DEBUG === '1'){
         try { return store.fakePut(me, JSON.parse(q.get('v') || '{}')); } catch { return { ok: false }; }
@@ -1148,6 +1156,30 @@ function onHttp(req, res){
   // **검사 전용** — 환불 확인을 지금 돌린다 (평소엔 6시간마다). Render 에는 E2E_DEBUG 가 없다
   if (req.url === '/__voided' && process.env.E2E_DEBUG === '1'){
     checkVoided().then(() => { res.writeHead(200); res.end('ok'); });
+    return;
+  }
+  // [stated] **AdMob 서버 확인 알림** (2026-11-01) — 보상형 광고를 끝까지 본 사람이 생기면 AdMob 이 여기로 알린다.
+  // 서명이 맞아야만 받는다. 꺼져 있으면(`DUEL_AD_SSV` 없음) 확인만 하고 주지 않는다 — 앱이 예전처럼 바로 받는다.
+  // 우리 쪽 오류면 500 으로 답한다 → AdMob 이 다시 보낸다(1초 간격 5번). 같은 거래는 한 번만 준다
+  if (req.url && req.url.startsWith('/admob-ssv')){
+    const raw = req.url.includes('?') ? req.url.slice(req.url.indexOf('?') + 1) : '';
+    verifySsv(raw).then(async v => {
+      if (!v.ok){
+        alert('warn', 'ssvbad', `AdMob 확인 알림 거절 (${v.why}) — 서명이 안 맞음`, raw.slice(0, 300));
+        res.writeHead(400); res.end(); return;
+      }
+      const p = v.p;
+      // 콘솔의 '확인 주소 시험' 은 계정·값 없이 온다 → 200 으로 받아 준다
+      const [kind, nonce] = String(p.custom_data || '').split('.');
+      const unitOk = !p.ad_unit || String(p.ad_unit).endsWith(AD_UNIT);
+      if (!AD_SSV || !unitOk || !p.user_id || !kind || !nonce){
+        alert('info', 'ssvseen', `AdMob 확인 알림 받음${AD_SSV ? '' : ' (아직 꺼짐 — DUEL_AD_SSV=1 로 켜면 이걸로 준다)'}`,
+          `단위 ${p.ad_unit || '-'}${unitOk ? '' : ' (우리 단위 아님)'} · 계정 ${p.user_id ? '있음' : '없음'} · 값 ${p.custom_data ? '있음' : '없음'}`);
+        res.writeHead(200); res.end('ok'); return;
+      }
+      await store.adSsvGrant(p.user_id, kind, nonce, p.transaction_id);
+      res.writeHead(200); res.end('ok');
+    }).catch(e => { bug('AdMob 확인 알림')(e); try { res.writeHead(500); res.end(); } catch { /* 무시 */ } });
     return;
   }
   if (req.url && req.url.startsWith('/pay')){
@@ -1492,6 +1524,9 @@ function pairUp(key){
   }
 }
 
+// 친구방에서만 받는 명령 (아래 메시지 처리 참고)
+const ROOM_ONLY = new Set(['mode', 'kickWatch', 'kick', 'start', 'toroom', 'againAsk', 'againOk', 'againNo', 'again']);
+
 /** [stated] **게임 소켓도 본인 확인을 한다** (2026-11-01 출시 전 검증).
  *  예전엔 접속 주소의 `uid=` 를 그대로 믿었다 — 이름 검색(`/find`)으로 남의 계정 번호를 알아내면
  *  그 사람 계정으로 빠른 매칭을 돌려 **그 사람 티켓을 쓰고, 일부러 져서 점수를 깎을 수 있었다.**
@@ -1577,6 +1612,15 @@ wss.on('connection', (ws, req) => {
     console.log(`옛 자리 정리: room ${held.id} slot ${slot}`);
   }
   const back = resume ? held : null;
+  // [stated] **빠른 매칭에서 오래 끊겼다 돌아오면 새 판에 넣지 않는다** (2026-11-01). 자리는 10초만 붙들어서
+  // 그 뒤 '복귀' 로 붙으면 대기열로 떨어져, 앱은 옛 판 화면인데 서버에선 **새 판이 몰래 열렸다**(티켓도 깎인다).
+  // 티켓 확인을 넣은 뒤로는 티켓 0장이면 거절 → 앱이 8초마다 다시 붙는 것을 끝없이 되풀이했다
+  //  → 돌아갈 판이 없다고 알리고 끝낸다 (`seat`). 앱은 판 중이면 홈으로 + 알림, 결과 화면이면 조용히 끊는다
+  if (resume && !back && mode === 'queue'){
+    try { ws.send(JSON.stringify({ t: 'roomgone', why: 'seat' })); } catch { /* 무시 */ }
+    try { ws.close(4410, 'seat gone'); } catch { /* 무시 */ }
+    return;
+  }
   if (back){
     ws.room = back;
     if (back.seatOf(sid) >= 0){
@@ -1639,24 +1683,45 @@ wss.on('connection', (ws, req) => {
     }
     ws.room = null;
     const key = qkey(want, melee, ffa, soccer);   // 인원수·모드가 같은 사람끼리만 붙인다
-    ws.qkey = key;
-    ws.wantColor = wantColor;
-    const q = queueOf(key);
-    q.push(ws);
-    ws.send(JSON.stringify({ t: 'queued', ahead: q.length - 1 }));
-    // [stated] **점수가 가까운 사람끼리 붙인다.** 점수를 알아야 고를 수 있으므로 미리 읽어 둔다.
-    // 못 읽어도 매칭은 진행한다 — 그때는 점수를 모르는 사람으로 보고 아무나와 붙는다
-    if (ws.uid && store.isOn()){
-      const kind = soccer ? 'soccer' : (melee ? 'melee' : 'gun');
-      store.readPlayers([ws.uid]).then(m => {
-        const v = m.get(ws.uid);
-        if (v) ws.qScore = (v.score && v.score[kind]);
-        pairUp(key);
-      }).catch(e => { bug('매칭 점수 읽기')(e); pairUp(key); });
+    const enter = () => {
+      ws.qkey = key;
+      ws.wantColor = wantColor;
+      const q = queueOf(key);
+      q.push(ws);
+      ws.send(JSON.stringify({ t: 'queued', ahead: q.length - 1 }));
+      // [stated] **점수가 가까운 사람끼리 붙인다.** 점수를 알아야 고를 수 있으므로 미리 읽어 둔다.
+      // 못 읽어도 매칭은 진행한다 — 그때는 점수를 모르는 사람으로 보고 아무나와 붙는다
+      if (ws.uid && store.isOn()){
+        const kind = soccer ? 'soccer' : (melee ? 'melee' : 'gun');
+        store.readPlayers([ws.uid]).then(m => {
+          const v = m.get(ws.uid);
+          if (v) ws.qScore = (v.score && v.score[kind]);
+          pairUp(key);
+        }).catch(e => { bug('매칭 점수 읽기')(e); pairUp(key); });
+      }
+      pairUp(key);
+      // [stated] **5초 안에 상대가 잡히게 한다.** 사람이 모자라면 빈 자리를 AI 로 채운다
+      ws.botAt = Date.now() + BOT_FILL_MS;
+    };
+    // [stated] **빠른 매칭은 서버가 티켓을 보고 들여보낸다** (2026-11-01). 예전엔 앱 화면만 막아서, 고친 앱은
+    // 티켓 0장으로도 판을 열었다(판이 시작된 뒤 깎으려다 없으면 그냥 넘어갔다).
+    //  - 계정이 확인 안 된 접속도 막는다 — 안 그러면 증표를 빼고 붙어서 티켓 확인을 건너뛴다
+    //    (검사용 가짜 저장소·저장소가 꺼진 서버는 예전처럼 들인다)
+    //  - 티켓을 못 읽으면(저장소 오류) 막지 않는다 — 우리 쪽 문제로 정상 사용자를 막지 않게
+    const refuse = why => {
+      try { ws.send(JSON.stringify({ t: 'noticket', why })); } catch { /* 무시 */ }
+      try { ws.close(4402, 'no ticket'); } catch { /* 무시 */ }
+    };
+    if (!store.isOn()) enter();
+    else if (!ws.uid) (store.isFake() ? enter() : refuse('login'));
+    else {
+      store.canQueue(ws.uid, { ffa, soccer })
+        .catch(() => ({ ok: true }))
+        .then(r => {
+          if (ws.readyState !== 1) return;          // 확인하는 사이 나갔다
+          if (r && !r.ok) refuse(r.why || 'noTicket'); else enter();
+        });
     }
-    pairUp(key);
-    // [stated] **5초 안에 상대가 잡히게 한다.** 사람이 모자라면 빈 자리를 AI 로 채운다
-    ws.botAt = Date.now() + BOT_FILL_MS;
   }
 
   // [stated] **메시지 하나 처리하다 난 오류는 그 메시지(그 방)에서 끝낸다** — 서버 전체를 끄지 않는다
@@ -1801,6 +1866,10 @@ wss.on('connection', (ws, req) => {
     }
     // [stated] **판이 끝나면 방으로 돌아온다.** 방장이 누르면 같은 사람들로 새 판
     // [stated] **방장이 종목을 바꾼다** (인원수는 그대로)
+    // [stated] **방 전용 명령은 친구방(코드가 있는 방)에서만 먹는다** (2026-11-01). 빠른 매칭 방에 이 명령으로
+    // 새 판을 열면(다시 하기·시작·종목 바꾸기) 티켓 없이 계속 할 수 있었다(고친 앱).
+    // 앱은 빠른 매칭에서 이 명령들을 보내지 않는다 — 빠른 매칭의 다시 하기는 **새로 찾기**다
+    if (ROOM_ONLY.has(m.t) && ws.room && !ws.room.code) return;
     if (m.t === 'mode' && ws.room){
       const room = ws.room;
       room.ensureHost();

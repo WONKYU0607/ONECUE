@@ -526,6 +526,39 @@ export function adLeftOf(v, today = dayKey()){
  * 한 장씩, **기본 상한까지만** (일반 5 · 축구 3 · 개인전 3판). 코인으로 사서 상한 위에 있으면 못 받는다.
  * 꽉 찼는데 오면(고친 클라·화면이 늦게 갱신됨) 안 주고 지금 값만 돌려준다(`full`)
  */
+/** 광고 한 편 보상을 문서 값 `v` 에 계산한다 (쓰지는 않는다) — 바로 받기(`adReward`)와
+ *  AdMob 서버 확인(`adSsvGrant`)이 **같은 규칙**을 쓰게 한 곳에 둔다.
+ *  돌려주는 값: `{ res, patch }` — `patch` 가 null 이면 줄 게 없다(상한·꽉 참) */
+function adGrantIn(v, k, now = Date.now(), today = dayKey()){
+  const a = adOf(v, today);
+  const g = grown(v, now);                      // 항목이 없으면 처음 값(가득)으로 본다
+  let soc = socOf(v, today);
+  const state = () => ({ ...g, soc, ad: adLeftOf({ ad: a }, today) });
+  if (a.n >= AD_DAY_MAX) return { res: { ok: false, why: 'capped', ...state() }, patch: null };
+  const patch = {};
+  if (k === 'soc'){
+    if (soc >= SOC_MAX) return { res: { ok: false, why: 'full', ...state() }, patch: null };
+    soc += 1; patch.soc = soc; patch.socDay = today;
+  } else if (k === 'ffa'){
+    // 개인전은 한 판에 티켓과 하루 판수를 **둘 다** 쓴다 → 적은 쪽이 실제 할 수 있는 판수
+    if (Math.min(g.tk, g.ffa) >= Math.min(TICKET_MAX, FFA_MAX)) return { res: { ok: false, why: 'full', ...state() }, patch: null };
+    const upFfa = g.ffa < FFA_MAX && g.ffa <= g.tk;
+    const upTk = g.tk < TICKET_MAX && g.tk <= g.ffa;
+    if (upFfa && a.ffa >= AD_FFA_MAX) return { res: { ok: false, why: 'ffaCapped', ...state() }, patch: null };
+    if (upFfa){ g.ffa += 1; a.ffa += 1; }
+    if (upTk) g.tk += 1;
+    Object.assign(patch, { tk: g.tk, at: g.at, ffa: g.ffa, day: g.day });
+  } else {
+    if (g.tk >= TICKET_MAX) return { res: { ok: false, why: 'full', ...state() }, patch: null };
+    // 시간 충전 시계(`at`)는 그대로 — 4→5 로 차면 충전이 멈추고, 그 밑이면 하던 대로 계속 센다
+    g.tk += 1;
+    Object.assign(patch, { tk: g.tk, at: g.at, ffa: g.ffa, day: g.day });
+  }
+  a.n += 1;
+  patch.ad = { day: a.day, n: a.n, ffa: a.ffa };
+  return { res: { ok: true, kind: k, ...state() }, patch };
+}
+
 export async function adReward(uid, kind){
   const k = ['tk', 'soc', 'ffa'].includes(kind) ? kind : null;
   if (!isOn() || !uid || !k) return { ok: false, why: 'bad' };
@@ -534,39 +567,72 @@ export async function adReward(uid, kind){
       const ref = dbx && dbx.doc('players/' + uid);
       const d = await tx.get(ref);
       const v = d.exists ? d.data() : {};
-      const now = Date.now();
-      const today = dayKey();
-      const a = adOf(v, today);
-      const g = grown(v, now);                      // 항목이 없으면 처음 값(가득)으로 본다
-      let soc = socOf(v, today);
-      const state = () => ({ ...g, soc, ad: adLeftOf({ ad: a }, today) });
-      if (a.n >= AD_DAY_MAX) return { ok: false, why: 'capped', ...state() };
-      const patch = {};
-      if (k === 'soc'){
-        if (soc >= SOC_MAX) return { ok: false, why: 'full', ...state() };
-        soc += 1; patch.soc = soc; patch.socDay = today;
-      } else if (k === 'ffa'){
-        // 개인전은 한 판에 티켓과 하루 판수를 **둘 다** 쓴다 → 적은 쪽이 실제 할 수 있는 판수
-        if (Math.min(g.tk, g.ffa) >= Math.min(TICKET_MAX, FFA_MAX)) return { ok: false, why: 'full', ...state() };
-        const upFfa = g.ffa < FFA_MAX && g.ffa <= g.tk;
-        const upTk = g.tk < TICKET_MAX && g.tk <= g.ffa;
-        if (upFfa && a.ffa >= AD_FFA_MAX) return { ok: false, why: 'ffaCapped', ...state() };
-        if (upFfa){ g.ffa += 1; a.ffa += 1; }
-        if (upTk) g.tk += 1;
-        Object.assign(patch, { tk: g.tk, at: g.at, ffa: g.ffa, day: g.day });
-      } else {
-        if (g.tk >= TICKET_MAX) return { ok: false, why: 'full', ...state() };
-        // 시간 충전 시계(`at`)는 그대로 — 4→5 로 차면 충전이 멈추고, 그 밑이면 하던 대로 계속 센다
-        g.tk += 1;
-        Object.assign(patch, { tk: g.tk, at: g.at, ffa: g.ffa, day: g.day });
-      }
-      a.n += 1;
-      patch.ad = { day: a.day, n: a.n, ffa: a.ffa };
-      tx.set(ref, patch, whole(patch));
-      return { ok: true, kind: k, ...state() };
+      const { res, patch } = adGrantIn(v, k);
+      if (patch) tx.set(ref, patch, whole(patch));
+      return res;
     });
   } catch (e){
     fail('urgent', 'ad', '광고 보상을 못 줌 — 광고를 끝까지 봤는데 티켓이 안 들어감', e, `계정 ${uid} · 종류 ${kind}\n손으로 티켓 1장을 넣어 주면 된다.`);
+    return { ok: false, why: 'err' };
+  }
+}
+
+// ── [stated] 광고 보상을 AdMob 서버 확인(SSV)으로만 준다 (2026-11-01 출시 전 검증) ──────────
+// 예전엔 앱이 "광고 다 봤다" 고 하면 그 말을 믿고 티켓을 줬다 — 고친 앱이나 직접 보낸 요청이면
+// 광고를 안 보고도 받았다(하루 5장까지). 이제 AdMob 이 서버로 직접 알려 준 것(서명 확인)만 준다.
+//  - 앱은 광고를 띄울 때 계정(`user_id`)과 '이 광고 한 편의 번호'(`custom_data` = 종류.번호)를 싣는다
+//  - AdMob 이 `/admob-ssv` 로 알려 오면 여기서 그 번호로 기록하며 준다(같은 알림이 또 와도 한 번만)
+//  - 앱은 광고가 끝나면 그 번호로 "받았나" 를 묻는다(`adClaim`). 아직이면 'wait' — 잠시 뒤 다시 묻는다
+//  - **광고 제거를 산 사람**은 광고가 없으니 이 확인 없이 바로 받는다(서버가 산 기록을 본다)
+const AD_TX_KEEP = 40;      // 같은 알림(재시도)을 걸러 내려고 기억해 두는 최근 거래 번호 수
+const AD_GOT_KEEP = 12;     // 앱이 물어볼 최근 광고 번호 수
+
+/** AdMob 이 서명해서 알려 온 광고 한 편 보상. `txId` 는 AdMob 거래 번호(같은 알림이 다시 와도 한 번만) */
+export async function adSsvGrant(uid, kind, nonce, txId){
+  const k = ['tk', 'soc', 'ffa'].includes(kind) ? kind : null;
+  const n = String(nonce || '').slice(0, 40), t = String(txId || '').slice(0, 120);
+  if (!isOn() || !uid || !k || !n || !t) return { ok: false, why: 'bad' };
+  try {
+    return await withDoc(uid, async (tx, dbx) => {
+      const ref = dbx && dbx.doc('players/' + uid);
+      const d = await tx.get(ref);
+      const v = d.exists ? d.data() : {};
+      const seen = Array.isArray(v.adTx) ? v.adTx : [];
+      if (seen.includes(t)) return { ok: true, dup: true };
+      const { res, patch } = adGrantIn(v, k);
+      const got = v.adGot && typeof v.adGot === 'object' ? { ...v.adGot } : {};
+      got[n] = { ok: !!res.ok, why: res.why || '', at: Date.now() };
+      const keep = Object.entries(got).sort((x, y) => (y[1].at | 0) - (x[1].at | 0)).slice(0, AD_GOT_KEEP);
+      const out = { ...(patch || {}), adTx: [...seen, t].slice(-AD_TX_KEEP), adGot: Object.fromEntries(keep) };
+      tx.set(ref, out, whole(out));
+      return res;
+    });
+  } catch (e){
+    fail('urgent', 'adssv', '광고 보상을 못 줌 (AdMob 확인) — AdMob 이 다시 보낸다', e, `계정 ${uid} · 종류 ${kind}`);
+    throw e;                                    // 실패로 답해야 AdMob 이 다시 보낸다
+  }
+}
+
+/**
+ * 앱이 광고를 다 보고 묻는다 — "이 번호(`nonce`) 보상 받았나".
+ * `ssv` 가 꺼져 있으면(아직 AdMob 설정 전) 예전처럼 바로 준다. 켜져 있으면 AdMob 알림이 온 것만:
+ * 왔으면 그 결과, 아직이면 `{ ok:false, why:'wait' }`. **광고 제거를 산 사람은 언제나 바로** 준다
+ */
+export async function adClaim(uid, kind, nonce, ssv){
+  const k = ['tk', 'soc', 'ffa'].includes(kind) ? kind : null;
+  if (!isOn() || !uid || !k) return { ok: false, why: 'bad' };
+  if (!ssv) return adReward(uid, k);
+  try {
+    const v = FAKE ? fakeDoc(uid) : await db.doc('players/' + uid).get().then(d => (d.exists ? d.data() : {}));
+    if (v.noads) return adReward(uid, k);
+    const n = String(nonce || '').slice(0, 40);
+    const got = n && v.adGot && v.adGot[n];
+    const now = Date.now(), today = dayKey();
+    const state = { ...grown(v, now), soc: socOf(v, today), ad: adLeftOf(v, today) };
+    if (!got) return { ok: false, why: 'wait', ...state };
+    return { ok: !!got.ok, why: got.why || undefined, kind: k, ...state };
+  } catch (e){
+    fail('warn', 'adclaim', '광고 보상 확인 실패', e, `계정 ${uid}`);
     return { ok: false, why: 'err' };
   }
 }
@@ -579,6 +645,25 @@ export async function adReward(uid, kind){
  * 서버에 축구 티켓 개념이 없어서 축구 판에도 일반 티켓을 깎았고,
  * 클라가 축구 티켓을 따로 깎아 **둘 다 빠졌다**.
  */
+/** [stated] **빠른 매칭에 들어가기 전에 티켓이 있는지** (2026-11-01) — 깎지는 않는다(VS 화면 뒤에 깎는다).
+ *  축구는 축구 티켓, 개인전은 티켓 + 하루 판수, 나머지는 티켓. 돌려주는 값 `{ ok }` 또는 `{ ok:false, why }`
+ *  ('noTicket' 'noFfa' 'noSoccer'). **읽기 실패는 막지 않는다**(우리 쪽 문제로 정상 사용자를 막지 않게) */
+export async function canQueue(uid, { ffa = false, soccer = false } = {}){
+  if (!isOn() || !uid) return { ok: true };
+  try {
+    const v = FAKE ? fakeDoc(uid) : await db.doc('players/' + uid).get().then(d => (d.exists ? d.data() : null));
+    const now = Date.now(), today = dayKey();
+    if (soccer) return socOf(v || {}, today) > 0 ? { ok: true } : { ok: false, why: 'noSoccer' };
+    const g = grown(v || { tk: TICKET_MAX, at: now, ffa: FFA_MAX, day: today }, now);
+    if (g.tk <= 0) return { ok: false, why: 'noTicket' };
+    if (ffa && g.ffa <= 0) return { ok: false, why: 'noFfa' };
+    return { ok: true };
+  } catch (e){
+    fail('warn', 'tkcheck', '빠른 매칭 전 티켓 확인 실패 — 이번엔 막지 않고 들여보냄', e, `계정 ${uid}`);
+    return { ok: true };
+  }
+}
+
 export async function spendSoccer(uid){
   if (!isOn() || !uid) return { ok: false, off: true };
   try {

@@ -227,9 +227,11 @@ export default function Result({ result, summary, score, session, host, waiting,
           <p className="res-auto">{t(autoHome ? 'res.autoHome' : 'res.autoBack', { s: left })}</p>
         )}
         {!onRoom && (<>
+        {/* [stated] 아래 종목·인원 단추는 **빠른 매칭에서는 안 보인다** (2026-11-01) — 빠른 매칭의 다시 하기는 새로 찾기라
+            여기서 바꿔도 쓸 데가 없었고, 서버도 이제 빠른 매칭 방의 종목·인원 바꾸기를 받지 않는다(티켓 없이 새 판을 여는 길이었다) */}
         {/* [stated] **방장은 종목도 바꿀 수 있다** — 인원수는 그대로라 자리가 안 흔들린다.
             축구는 1대1·2대2 뿐, 개인전은 칼전만 */}
-        {session?.online && host && !session?.watching && (
+        {session?.online && host && !session?.watching && session?.mode !== 'queue' && (
           <div className="res-modes">
             {[['gun', { melee: false, ffa: false, soccer: false }, 'mode.gun'],
               ['melee', { melee: true, ffa: false, soccer: false }, 'mode.melee'],
@@ -250,7 +252,7 @@ export default function Result({ result, summary, score, session, host, waiting,
         )}
         {/* [stated] **인원 바꾸기** — 줄이면 뒤에 앉은 사람부터 관전으로 간다.
             축구는 1대1·2대2 뿐, 개인전은 3~6명 */}
-        {session?.online && host && !session?.watching && (
+        {session?.online && host && !session?.watching && session?.mode !== 'queue' && (
           <div className="res-modes">
             {(session.soccer ? [2, 4] : session.ffa ? [3, 4, 5, 6] : [2, 4, 6]).map(k => {
               const now = (session.n || 2) === k;

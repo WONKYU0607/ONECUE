@@ -143,7 +143,8 @@ export const claimMail = (id = '') => ask({ act: 'mail', id });
 export const buySkin = (kind, id) => ask({ act: 'buy', what: 'skin', kind, id: String(id) });
 /** [stated] **광고를 끝까지 봤다** → 그 모드 티켓 한 장. `kind`: 'tk' 일반 · 'soc' 축구 · 'ffa' 개인전.
  *  하루 횟수·지급은 서버가 판정한다. 돌려받은 값(`tk`·`soc`·`ffa`·`ad`)으로 화면 사본을 맞춘다 */
-export const adTicket = kind => ask({ act: 'ad', kind });
+// [stated] `n`: 이 광고 한 편의 번호 — 서버는 AdMob 이 이 번호로 알려 온 것만 준다 (2026-11-01)
+export const adTicket = (kind, n = '') => ask({ act: 'ad', kind, ...(n ? { n } : {}) });
 /** 코인으로 티켓을 산다 */
 export const buyTicket = (soccer = false) =>
   ask({ act: 'buy', what: 'ticket', soccer: soccer ? '1' : '0' });

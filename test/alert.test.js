@@ -268,6 +268,23 @@ console.log('진짜 서버 안에서 — 판 전 점수를 못 읽은 판은 건
   ws.terminate();
 }
 
+// [stated] **빠른 매칭은 서버가 티켓을 보고 들인다** (2026-11-01) — 진짜 저장소가 켜진 서버(Render 와 같은 갈래)에서:
+//  - 로그인 증표가 없으면 들어가지 못한다(증표를 빼고 붙어 티켓 확인을 건너뛰지 못하게)
+//  - 저장소가 실패해 티켓을 못 읽으면 **막지 않는다** — 우리 쪽 문제로 정상 사용자를 막지 않게
+console.log('진짜 서버 안에서 — 빠른 매칭 입장 확인 (증표 없음 · 티켓을 못 읽음)');
+{
+  const tryJoin = qs => new Promise(res => {
+    const w = new WebSocket('ws://127.0.0.1:9436/?' + qs);
+    const end = v => { try { w.terminate(); } catch { /* 무시 */ } res(v); };
+    w.on('message', d => { let m; try { m = JSON.parse(d); } catch { return; }
+      if (m.t === 'noticket') end('refused:' + m.why); if (m.t === 'queued') end('queued'); });
+    w.on('error', () => end('error'));
+    setTimeout(() => end('none'), 5000);
+  });
+  assert(await tryJoin('sid=g1&mode=queue&n=2&nick=a&uid=SOMEONE') === 'refused:login', '  증표 없이 남의 계정만 적으면 못 들어간다');
+  assert(await tryJoin('sid=g2&mode=queue&n=2&nick=a&uid=UOK&tok=UOK') === 'queued', '  티켓을 못 읽어도(저장소 실패) 막지 않는다');
+}
+
 console.log('alert.test.js 통과');
 disc.close();
 process.exit(0);

@@ -36,8 +36,10 @@ export function __useAdMob(mod, isApp = true){
   consent = { can: false, privacy: false, known: false };
 }
 
-export async function showRewarded(){
-  return (await isNative()) ? nativeRewarded() : fakeRewarded();
+/** `ssv`: [stated] **AdMob 이 서버로 직접 알려 줄 때 실을 값** (2026-11-01) — `{ userId, customData }`.
+ *  서버는 이 알림(서명 확인)으로만 티켓을 준다. 웹의 가짜 광고는 알림이 없다(검사 서버는 바로 준다) */
+export async function showRewarded(ssv){
+  return (await isNative()) ? nativeRewarded(ssv) : fakeRewarded();
 }
 
 // ── [stated] 광고 동의 (구글 UMP) — 전 세계 출시 (2026-10-19) ─────────────────
@@ -83,7 +85,7 @@ export async function showAdPrivacy(){
 
 // ── 앱: AdMob ──────────────────────────────────────────────────
 let inited = null;
-async function nativeRewarded(){
+async function nativeRewarded(ssv){
   // 동의가 없으면 광고를 요청하지 않는다. 켤 때 못 물었으면(연결 없음 등) 여기서 한 번 더 묻는다
   let c = await gatherConsent();
   if (!c.can){ consentP = null; c = await gatherConsent(); }
@@ -102,7 +104,8 @@ async function nativeRewarded(){
   let rewarded = false;
   const handles = [];
   try {
-    await AdMob.prepareRewardVideoAd({ adId: REWARD_AD_ID, isTesting: AD_TESTING });
+    await AdMob.prepareRewardVideoAd({ adId: REWARD_AD_ID, isTesting: AD_TESTING,
+      ...(ssv && (ssv.userId || ssv.customData) ? { ssv } : {}) });
   } catch { return { ok: false, why: 'load' }; }
   try {
     let done = null;

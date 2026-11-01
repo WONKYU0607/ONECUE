@@ -50,6 +50,8 @@ export default function App(){
   const [, bumpLang] = useState(0);
   useEffect(() => onLangChange(() => bumpLang(v => v + 1)), []);
   const [screen, setScreen] = useState('splash');   // splash|login|home|practice|pvp|room|game|result|ranks|friends|quests|mail|shop|costume
+  const screenNow = useRef(screen);                 // 한 번만 거는 소켓 알림 처리가 지금 화면을 보려고
+  screenNow.current = screen;
   const [rankKind, setRankKind] = useState('gun');  // 순위표에서 먼저 볼 종목
   const [session, setSession] = useState(null);     // { mode:'pvp'|'ai', stage?:number }
   const [result, setResult] = useState(null);
@@ -85,11 +87,14 @@ export default function App(){
       setScreen('home');
     });
     // [stated] **서버가 이 방을 오류로 닫았다** (2026-11-01) — 다른 방은 그대로 돈다. 홈으로 보내고 알린다
-    onRoomGone(() => {
+    onRoomGone(why => {
       disconnect();
+      // 빠른 매칭 결과 화면에서 오래 끊겼다 돌아온 것 — 판은 이미 끝났다. 결과는 그대로 두고 연결만 끊는다
+      // ([다시 하기]·[홈] 은 연결 없이도 동작한다)
+      if (why === 'seat' && screenNow.current === 'result') return;
       setRoom(null);
       setAgainAsk(null); setAgainWait(false); setResult(null); setSearch(null);
-      setKickedNote('err.roomGone');
+      setKickedNote(why === 'seat' ? 'err.seatGone' : 'err.roomGone');
       setScreen('home');
     });
     return () => { onRoom(null); onGo(null); onKicked(null); onRoomGone(null); onAgainMsg(null); onModeMsg(null);
