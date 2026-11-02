@@ -14,7 +14,11 @@
 // 그래서 서버는 계산 전에 입력을 `canonIn` 으로 다듬고, 이 파일은 그 다듬은 값을 **그대로** 되살린다
 // (wire.test.js 가 실제 판 프레임으로 왕복을 확인한다)
 
-export const W_FRAME = 1, W_SNAP = 2, W_IN = 3;
+export const W_FRAME = 1, W_SNAP = 2, W_IN = 3, W_BUNDLE = 4, W_INS = 5, W_PONG = 6;
+// [stated] **틱 프레임 묶음** (2026-11-02 트래픽·서버 CPU 줄이기) — 새 앱(`w=3`)에는 틱 프레임 여러 개를
+// 메시지 하나로 보낸다: [4][개수][프레임 몸통…] (몸통 = 프레임에서 맨 앞 종류 바이트를 뺀 것).
+// 서버 CPU 의 절반 가까이가 '소켓에 쓰기' 였다 → 묶으면 그만큼 준다. 화면 매끄러움은 같다(net 측정)
+// 새 앱 프레임은 **검사값(ck)을 몇 틱마다만** 싣는다 — 깃발 32 = 이 틱은 검사값 없음 · 64 = 인원수가 앞 틱과 같아 뺐음
 
 /** 입력 하나를 정해진 꼴로. 시뮬은 참/거짓·`|0` 으로만 읽으므로 뜻은 같다 */
 export function canonIn(x){
@@ -84,20 +88,23 @@ const sameIn = (a, b) => !!a && !!b && a.dx === b.dx && a.dy === b.dy && a.fire 
 /** 서버 쪽 — 방마다 하나. 앞 틱 값을 들고 있다 */
 export function frameEncoder(){ return { tick: -1, inp: null, d: null, lg: null, ms: null, bv: null, ct: null }; }
 
-/** `key` 면 받는 쪽이 아무것도 모른다고 보고 전부 싣는다 (새 연결의 첫 프레임). 상태는 안 바꾼다 */
-export function encodeFrame(enc, m, key = false){
+/** `key` 면 받는 쪽이 아무것도 모른다고 보고 전부 싣는다 (새 연결의 첫 프레임). 상태는 안 바꾼다.
+ *  `lean` (새 앱 `w=3` 만) — 인원수가 앞 틱과 같으면 인원수 바이트를 뺀다(깃발 64) */
+export function encodeFrame(enc, m, key = false, lean = false){
   const w = new W(16 + m.inp.length * 6);
   const inp = m.inp;                                    // 서버가 이미 canonIn 으로 다듬은 것
   const prm = key || m.ms !== enc.ms || m.bv !== enc.bv || m.ct !== enc.ct || (m.tick % 30 === 0);
+  const noCk = m.ck === undefined;                      // 검사값을 안 싣는 틱 (새 앱에게만 — 서버가 정한다)
+  const sameN = lean && !key && !!enc.inp && enc.inp.length === inp.length;   // 인원수 그대로 → 안 싣는다
   const flags = ((key || m.tick !== enc.tick + 1) ? 1 : 0) | ((key || m.d !== enc.d || m.tick % 30 === 0) ? 2 : 0)
-    | ((m.lg | 0) !== 0 ? 4 : 0) | (prm ? 8 : 0) | (key ? 16 : 0);
+    | ((m.lg | 0) !== 0 ? 4 : 0) | (prm ? 8 : 0) | (key ? 16 : 0) | (noCk ? 32 : 0) | (sameN ? 64 : 0);
   w.u8(W_FRAME); w.u8(flags);
   if (flags & 1) w.uv(m.tick);
-  w.i32(m.ck);
+  if (!noCk) w.i32(m.ck);
   if (flags & 2) w.uv(m.d | 0);
   if (flags & 4) w.sv(m.lg | 0);
   if (flags & 8){ w.sv(m.ms); w.sv(m.bv); w.sv(m.ct); }
-  w.u8(inp.length);
+  if (!sameN) w.u8(inp.length);
   let same = 0;
   if (!key && enc.inp && enc.inp.length === inp.length)
     for (let i = 0; i < inp.length; i++) if (sameIn(inp[i], enc.inp[i])) same |= 1 << i;
@@ -115,14 +122,37 @@ export function frameDecoder(){ return { tick: -1, inp: null }; }
 export function decodeFrame(dec, u8){
   const r = new R(u8);
   if (r.u8() !== W_FRAME) throw new Error('wire: not a frame');
+  return frameBody(dec, r);
+}
+/** 묶음 하나 → 프레임 여러 개 (보낸 순서 그대로) */
+export function decodeBundle(dec, u8){
+  const r = new R(u8);
+  if (r.u8() !== W_BUNDLE) throw new Error('wire: not a bundle');
+  const n = r.u8();
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(frameBody(dec, r));
+  return out;
+}
+/** 프레임 여러 개(각각 `encodeFrame` 결과)를 묶음 하나로 */
+export function packBundle(frames){
+  let len = 2;
+  for (const f of frames) len += f.length - 1;
+  const b = new Uint8Array(len);
+  b[0] = W_BUNDLE; b[1] = frames.length;
+  let o = 2;
+  for (const f of frames){ b.set(f.subarray(1), o); o += f.length - 1; }
+  return b;
+}
+function frameBody(dec, r){
   const flags = r.u8();
   if (!(flags & 16) && !dec.inp) throw new Error('wire: no keyframe yet');   // 생길 수 없다(첫 프레임은 키프레임)
   const tick = flags & 1 ? r.uv() : dec.tick + 1;
-  const m = { t: 'f', tick, ck: r.i32() };
+  const m = { t: 'f', tick };
+  if (!(flags & 32)) m.ck = r.i32();
   if (flags & 2) m.d = r.uv();
   m.lg = flags & 4 ? r.sv() : 0;
   if (flags & 8){ m.ms = r.sv(); m.bv = r.sv(); m.ct = r.sv(); }
-  const n = r.u8(), same = r.u8();
+  const n = flags & 64 ? dec.inp.length : r.u8(), same = r.u8();     // 64 = 인원수가 앞 틱과 같아 안 실었다
   const inp = new Array(n);
   for (let i = 0; i < n; i++) inp[i] = (same & (1 << i)) ? { ...dec.inp[i] } : getIn(r);
   m.inp = inp;
@@ -142,4 +172,27 @@ export function decodeIn(u8){
   if (r.u8() !== W_IN) throw new Error('wire: not an input');
   const pid = r.u8(), tick = r.uv();
   return { t: 'in', pid, tick, ...getIn(r) };
+}
+// [stated] **핑 응답을 숫자로** (2026-11-02 보내는 양 줄이기 · 새 앱 `w=3` 만) — 판 중 1초에 두 번 가는 `{"t":"q","id":…}`(19바이트)를
+// [6][번호] 3바이트로. 전투 중 받는 양의 약 6% 였다
+export function encodePong(id){ const w = new W(6); w.u8(W_PONG); w.uv(Math.max(0, id | 0)); return w.out(); }
+export function decodePong(u8){ const r = new R(u8); if (r.u8() !== W_PONG) throw new Error('wire: not a pong'); return { t: 'q', id: r.uv() }; }
+
+// [stated] **같은 화면 갱신에서 나온 입력 여러 틱을 메시지 하나로** (2026-11-02 서버 CPU 줄이기) — 새 앱(`w=3`)이
+// 서버가 받는다고 알려 줄 때만(hello `ins`). [5][개수][자리·틱·입력 …]. 늦추지 않는다 — 한 번에 나온 것만 묶는다
+export const INS_MAX = 16;
+export function encodeIns(list){
+  const w = new W(8 + list.length * 8);
+  w.u8(W_INS); w.u8(list.length);
+  for (const m of list){ w.u8(m.pid | 0); w.uv(m.tick | 0); putIn(w, canonIn(m)); }
+  return w.out();
+}
+export function decodeIns(u8){
+  const r = new R(u8);
+  if (r.u8() !== W_INS) throw new Error('wire: not inputs');
+  const n = r.u8();
+  if (n < 1 || n > INS_MAX) throw new Error('wire: bad count');
+  const out = [];
+  for (let i = 0; i < n; i++){ const pid = r.u8(), tick = r.uv(); out.push({ t: 'in', pid, tick, ...getIn(r) }); }
+  return out;
 }

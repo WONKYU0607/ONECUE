@@ -64,6 +64,8 @@ assert(helloA.ver === PROTO_VER, `hello에 서버 버전이 실려온다 (${hell
 assert(A.msgs.some(m => m.t === 'go') && B.msgs.some(m => m.t === 'go'), '방이 차면 go 브로드캐스트');
 
 const ca = new Client(A, [0]), cb = new Client(B, [1]);
+// 핑 번호를 갈라 둔다 — 응답에 누구 것인지(`pid`)를 더는 싣지 않으므로 번호로 가린다
+cb.pingId = 100000;
 let raf = true;
 (async () => {
   while (raf){
@@ -80,7 +82,11 @@ assert(ca.s.tick > 30 && cb.s.tick > 30, `양쪽이 확정 프레임 수신 (A $
 assert(ca.rtt >= 0 && cb.rtt >= 0, `RTT 측정됨 (${ca.rtt.toFixed(1)}ms / ${cb.rtt.toFixed(1)}ms)`);
 
 // 핑 응답이 상대에게 새지 않는지
-assert(!A.msgs.some(m => m.t === 'q' && m.pid === 1), 'A는 B의 핑 응답을 받지 않음');
+{
+  const qa = A.msgs.filter(m => m.t === 'q'), qb = B.msgs.filter(m => m.t === 'q');
+  assert(qa.length > 0 && qb.length > 0, `둘 다 자기 핑 응답을 받는다 (A ${qa.length} / B ${qb.length})`);
+  assert(qa.every(m => m.id < 100000) && qb.every(m => m.id >= 100000), 'A는 B의 핑 응답을 받지 않음 (반대도)');
+}
 
 // 한쪽이 START를 누르면 양쪽 다 시작
 // 아이템을 전부 놓아야 설치 완료가 된다

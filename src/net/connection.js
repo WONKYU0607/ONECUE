@@ -87,7 +87,9 @@ const wsUrl = (mode = 'queue', code = '', resume = false, n = 2, melee = false, 
   (color >= 0 ? '&color=' + color : '') + (resume ? '&resume=1' : '') + WIRE;
 // [stated] **판 도중 메시지를 숫자로 묶어 받는다** (2026-10-19 보내는 양·서버 CPU 줄이기, `wire.js`).
 // 스냅샷 압축은 브라우저가 풀 수 있을 때만(`DecompressionStream`) 받는다 — 못 풀면 서버가 글자로 보낸다
-const WIRE = '&w=2' + (typeof DecompressionStream === 'function' ? '&z=1' : '');
+// [stated] `w=3` (2026-11-02) — 틱 프레임 **묶음**과 **몇 틱마다 오는 검사값**을 읽는다. 옛 서버는 `w=3` 을 몰라 글자(JSON)로 보내는데
+// 그것도 읽으므로 서버를 먼저 올리든 앱을 먼저 올리든 붙는다
+const WIRE = '&w=3' + (typeof DecompressionStream === 'function' ? '&z=1' : '');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 잠든 서버는 HTTP 요청으로도 깨어난다. 소켓보다 먼저 두드려 둔다.

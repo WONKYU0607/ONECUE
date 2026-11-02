@@ -159,7 +159,8 @@ console.log('봇 자리에는 퀘스트 진행도를 안 쓴다 (진짜 서버 �
     });
     await new Promise(r => ws.on('open', r));
     ws.send(JSON.stringify({ t: 'vsSeen' }));
-    for (let i = 0; i < 150 && phase !== 2; i++) await sleep(100);
+    // 단계는 스냅샷으로 본다 — 주기 스냅샷은 30초마다라(2026-11-02) 앱처럼 1초마다 달라고 한다
+    for (let i = 0; i < 150 && phase !== 2; i++){ if (i % 10 === 0) ws.send(JSON.stringify({ t: 'snap' })); await sleep(100); }
     assert(phase === 2, '  봇과 판이 시작됐다');
     await sleep(1500);
     ws.send(JSON.stringify({ t: '__end', win: slot }));

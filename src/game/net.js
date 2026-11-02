@@ -27,7 +27,7 @@ import {
   normalizeState,
   step } from './sim.js';
 import { t } from '../i18n/index.js';
-import { canonIn, frameDecoder, decodeFrame, encodeIn, W_FRAME, W_SNAP } from '../net/wire.js';
+import { canonIn, frameDecoder, decodeFrame, decodeBundle, decodePong, encodeIn, encodeIns, INS_MAX, W_FRAME, W_SNAP, W_BUNDLE, W_PONG } from '../net/wire.js';
 
 // 압축 스냅샷 풀기 (브라우저 내장). zlib 형식 = 'deflate'
 async function inflateText(u8){
@@ -38,6 +38,10 @@ async function inflateText(u8){
 // ================= TRANSPORT (NET SEAM) =================
 // 시계 주입: 브라우저는 실제 시간, 테스트는 가상 시계를 넣어 결정론적으로 돌린다
 let CLOCK = { now: () => performance.now(), delay: (fn, ms) => setTimeout(fn, ms) };
+// 게임이 핑을 재는 동안 연결 쪽 핑(매칭용)을 쉬는 시간 — 게임 핑(0.5초)이 이만큼 끊기면 다시 잰다
+const GAME_PING_HOLD = 3000;
+// 지금 하던 일(이번 화면 갱신)이 끝나자마자 — 늦추지 않고 그 안에서 나온 것만 모은다
+const soon = typeof queueMicrotask === 'function' ? queueMicrotask : fn => Promise.resolve().then(fn);
 export function setClock(c){ CLOCK = c; }
 
 // 실제 온라인에서는 이 클래스만 WebSocket 구현으로 교체하면 됨.
@@ -67,8 +71,14 @@ export class WsTransport {
     this.pings = new Map();
     this.pingId = 1;
     this.pingTimer = null;
-    // [stated] **숫자로 묶은 꼴**(wire.js)을 쓰는가 — 주소에 `w=2` 를 붙인 연결만 (connection.js 가 붙인다)
-    this.bin = /[?&]w=2(&|$)/.test(url);
+    this.gameAt = -1e9;          // 게임(`Client.ping`)이 마지막으로 잰 때
+    // [stated] **숫자로 묶은 꼴**(wire.js)을 쓰는가 — 주소에 `w=2`·`w=3` 을 붙인 연결만 (connection.js 가 붙인다)
+    this.bin = /[?&]w=[23](&|$)/.test(url);
+    // [stated] **새 앱(`w=3`)** — 가만히 있는 입력은 몇 틱만 보내고 쉰다(`Client.sendInputs`) (2026-11-02 서버 CPU 줄이기)
+    this.lean = /[?&]w=3(&|$)/.test(url);
+    // 서버가 입력 여러 틱 묶음(`W_INS`)을 받는다고 알렸는가 (hello `ins`) — 연결마다 새로 받는다
+    this.ins = false;
+    this.inq = [];               // 이번 화면 갱신에서 나온 입력 (곧바로 한 메시지로 보낸다)
     this.fdec = null;
   }
   // 접속되면 곧바로 재기 시작한다
@@ -76,6 +86,9 @@ export class WsTransport {
     if (this.pingTimer) return;
     const beat = () => {
       if (this.closed || !this.ws || this.ws.readyState !== 1) return;
+      // [stated] **판 중엔 쉰다** (2026-11-02 보내는 양 줄이기) — 게임이 0.5초마다 따로 잰다(`Client.ping`).
+      // 둘이 겹쳐 1초에 왕복 3.4번이 오갔다. 게임이 멈추면(결과·로비) 3초 뒤 다시 잰다
+      if (CLOCK.now() - this.gameAt < GAME_PING_HOLD) return;
       const id = this.pingId++;
       this.pings.set(id, CLOCK.now());
       try { this.ws.send(JSON.stringify({ t: 'p', id, pre: 1 })); } catch { /* 무시 */ }
@@ -100,6 +113,8 @@ export class WsTransport {
       const ws = new WebSocket(this.url);
       ws.binaryType = 'arraybuffer';
       this.ws = ws;
+      this.ins = false;          // 새 연결 — 이 서버가 받는지 hello 로 다시 듣는다
+      this.inq.length = 0;
       // **연결마다 새로** — 서버는 새 연결의 첫 틱 프레임을 전부 실어(키프레임) 보낸다
       this.fdec = frameDecoder();
       // [stated] **받은 순서 그대로 넘긴다** (2026-10-19 판 시작 데싱크).
@@ -140,11 +155,20 @@ export class WsTransport {
             put(inflateText(u8.subarray(1)).then(txt => { try { return JSON.parse(txt); } catch { return null; } }));
             return;
           }
+          // [stated] 틱 프레임 **묶음** — 보낸 순서 그대로 하나씩 넘긴다 (2026-11-02)
+          if (u8[0] === W_BUNDLE){
+            let ms;
+            try { ms = decodeBundle(this.fdec, u8); } catch { return; }
+            for (const x of ms) put(x);
+            return;
+          }
+          if (u8[0] === W_PONG){ try { put(decodePong(u8)); } catch { /* 무시 */ } return; }
           if (u8[0] !== W_FRAME) return;
           try { m = decodeFrame(this.fdec, u8); } catch { return; }
         } else {
           try { m = JSON.parse(e.data); } catch { return; }
         }
+        if (m && m.t === 'hello') this.ins = !!m.ins;
         // 매칭 중에 보낸 ping 의 답. 여기서 미리 왕복 시간을 재둔다
         if (m.t === 'p' && this.pings.has(m.id)){
           const t0 = this.pings.get(m.id);
@@ -173,10 +197,30 @@ export class WsTransport {
     }, wait);
   }
   clientSend(msg){
+    if (msg.t === 'p' && !msg.pre) this.gameAt = CLOCK.now();
+    // [stated] **한 번의 화면 갱신에서 나온 입력 여러 틱은 메시지 하나로** (2026-11-02 서버 CPU 줄이기).
+    // 서버 CPU 의 큰 몫이 '받은 메시지 하나하나' 였다. 화면이 30프레임이면 한 번에 2틱씩 나온다.
+    // 기다리지 않는다 — 지금 하던 일이 끝나는 즉시(같은 프레임 안) 보낸다
+    if (msg.t === 'in' && this.bin && this.ins){
+      this.inq.push(msg);
+      if (this.inq.length === 1) soon(() => this.flushIn());
+      else if (this.inq.length >= INS_MAX) this.flushIn();
+      return;
+    }
+    if (this.inq.length) this.flushIn();              // 순서를 지킨다 — 모아 둔 입력이 먼저
     // 조작 입력(1초에 60번)은 숫자로 묶어 보낸다 — 서버가 글자를 읽는 CPU 를 아낀다
     const raw = (this.bin && msg.t === 'in') ? encodeIn(msg) : JSON.stringify(msg);
+    this.sendRaw(raw);
+  }
+  sendRaw(raw){
     if (this.ws && this.ws.readyState === 1) this.ws.send(raw);
     else if (this.queue.length < 200) this.queue.push(raw);   // 끊긴 동안 무한정 쌓지 않는다
+  }
+  flushIn(){
+    const q = this.inq;
+    if (!q.length) return;
+    this.inq = [];
+    this.sendRaw(q.length === 1 ? encodeIn(q[0]) : encodeIns(q));
   }
   serverSend(){ /* 클라에는 서버가 없다 */ }
   close(){
@@ -229,7 +273,8 @@ export class Server {
       const b = (this.rxBy[m.pid] = this.rxBy[m.pid] || {});
       b[m.t] = (b[m.t] || 0) + 1;
     }
-    if (m.t === 'p'){ this.net.serverSend({ t:'q', id:m.id, pid:m.pid }, m.pid); return; }   // 핑 응답은 보낸 클라에게만
+    // 핑 응답은 보낸 클라에게만. 받는 쪽은 `id` 만 본다 — 누구에게 보낼지(`pid`)는 싣지 않는다 (2026-11-02 보내는 양 줄이기)
+    if (m.t === 'p'){ this.net.serverSend({ t:'q', id:m.id }, m.pid); return; }
     if (m.t === 'rtt'){
       // [stated] **핑이 한 번 튀면 지연이 세 배가 된다** (RTT 140 → 640 이면 6 → 21틱).
       // 스파이크는 지나가는 건데 그걸로 판 전체 기준을 잡으니 예측이 0.67초를 앞서 달리다
@@ -409,7 +454,10 @@ export class Server {
       // 다듬고 나서 계산한다. 다르면 서버와 앱 계산이 갈린다 (2026-10-19 보내는 양 줄이기)
       for (let i = 0; i < inp.length; i++) inp[i] = canonIn(inp[i]);
       step(this.s, inp);
-      this.net.serverSend({ t:'f', tick: this.s.tick, inp, ck: checksum(this.s), d: this.delay, lg: this.s.lag,
+      // [stated] **검사값(ck)은 `ckEvery` 틱마다만** 계산해 싣는다 (2026-11-02) — 방에 새 앱만 있을 때 서버가 늘린다.
+      // 옛 앱은 매 틱 검사값을 기다리므로 그때는 1(매 틱)이다. 결정론이라 몇 틱 늦게 잡아도 스냅샷으로 바로잡는다
+      const ckNow = !(this.ckEvery > 1) || this.s.tick % this.ckEvery === 0;
+      this.net.serverSend({ t:'f', tick: this.s.tick, inp, ck: ckNow ? checksum(this.s) : undefined, d: this.delay, lg: this.s.lag,
                           ms: this.s.maxStep, bv: this.s.bulletV, ct: this.s.coolT });
       if (this.s.tick % SNAP_EVERY === 0){
         this.net.serverSend({ t:'s', tick: this.s.tick, st: cloneState(this.s) });
@@ -435,6 +483,13 @@ export const RENDER_BUF = 2;   // 상대를 확정 기록보다 이만큼 뒤에
 // [stated] 입력이 늦을 때 직전 입력을 이어 쓰는 한도 (0.2초).
 // 더 길게 두면 연결이 끊긴 사람이 계속 달린다
 const HOLD_INPUT = 12;
+// 가만히 있는 입력을 몇 틱까지는 보내는가 (`Client.sendInputs`)
+const IDLE_SEND = 3;
+/** 서버가 '안 온 틱' 을 채우는 값(`NOIN`)과 **칸 하나까지 같은** 입력인가 */
+export function isIdleIn(e){
+  return !e.dx && !e.dy && !e.fire && (e.fch == null || e.fch === 100) && !e.tkl && !e.sh && !e.ready && !e.go
+    && !e.place && !e.thr && !e.fastReq && !e.fastAns && !e.bareReq && !e.bareAns;
+}
 // 예측이 확정보다 앞설 수 있는 최대 틱
 const PRED_MAX = 12;
 // 확정이 이만큼(1초) 넘게 밀리면 재생하지 않고 최신 스냅샷으로 건너뛴다
@@ -481,7 +536,9 @@ export class Client {
     this.tickAt = CLOCK.now();
     this.desync = 0; this.pendingSnap = null;
     // 진단 계기판: 무엇을 받았고 무엇을 보냈는지 전부 센다
-    this.stats = { f:0, q:0, snap:0, hello:0, peer:0, other:0, sentIn:0, sendCalls:0, blocked:0 };
+    this.stats = { f:0, q:0, snap:0, hello:0, peer:0, other:0, sentIn:0, skipIn:0, sendCalls:0, blocked:0 };
+    // 자리별로 '아무것도 안 하는 입력' 이 몇 틱째 이어지는가 (`sendInputs` 가 쉬는 기준)
+    this.idleRun = [];
     this.awaitSnap = true;             // 스냅샷을 받아야 시작(또는 재개)할 수 있는 상태
     this.ckHist = new Map();
     // **방 상태는 `Client` 가 가로채도 계속 흘러가야 한다** — 안 그러면 방 화면이 죽는다
@@ -510,7 +567,10 @@ export class Client {
       if (t0 !== undefined){
         this.pings.delete(m.id);
         this.rtt = CLOCK.now() - t0;
-        this.net.clientSend({ t:'rtt', pid:m.pid, rtt:this.rtt });
+        // 내 자리는 내가 안다 — 응답엔 이제 `pid` 가 안 실려 온다 (2026-11-02 보내는 양 줄이기)
+        this.net.clientSend({ t:'rtt', pid: this.controlled[0], rtt:this.rtt });
+        // 연결이 재 두는 값(재접속 직후 `resync` 가 쓴다)도 같이 새로 — 판 중엔 연결 쪽 핑을 쉬므로
+        if (typeof this.net.rtt === 'number') this.net.rtt = this.net.rtt < 0 ? this.rtt : this.net.rtt * 0.6 + this.rtt * 0.4;
       }
     } else if (m.t === 'host'){
       // [stated] 방장인지 알려준다 — 결과 화면에서 '다시 하기' 를 그릴지 정한다
@@ -558,6 +618,7 @@ export class Client {
     this.rtt = (this.net && this.net.rtt > 0) ? this.net.rtt : -1;
     this.pings.clear(); this.lastPing = -1e9;
     this.pendingSnap = null;
+    this.idleRun = [];                 // 새 연결의 서버는 내 마지막 입력을 모른다 — 가만히 있어도 처음 몇 틱은 다시 보낸다
     if (this.rtt > 0){
       try { this.net.clientSend({ t:'rtt', pid: this.controlled[0], rtt: this.rtt }); }
       catch { /* 무시 */ }
@@ -618,8 +679,14 @@ export class Client {
         const len = Math.sqrt(dx*dx + dy*dy);
         if (len > cap){ const k = cap / len; dx = Math.round(dx * k); dy = Math.round(dy * k); }
         const e = { t:'in', pid, tick:t, dx, dy, fire:q.fire, fch:q.fch, tkl:q.tkl, sh:q.sh, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns, bareReq:q.bareReq, bareAns:q.bareAns };
-        this.net.clientSend(e);
-        this.stats.sentIn++;
+        // [stated] **가만히 있는 입력은 처음 몇 틱만 보내고 쉰다** (2026-11-02 서버 CPU 줄이기 · 새 앱 `w=3` 만).
+        // 서버는 안 온 틱을 '직전 입력의 이동만 이어 쓰기 → 그래도 없으면 무입력(NOIN)' 으로 채운다(`update`).
+        // 직전에 받은 것이 '아무것도 안 함' 이면 그 둘이 곧 '아무것도 안 함' 이다 → 서버 계산·화면이 보낸 것과 똑같다.
+        // 움직이다 멈춘 첫 몇 틱은 꼭 보낸다(서버가 '직전 = 멈춤' 을 알아야 한다. 하나가 늦어 버려져도 다음 것이 맞춘다)
+        const idle = isIdleIn(e);
+        const run = this.idleRun[pid] = idle ? (this.idleRun[pid] | 0) + 1 : 0;
+        if (idle && run > IDLE_SEND && this.net.lean) this.stats.skipIn++;
+        else { this.net.clientSend(e); this.stats.sentIn++; }
         this.sent.push({ tick:t, pid, dx, dy, fire:q.fire, fch:q.fch, tkl:q.tkl, sh:q.sh, ready:q.ready, go:q.go, place:q.place, thr:q.thr, fastReq:q.fastReq, fastAns:q.fastAns, bareReq:q.bareReq, bareAns:q.bareAns });
         // 못 실은 이동량만 남긴다. 탭이 오래 멈췄다 돌아왔을 때 몰아서 튀지 않게 상한을 둔다
         const BACKLOG = cap * 3;
@@ -686,7 +753,8 @@ export class Client {
       this.hist.push({ tick: this.s.tick, p: this.s.p.map(q => [q.x, q.y]) });
       if (this.hist.length > 60) this.hist.shift();
       while (this.sent.length && this.sent[0].tick <= this.s.tick) this.sent.shift();
-      if (checksum(this.s) !== f.ck){
+      // [stated] 새 앱 프레임은 **검사값을 몇 틱마다만** 싣는다 (2026-11-02) — 없는 틱은 건너뛴다
+      if (f.ck !== undefined && checksum(this.s) !== f.ck){
         this.desync++;
         const sn = this.pendingSnap;
         if (sn && sn.tick >= this.s.tick){ this.s = normalizeState(cloneState(sn.st)); this.pendingSnap = null; }

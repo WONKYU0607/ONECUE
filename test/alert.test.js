@@ -258,7 +258,8 @@ console.log('진짜 서버 안에서 — 판 전 점수를 못 읽은 판은 건
   });
   await new Promise(r => ws.on('open', r));
   ws.send(JSON.stringify({ t: 'vsSeen' }));
-  for (let i = 0; i < 300 && phase !== 2; i++) await sleep(100);
+  // 단계는 스냅샷으로 본다 — 주기 스냅샷은 30초마다라(2026-11-02) 앱처럼 1초마다 달라고 한다
+  for (let i = 0; i < 300 && phase !== 2; i++){ if (i % 10 === 0) ws.send(JSON.stringify({ t: 'snap' })); await sleep(100); }
   assert(phase === 2, '  봇과 판이 열려 전투까지 간다');
   await sleep(500);
   ws.send(JSON.stringify({ t: '__end' }));

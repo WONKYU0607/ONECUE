@@ -22,7 +22,9 @@ function runGame(){
   const client = new Client(tr, [conn.slot]);
   const me = conn.slot, A = host ? me : 1 - me, B = 1 - A;   // A = 방장(미는 쪽), B = 공 가진 쪽
   let f = 0, nextRd = 0, placed = -1, last = performance.now();
-  const log = { pushB0: null, pushB1: null, passed: false, minGap: 1e9, tackled: false, tkFrame: -1 };
+  // ys = 확정 틱별 B 위치. **두 화면은 같은 '틱' 끼리 맞댄다** — 같은 '내 화면 프레임 수' 는 서로 다른 틱일 수 있다
+  // (틱 프레임은 몇 개씩 묶여 온다 · 2026-11-02)
+  const log = { pushB0: null, pushB1: null, passed: false, minGap: 1e9, tackled: false, tkFrame: -1, ys: {} };
   function loop(now){
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
     if (client.s.phase !== PH_PLAY && now >= nextRd){ client.setReady(me); client.setGo(me); nextRd = now + 250; }
@@ -41,6 +43,7 @@ function runGame(){
       if (k === 40){ log.pushB0 = s.p[B].y / FP; }
       if (k === 99){ log.pushB1 = s.p[B].y / FP; }
       // **미는 구간(40~99)에서만** 통과 여부를 잰다 — 태클은 미끄러져 지나가는 동작이라 따로 본다
+      if (k < 170) log.ys[s.tick] = s.p[B].y / FP;      // 판 내내 (두 화면의 구간이 어긋나도 겹치게)
       if (k >= 40 && k < 100){
         const g = (s.p[A].y - s.p[B].y) / FP;          // A 가 B 보다 아래 있어야(+) 통과 안 한 것
         log.minGap = Math.min(log.minGap, g);

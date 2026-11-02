@@ -37,6 +37,36 @@ console.log('입력 하나 — 마구 만든 값으로 왕복');
   assert(W.encodeIn({ t: 'in', pid: 0, tick: 5000, ...W.canonIn({}) }).length <= 5, '  가만히 있는 입력은 5바이트 안');
 }
 
+console.log('핑 응답(W_PONG) — 숫자 꼴 왕복');
+{
+  const ids = [0, 1, 127, 128, 16383, 16384, 2 ** 31 - 1];
+  assert(ids.every(id => { const u = W.encodePong(id); const b = W.decodePong(u); return u[0] === W.W_PONG && b.t === 'q' && b.id === id; }), '  번호가 그대로 되살아난다');
+  assert(W.encodePong(1000).length === 3, '  1초에 두 번 가는 크기는 3바이트');
+}
+
+console.log('입력 여러 틱 묶음(W_INS) — 마구 만든 값으로 왕복 · 깨진 것은 통째로 버린다');
+{
+  let bad = 0, seed = 11;
+  const rnd = k => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % k; };
+  for (let i = 0; i < 3000; i++){
+    const k = 1 + rnd(W.INS_MAX);
+    const list = Array.from({ length: k }, (_, j) => ({ t: 'in', pid: rnd(6), tick: 1000 + i * 20 + j, ...W.canonIn({
+      dx: rnd(2) ? rnd(70000) - 35000 : 0, dy: rnd(2) ? rnd(3000) - 1500 : 0, fire: rnd(2), fch: rnd(3) ? 100 : rnd(101),
+      tkl: rnd(2), sh: rnd(2), ready: rnd(2), go: rnd(2),
+      place: rnd(10) ? null : { k: rnd(5), c: rnd(9), r: rnd(12) }, thr: rnd(10) ? null : { k: rnd(3), ch: rnd(101) },
+      fastReq: rnd(5) ? 0 : 1, fastAns: rnd(5) ? 0 : 1 + rnd(2), bareReq: rnd(5) ? 0 : 1, bareAns: rnd(5) ? 0 : 1 + rnd(2) }) }));
+    const u8 = W.encodeIns(list);
+    const back = W.decodeIns(u8);
+    if (u8[0] !== W.W_INS || !eq(back, list)) bad++;
+  }
+  assert(bad === 0, '  3000묶음 모두 순서·자리·틱·값 그대로');
+  const ok = W.encodeIns([{ t: 'in', pid: 0, tick: 7, ...W.canonIn({ dx: 5 }) }, { t: 'in', pid: 0, tick: 8, ...W.canonIn({}) }]);
+  const throws = u8 => { try { W.decodeIns(u8); return false; } catch { return true; } };
+  assert(throws(ok.subarray(0, ok.length - 1)), '  끝이 잘린 묶음은 예외 (서버가 통째로 버린다)');
+  const zero = new Uint8Array(ok); zero[1] = 0; const many = new Uint8Array(ok); many[1] = W.INS_MAX + 1;
+  assert(throws(zero) && throws(many), `  개수 0 · ${W.INS_MAX + 1} 이상은 예외`);
+}
+
 // ── 진짜 서버 ──
 const PORT = 9541;
 const proc = spawn(process.execPath, ['server/index.js'], { env: { ...process.env, PORT: String(PORT), E2E_FAKE_STORE: '1', DUEL_ALERT_URL: '' }, stdio: ['ignore', 'ignore', 'inherit'] });

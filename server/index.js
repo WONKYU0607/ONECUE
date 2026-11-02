@@ -17,7 +17,18 @@ import { forfeit, setOff, resetForNextRound, newState } from '../src/game/sim.js
 import { alert, bug, hookProcess, setStatus, setTickProbe, startWatch, alarmWhy, alertStats } from './alert.js';
 import * as pay from './pay.js';
 import { deflateSync } from 'zlib';
-import { frameEncoder, encodeFrame, frameSent, decodeIn, W_IN, W_SNAP } from '../src/net/wire.js';
+import { frameEncoder, encodeFrame, frameSent, decodeIn, decodeIns, encodePong, packBundle, W_IN, W_INS, W_SNAP } from '../src/net/wire.js';
+// [stated] **틱 프레임 묶어 보내기** (2026-11-02 트래픽·서버 CPU 줄이기) — 새 앱(`w=3`)에는 프레임을 이만큼씩 묶는다.
+// 재 보니 서버 CPU 의 절반 가까이가 '소켓에 쓰기'(1초에 60번 × 사람 수)였다. 묶으면 그만큼 줄고 보내는 양도 준다.
+// 화면 매끄러움은 1·2·3 이 같았다(상대가 0~2px 더 뒤에 보일 뿐). 기본 3(50ms 에 한 번). Render 환경변수 `DUEL_BUNDLE` 로 바꾼다 — 1 이면 안 묶는다
+const BUNDLE = Math.max(1, Math.min(4, +process.env.DUEL_BUNDLE || 3));
+// 새 앱만 있는 방은 검사값(ck)을 이 틱마다만 싣는다 (옛 앱이 하나라도 있으면 매 틱)
+const CK_EVERY = 6;
+// [stated] **이 서버가 받을 줄 아는 것** — hello 에 실어 알린다. 앱은 이걸 보고서만 새 꼴을 쓴다
+// (서버를 옛 버전으로 되돌려도 새 앱이 안 깨지게). `ins` = 입력 여러 틱 묶음(`W_INS`)
+const CAPS = { ins: 1 };
+// [stated] 빠른 대전이 끝나고 이만큼 지나면 틱 프레임을 그만 보낸다 (`Room.quiet`) — 앱은 1.4초 뒤 결과 화면으로 간다
+const OVER_QUIET_MS = 2500;
 
 // [stated] **장애 알림(디스코드)** — `DUEL_ALERT_URL` 이 없으면 아무것도 안 건다 (alert.js)
 hookProcess();
@@ -140,7 +151,16 @@ class Room {
     this.pending = new Map();   // sid -> goneAt(0이면 아직 접속 중)
     // Server는 net.serverSend(msg, pid?)만 쓴다. pid를 주면 그 슬롯에게만 보낸다.
     this.server = new Server({
-      serverSend: (msg, pid) => this.send(msg, pid),
+      // [stated] **빠른 대전은 판이 끝나고 조금 뒤부터 엔진의 틱 프레임·주기 스냅샷을 모두에게 뿌리지 않는다** (2026-11-02 보내는 양 줄이기).
+      // 앱은 끝나고 1.4초 뒤 결과 화면으로 넘어가 게임을 멈춘다 — 그 뒤 홈으로 갈 때까지(5초 · 광고 보는 동안 수십 초)
+      // 아무도 안 쓰는 프레임이 계속 나갔다. 판 끝남(PH_OVER)에선 시뮬도 멈춰 있어 실을 것도 없고,
+      // 빠른 대전은 다시 열리지 않는다(`ROOM_ONLY` — 다시 하기·로비로가 안 먹는다).
+      // **엔진이 보내는 것만** 거른다 — 한 사람에게 보내는 것(`snap` 요청·핑 응답)과 방이 직접 보내는 것
+      // (재접속한 사람에게 맞추는 스냅샷 `syncAll` 등)은 그대로 간다. 끝난 판에 다시 붙어도 결과 화면이 뜬다
+      serverSend: (msg, pid) => {
+        if (pid === undefined && (msg.t === 'f' || msg.t === 's') && this.quiet()) return;
+        this.send(msg, pid);
+      },
       toServer: null
     }, n, melee, ffa, soccer);
     // 버프가 뜨는 자리를 정하는 씨앗. **서버가 정해 모두에게 내려보낸다** —
@@ -172,6 +192,10 @@ class Room {
     }
     pk.done();
   }
+  /** 빠른 대전이 끝나고 `OVER_QUIET_MS` 가 지났는가 (그 뒤엔 틱 프레임을 안 뿌린다) */
+  quiet(){
+    return !this.code && this.overAt > 0 && this.server.s.phase === PH_OVER && Date.now() - this.overAt > OVER_QUIET_MS;
+  }
   /** 한 사람(소켓)에게만 — 방 메시지와 같은 꼴로 */
   sendTo(ws, msg){
     if (!ws || ws.readyState !== 1) return;
@@ -184,16 +208,30 @@ class Room {
    *  전부 싣는다(키프레임). 안 그러면 받는 쪽이 모르는 값을 '같음' 으로 채워 계산이 갈린다 */
   pack(msg){
     const room = this;
-    let raw = null, bin = null, key = null, z = null;
+    let raw = null, bin = null, key = null, z = null, bin3 = null, key3 = null;
     return {
       to(ws){
         try {
           if (msg.t === 'f' && ws.bin){
-            if (ws.lastF !== room.fenc.tick || !room.fenc.inp){ key = key || encodeFrame(room.fenc, msg, true); ws.send(key); }
-            else { bin = bin || encodeFrame(room.fenc, msg, false); ws.send(bin); }
+            let out;
+            const fresh = ws.lastF !== room.fenc.tick || !room.fenc.inp;
+            // 새 앱은 더 줄인 꼴(인원수 바이트 생략), 옛 앱은 예전 꼴 — 꼴마다 한 번만 만든다
+            if (ws.v3) out = fresh ? (key3 = key3 || encodeFrame(room.fenc, msg, true, true)) : (bin3 = bin3 || encodeFrame(room.fenc, msg, false, true));
+            else out = fresh ? (key = key || encodeFrame(room.fenc, msg, true)) : (bin = bin || encodeFrame(room.fenc, msg, false));
             ws.lastF = msg.tick;
+            // 새 앱은 모았다가 묶어서 보낸다 (`flushWs` · 틱 끝의 `flushFrames`)
+            if (ws.v3 && BUNDLE > 1){
+              (ws.fq || (ws.fq = [])).push(out);
+              if (ws.fq.length >= BUNDLE) room.flushWs(ws);
+              return;
+            }
+            ws.send(out);
             return;
           }
+          // **순서를 지킨다** — 모아 둔 프레임이 있으면 먼저 보낸다 (스냅샷·방 소식이 프레임을 앞지르면 안 된다)
+          if (ws.fq && ws.fq.length) room.flushWs(ws);
+          // 핑 응답 — 새 앱에는 숫자 3바이트로 (`wire.encodePong`)
+          if (msg.t === 'q' && ws.v3){ ws.send(encodePong(msg.id)); return; }
           if (msg.t === 's' && ws.z){
             if (!z){ const d = deflateSync(Buffer.from(JSON.stringify(msg)), { level: 6 }); z = Buffer.concat([Buffer.from([W_SNAP]), d]); }
             ws.send(z);
@@ -205,6 +243,30 @@ class Room {
       },
       done(){ if (msg.t === 'f') frameSent(room.fenc, msg); }
     };
+  }
+  /** 이 소켓에 모아 둔 틱 프레임을 지금 보낸다 (하나면 그대로, 여럿이면 묶음 하나로) */
+  flushWs(ws){
+    const q = ws.fq;
+    if (!q || !q.length) return;
+    ws.fq = []; ws.fqHeld = 0;
+    try { ws.send(q.length === 1 ? q[0] : packBundle(q)); } catch { /* 끊긴 소켓 — 정리는 close 가 한다 */ }
+  }
+  /** 틱 끝마다 — 프레임이 `BUNDLE` 개 안 모였어도 **루프를 `BUNDLE-1` 번 넘게 기다리진 않는다** (늦어도 한두 틱) */
+  flushFrames(){
+    if (BUNDLE <= 1) return;
+    const visit = ws => {
+      if (!ws || !ws.fq || !ws.fq.length) return;
+      ws.fqHeld = (ws.fqHeld | 0) + 1;
+      if (ws.fqHeld >= BUNDLE) this.flushWs(ws);
+    };
+    for (const x of this.seats) visit(x && x.ws);
+    for (const w of this.watchers) visit(w);
+  }
+  /** 방에 붙은 사람이 **전부 새 앱**(`w=3`)인가 — 그래야 검사값을 몇 틱마다만 실어도 된다 */
+  allV3(){
+    for (const x of this.seats) if (x && x.ws && !x.ws.v3) return false;
+    for (const w of this.watchers) if (!w.v3) return false;
+    return true;
   }
   snapshotTo(slot){
     this.send({ t: 's', tick: this.server.s.tick, st: JSON.parse(JSON.stringify(this.server.s)) }, slot);
@@ -761,7 +823,7 @@ class Room {
   waitJoin(ws, sid, back = false){
     this.pending.set(sid, 0);
     this.waitingList.push(ws);
-    ws.send(JSON.stringify({ t: 'hello', pid: -1, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, soccer: this.soccer, back, ver: PROTO_VER }));
+    ws.send(JSON.stringify({ t: 'hello', pid: -1, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, soccer: this.soccer, back, ver: PROTO_VER, ...CAPS }));
     this.sendLobby(); this.sendRoom();
   }
   join(ws, sid, team, wantColor, nick){
@@ -804,7 +866,7 @@ class Room {
     ws.roomId = this.id; ws.slot = slot;
     this.emptyAt = 0;
 
-    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, soccer: this.soccer, back: reconnected, ver: PROTO_VER }));
+    ws.send(JSON.stringify({ t: 'hello', pid: slot, room: this.id, n: this.n, melee: this.melee, ffa: this.ffa, soccer: this.soccer, back: reconnected, ver: PROTO_VER, ...CAPS }));
     // 방은 이미 돌고 있으므로 현재 상태를 먼저 보내 시작점을 맞춘다.
     // **다른 사람에게도** — 이름·색·끊김 표시가 바뀌었다 (`syncAll`)
     this.syncAll();
@@ -983,6 +1045,10 @@ class Room {
         // 축구는 자리를 비우지 않고 AI 가 이어받는다
         if (this.soccer && this.server.s.phase !== PH_OVER) this.takeOver(i);
         else forfeit(this.server.s, i);         // 유예 시간이 지나면 완전히 나간 것으로
+        // [stated] **기권·봇 이어받기는 틱 프레임에 안 실린다 — 남은 사람 화면도 맞춘다** (`quit`·`leave` 와 같게, 2026-11-02).
+        // 여기만 빠져 있었다 — 3초마다 오던 주기 스냅샷이 가려 주다가, 30초로 늘리자 드러났다
+        // (새 앱은 검사값이 어긋나 스냅샷을 달라고 해서 맞췄지만 그건 '갈림' 으로 한 번 세어진다)
+        this.syncAll();
         this.send({ t: 'peer', slot: i, state: 'left' });
       }
     }
@@ -1593,8 +1659,10 @@ wss.on('connection', (ws, req) => {
   const wantColor = q.has('color') ? +q.get('color') : -1;
   ws.nick = nick;      // 모든 경로(대기열·방·팀 로비)가 같이 쓴다
   // [stated] 새 앱은 **숫자로 묶은 틱 프레임**(`w=2`)과 **압축 스냅샷**(`z=1`, 앱이 풀 수 있을 때)을 받는다 (wire.js)
-  ws.bin = q.get('w') === '2';
+  ws.bin = q.get('w') === '2' || q.get('w') === '3';
   ws.z = ws.bin && q.get('z') === '1';
+  // [stated] `w=3` = **묶음·띄엄띄엄 검사값을 읽는 새 앱** (2026-11-02). 옛 앱(`w=2`)은 예전 꼴 그대로 받는다
+  ws.v3 = q.get('w') === '3';
   ws.uid = uid || '';   // 로그인 계정 — **서버가 증표로 확인한 값**. 점수는 이 값으로 저장
   // [stated] 친구 목록에 **접속 중인지 표시**한다. 소켓을 들고 있는 서버만 알 수 있다.
   // 같은 사람이 탭을 여러 개 열 수 있으므로 수를 세고, 0 이 되면 지운다.
@@ -1743,12 +1811,23 @@ wss.on('connection', (ws, req) => {
     }
   });
   const onMessage = (raw, isBin) => {
-    let m;
+    let m, ms = null;
     try {
       // 새 앱은 조작 입력을 숫자로 묶어 보낸다 (wire.js). 나머지는 글자(JSON)
-      if (isBin){ if (raw[0] !== W_IN) return; m = decodeIn(new Uint8Array(raw.buffer, raw.byteOffset, raw.length)); }
+      if (isBin){
+        const u8 = new Uint8Array(raw.buffer, raw.byteOffset, raw.length);
+        if (raw[0] === W_INS) ms = decodeIns(u8);
+        else if (raw[0] === W_IN) m = decodeIn(u8);
+        else return;
+      }
       else m = JSON.parse(raw);
     } catch { return; }
+    // 입력 여러 틱 묶음 — 다 풀린 뒤에 하나씩 (반쯤 깨진 묶음은 통째로 버린다)
+    if (ms){ for (const x of ms) onMsg(x); return; }
+    onMsg(m);
+  };
+  const onMsg = m0 => {
+    let m = m0;
     // [stated] **객체가 아닌 것(`null`·숫자·글자·배열)은 버린다** — 예전엔 `null` 한 줄에 서버가 꺼졌다(재현함)
     if (!m || typeof m !== 'object' || Array.isArray(m) || typeof m.t !== 'string') return;
     // [stated] **스냅샷은 앱이 필요할 때 달라고 한다** (어긋남·화면 복귀·많이 밀림) — 0.25초에 한 번까지
@@ -1784,7 +1863,7 @@ wss.on('connection', (ws, req) => {
         if (Array.isArray(st0.nick)) st0.nick[dst] = ws.nick || '';
         if (Array.isArray(st0.color) && Number.isInteger(m.color) && m.color >= 0) st0.color[dst] = m.color;
         ws.send(JSON.stringify({ t: 'hello', pid: dst, room: room.id, n: room.n,
-          melee: room.melee, ffa: room.ffa, soccer: room.soccer, back: true, ver: PROTO_VER }));
+          melee: room.melee, ffa: room.ffa, soccer: room.soccer, back: true, ver: PROTO_VER, ...CAPS }));
         room.send({ t: 's', tick: st0.tick, st: JSON.parse(JSON.stringify(st0)) });
         room.ensureHost(); room.sendLobby(); room.sendRoom();
         console.log(`관전 → 팀 ${team} (slot ${dst})`);
@@ -1846,7 +1925,7 @@ wss.on('connection', (ws, req) => {
         if (Array.isArray(st0.color)){ st0.color[dst] = st0.color[ws.slot] | 0; }
         ws.slot = dst;
         ws.send(JSON.stringify({ t: 'hello', pid: dst, room: room.id, n: room.n,
-          melee: room.melee, ffa: room.ffa, soccer: room.soccer, back: true, ver: PROTO_VER }));
+          melee: room.melee, ffa: room.ffa, soccer: room.soccer, back: true, ver: PROTO_VER, ...CAPS }));
         room.send({ t: 's', tick: st0.tick, st: JSON.parse(JSON.stringify(st0)) });
         room.sendLobby(); room.sendRoom();
         console.log(`팀 이동: room ${room.id} ${cur} → ${team} (slot ${dst})`);
@@ -2112,7 +2191,9 @@ setInterval(() => {
       }
       if (room.boom) throw new Error('검사용 방 오류 (틱)');   // 검사 전용 (`__roomfail`)
       room.arena();           // 봇 AI 가 시뮬보다 먼저 팀을 본다 — 이 방 기준으로 맞춰 둔다
+      room.server.ckEvery = room.allV3() ? CK_EVERY : 1;   // 옛 앱이 있으면 매 틱 검사값
       room.server.update(now);
+      room.flushFrames();     // 묶음이 덜 찼어도 오래 붙들지 않는다
       room.prime();           // 전투가 시작되면 점수를 한 번 읽어둔다
       room.settle();          // 판이 끝났으면 점수를 쓴다 (한 번만)
       // 판이 끝난 순간 **방장이 누구인지 알린다** — 결과 화면에서 다시 시작 버튼을 그린다

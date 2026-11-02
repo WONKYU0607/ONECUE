@@ -56,7 +56,11 @@ try {
   console.log('스틱을 상대 쪽으로 민 채 태클해도 걸린다');
   assert(a.tackled && b.tackled, `  두 화면 모두 태클이 걸렸다 (${a.tkFrame}, ${b.tkFrame}프레임째)`);
   console.log('두 화면이 같은 결과를 본다');
-  assert(a.pushB1 === b.pushB1, `  밀린 위치가 같다 (${a.pushB1} / ${b.pushB1})`);
+  // 같은 틱끼리 맞댄다 (두 화면의 '내 프레임 수' 는 틱이 조금씩 다를 수 있다 — 틱 프레임이 묶여 온다)
+  const common = Object.keys(a.ys).filter(t => t in b.ys);
+  const diff = common.filter(t => a.ys[t] !== b.ys[t]);
+  assert(common.length >= 10 && diff.length === 0,
+    `  같은 틱의 밀린 위치가 같다 (${common.length}틱 맞대 다름 ${diff.length}${diff.length ? ` · 틱 ${diff[0]}: ${a.ys[diff[0]]} / ${b.ys[diff[0]]}` : ''})`);
   console.log('e2e-contact.test.js 통과');
 } finally {
   await browser.close().catch(() => {});
