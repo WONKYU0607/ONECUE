@@ -188,8 +188,8 @@ async function nativeRewarded(ssv){
 // ── [stated] 전면 광고 — 빠른 대전 3판마다 한 번, 결과 화면을 떠날 때 (2026-11-02) ──
 // AdMob 정책: 앱을 켤 때·끌 때 금지, 연달아 금지, **늦게 떠서 다음 화면을 덮으면 안 된다** →
 // 미리 불러 두고, **그 순간 준비돼 있을 때만** 띄운다(아니면 이번엔 건너뛴다).
-// [stated] **AdMob 에서 전면 광고 단위를 만들어 이 값을 넣어야 켜진다** — 비어 있으면 앱에서는 아예 안 뜬다
-export const INTER_AD_ID = '';
+// [stated] **AdMob 전면 광고 단위** (2026-11-02 등록) — 비워 두면 앱에서는 아예 안 뜬다
+export const INTER_AD_ID = 'ca-app-pub-5845861200468545/5865035267';
 let interId = INTER_AD_ID;
 /** **검사 전용** — 전면 광고 단위를 끼운다 */
 export function __setInterId(id){ interId = id; }
