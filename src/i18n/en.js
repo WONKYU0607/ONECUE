@@ -203,6 +203,7 @@ export default {
   'ad.late': 'Confirmation is taking a while. Your ticket will arrive shortly',
   'ad.capped': "You've used all ad rewards today",
   'ad.fakeTitle': 'Ad (test)',
+  'ad.fakeInter': 'Interstitial ad (test)',
   'ad.fakeNote': 'On the web this screen stands in for a real ad',
   'ready.askShort': 'Opponent wants {what}',
   'ready.votesShort': 'Yes {yes} · No {no}',

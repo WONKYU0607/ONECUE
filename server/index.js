@@ -1126,8 +1126,12 @@ function onHttp(req, res){
     const kind = k0 === 'melee' ? 'melee' : (k0 === 'soccer' ? 'soccer' : 'gun');
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     if (!uid){ res.end(JSON.stringify({ ok: false, why: 'uid 없음' })); return; }
+    // [stated] **상위 30명 목록도 같이 준다** (2026-11-02) — 앱이 `ranks/{종목}` 문서를 따로 읽지 않게(읽기 1회 아낌).
+    // 서버가 아직 목록을 안 만들었으면 빼고 준다 → 앱이 예전처럼 문서를 읽는다
+    const list = store.rankListOf(kind);
+    const more = list ? { list } : {};
     store.myRank(uid, kind)
-      .then(r => res.end(JSON.stringify(r ? { ok: true, kind, ...r } : { ok: false, why: '기록 없음' })))
+      .then(r => res.end(JSON.stringify(r ? { ok: true, kind, ...r, ...more } : { ok: false, why: '기록 없음', ...more })))
       .catch(e => { bug('요청 /rank')(e); res.end(JSON.stringify({ ok: false, why: '실패' })); });
     return;
   }
@@ -1396,6 +1400,9 @@ setStatus(() => {
 // 10초 동안 가장 늦은 틱 (알림이 볼 때마다 새로 센다)
 setTickProbe(() => { const w = tickWorst; tickWorst = 0; return { worst: w, rooms: rooms.size }; });
 store.warmup();   // **첫 판이 아니라 부팅 때** Firestore 연결을 연다
+// [stated] **선수 색인** (2026-11-02 DB 비용 줄이기) — 켤 때 모든 선수의 이름·점수를 한 번 읽어 메모리에 둔다.
+// 등수·순위표를 세기 쿼리 없이 바로 준다. 다 읽기 전·실패 때는 예전 방식으로 돈다 (store.js `startIndex`)
+store.startIndex();
 
 // 대기열: 새로 들어온 사람은 방에 바로 앉히지 않는다.
 // 방에 빈 자리가 있다고 바로 넣으면, 상대가 재접속 대기 중인(예약석) 방에 앉아
@@ -1683,7 +1690,7 @@ wss.on('connection', (ws, req) => {
     }
     ws.room = null;
     const key = qkey(want, melee, ffa, soccer);   // 인원수·모드가 같은 사람끼리만 붙인다
-    const enter = () => {
+    const enter = (pre = null) => {
       ws.qkey = key;
       ws.wantColor = wantColor;
       const q = queueOf(key);
@@ -1691,7 +1698,9 @@ wss.on('connection', (ws, req) => {
       ws.send(JSON.stringify({ t: 'queued', ahead: q.length - 1 }));
       // [stated] **점수가 가까운 사람끼리 붙인다.** 점수를 알아야 고를 수 있으므로 미리 읽어 둔다.
       // 못 읽어도 매칭은 진행한다 — 그때는 점수를 모르는 사람으로 보고 아무나와 붙는다
-      if (ws.uid && store.isOn()){
+      // 티켓 확인(`canQueue`)이 점수를 같이 읽어 왔으면 그걸 쓴다 — 같은 문서를 또 읽지 않는다 (2026-11-02)
+      if (pre && typeof pre.score === 'number') ws.qScore = pre.score;
+      else if (ws.uid && store.isOn()){
         const kind = soccer ? 'soccer' : (melee ? 'melee' : 'gun');
         store.readPlayers([ws.uid]).then(m => {
           const v = m.get(ws.uid);
@@ -1715,11 +1724,11 @@ wss.on('connection', (ws, req) => {
     if (!store.isOn()) enter();
     else if (!ws.uid) (store.isFake() ? enter() : refuse('login'));
     else {
-      store.canQueue(ws.uid, { ffa, soccer })
+      store.canQueue(ws.uid, { ffa, soccer, kind: soccer ? 'soccer' : (melee ? 'melee' : 'gun') })
         .catch(() => ({ ok: true }))
         .then(r => {
           if (ws.readyState !== 1) return;          // 확인하는 사이 나갔다
-          if (r && !r.ok) refuse(r.why || 'noTicket'); else enter();
+          if (r && !r.ok) refuse(r.why || 'noTicket'); else enter(r);
         });
     }
   }

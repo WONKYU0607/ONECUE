@@ -30,6 +30,7 @@ import { disconnect } from './net/connection.js';
 import { recordResult, modeKey } from './state/progress.js';
 import { VIEW, SELF, HAND, teamOf, PH_READY, PH_PLAY } from './game/config.js';
 import { warmUp, keysFor } from './game/assets.js';
+import { quickMatchDone, maybeInterstitial, warmInterstitial } from './state/interad.js';
 
 // 화면 전환은 여기 한 곳에서만 한다.
 // GameCanvas는 'game'일 때만 마운트되므로, 화면을 벗어나면 게임 루프·소켓이 자동으로 정리된다.
@@ -234,7 +235,8 @@ export default function App(){
       // [stated] PVP·연습은 **홈 칸 안에서** 고른다 — 따로 화면이 없다 (옛 `PvpMenu`·`PracticeMenu` 삭제)
       // 순위·친구 화면이 이 목록에서 빠져 있어 **하단 뒤로가기를 눌러도 아무 일도 안 났다**
       // [stated] **친구방 결과 화면에서 뒤로가기 = [방으로]** (2026-11-01) — 예전엔 홈으로 가서 확인 없이 방을 나갔다
-      if (screen === 'result' && getRoom() && backToRoomRef.current){ backToRoomRef.current(); return true; }
+      // 빠른 대전이면 3판마다 전면 광고 뒤에 (`leaveResult` 가 빠른 대전인지 본다 — 친구방은 바로 넘어간다)
+      if (screen === 'result'){ leaveResultRef.current(getRoom() && backToRoomRef.current ? backToRoomRef.current : goHome); return true; }
       if (screen === 'result' || screen === 'ranks' || screen === 'friends'
           || screen === 'shop' || screen === 'costume' || screen === 'quests' || screen === 'mail'){
         goHome(); return true;
@@ -384,6 +386,8 @@ export default function App(){
       if (getRoom()){ backToLobby(); setScreen('room'); } else goHome();
       return;
     }
+    // [stated] **빠른 대전 3판마다 전면 광고** (2026-11-02) — 결과 화면까지 온 빠른 대전만 센다 (친구방·AI 제외)
+    if (session?.kind === 'pvp' && session?.mode === 'queue') quickMatchDone();
     setResult(r); setIsHost(!!host); setScreen('result');
   }, [session, goHome]);
   // **검사 전용(개발 서버 `?e2e=1`)** — 판을 이긴/진 것으로 끝낸다. 승패 판정(시뮬)은 건드리지 않고
@@ -406,6 +410,17 @@ export default function App(){
     } else goHome();
   }, [goHome, session]);
   backToRoomRef.current = backToRoom;
+  // [stated] **빠른 대전 결과 화면을 떠날 때**(홈·다시 하기·뒤로가기·5초 자동) 3판마다 전면 광고 (2026-11-02).
+  // 광고가 닫힌 **뒤에** 다음 화면으로 간다 — 광고 도중 다른 누름·자동 복귀는 무시한다(한 번만 넘어간다)
+  const leaving = useRef(false);
+  const leaveResult = useCallback(next => {
+    if (leaving.current) return;
+    if (session?.mode !== 'queue'){ next(); return; }
+    leaving.current = true;
+    maybeInterstitial().catch(() => false).then(() => { leaving.current = false; next(); });
+  }, [session]);
+  const leaveResultRef = useRef(leaveResult);
+  leaveResultRef.current = leaveResult;
   const again     = useCallback(() => {
     setResult(null);
     // [stated] **빠른 매칭의 '다시 하기' 는 새 상대를 찾는 것이다.**
@@ -454,6 +469,7 @@ export default function App(){
         // **첫 탭에서 소리를 연다.** 브라우저는 사용자가 만지기 전엔 소리를 못 낸다
         unlockAudio(); preloadSfx();
         startPlayClock();   // [stated] 게임 누적 접속 시간 — 화면이 보일 때만 센다
+        warmInterstitial();  // 지난번에 빠른 대전을 2판 이상 해 뒀으면 전면 광고를 미리 불러 둔다
         if (e2eSkipLogin()){ goHome(); goHomeFirst(); return; }   // 검사 전용(개발 서버)
         setScreen('login');
       }} />}
@@ -494,10 +510,11 @@ export default function App(){
                                        onAuto={() => {
                                          // [stated] **5초가 지나면 결판난다** — 수락 창이 떠 있으면 거절과 같게
                                          if (againAsk){ setAgainAsk(null); answerAgain(false); return; }
-                                         (getRoom() ? backToRoom : goHome)();
+                                         // 빠른 대전도 방 상태(`roomst`)가 있어 `getRoom()` 이 참일 수 있다 — 어느 쪽이든 `leaveResult` 를 거친다
+                                         leaveResult(getRoom() ? backToRoom : goHome);
                                        }}
-                                       onAgain={again} onMode={setRoomMode} onRoom={(session?.mode === 'create' || session?.mode === 'join') ? backToRoom : null}
-        onNext={(session?.kind === 'ai' && result === 'win' && (session.stage || 1) < 30) ? nextStage : null} onHome={goHome} />}
+                                       onAgain={() => leaveResult(again)} onMode={setRoomMode} onRoom={(session?.mode === 'create' || session?.mode === 'join') ? backToRoom : null}
+        onNext={(session?.kind === 'ai' && result === 'win' && (session.stage || 1) < 30) ? nextStage : null} onHome={() => leaveResult(goHome)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onTuto={startTuto}
                                       regBack={fn => { settingsBack.current = fn; }} />}
       {/* [stated] **다시 하기 신청을 받았다** — 예: 그 판 다시, 아니오: 모두 로비로 */}

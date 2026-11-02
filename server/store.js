@@ -4,7 +4,7 @@
 // 키는 코드에 두지 않고 환경변수 FIREBASE_KEY(서비스 계정 JSON)로만 받는다.
 // **키가 없으면 조용히 꺼진다** — 개발 중이나 키를 안 넣었을 때 서버가 죽으면 안 된다.
 import { initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue, FieldPath } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { alert, errText } from './alert.js';
 
@@ -148,7 +148,7 @@ export async function claimNick(uid, nick){
       return { ok: true, nick: String(nick) };
     });
     // 순위표(상위 30명)에 있는 사람이면 표의 이름도 바꾼다 — 예전엔 아무 판이 끝날 때마다 다시 만들어 저절로 됐다
-    if (r && r.ok) requeueRanksOf(uid);
+    if (r && r.ok){ ixNick(uid, r.nick); requeueRanksOf(uid); }
     return r;
   } catch (e){
     fail('warn', 'nick', '닉네임 바꾸기 실패', e, `계정 ${uid}`);
@@ -209,6 +209,7 @@ export async function readPlayers(uids){
     const snaps = await db.getAll(...refs);
     snaps.forEach((s, i) => {
       const d = s.exists ? s.data() : null;
+      ixPut(uids[i], d);                     // 통째로 읽은 김에 선수 색인을 바로잡는다
       out.set(uids[i], {
         nick: (d && d.nick) || '',
         // [stated] 축구는 **0점에서 시작**한다 (총·칼은 1000)
@@ -224,6 +225,13 @@ export async function readPlayers(uids){
     fail('warn', 'read', 'Firestore 읽기 실패 (점수)', e, `계정 ${uids.join(', ')}`);
   }
   return out;
+}
+
+/** 문서 하나에서 이 종목 점수 — `readPlayers` 와 **같은 기본값**(총·칼 1000, 축구 0). 가짜 저장소는 칸이 평평하다 */
+function scoreFor(v, kind){
+  const dflt = kind === 'soccer' ? 0 : 1000;
+  if (FAKE) return v[kind] ?? dflt;
+  return (v && v.score && v.score[kind]) ?? dflt;
 }
 
 /** 판이 끝나면 점수를 쓴다. **여러 명을 한 번에** (묶음 쓰기 1회) */
@@ -262,6 +270,11 @@ export async function writeResults(rows){
       batch.set(db.doc('players/' + r.uid), patch, { merge: true });
     }
     await batch.commit();
+    // 선수 색인은 **저장이 성공한 뒤에만** 고친다 — 실패했는데 메모리만 바뀌면 등수가 틀어진다
+    for (const r of rows){
+      const kind = r.kind === 'melee' ? 'melee' : (r.kind === 'soccer' ? 'soccer' : 'gun');
+      ixScore(r.uid, kind, Math.max(0, r.score | 0));
+    }
     return true;
   } catch (e){
     fail('urgent', 'write', '점수를 못 적음 — 판 결과(점수·전적·코인)가 저장 안 됨', e,
@@ -269,6 +282,93 @@ export async function writeResults(rows){
     return false;
   }
 }
+
+// ══ [stated] 선수 색인 — 등수·순위표를 서버 메모리에서 (2026-11-02 "db는 좀 손봐서 줄여보자") ══════════
+// 홈에 올 때마다 세 종목 등수를 '나보다 점수 높은 사람 수' 세기로 구했는데, 세기는 **훑은 1,000명마다 읽기 1회**라
+// 가입자가 늘수록 비싸진다 — 계산해 보니 하루 1만 명이면 **DB 읽기의 약 75%** 가 이것이었다.
+// 점수는 **이 서버만 쓴다**(앱은 규칙에 막혀 못 쓴다). 그래서:
+//  - 켤 때 모든 선수의 이름·점수를 **한 번** 읽어 메모리에 둔다 (`startIndex`, 가입자 수만큼 읽기 1회씩)
+//  - 그 뒤로는 **서버가 쓴 것을 저장이 성공한 뒤에** 그대로 반영한다 (판 결과·이름·계정 삭제·봇)
+//  - 서버가 어떤 문서를 통째로 읽을 때마다(내 등수·티켓 확인·판 전 점수) 그 값으로 **바로잡는다**
+//    → 배포 중 옛 서버가 잠깐 쓴 값이나 콘솔에서 손으로 고친 값도, 그 사람이 다시 오면 맞춰진다
+//  - 준비 전(켜지는 중·읽기 실패)에는 **예전 방식(세기 쿼리)** 으로 그대로 돈다
+// 값은 전부 '덮어쓰기' 라 몇 번 거듭 반영해도 같다 — 읽는 동안 생긴 변경은 모아 두었다가 읽기 뒤에 다시 반영한다.
+// 메모리: 선수 1명당 약 200바이트(5만 명이면 약 10MB). '높은 사람 수' 는 점수칸별 합(펜윅 나무)으로 바로 센다
+const IX_KINDS = ['gun', 'melee', 'soccer'];
+const IX_MAX = 1 << 14;                    // 점수 0~16383 (이보다 높으면 맨 끝 칸 — 서로 같은 점수로 센다)
+const IX_PAGE = 2000;                      // 한 번에 읽는 문서 수
+const ixFen = () => ({ t: new Int32Array(IX_MAX + 1), n: 0 });
+// `on` = 모으는 중(읽는 중이거나 준비됨) · `ready` = 다 읽어서 쓸 수 있음
+const IX = { on: false, ready: false, loading: null, map: new Map(), fen: { gun: ixFen(), melee: ixFen(), soccer: ixFen() }, wait: null };
+const ixSlot = s => Math.max(0, Math.min(IX_MAX - 1, Math.floor(s)));
+function ixAdd(f, s, d){ for (let i = ixSlot(s) + 1; i <= IX_MAX; i += i & -i) f.t[i] += d; f.n += d; }
+function ixUpTo(f, s){ if (s < 0) return 0; let r = 0; for (let i = ixSlot(s) + 1; i > 0; i -= i & -i) r += f.t[i]; return r; }
+/** 이 종목에서 `score` 보다 **높은** 사람 수 (점수 칸이 있는 사람만 — 세기 쿼리 `where(score.k > s)` 와 같다) */
+export const ixAbove = (k, score) => { const f = IX.fen[k]; return f.n - ixUpTo(f, score); };
+const ixNum = x => (typeof x === 'number' && Number.isFinite(x) ? x : undefined);
+/** 한 사람의 색인을 통째로 바꾼다 (`v` 가 null 이면 뺀다) */
+function ixSet(uid, v){
+  const old = IX.map.get(uid);
+  if (old) for (const k of IX_KINDS) if (old.score[k] !== undefined) ixAdd(IX.fen[k], old.score[k], -1);
+  if (!v){ IX.map.delete(uid); return; }
+  for (const k of IX_KINDS) if (v.score[k] !== undefined) ixAdd(IX.fen[k], v.score[k], +1);
+  IX.map.set(uid, v);
+}
+// 고치기는 **지금 하고, 읽는 중이면 읽기가 끝난 뒤 한 번 더** 한다 — 읽은 값이 그 위를 덮으므로.
+// (점수 하나·이름 하나만 바뀐 것은 '읽은 값 위에' 얹어야 다른 칸이 안 지워진다 — 그래서 값이 아니라 고치는 일을 모아 둔다)
+function ixOp(uid, fn){
+  if (!uid || !IX.on) return;
+  if (IX.wait) IX.wait.push(fn);
+  fn();
+}
+const ixDoc = d => (d ? { nick: String(d.nick || ''), score: { gun: ixNum((d.score || {}).gun), melee: ixNum((d.score || {}).melee), soccer: ixNum((d.score || {}).soccer) } } : null);
+/** 문서(전체 또는 이름·점수만)로 바로잡는다 — 문서가 없으면(null) 뺀다 */
+const ixPut = (uid, d) => ixOp(uid, () => ixSet(uid, ixDoc(d)));
+/** 점수 하나만 바뀐 것 (판 결과) — 저장이 **성공한 뒤에만** 부른다 */
+const ixScore = (uid, kind, score) => ixOp(uid, () => {
+  const o = IX.map.get(uid);
+  ixSet(uid, { nick: o ? o.nick : '', score: { ...(o ? o.score : {}), [kind]: score } });
+});
+const ixNick = (uid, nick) => ixOp(uid, () => {
+  const o = IX.map.get(uid);
+  ixSet(uid, { nick: String(nick || ''), score: { ...(o ? o.score : {}) } });
+});
+const ixDrop = uid => ixOp(uid, () => ixSet(uid, null));
+/** **켤 때 한 번** — 모든 선수의 이름·점수를 읽어 색인을 만든다. 실패하면 10분 뒤 다시(그동안은 예전 방식) */
+export function startIndex(){
+  if (!db || FAKE || IX.on) return IX.loading;
+  IX.on = true; IX.wait = [];
+  IX.loading = (async () => {
+    const t0 = Date.now();
+    const base = db.collection('players').select('nick', 'score').orderBy(FieldPath.documentId()).limit(IX_PAGE);
+    let q = base, n = 0;
+    const got = new Map();
+    for (;;){
+      const s = await q.get();
+      for (const d of s.docs) got.set(d.id, d.data());
+      n += s.docs.length;
+      if (s.docs.length < IX_PAGE) break;
+      q = base.startAfter(s.docs[s.docs.length - 1]);
+    }
+    // 읽은 것을 깔고, 읽는 동안 서버가 고친 것을 **그 위에 순서대로 다시** 한다
+    const wait = IX.wait; IX.wait = null;
+    for (const [uid, d] of got) ixSet(uid, ixDoc(d));
+    for (const fn of wait) fn();
+    IX.ready = true;
+    console.log(`[store] 선수 색인 ${n}명 (${Date.now() - t0}ms)`);
+    for (const k of IX_KINDS) buildRanks(k).catch(() => {});     // 앱이 받을 순위표를 메모리에 채운다(읽기 0)
+    return true;
+  })().catch(e => {
+    __ixReset();
+    fail('warn', 'index', '선수 색인 만들기 실패 — 등수는 예전 방식(세기)으로 돈다. 10분 뒤 다시', e);
+    setTimeout(() => startIndex(), 10 * 60_000).unref?.();
+    return false;
+  });
+  return IX.loading;
+}
+export const ixReady = () => IX.ready;
+/** **검사 전용** — 색인을 비운다 */
+export function __ixReset(){ IX.on = false; IX.ready = false; IX.loading = null; IX.wait = null; IX.map.clear(); for (const k of IX_KINDS) IX.fen[k] = ixFen(); }
 
 /** [stated] **정확한 등수.** 나보다 점수가 높은 사람 수를 세어 +1 한다.
  *  집계 쿼리는 훑은 색인 1,000건마다 읽기 1회로 계산돼서, 만 명 중 5,000등이어도
@@ -285,6 +385,13 @@ export async function myRank(uid, kind = 'gun'){
     const v = await rankMe(uid);
     if (!v) return null;
     const score = (v.score && v.score[k]) | 0;
+    // [stated] **선수 색인이 준비됐으면 세기 쿼리를 안 쓴다** (2026-11-02). 방금 읽은 내 문서로 색인을 바로잡고
+    // (다른 서버가 쓴 값·놓친 값이 있어도 내 등수는 맞게) 메모리에서 센다. 전체 인원만 예전처럼 센다
+    if (IX.ready){
+      ixPut(uid, v);
+      const total = await rankCount('total', TOTAL_MS, () => db.collection('players').count().get());
+      return { rank: ixAbove(k, score) + 1, total, score, nick: v.nick || '' };
+    }
     // 나보다 **높은** 사람만 센다. 동점자끼리는 같은 등수가 된다
     const [above, total] = await Promise.all([
       rankCount(k + ':' + score, ABOVE_MS, () => db.collection('players').where(field, '>', score).count().get()),
@@ -648,16 +755,19 @@ export async function adClaim(uid, kind, nonce, ssv){
 /** [stated] **빠른 매칭에 들어가기 전에 티켓이 있는지** (2026-11-01) — 깎지는 않는다(VS 화면 뒤에 깎는다).
  *  축구는 축구 티켓, 개인전은 티켓 + 하루 판수, 나머지는 티켓. 돌려주는 값 `{ ok }` 또는 `{ ok:false, why }`
  *  ('noTicket' 'noFfa' 'noSoccer'). **읽기 실패는 막지 않는다**(우리 쪽 문제로 정상 사용자를 막지 않게) */
-export async function canQueue(uid, { ffa = false, soccer = false } = {}){
+export async function canQueue(uid, { ffa = false, soccer = false, kind = '' } = {}){
   if (!isOn() || !uid) return { ok: true };
   try {
     const v = FAKE ? fakeDoc(uid) : await db.doc('players/' + uid).get().then(d => (d.exists ? d.data() : null));
+    if (!FAKE) ixPut(uid, v);                // 통째로 읽은 김에 선수 색인을 바로잡는다
+    // [stated] **매칭용 점수도 여기서 같이 준다** (2026-11-02) — 예전엔 들여보낸 뒤 같은 문서를 한 번 더 읽었다
+    const sc = kind ? { score: scoreFor(v || {}, kind) } : {};
     const now = Date.now(), today = dayKey();
-    if (soccer) return socOf(v || {}, today) > 0 ? { ok: true } : { ok: false, why: 'noSoccer' };
+    if (soccer) return socOf(v || {}, today) > 0 ? { ok: true, ...sc } : { ok: false, why: 'noSoccer' };
     const g = grown(v || { tk: TICKET_MAX, at: now, ffa: FFA_MAX, day: today }, now);
     if (g.tk <= 0) return { ok: false, why: 'noTicket' };
     if (ffa && g.ffa <= 0) return { ok: false, why: 'noFfa' };
-    return { ok: true };
+    return { ok: true, ...sc };
   } catch (e){
     fail('warn', 'tkcheck', '빠른 매칭 전 티켓 확인 실패 — 이번엔 막지 않고 들여보냄', e, `계정 ${uid}`);
     return { ok: true };
@@ -819,6 +929,7 @@ export async function deleteAccount(uid){
     }
     try { await deleteAuthUser(uid); }
     catch (e){ if (!(e && e.code === 'auth/user-not-found')) throw e; }
+    ixDrop(uid);                         // 선수 색인에서도 뺀다 (등수·순위표)
     for (const k of ['gun', 'melee', 'soccer']) queueRanks(k);
     console.log('[store] 계정 삭제', uid.slice(0, 6), `(문서 ${refs.length})`);
     return { ok: true };
@@ -850,6 +961,7 @@ export async function seedBots(bots){
       made++;
     });
     if (made) await batch.commit();
+    snaps.forEach((snap, i) => { if (!snap.exists) ixPut(bots[i].uid, { nick: bots[i].nick, score: bots[i].score }); });
     console.log(`[store] 봇 계정 ${made}개 새로 만듦 (전체 ${bots.length})`);
     return made;
   } catch (e){
@@ -899,6 +1011,10 @@ const rankWait = new Map();          // kind → 예약된 타이머
 //  - 목록이 아직 30명이 안 되면
 // 그때만 만든다. 서버가 막 켜져 목록을 모르면 만든다. `rows` 없이 부르면(계정 삭제·이름 바꿈) 늘 만든다
 const rankTop = new Map();           // kind → { ids:Set, cut:30등 점수(30명 미만이면 -1) }
+// [stated] **마지막으로 만든 목록을 서버도 들고 있다** (2026-11-02) — `/rank` 가 내 등수와 같이 내려준다.
+// 앱은 그걸 쓰고, 서버가 안 받을 때만 예전처럼 `ranks/{종목}` 문서를 직접 읽는다(읽기 1회)
+const rankList = new Map();          // kind → [{ rank, nick, score }]
+export const rankListOf = kind => rankList.get(kind) || null;
 /** 예약했으면(또는 이미 예약돼 있으면) true, 상위 30명과 상관없어 건너뛰면 false */
 export function queueRanks(kind = 'gun', rows = null){
   if (rankWait.has(kind)) return true;    // 이미 예약돼 있으면 그대로 둔다
@@ -917,7 +1033,7 @@ export function requeueRanksOf(uid){
 /** **검사 전용** */
 export const __rankTop = kind => rankTop.get(kind) || null;
 /** **검사 전용** — 예약과 기억한 목록을 비운다 */
-export const __rankReset = () => { for (const t of rankWait.values()) clearTimeout(t); rankWait.clear(); rankTop.clear(); };
+export const __rankReset = () => { for (const t of rankWait.values()) clearTimeout(t); rankWait.clear(); rankTop.clear(); rankList.clear(); };
 
 /** 순위표를 한 덩어리로 저장한다. [stated] 상위 **30명**.
  *  **문서 하나에 모아둔다** — 볼 때마다 30명을 각각 읽으면 읽기 할당량이 금방 닳는다.
@@ -925,14 +1041,37 @@ export const __rankReset = () => { for (const t of rankWait.values()) clearTimeo
 export async function buildRanks(kind = 'gun', top = 30){
   if (!db) return false;
   try {
-    const q = await db.collection('players')
-      .orderBy('score.' + kind, 'desc').limit(top).get();
-    const list = q.docs.map((d, i) => {
-      const v = d.data();
-      return { rank: i + 1, nick: v.nick || '', score: (v.score && v.score[kind]) | 0 };
-    });
+    let ids, list;
+    if (IX.ready){
+      // [stated] **선수 색인이 있으면 메모리에서 뽑는다** (2026-11-02) — 읽기 30회 → 0회.
+      // 점수 높은 순, 같은 점수는 문서 이름 내림차순(파이어스토어가 내림차순 정렬 뒤에 붙이는 순서와 같게)
+      const best = [];
+      for (const [uid, v] of IX.map){
+        const sc = v.score[kind];
+        if (sc === undefined) continue;
+        if (best.length === top){
+          const last = best[top - 1];
+          if (sc < last.sc || (sc === last.sc && uid < last.uid)) continue;
+        }
+        let i = best.length;
+        while (i > 0 && (best[i - 1].sc < sc || (best[i - 1].sc === sc && best[i - 1].uid < uid))) i--;
+        best.splice(i, 0, { uid, sc, nick: v.nick });
+        if (best.length > top) best.pop();
+      }
+      ids = best.map(x => x.uid);
+      list = best.map((x, i) => ({ rank: i + 1, nick: x.nick || '', score: x.sc | 0 }));
+    } else {
+      const q = await db.collection('players')
+        .orderBy('score.' + kind, 'desc').limit(top).get();
+      ids = q.docs.map(d => d.id);
+      list = q.docs.map((d, i) => {
+        const v = d.data();
+        return { rank: i + 1, nick: v.nick || '', score: (v.score && v.score[kind]) | 0 };
+      });
+    }
     await db.doc('ranks/' + kind).set({ list, at: FieldValue.serverTimestamp() });
-    rankTop.set(kind, { ids: new Set(q.docs.map(d => d.id)), cut: list.length >= top ? list[list.length - 1].score : -1 });
+    rankTop.set(kind, { ids: new Set(ids), cut: list.length >= top ? list[list.length - 1].score : -1 });
+    rankList.set(kind, list);
     return true;
   } catch (e){
     fail('warn', 'ranks', `순위표 갱신 실패 (${kind})`, e);

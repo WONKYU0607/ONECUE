@@ -19,7 +19,7 @@ try { puppeteer = createRequire(import.meta.url)('puppeteer-core'); } catch { sk
 const CHROME = findChrome();
 if (!CHROME) skip('크롬 없음');
 const wait = ms => new Promise(r => setTimeout(r, ms));
-const SP = 9131, VP = 5601;
+const SP = 9613, VP = 6013;
 const slog = fs.openSync('/tmp/seatgone_srv.log', 'w');
 const ps = [spawn(process.execPath, ['server/index.js'], { env: { ...process.env, PORT: String(SP), E2E_DEBUG: '1', E2E_FAKE_STORE: '1' }, stdio: ['ignore', slog, slog] }),
             spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--port', String(VP), '--host', '127.0.0.1', '--strictPort'],

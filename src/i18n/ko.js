@@ -203,6 +203,7 @@ export default {
   'ad.late': '광고 확인이 늦어지고 있어요. 잠시 뒤 티켓이 들어옵니다',
   'ad.capped': '오늘 광고 보상을 다 받았어요',
   'ad.fakeTitle': '광고 (테스트)',
+  'ad.fakeInter': '전면 광고 (테스트)',
   'ad.fakeNote': '웹에서는 진짜 광고 대신 이 화면이 나와요',
   'ready.askShort': '상대가 {what} 신청',
   'ready.votesShort': '찬성 {yes} · 반대 {no}',

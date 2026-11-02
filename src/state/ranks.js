@@ -64,11 +64,16 @@ async function fetchMy(kind){
       { cache: 'no-store', signal: ac.signal });
     clearTimeout(timer);
     const j = await res.json();
+    // [stated] 서버가 **상위 30명 목록도 같이** 주면 받아 둔다 (2026-11-02) — 문서를 따로 안 읽는다
+    srvList[kind] = Array.isArray(j && j.list) ? j.list : null;
     // **"기록이 없다"와 "못 받았다"는 다르다.** 서버가 자고 있으면 응답이 안 오는데,
     // 그걸 기록 없음으로 보여주면 **`기록 없음` → `3,847등` 으로 글자가 튄다**
     return j && j.ok ? { rank: j.rank | 0, total: j.total | 0, score: j.score | 0 } : null;
   } catch { return ERR; }
 }
+const srvList = { gun: null, melee: null, soccer: null };     // 서버가 같이 준 상위 30명 (이번 요청 것)
+// 서버 답을 이만큼만 기다렸다가, 늦으면(자고 있음 등) 예전처럼 문서를 직접 읽는다 — 목록이 늦게 뜨지 않게
+const LIST_WAIT_MS = 1500;
 
 async function fetchList(kind){
   try {
@@ -89,7 +94,12 @@ export function loadRank(kindRaw, force = false){
   const hit = cache[kind];
   if (!force && hit && Date.now() - hit.at < CACHE_MS) return Promise.resolve(hit);
   if (inflight[kind]) return inflight[kind];
-  inflight[kind] = Promise.all([fetchMy(kind), fetchList(kind)])
+  srvList[kind] = null;
+  const myP = fetchMy(kind);
+  // 목록: 서버가 제때 같이 주면 그걸, 아니면(늦음·옛 서버·못 받음) `ranks/{종목}` 문서를 읽는다
+  const listP = Promise.race([myP.then(() => 'srv'), new Promise(r => setTimeout(() => r('slow'), LIST_WAIT_MS))])
+    .then(w => (w === 'srv' && srvList[kind] ? srvList[kind] : fetchList(kind)));
+  inflight[kind] = Promise.all([myP, listP])
     .then(([my, list]) => {
       const bad = my === ERR;
       const v = { at: Date.now(), my: bad ? null : my, list, err: bad };

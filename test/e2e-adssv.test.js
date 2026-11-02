@@ -16,7 +16,7 @@ try { puppeteer = createRequire(import.meta.url)('puppeteer-core'); } catch { sk
 const CHROME = findChrome();
 if (!CHROME) skip('크롬 없음');
 const wait = ms => new Promise(r => setTimeout(r, ms));
-const SP = 9127, VP = 5597;
+const SP = 9611, VP = 6011;
 import crypto from 'crypto';
 const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 const KEYS = JSON.stringify({ keys: [{ keyId: 42, pem: publicKey.export({ type: 'spki', format: 'pem' }) }] });

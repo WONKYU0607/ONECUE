@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { getColor } from '../state/profile.js';
 import { tk, out, outSoccer, tkSoccer, notFull, notFullSoccer } from './pvpTickets.js';
-import { showRewarded } from '../state/ads.js';
+import { showRewardedFor, preloadRewarded } from '../state/ads.js';
 import { adTicket, noadsNow, onNoads, whoAmI } from '../state/questclient.js';
 import { syncTickets, adLeft, adFfaLeft, ffaAdUsesCount } from '../state/tickets.js';
 import { AD_DAY_MAX } from '../state/quests.js';
@@ -96,20 +96,22 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch, act, 
     setAdBusy(true); setAdNote('');
     // [stated] **AdMob 이 서버로 직접 알려 준 것만 티켓이 된다** (2026-11-01) — 광고 한 편마다 번호를 붙여
     // (`종류.번호`) 계정과 함께 광고에 싣고, 다 본 뒤 그 번호로 "받았나" 를 묻는다
+    // [stated] 미리 불러 둔 광고가 이 종류·이 계정 것이면 바로 뜬다 (2026-11-02)
     const me = noads ? null : await whoAmI().catch(() => null);
-    const nonce = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
-    const r = noads ? { ok: true }
-      : await showRewarded(me ? { userId: me.uid, customData: `${adKind}.${nonce}` } : null);
+    const r = noads ? { ok: true, nonce: Math.random().toString(36).slice(2, 12) + Date.now().toString(36) }
+      : await showRewardedFor(adKind, me ? me.uid : '');
+    const nonce = (r && r.nonce) || '';
     if (!r || !r.ok){
       setAdNote(t(r && r.why === 'skip' ? 'ad.skip' : 'ad.loadFail'));
       setAdBusy(false);
       return;
     }
     let g = await adTicket(adKind, nonce);
-    // AdMob 알림은 보통 몇 초 안에 온다 — 그동안 '확인 중' 을 보여 주며 1초마다 다시 묻는다 (최대 15초)
-    for (let i = 0; i < 15 && g && g.why === 'wait'; i++){
+    // AdMob 알림은 보통 몇 초 안에 온다 — 그동안 '확인 중' 을 보여 주며 1.5초마다 다시 묻는다 (최대 15초).
+    // [stated] 묻기 한 번이 DB 읽기 한 번이라 1초 → 1.5초로 줄였다 (2026-11-02)
+    for (let i = 0; i < 10 && g && g.why === 'wait'; i++){
       setAdNote(t('ad.checking'));
-      await new Promise(res => setTimeout(res, 1000));
+      await new Promise(res => setTimeout(res, 1500));
       g = await adTicket(adKind, nonce);
     }
     if (g && g.why === 'wait'){
@@ -126,6 +128,15 @@ export default function PvpBox({ onStart, regBack, search, onCancelSearch, act, 
     setAdBusy(false);
     redraw(x => x + 1);
   };
+  // [stated] **티켓 광고를 미리 불러 둔다** (2026-11-02) — 광고 버튼이 보이면 그 종류로 불러 둔다(누르면 바로 뜬다).
+  // 광고 제거를 산 사람은 광고가 없으니 안 부른다. 앱이 아니면(웹) 아무것도 안 한다
+  const adShown = !search && !adBusy && adCan && (adPlus || blocked);
+  useEffect(() => {
+    if (!adShown || noads) return undefined;
+    let live = true;
+    whoAmI().then(me => { if (live && me) preloadRewarded(adKind, me.uid); }).catch(() => {});
+    return () => { live = false; };
+  }, [adShown, noads, adKind]);
   const start = () => {
     if (!open || blocked || adBusy) return;
     const n = ffa ? curFfaN : curSize;
