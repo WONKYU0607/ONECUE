@@ -156,9 +156,15 @@ class Room {
       // 아무도 안 쓰는 프레임이 계속 나갔다. 판 끝남(PH_OVER)에선 시뮬도 멈춰 있어 실을 것도 없고,
       // 빠른 대전은 다시 열리지 않는다(`ROOM_ONLY` — 다시 하기·로비로가 안 먹는다).
       // **엔진이 보내는 것만** 거른다 — 한 사람에게 보내는 것(`snap` 요청·핑 응답)과 방이 직접 보내는 것
-      // (재접속한 사람에게 맞추는 스냅샷 `syncAll` 등)은 그대로 간다. 끝난 판에 다시 붙어도 결과 화면이 뜬다
+      // (재접속한 사람에게 맞추는 스냅샷 `syncAll` 등)은 그대로 간다. 끝난 판에 다시 붙어도 결과 화면이 뜬다.
+      // [stated] **친구방은 로비(시작 전·[방으로] 뒤)와 판이 끝난 뒤에도** (2026-11-04 사용자 결정) — `quiet`.
+      // 관전자에게는 그대로 보낸다: 꽉 찬 방에 관전으로 들어오면 로비 중이어도 게임 화면이 뜨고,
+      // 그 화면은 프레임이 와야 스냅샷을 달라고 해 상태를 맞춘다(관전은 방마다 최대 10명이라 적다)
       serverSend: (msg, pid) => {
-        if (pid === undefined && (msg.t === 'f' || msg.t === 's') && this.quiet()) return;
+        if (pid === undefined && (msg.t === 'f' || msg.t === 's') && this.quiet()){
+          if (this.watchers.size) this.sendWatchers(msg);
+          return;
+        }
         this.send(msg, pid);
       },
       toServer: null
@@ -192,9 +198,21 @@ class Room {
     }
     pk.done();
   }
-  /** 빠른 대전이 끝나고 `OVER_QUIET_MS` 가 지났는가 (그 뒤엔 틱 프레임을 안 뿌린다) */
+  /** 엔진의 틱 프레임·주기 스냅샷을 자리에 앉은 사람에게 안 뿌릴 때인가.
+   *  빠른 대전: 끝나고 `OVER_QUIET_MS` 뒤부터. 친구방: 그것에 더해 **판이 안 열린 동안**(로비) 내내 —
+   *  로비 화면은 판 상태를 안 쓰고(방 소식 `roomst`·`lobby` 로 그린다), [시작]·다시 하기 때 스냅샷을 먼저 보낸다 */
   quiet(){
-    return !this.code && this.overAt > 0 && this.server.s.phase === PH_OVER && Date.now() - this.overAt > OVER_QUIET_MS;
+    const over = this.overAt > 0 && this.server.s.phase === PH_OVER && Date.now() - this.overAt > OVER_QUIET_MS;
+    if (!this.code) return over;
+    return !this.live || over;
+  }
+  /** 관전자에게만 (조용한 동안 엔진 메시지) — 자리에 앉은 사람은 다음에 받을 때 키프레임으로 받는다(`lastF` 가 어긋나므로) */
+  sendWatchers(msg){
+    const pk = this.pack(msg);
+    for (const w of this.watchers){
+      if (w.readyState === 1) pk.to(w); else this.watchers.delete(w);
+    }
+    pk.done();
   }
   /** 한 사람(소켓)에게만 — 방 메시지와 같은 꼴로 */
   sendTo(ws, msg){
@@ -1468,7 +1486,9 @@ setTickProbe(() => { const w = tickWorst; tickWorst = 0; return { worst: w, room
 store.warmup();   // **첫 판이 아니라 부팅 때** Firestore 연결을 연다
 // [stated] **선수 색인** (2026-11-02 DB 비용 줄이기) — 켤 때 모든 선수의 이름·점수를 한 번 읽어 메모리에 둔다.
 // 등수·순위표를 세기 쿼리 없이 바로 준다. 다 읽기 전·실패 때는 예전 방식으로 돈다 (store.js `startIndex`)
-store.startIndex();
+// [stated] **기본은 끈다** (2026-11-04 사용자 결정) — 서버가 켜질 때마다(배포·재시작) 선수 수만큼 읽는다.
+// 꺼 두면 등수는 예전처럼 세기 쿼리로 센다. Render 환경 변수 `DUEL_RANK_INDEX=1` 이면 다시 켠다(코드 수정 없이)
+if (process.env.DUEL_RANK_INDEX === '1') store.startIndex();
 
 // 대기열: 새로 들어온 사람은 방에 바로 앉히지 않는다.
 // 방에 빈 자리가 있다고 바로 넣으면, 상대가 재접속 대기 중인(예약석) 방에 앉아

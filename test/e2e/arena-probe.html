@@ -41,13 +41,10 @@ async function runGame(){
   let f = 0, nextRd = 0, last = performance.now();
   // 틱마다 한 줄씩. 두 화면이 같은 틱에서 같은 값을 적어야 한다
   const rows = {};
-  function loop(now){
-    const dt = Math.min(0.1, (now - last) / 1000); last = now;
-    if (client.s.phase !== PH_PLAY && now >= nextRd){ client.setReady(SELF.slot); client.setGo(SELF.slot); nextRd = now + 250; }
-    const s = client.s;
-    if (s.phase === PH_PLAY){
-      // **서버가 내려준 상태만** 적는다 (예측분은 화면마다 다를 수 있다)
-      rows[s.tick] = [
+  // **서버가 내려준 상태만** 적는다 (예측분은 화면마다 다를 수 있다)
+  const record = s => {
+    if (s.phase !== PH_PLAY) return;
+    rows[s.tick] = [
         checksum(s),
         s.buffs.map(b => b.k + '/' + b.c + ',' + b.r).join('|'),
         s.portals.map(g => g.c + ',' + g.r).join('|'),
@@ -57,6 +54,18 @@ async function runGame(){
         // 누가 몇 번 차원문을 밟고 있는지 — **탄 시점**이 여기서 드러난다
         s.onPort.join(',')
       ].join(' # ');
+  };
+  // [stated] **틱 프레임이 묶여 오면**(2026-11-02) 한 화면 갱신에 몇 틱씩 한꺼번에 굴러, 갱신마다 한 번 적으면
+  // 두 화면이 서로 다른 틱만 적는다(같이 본 틱이 모자라고, 판이 짧으면 480틱을 못 채운다).
+  // → 프레임을 하나 꺼낼 때마다(꺼내기 직전 = 앞 틱까지 굴린 상태) 적는다. 갱신 끝의 상태는 아래에서 적는다
+  const fdel = client.frames.delete.bind(client.frames);
+  client.frames.delete = k => { record(client.s); return fdel(k); };
+  function loop(now){
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (client.s.phase !== PH_PLAY && now >= nextRd){ client.setReady(SELF.slot); client.setGo(SELF.slot); nextRd = now + 250; }
+    const s = client.s;
+    if (s.phase === PH_PLAY){
+      record(s);
       if (Object.keys(rows).length >= 480 && !E.rep){
         // `desync` 는 **내가 직접 돌린 시뮬**이 서버 값과 어긋난 횟수다.
         // 스킨이 판정에 새어 들어가면 서버(스킨을 모름)와 갈려 여기가 올라간다

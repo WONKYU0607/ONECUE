@@ -31,15 +31,18 @@ function conn(qs, path = '/'){
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}${path}?${qs}`, { headers: { Origin: 'https://localhost' } });
   const c = { ws, msgs: [], tick: 0, closed: false };
   ws.on('message', d => { let m; try { m = JSON.parse(d); } catch { return; }
-    c.msgs.push(m); if (m.t === 's') c.tick = m.tick; if (m.t === 'f' && typeof m.tick === 'number') c.tick = m.tick; });
+    c.msgs.push(m); if (m.t === 's'){ c.tick = m.tick; c.at = Date.now(); } if (m.t === 'f' && typeof m.tick === 'number'){ c.tick = m.tick; c.at = Date.now(); } });
   ws.on('close', () => { c.closed = true; }); ws.on('error', () => {});
   c.open = () => new Promise(r => { if (ws.readyState === 1) return r(); ws.on('open', r); setTimeout(r, 3000); });
   c.send = o => { try { ws.send(typeof o === 'string' ? o : JSON.stringify(o)); } catch { /* 무시 */ } };
   c.waitFor = async (pred, ms = 8000) => { const t0 = Date.now(); while (Date.now() - t0 < ms){ const m = c.msgs.find(pred); if (m) return m; await wait(50); } return null; };
-  c.inp = (k = 4, extra = {}) => c.send({ t: 'in', tick: c.tick + k, dx: 0, dy: 0, ready: 1, go: 1, ...extra });
+  // 지금 서버 틱 = 마지막으로 받은 틱 + 그 뒤 지난 시간 (친구방 로비에선 틱 프레임이 안 와서 스냅샷으로만 안다 — 2026-11-04)
+  c.now = () => c.tick + (c.at ? Math.round((Date.now() - c.at) / (1000 / 60)) : 0);
+  c.inp = (k = 4, extra = {}) => c.send({ t: 'in', tick: c.now() + k, dx: 0, dy: 0, ready: 1, go: 1, ...extra });
   return c;
 }
-const pump = async (cs, ms, extra = {}) => { const t0 = Date.now(); while (Date.now() - t0 < ms){ for (const c of cs) c.inp(4, extra); await wait(50); } };
+// 틱 프레임이 0.5초 넘게 안 오면(친구방 로비) 앱처럼 스냅샷을 달라고 해 지금 틱을 안다
+const pump = async (cs, ms, extra = {}) => { const t0 = Date.now(); while (Date.now() - t0 < ms){ for (const c of cs){ if (!c.at || Date.now() - c.at > 500) c.send({ t: 'snap' }); c.inp(4, extra); } await wait(50); } };
 const roomOf = async pred => (await health()).rooms.find(pred);
 
 try {

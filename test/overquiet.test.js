@@ -3,7 +3,9 @@
 //  2. 그 뒤에도 한 사람에게 보내는 것(스냅샷 요청 `snap`·핑 응답)은 온다
 //  3. 빠른 대전은 다시 열리지 않는다(로비로·다시 하기가 안 먹는다) — 그래서 끝난 뒤 프레임이 필요 없다
 //     끝난 판에 다시 붙으면(끊겼다 돌아옴) 방이 맞춰 주는 스냅샷은 온다 → 앱이 '판 끝남' 을 알고 결과 화면으로 간다
-//  4. 친구방은 끝난 뒤에도 그대로 보낸다 (로비·다시 하기가 이어진다)
+//  4. 친구방 (2026-11-04): 로비(시작 전·[방으로] 뒤)와 끝난 뒤 2.5초부터는 앉은 사람에게 안 보낸다.
+//     관전자에게는 보낸다(꽉 찬 방에 관전으로 들어오면 로비 중이어도 게임 화면이 뜬다).
+//     [시작]·다시 하기 때는 스냅샷이 먼저 가고 프레임이 이어져 앱 계산이 따라온다
 import { spawn } from 'child_process';
 import wsPkg from '../server/node_modules/ws/index.js';
 import { assert, waitPort } from './harness.js';
@@ -119,8 +121,9 @@ try {
     b.ws.terminate();
   }
 
-  console.log('친구방 — 끝난 뒤에도 그대로 보낸다');
+  console.log('친구방 — 로비·끝난 뒤엔 앉은 사람에게 안 뿌리고, 시작·다시 하기 때 다시 (2026-11-04)');
   {
+    let now = 0; setClock({ now: () => now, delay: fn => fn() });
     const h = guest('sid=oqh&uid=e2e-oqh&tok=e2e-oqh&nick=h&mode=create&n=2');
     await h.open; await wait(800);
     h.send({ t: 'team', team: 0 }); await wait(400);
@@ -128,19 +131,63 @@ try {
     const j = guest(`sid=oqj&uid=e2e-oqj&tok=e2e-oqj&nick=j&mode=join&code=${h.code}&n=2`);
     await j.open; await wait(800);
     j.send({ t: 'team', team: 1 }); await wait(400);
-    h.send({ t: 'start' }); await wait(600);
-    const iv = drive([h, j]);
     const mine = rs => rs.find(r => r.code === h.code);
-    assert(await untilPhase(mine, 2), '  전투까지 들어갔다');
+    const L0 = Date.now(); await wait(3000);
+    assert(between(h, L0, Date.now()) + between(j, L0, Date.now()) === 0, '  로비(둘 다 앉음·시작 전)에선 틱 프레임이 안 온다');
+
+    // 꽉 찬 방에 관전으로 — 로비 중이어도 게임 화면이 뜨므로 관전자에게는 보낸다
+    const w = guest(`sid=oqw&uid=e2e-oqw&tok=e2e-oqw&nick=w&mode=join&code=${h.code}&n=2`);
+    for (let i = 0; i < 30 && !w.msgs.watch; i++) await wait(100);
+    const W0 = Date.now(); await wait(1500);
+    assert(w.msgs.watch && between(w, W0, Date.now()) > 40, `  관전자에게는 로비에서도 온다 (${between(w, W0, Date.now())}개)`);
+    assert(between(h, W0, Date.now()) === 0, '  그동안 앉은 사람에게는 여전히 안 온다');
+
+    // 시작 — 방장 쪽에 앱 계산기를 붙여 따라오는지 본다 (어긋나면 스냅샷을 달라고 한다, 앱처럼)
+    SELF.slot = h.slot; SELF.n = 2; Object.assign(SELF, { melee: false, ffa: false, soccer: false });
+    h.client = new Client({ clientSend(m){ if (m.t === 'snap') h.send({ t: 'snap' }); }, serverSend(){}, close(){} }, [h.slot]);
+    h.send({ t: 'start' });
+    const iv = drive([h, j]);
+    const apply = setInterval(() => { now += 1000 / 60; SELF.slot = h.slot; h.client.applyFrames(); }, 1000 / 60);
+    assert(await untilPhase(mine, 2), '  [시작] 하면 다시 와서 전투까지 들어갔다');
+    await wait(1000);
+    assert(h.client.s.phase === 2 && h.tick - h.client.s.tick < 30, `  앱 계산기가 따라왔다 (단계 ${h.client.s.phase} · 앱 틱 ${h.client.s.tick} / 받은 ${h.tick})`);
     h.send({ t: '__end', win: 0 });
     const T = await untilPhase(mine, 3, 5000);
     assert(T > 0, '  판이 끝났다');
     await wait(5000);
-    clearInterval(iv);
-    const late = Math.min(between(h, T + 2900, T + 5000), between(j, T + 2900, T + 5000));
-    assert(late > 60, `  끝나고 3초 뒤에도 계속 온다 (${late}개)`);
-    assert(!h.err && !j.err, `  받은 것을 다 풀었다 (${h.err || j.err || '이상 없음'})`);
-    h.ws.terminate(); j.ws.terminate();
+    assert(between(h, T, T + 2000) > 60 && between(h, T + 2900, Date.now()) === 0 && between(j, T + 2900, Date.now()) === 0,
+      `  끝난 직후 2초는 오고(${between(h, T, T + 2000)}개), 3초 뒤부터 안 온다(${between(h, T + 2900, Date.now())}개)`);
+    assert(between(w, T + 2900, Date.now()) > 60, '  관전자에게는 끝난 뒤에도 온다');
+
+    // 다시 하기 — 스냅샷이 먼저 오고, 프레임이 그 다음 틱부터 이어진다. 앱 계산기가 새로 갈리지 않는다
+    const d0 = h.client.desync | 0;
+    const A0 = Date.now();
+    h.send({ t: 'againAsk' }); await wait(300); j.send({ t: 'againOk' });
+    assert(await untilPhase(mine, 0, 3000), '  다시 하기 → 새 판 (배치 단계)');
+    await wait(2000);
+    const after = h.order.filter(x => x[2] >= A0);
+    const firstS = after.findIndex(x => x[0] === 's'), firstF = after.findIndex(x => x[0] === 'f');
+    const fs = after.filter(x => x[0] === 'f');
+    let gap = '';
+    for (let i = 1; i < fs.length; i++) if (fs[i][1] !== fs[i - 1][1] + 1){ gap = `${fs[i - 1][1]}→${fs[i][1]}`; break; }
+    assert(firstS >= 0 && firstF > firstS && fs.length > 60 && !gap && fs[0][1] === after[firstS][1] + 1,
+      `  스냅샷 먼저, 프레임은 그 다음 틱부터 빠짐없이 (${fs.length}개${gap ? ' · 빠짐 ' + gap : ''})`);
+    // (입력이 준비·시작을 계속 누르므로 새 판은 곧 카운트다운으로 넘어간다 — '판 끝남' 만 아니면 된다)
+    assert(h.client.s.phase !== 3 && h.tick - h.client.s.tick < 30 && (h.client.desync | 0) === d0,
+      `  앱 계산기가 새 판에 따라붙었다 (단계 ${h.client.s.phase} · 앱 틱 ${h.client.s.tick} / 받은 ${h.tick} · 다시 열린 뒤 갈림 ${(h.client.desync | 0) - d0})`);
+
+    // 한 판 더 끝내고 [방으로] — 로비가 되면 다시 안 온다
+    h.send({ t: '__end', win: 0 });
+    assert(await untilPhase(mine, 3, 5000), '  두 번째 판도 끝났다');
+    await wait(500);
+    h.send({ t: 'toroom' });
+    assert(await untilPhase(mine, 0, 3000), '  [방으로] → 로비');
+    await wait(500);
+    const B0 = Date.now(); await wait(3000);
+    assert(between(h, B0, Date.now()) + between(j, B0, Date.now()) === 0, '  로비로 돌아오면 다시 안 온다');
+    clearInterval(iv); clearInterval(apply);
+    assert(!h.err && !j.err && !w.err, `  받은 것을 다 풀었다 (${h.err || j.err || w.err || '이상 없음'})`);
+    h.ws.terminate(); j.ws.terminate(); w.ws.terminate();
   }
   console.log('overquiet.test.js 통과');
 } finally {
