@@ -183,19 +183,9 @@ export async function findByNick(nick){
 export function warmup(){
   if (!db) return;
   // [stated] **`__이름__` 꼴 문서 이름은 파이어스토어가 예약해 둬서 거절한다** (2026-10-20 디스코드 알림으로 드러남).
-  // 예전엔 로그에만 남아 몰랐다. 연결은 열렸지만 매번 실패로 찍혔다 → 실제로 있는 순위표 문서를 읽는다.
-  // [stated] **세 종목 순위표를 읽어 서버가 들고 있는다** (2026-11-04 — 선수 색인을 기본으로 끈 뒤, 읽기 3회).
-  // 안 그러면 막 켜진 서버는 `/rank` 에 목록을 못 실어 앱마다 순위표 문서를 따로 읽는다.
-  // 이미 새로 만든 목록이 있으면(그사이 판이 끝나 `buildRanks`) 덮지 않는다
-  const kinds = ['gun', 'melee', 'soccer'];
-  Promise.all(kinds.map(k => db.doc('ranks/' + k).get()))
-    .then(snaps => {
-      snaps.forEach((d, i) => {
-        const list = d.exists ? (d.data() || {}).list : null;
-        if (Array.isArray(list) && !rankList.has(kinds[i])) rankList.set(kinds[i], list);
-      });
-      console.log('[store] 연결 미리 열어둠 · 순위표 받아 둠');
-    })
+  // 예전엔 로그에만 남아 몰랐다. 연결은 열렸지만 매번 실패로 찍혔다 → 실제로 있는 순위표 문서를 읽는다(읽기 1회)
+  db.doc('ranks/gun').get()
+    .then(() => console.log('[store] 연결 미리 열어둠'))
     .catch(e => fail('warn', 'warmup', 'Firestore 연결 미리 열기 실패', e));
 }
 

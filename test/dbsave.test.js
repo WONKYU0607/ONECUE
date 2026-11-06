@@ -66,24 +66,16 @@ const fake = {
 S.__useDb(fake, async () => {});
 for (let i = 0; i < 100; i++) data.set('players/p' + i, { nick: 'p' + i, score: { gun: i * 10, melee: 1000, soccer: 0 } });
 
-console.log('켤 때 연결 미리 열기 — 예약된 문서 이름을 안 쓴다 · 세 종목 순위표를 받아 둔다');
+console.log('켤 때 연결 미리 열기 — 예약된 문서 이름을 안 쓴다');
 {
   const seen = [];
   const doc0 = fake.doc;
   fake.doc = p => { seen.push(p); return doc0(p); };
-  S.__rankReset();
-  const saved = [{ rank: 1, nick: 'top', score: 1500 }, { rank: 2, nick: 'two', score: 1400 }];
-  data.set('ranks/gun', { list: saved });           // 총격전만 저장된 순위표가 있다
-  const r0 = n.read;
   S.warmup();
   await sleep(50);
   fake.doc = doc0;
   const bad = seen.filter(p => /^__.*__$/.test(p.split('/').pop()));
-  assert(seen.length === 3 && bad.length === 0 && seen.every(p => /^ranks\/(gun|melee|soccer)$/.test(p)),
-    `  읽는 문서: ${seen.join(', ')} (예약된 이름 아님 · 읽기 ${n.read - r0}회)`);
-  assert(JSON.stringify(S.rankListOf('gun')) === JSON.stringify(saved) && S.rankListOf('melee') === null && S.rankListOf('soccer') === null,
-    '  저장된 순위표를 서버가 들고 있다 (없는 종목은 비워 둔다 → 앱이 예전처럼 읽는다)');
-  data.delete('ranks/gun'); S.__rankReset();
+  assert(seen.length === 1 && bad.length === 0, `  읽는 문서: ${seen.join(', ')} (예약된 이름 아님)`);
 }
 
 console.log('순위표 — 상위 30명이 바뀔 수 있을 때만 다시 만든다');

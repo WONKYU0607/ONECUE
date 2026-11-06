@@ -1486,9 +1486,7 @@ setTickProbe(() => { const w = tickWorst; tickWorst = 0; return { worst: w, room
 store.warmup();   // **첫 판이 아니라 부팅 때** Firestore 연결을 연다
 // [stated] **선수 색인** (2026-11-02 DB 비용 줄이기) — 켤 때 모든 선수의 이름·점수를 한 번 읽어 메모리에 둔다.
 // 등수·순위표를 세기 쿼리 없이 바로 준다. 다 읽기 전·실패 때는 예전 방식으로 돈다 (store.js `startIndex`)
-// [stated] **기본은 끈다** (2026-11-04 사용자 결정) — 서버가 켜질 때마다(배포·재시작) 선수 수만큼 읽는다.
-// 꺼 두면 등수는 예전처럼 세기 쿼리로 센다. Render 환경 변수 `DUEL_RANK_INDEX=1` 이면 다시 켠다(코드 수정 없이)
-if (process.env.DUEL_RANK_INDEX === '1') store.startIndex();
+store.startIndex();
 
 // 대기열: 새로 들어온 사람은 방에 바로 앉히지 않는다.
 // 방에 빈 자리가 있다고 바로 넣으면, 상대가 재접속 대기 중인(예약석) 방에 앉아
