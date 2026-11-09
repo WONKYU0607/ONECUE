@@ -341,7 +341,8 @@ export async function connectAndWait({ onStage, onCode, onJoined, onLobby, onVs,
         settled = true;
         transport.auto = false;
         transport.close();
-        const e = new Error(t(m.why === 'login' ? 'err.needLogin'
+        // `busy` = 티켓은 있지만 같은 계정이 다른 기기에서 그 티켓으로 판을 잡는 중 (2026-11-09)
+        const e = new Error(t(m.why === 'login' ? 'err.needLogin' : m.why === 'busy' ? 'err.ticketBusy'
           : m.why === 'noSoccer' ? 'err.noSocTicket' : m.why === 'noFfa' ? 'err.noFfa' : 'err.noTicket'));
         e.code = 'noticket';
         reject(e);

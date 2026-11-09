@@ -755,7 +755,9 @@ export async function adClaim(uid, kind, nonce, ssv){
 /** [stated] **빠른 매칭에 들어가기 전에 티켓이 있는지** (2026-11-01) — 깎지는 않는다(VS 화면 뒤에 깎는다).
  *  축구는 축구 티켓, 개인전은 티켓 + 하루 판수, 나머지는 티켓. 돌려주는 값 `{ ok }` 또는 `{ ok:false, why }`
  *  ('noTicket' 'noFfa' 'noSoccer'). **읽기 실패는 막지 않는다**(우리 쪽 문제로 정상 사용자를 막지 않게) */
-export async function canQueue(uid, { ffa = false, soccer = false, kind = '' } = {}){
+/** `held` = 이 계정이 다른 기기에서 **아직 안 낸** 자리 수 { tk, ffa, soc } (index.js `heldOf`) — 그만큼 빼고 본다.
+ *  저장된 티켓은 있는데 그 자리들 때문에 모자라면 `busy` (다른 기기에서 쓰는 중) */
+export async function canQueue(uid, { ffa = false, soccer = false, kind = '', held = null } = {}){
   if (!isOn() || !uid) return { ok: true };
   try {
     const v = FAKE ? fakeDoc(uid) : await db.doc('players/' + uid).get().then(d => (d.exists ? d.data() : null));
@@ -763,10 +765,16 @@ export async function canQueue(uid, { ffa = false, soccer = false, kind = '' } =
     // [stated] **매칭용 점수도 여기서 같이 준다** (2026-11-02) — 예전엔 들여보낸 뒤 같은 문서를 한 번 더 읽었다
     const sc = kind ? { score: scoreFor(v || {}, kind) } : {};
     const now = Date.now(), today = dayKey();
-    if (soccer) return socOf(v || {}, today) > 0 ? { ok: true, ...sc } : { ok: false, why: 'noSoccer' };
+    const h = held || { tk: 0, ffa: 0, soc: 0 };
+    if (soccer){
+      const soc = socOf(v || {}, today);
+      if (soc <= 0) return { ok: false, why: 'noSoccer' };
+      return soc - (h.soc | 0) > 0 ? { ok: true, ...sc } : { ok: false, why: 'busy' };
+    }
     const g = grown(v || { tk: TICKET_MAX, at: now, ffa: FFA_MAX, day: today }, now);
     if (g.tk <= 0) return { ok: false, why: 'noTicket' };
     if (ffa && g.ffa <= 0) return { ok: false, why: 'noFfa' };
+    if (g.tk - (h.tk | 0) <= 0 || (ffa && g.ffa - (h.ffa | 0) <= 0)) return { ok: false, why: 'busy' };
     return { ok: true, ...sc };
   } catch (e){
     fail('warn', 'tkcheck', '빠른 매칭 전 티켓 확인 실패 — 이번엔 막지 않고 들여보냄', e, `계정 ${uid}`);

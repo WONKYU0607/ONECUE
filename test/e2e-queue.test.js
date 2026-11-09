@@ -41,7 +41,10 @@ for (let i = 0; i < 40; i++){
   await wait(500);
 }
 const b=await puppeteer.launch({executablePath: CHROME,args:['--no-sandbox']});
-const dev=async(try2)=>{ const c=await b.createBrowserContext(); const p=await c.newPage();
+// [stated] **기기마다 다른 계정으로** (2026-11-09) — 주소에 `u=` 가 없으면 둘 다 'e2e-user' 라서,
+// 같은 계정끼리는 한 판에 안 붙이게 된 뒤로(티켓 한 장을 두 번 쓰던 틈) 서로 못 만난다
+let devNo = 0;
+const dev=async(try2, u = 'q' + (++devNo))=>{ const c=await b.createBrowserContext(); const p=await c.newPage();
   await p.setViewport({width:393,height:760,deviceScaleFactor:1,isMobile:true,hasTouch:true});
   p.on('pageerror',e=>console.log('ERR',e.message.slice(0,140)));
   p.on('console',m=>{ if(m.type()==='error'||m.type()==='warning') console.log('CON',m.text().slice(0,140)); });
@@ -49,13 +52,13 @@ const dev=async(try2)=>{ const c=await b.createBrowserContext(); const p=await c
     localStorage.setItem('duel.lang','ko');
     localStorage.setItem('duel.settings.v1', JSON.stringify({ tutoDone: true }));   // 튜토리얼 안내 끄기
   } catch { /* 무시 */ } });
-  await p.goto(`http://127.0.0.1:${VP}/?e2e=1`,{waitUntil:'networkidle0'});
+  await p.goto(`http://127.0.0.1:${VP}/?e2e=1&u=${u}`,{waitUntil:'networkidle0'});
   const ok2 = await p.waitForSelector('.screen.splash', { timeout: 20000 }).then(() => true).catch(() => false);
   if (!ok2){                                    // 개발 서버가 준비 중이면 한 번 더
     await c.close();
     if (try2) throw new Error('앱이 안 뜬다');
     await wait(3000);
-    return dev(true);
+    return dev(true, u);
   }
   await p.waitForSelector('.screen.splash.ready',{timeout:20000}).catch(()=>{});
   await p.click('.screen.splash');                            // 스플래시는 눌러서 넘긴다

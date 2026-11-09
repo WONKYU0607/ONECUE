@@ -31,7 +31,10 @@ for (let i = 0; i < 40; i++){ try { if ((await fetch(`http://127.0.0.1:${VP}/src
 const health = async () => (await fetch(`http://127.0.0.1:${SP}/health?d=1`)).json();
 const botRooms = async () => (await health()).rooms.filter(r => !r.code);      // 코드 없는 방 = 빠른 매칭
 const b = await puppeteer.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
+// 기기마다 다른 계정으로 (`u=`) — 같은 계정끼리는 한 판에 안 붙인다 (2026-11-09)
+let devNo = 0;
 const dev = async () => {
+  const u = 'c' + (++devNo);
   const c = await b.createBrowserContext(); const p = await c.newPage();
   await p.setViewport({ width: 393, height: 851, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   p.on('pageerror', e => console.log('ERR', e.message.slice(0, 140)));
@@ -39,7 +42,7 @@ const dev = async () => {
     localStorage.setItem('duel.lang', 'ko');
     localStorage.setItem('duel.settings.v1', JSON.stringify({ tutoDone: true }));
   } catch { /* 무시 */ } });
-  await p.goto(`http://127.0.0.1:${VP}/?e2e=1`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await p.goto(`http://127.0.0.1:${VP}/?e2e=1&u=${u}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await p.waitForSelector('.screen.splash', { timeout: 20000 });
   await p.waitForSelector('.screen.splash.ready', { timeout: 20000 }).catch(() => {});
   await p.click('.screen.splash');

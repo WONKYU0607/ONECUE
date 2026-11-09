@@ -260,6 +260,7 @@ export default {
   'pvp.enter': '입장',
   'err.noServer': '서버에 연결할 수 없습니다',
   'err.offline': '서버에 연결하지 못했어요. 잠시 후 다시 열어 주세요',
+  'err.ticketBusy': '다른 기기에서 이 계정의 티켓으로 대전 중이에요. 잠시 뒤 다시 해 주세요',
   'err.noTicket': '티켓이 없어요',
   'err.noSocTicket': '축구 티켓이 없어요',
   'err.noFfa': '오늘 개인전 판수를 다 썼어요',

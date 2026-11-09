@@ -260,6 +260,7 @@ export default {
   'pvp.enter': 'Join',
   'err.noServer': 'Cannot reach the server',
   'err.offline': "Couldn't reach the server. Please try again shortly",
+  'err.ticketBusy': 'Your ticket is being used on another device. Please try again shortly.',
   'err.noTicket': 'No tickets left',
   'err.noSocTicket': 'No soccer tickets left',
   'err.noFfa': "You've used today's free-for-all matches",

@@ -52,6 +52,11 @@ const codes = new Map();         // 코드 -> Room (친구방)
 // **소켓을 들고 있는 이 서버만 알 수 있다** — Firestore 로는 알 방법이 없다
 const online = new Map();
 const waiting = new Map();       // '인원수:모드' -> 대기 소켓 목록. 섞이면 안 된다
+// [stated] **티켓 한 장을 기기 두 대로 두 번 쓰던 틈 막기** (2026-11-09 사용자 결정).
+// 티켓은 VS 화면을 본 뒤에 깎는다(`charge`). 그래서 깎기 전에 다른 기기로 줄을 서면 둘 다 '1장 있음' 을 보고
+// 들어와, 두 번째 판은 깎을 게 없어 공짜로 했다. → 줄을 세우기 전에 **이 계정이 아직 안 낸 자리**를 세어 빼고 본다
+const checking = new Set();      // 티켓 확인 중인 소켓 (`canQueue` 를 기다리는 동안)
+const spending = new Map();      // uid -> { tk, ffa, soc } 깎는 중(저장이 끝나기 전)인 수
 // **축구는 대기열이 따로여야 한다** — 같은 인원수라도 규칙이 완전히 달라 섞이면 안 된다
 const qkey = (n, melee, ffa, soccer) => `${n}:${soccer ? 'b' : (melee ? 'm' : 's')}${ffa ? ':f' : ''}`;
 // [stated] 사람이 모자랄 때 빈 자리를 AI 로 채우기까지 기다리는 시간 (7초)
@@ -465,11 +470,20 @@ class Room {
     const seat = this.seats[slot];
     if (!seat || !seat.uid || seat.bot || this.charged.has(seat.uid)) return;
     this.charged.add(seat.uid);
+    // 저장이 끝날 때까지는 '깎는 중' 으로 센다 — 그 사이 다른 기기의 티켓 확인이 아직 안 깎인 수를 읽는다 (`heldOf`)
+    const uid = seat.uid, sp = spending.get(uid) || { tk: 0, ffa: 0, soc: 0 };
+    const kind = this.soccer ? 'soc' : 'tk', ffa = !this.soccer && !!this.server.s.ffa;
+    sp[kind]++; if (ffa) sp.ffa++;
+    spending.set(uid, sp);
     // [stated] **축구는 전용 티켓**이라 일반 티켓을 안 건드린다 — 둘 다 빠지던 문제
-    const spend = this.soccer ? store.spendSoccer(seat.uid)
-                              : store.spendTicket(seat.uid, !!this.server.s.ffa);
-    spend.then(r => { if (r && !r.ok && r.why) console.log('[티켓]', seat.uid.slice(0, 6), r.why); })
-         .catch(bug('티켓 빼기'));
+    const spend = this.soccer ? store.spendSoccer(uid)
+                              : store.spendTicket(uid, ffa);
+    spend.then(r => { if (r && !r.ok && r.why) console.log('[티켓]', uid.slice(0, 6), r.why); })
+         .catch(bug('티켓 빼기'))
+         .finally(() => {
+           sp[kind]--; if (ffa) sp.ffa--;
+           if (!sp.tk && !sp.ffa && !sp.soc && spending.get(uid) === sp) spending.delete(uid);
+         });
   }
 
   /** 이 자리를 **중간에 나간 사람**으로 적는다 — 처음 나간 순간 것만 남긴다.
@@ -1534,9 +1548,12 @@ function fillWithBots(key){
   };
   if (!q.some(due)) return;
   const picked = [];
-  while (picked.length < n && q.length){
-    const ws = q.shift();
-    if (ws.readyState === 1) picked.push(ws);
+  // 같은 계정은 한 판에 하나만 (`pairUp` 과 같은 까닭) — 남은 쪽은 대기열에 그대로 둔다
+  for (let i = 0; i < q.length && picked.length < n; ){
+    const ws = q[i];
+    if (ws.readyState !== 1){ q.splice(i, 1); continue; }
+    if (ws.uid && picked.some(p => p.uid === ws.uid)){ i++; continue; }
+    picked.push(ws); q.splice(i, 1);
   }
   if (!picked.length) return;
   const room = new Room(nextRoomId++, null, n, melee, ffa, soccer);
@@ -1576,6 +1593,24 @@ function serverWarm(){
   return tickSeen >= WARM_MIN_TICKS && tickLate < WARM_LATE_MS;
 }
 
+/** 이 계정이 **아직 티켓을 안 낸** 빠른 대전 자리 수 (종류별) — 줄 선 것·확인 중인 것·앉았지만 안 깎은 것·깎는 중인 것.
+ *  끊긴 소켓은 안 센다(판을 못 하므로). `except` = 지금 확인하는 그 소켓 */
+function heldOf(uid, except){
+  const h = { tk: 0, ffa: 0, soc: 0 };
+  if (!uid) return h;
+  const add = (soc, ffa) => { if (soc) h.soc++; else { h.tk++; if (ffa) h.ffa++; } };
+  const live = w => !!w && w !== except && w.uid === uid && w.readyState === 1;
+  for (const q of waiting.values()) for (const w of q) if (live(w)) add(w.qSoc, w.qFfa);
+  for (const w of checking) if (live(w)) add(w.qSoc, w.qFfa);
+  for (const room of rooms.values()){
+    if (room.code || room.settled || room.server.s.over || room.charged.has(uid)) continue;
+    for (const seat of room.seats) if (seat && !seat.bot && seat.uid === uid && live(seat.ws)) add(room.soccer, room.ffa);
+  }
+  const sp = spending.get(uid);
+  if (sp){ h.tk += sp.tk; h.ffa += sp.ffa; h.soc += sp.soc; }
+  return h;
+}
+
 function pairUp(key){
   if (!serverWarm()) return;                              // 데워질 때까지 대기열에 둔다
   const q = queueOf(key);
@@ -1594,8 +1629,12 @@ function pairUp(key){
     // 가장 오래 기다린 사람을 기준으로, 점수가 가까운 순으로 채운다.
     // **기준을 맨 앞으로 두어야** 오래 기다린 사람이 계속 밀리지 않는다
     const head = q[0];
-    const rest = q.slice(1).sort((a, b) => Math.abs(sc(a) - sc(head)) - Math.abs(sc(b) - sc(head)));
-    const picked = [head, ...rest.slice(0, n - 1)];
+    // [stated] **같은 계정끼리는 한 판에 안 붙인다** (2026-11-09) — 기기 두 대로 자기 자신과 붙으면
+    // 티켓은 한 장만 깎이고(계정마다 한 번) 퀘스트·코인은 두 자리 몫을 받았다
+    const rest = q.slice(1).filter(w => !w.uid || w.uid !== head.uid)
+      .sort((a, b) => Math.abs(sc(a) - sc(head)) - Math.abs(sc(b) - sc(head)));
+    const picked = [head];
+    for (const w of rest){ if (picked.length >= n) break; if (!w.uid || !picked.some(p => p.uid === w.uid)) picked.push(w); }
     for (const ws of picked){
       const i = q.indexOf(ws);
       if (i >= 0) q.splice(i, 1);
@@ -1807,12 +1846,18 @@ wss.on('connection', (ws, req) => {
       try { ws.send(JSON.stringify({ t: 'noticket', why })); } catch { /* 무시 */ }
       try { ws.close(4402, 'no ticket'); } catch { /* 무시 */ }
     };
+    ws.qSoc = !!soccer; ws.qFfa = !soccer && !!ffa;   // 무슨 티켓을 쓸 자리인가 (`heldOf`)
     if (!store.isOn()) enter();
     else if (!ws.uid) (store.isFake() ? enter() : refuse('login'));
     else {
-      store.canQueue(ws.uid, { ffa, soccer, kind: soccer ? 'soccer' : (melee ? 'melee' : 'gun') })
+      // 이 계정이 다른 소켓(다른 기기)에서 아직 안 낸 자리만큼 빼고 본다 — 확인을 **시작하기 전에** 세고,
+      // 확인하는 동안 이 소켓도 '확인 중' 으로 세어 다른 기기가 같은 틈에 들어오지 못하게 한다
+      const held = heldOf(ws.uid, ws);
+      checking.add(ws);
+      store.canQueue(ws.uid, { ffa, soccer, kind: soccer ? 'soccer' : (melee ? 'melee' : 'gun'), held })
         .catch(() => ({ ok: true }))
         .then(r => {
+          checking.delete(ws);
           if (ws.readyState !== 1) return;          // 확인하는 사이 나갔다
           if (r && !r.ok) refuse(r.why || 'noTicket'); else enter(r);
         });
